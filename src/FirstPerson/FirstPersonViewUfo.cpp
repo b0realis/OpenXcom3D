@@ -472,11 +472,13 @@ void FirstPersonView::findUfos()
 				buildUfoModel(mapData, outward, ufoModel);
 				// (A part whose frames' models differ and that has no light among its voxels would stand still as a
 				// steady model: a machine at work in a set a UFO is built from. It plays its frames, as anywhere else.
-				// One whose models are all alike loses nothing as a steady model, and keeps its hull's trim.)
+				// One whose models are all alike loses nothing as a steady model, and keeps its hull's trim. And a part
+				// the mod names as a thing in motion, turned from its art frame by frame, plays its frames whatever
+				// lights it has: The X-Com Files' colony pedestal stood still. See turnedFrom.)
 				bool anyLight = false;
 				for (int z = 0; z < Position::TileZ && !anyLight; ++z)
 					for (int y = 0; y < Position::TileXY && !anyLight; ++y) anyLight = ufoModel.lit[z][y] != 0;
-				if (!ufoModel.model.empty && (anyLight || !modelsAnimate(mapData)))
+				if (!ufoModel.model.empty && (anyLight || !modelsAnimate(mapData)) && turnedFrom(mapData) < 0)
 				{
 					_frames[mapData].steady = &ufoModel.model;
 					++modelCount;

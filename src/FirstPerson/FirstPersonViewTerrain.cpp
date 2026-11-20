@@ -70,6 +70,7 @@
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
 #include "../Battlescape/Pathfinding.h"
+#include "../Battlescape/TileEngine.h"
 #include "../Mod/MapData.h"
 #include "../Mod/MapDataSet.h"
 #include "../Mod/RuleDamageType.h"
@@ -2600,6 +2601,8 @@ Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, 
 	return 0;
 }
 
+static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, int from); // (below)
+
 /**
  * Tells whether an animated record's frames are a light pulsing, blinking or changing its colour, not a thing in
  * motion: such a part always cross-fades softly from frame to frame (see AnimatedNearShades). Two pictures taking
@@ -2719,6 +2722,14 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		found = _models.emplace(key, VoxelModel()).first;
 		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
 		found->second.pulse = pulsingFrames(mapData);
+		// (A thing in motion round its own upright axis, named in the mod's table: this frame's shape turned from this frame's art. See turnedFrom.)
+		const int turned = cutout || found->second.empty || found->second.ghostly ? -1 : turnedFrom(mapData);
+		if (turned >= 0)
+		{
+			const Surface *sprite = mapData->getDataset()->getSurfaceset()->getFrame(spriteIndex);
+			turnFromArt(found->second, sprite, mapData->getYOffset(), turned);
+			if (!found->second.empty) colorHiddenSides(found->second, sprite);
+		}
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 		// (see buildArtFill); an object the art draws as a block of crops, the block (see
@@ -3109,6 +3120,24 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		addBrokenPaneEdges(mapData, model);
 	}
 
+	// A wall or an object whose shape lies wholly inside a floor's slab (the two bottom rows of voxels: the remains
+	// of a fence, a tuft of grass, a pond, a stump, a grate glowing in a deck): on a floor its voxels are the floor's
+	// own, and the rays meet the floor's first, so it showed only where it had no floor under it; the map draws it
+	// over the floor. (Found by the developer's arena, see arenaStep: every one of them laid on a floor showed as
+	// nothing.) With the setting "Parts without shape" on at all it is made from its art as a part without a shape
+	// is whose art is low (see buildRelief): what lies in the floor's diamond laid on the slab, what rises from it
+	// standing up. If its art is nowhere near the ground (sparks in the air over a plate) nothing is made: where it
+	// animates, it is drawn as a sprite (see artOverlay); where it doesn't, the game's shape is kept.
+	const bool inSlab = !model.empty && !cutout && !shape && !glassPane && Options::fpsGhostParts != 0 && mapData->getObjectType() != O_FLOOR
+		&& model.max[2] < LowArtFlatLayer;
+	VoxelModel slabModel;
+	if (inSlab)
+	{
+		slabModel = model;
+		clearModel(model);
+		model.wayThrough = slabModel.wayThrough;
+	}
+
 	// No voxels at all, though the map draws it (a ladder, a lift's pad, a wall of laser beams):
 	// with the setting "Parts without shape" (1: lifts and ladders, the parts with the grav lift
 	// flag, cages, as round a lift, and low art, as crops, see lowArt; 2: all of them), a
@@ -3121,7 +3150,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	{
 		const bool ghostShape = shape && shape->ghost;
 		bool rises = false;
-		bool low = mapData->getObjectType() == O_OBJECT && lowArt(sprite, yOffset, rises);
+		bool low = lowArt(sprite, yOffset, rises) && mapData->getObjectType() == O_OBJECT;
+		low = low || inSlab; // (a shape in the floor's slab is low, whatever its art)
 		int block = cutout ? 0 : cropBlockOf(nullptr, mapData, sprite, yOffset);
 		// A floor without shape lying flat that is no lift's pad (a pool's water in XPiratez: no voxels,
 		// no floor to stand on): the map draws it whole, so it fills its tile here too, solid, with
@@ -3188,6 +3218,12 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				if (flatFloor) model.solidGhost = !model.empty;
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
+		}
+		if (inSlab && model.empty)
+		{
+			bool animated = false;
+			for (int frame = 1; frame < 8; ++frame) animated = animated || mapData->getSprite(frame) != mapData->getSprite(0);
+			if (!animated) model = slabModel;
 		}
 		return;
 	}
@@ -4747,6 +4783,219 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 }
 
 /**
+ * Turns a frame's shape from its art, as on a lathe, from a height up: for a thing in motion round its own upright
+ * axis that the mod's table names (`turned:`, see FirstPersonView::turnedFrom). The game's shape is one for all the
+ * frames, so a collar rising round a rod and the thin rod standing alone were the same block with other paint (the
+ * owner: the pedestals of XPiratez's T'leth base "do not move as shapes").
+ * The thing is taken as discs about the axis, one a height. The art shows a disc as an ellipse: as wide as the disc
+ * on the row its middle lands on, and its far rim on the rows above, narrowing. So, from the bottom up, a height
+ * whose row is wider than the far rims of the discs below it would be has a disc of its own, as wide as the row
+ * (a drum's side, a collar); a height whose row those rims account for shows nothing of its own, and what stands
+ * there is what stands on the disc: the next disc found above, or, with none above, the game's shape. Read plainly,
+ * row by row, a flat slab became a dome.
+ * (A disc is cut by the tile's sides, so a wide one is the tile's square, and its far rim the square's corner.)
+ * Voxels the game's shape hasn't got are coloured as the others, by the pixel they land on, or the nearest drawn one
+ * toward the axis. Below the height the game's shape stands.
+ * @param model The frame's model, built from the game's shape.
+ * @param sprite The frame's art.
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ * @param from The height (voxels) the turned shape starts at.
+ */
+static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, int from)
+{
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	// The shape's own upright axis (the middle of its voxels), and how far it reaches from it at each height.
+	double sumX = 0.0, sumY = 0.0;
+	int count = 0;
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+				if (model.color[z][y][x]) { sumX += x; sumY += y; ++count; }
+	if (!count) return;
+	const float axisX = (float)(sumX / count), axisY = (float)(sumY / count);
+	float shape[Position::TileZ] = {}, art[Position::TileZ] = {}, reach[Position::TileZ] = {};
+	bool own[Position::TileZ] = {};
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+				if (model.color[z][y][x]) shape[z] = std::max(shape[z], std::hypot(x - axisX, y - axisY) + 0.5f);
+		// (Half the row's span: a pixel across is a voxel times the square root of two along the tile's diagonal.)
+		const int row = (int)std::lround(24.0f + (axisX + axisY) * 0.5f - z + yOffset);
+		int first = width, last = -1;
+		for (int x = 0; row >= 0 && row < height && x < width; ++x)
+		{
+			if (sprite->getPixel(x, row))
+			{
+				first = std::min(first, x);
+				last = x;
+			}
+		}
+		art[z] = last < 0 ? 0.0f : (last - first + 1) * 0.5f / 1.41421356f;
+	}
+	// From the bottom up: the heights with a disc of their own.
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		// As wide as the far rims of the discs below are on this row. A disc's rim d rows up: the square root of its
+		// reach squared less two d squared; and no disc goes past the tile, whose far corner narrows by the square
+		// root of two a row (a slab filling the tile shows a diamond, not an ellipse).
+		float rims = 0.0f;
+		for (int below = 0; below < z; ++below)
+		{
+			if (!own[below]) continue;
+			const float rows = (float)(z - below), left = reach[below] * reach[below] - 2.0f * rows * rows;
+			const float rim = std::min(left > 0.0f ? std::sqrt(left) : 0.0f, (Position::TileXY * 0.5f - rows) * 1.41421356f);
+			rims = std::max(rims, rim);
+		}
+		own[z] = art[z] > rims + TurnedRimSlack;
+		reach[z] = own[z] ? art[z] : 0.0f;
+	}
+	// From the top down: the others have what stands on the disc below them, no wider than their row.
+	float above = -1.0f;
+	for (int z = Position::TileZ - 1; z >= 0; --z)
+	{
+		if (own[z]) above = reach[z];
+		else reach[z] = std::min(art[z], above >= 0.0f ? above : shape[z]);
+	}
+	auto pixelAt = [&](int x, int y, int z) -> Uint8
+	{
+		const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+		return spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+	};
+	for (int z = std::max(0, from); z < Position::TileZ; ++z)
+	{
+		for (int y = 0; y < Position::TileXY; ++y)
+		{
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				const float fromAxisX = x - axisX, fromAxisY = y - axisY;
+				const bool inside = reach[z] > 0.0f && fromAxisX * fromAxisX + fromAxisY * fromAxisY <= reach[z] * reach[z];
+				if (!inside)
+				{
+					model.color[z][y][x] = 0;
+					model.glass[z][y] &= (Uint16)~(1 << x);
+					model.clear[z][y] &= (Uint16)~(1 << x);
+				}
+				else if (!model.color[z][y][x])
+				{
+					// (the pixel it lands on, or the first drawn one on the way to the axis)
+					Uint8 color = 0;
+					float atX = (float)x, atY = (float)y;
+					for (int step = 0; !color && step < Position::TileXY; ++step)
+					{
+						color = pixelAt((int)std::lround(atX), (int)std::lround(atY), z);
+						const float toAxisX = axisX - atX, toAxisY = axisY - atY, far = std::hypot(toAxisX, toAxisY);
+						if (far < 0.5f) break;
+						atX += toAxisX / far;
+						atY += toAxisY / far;
+					}
+					model.color[z][y][x] = color;
+				}
+			}
+		}
+	}
+	// A voxel of a disc's top that the art hides behind what stands on the disc (the far side of a collar's top, behind
+	// the rod) landed on that other's pixel: the far half of the top had the rod's shaded side for its colours. Turned
+	// about its axis the thing is the same all round, so such a voxel takes the colour of one of the top's that the art
+	// does show, as far from the axis: of those, the nearest to the point across the axis from it. (Only the tops: a
+	// side's voxels hidden behind the thing's own side higher up land on that side, which is their look.)
+	// (The art looks along x, y and z all growing by one.)
+	struct Shown { float far; int x, y; Uint8 color; };
+	std::vector<Shown> shown;
+	std::vector<std::pair<int, int>> behind;
+	for (int z = std::max(0, from); z < Position::TileZ; ++z)
+	{
+		shown.clear();
+		behind.clear();
+		for (int y = 0; y < Position::TileXY; ++y)
+		{
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (!model.color[z][y][x] || (z + 1 < Position::TileZ && model.color[z + 1][y][x])) continue;
+				bool hidden = false;
+				for (int step = 1; !hidden && x + step < Position::TileXY && y + step < Position::TileXY && z + step < Position::TileZ; ++step)
+				{
+					hidden = model.color[z + step][y + step][x + step] != 0;
+				}
+				if (hidden) behind.emplace_back(x, y);
+				else shown.push_back({ std::hypot(x - axisX, y - axisY), x, y, model.color[z][y][x] });
+			}
+		}
+		for (const auto &voxel : behind)
+		{
+			const float far = std::hypot(voxel.first - axisX, voxel.second - axisY), acrossX = 2.0f * axisX - voxel.first, acrossY = 2.0f * axisY - voxel.second;
+			float best = FLT_MAX;
+			for (const Shown &one : shown)
+			{
+				// (as far from the axis first: a voxel off counts as four across)
+				const float score = std::abs(one.far - far) * 4.0f + std::hypot(one.x - acrossX, one.y - acrossY);
+				if (score < best)
+				{
+					best = score;
+					model.color[z][voxel.second][voxel.first] = one.color;
+				}
+			}
+		}
+	}
+	// (Its box again, over what there is now.)
+	bool any = false;
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		model.min[axis] = 255;
+		model.max[axis] = 0;
+	}
+	for (int z = 0; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (!model.color[z][y][x]) continue;
+				any = true;
+				const int voxel[3] = { x, y, z };
+				for (int axis = 0; axis < 3; ++axis)
+				{
+					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
+					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
+				}
+			}
+	model.empty = !any;
+}
+
+/**
+ * The height from which an animated part's frames are each turned from their art (see turnFromArt): what the mod's
+ * table `turned:` gives for the part's data set and record, if its frames are different pictures. Kept for the record.
+ * @param mapData The tile part's record.
+ * @return The height in voxels, or -1 for a part the table doesn't name.
+ */
+int FirstPersonView::turnedFrom(const MapData *mapData)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->turnedFrom(mapData);
+	}
+	auto known = _turnedParts.find(mapData);
+	if (known != _turnedParts.end())
+	{
+		return known->second;
+	}
+	int &from = _turnedParts[mapData];
+	from = -1;
+	MapDataSet *dataSet = mapData->getDataset();
+	if (!dataSet || mapData->isUFODoor() || !artAnimates(mapData))
+	{
+		return from;
+	}
+	for (size_t record = 0; record < dataSet->getSize(); ++record)
+	{
+		if (dataSet->getObject(record) == mapData)
+		{
+			from = _game->getMod()->getFirstPerson().getTurnedFrom(dataSet->getName(), (int)record);
+			break;
+		}
+	}
+	return from;
+}
+
+/**
  * Tells whether a record's frames are different pictures: an animated part by its art, not only by its numbers (a
  * mod's wall may have two sprite numbers for one picture, see getModel).
  * @param mapData The tile part's record.
@@ -4847,7 +5096,9 @@ const FirstPersonView::ArtOverlay *FirstPersonView::artOverlay(const MapData *ma
 	{
 		models[frame] = getModel(mapData, frames.sprite[frame], false);
 		anyVoxels = anyVoxels || !models[frame]->empty || models[frame]->ghost;
-		ownVoxels = ownVoxels || (!models[frame]->empty && !models[frame]->ghostly);
+		// (Its own voxels, or a ghost the view draws solid: low art laid or stood on the floor, which shows what of the
+		// art is near the ground and nothing of what floats over it: a globe turning over its projector.)
+		ownVoxels = ownVoxels || (!models[frame]->empty && (!models[frame]->ghostly || models[frame]->solidGhost));
 	}
 	const int yOffset = mapData->getYOffset();
 	std::vector<char> shown[8];
@@ -4877,7 +5128,7 @@ const FirstPersonView::ArtOverlay *FirstPersonView::artOverlay(const MapData *ma
 		// The pixels the shape's voxels land on (the first frame's: the game's shape is one for all its frames),
 		// the middle of the shape, and its top.
 		const VoxelModel &shape = *models[0];
-		if (shape.empty || shape.ghostly) return nullptr;
+		if (shape.empty || (shape.ghostly && !shape.solidGhost)) return nullptr;
 		// Only a part that stands still in the view: no two of its frames' models differ. One whose model shows its
 		// animation is left as it is, whatever more its art has round it (a first version drew a sprite for every part
 		// with changing art outside its shape: 697 of XPiratez's records, the sea's every tile among TFTD's).
@@ -4973,6 +5224,28 @@ void FirstPersonView::clearArtOverlays()
 }
 
 /**
+ * Every tile set the mod knows: its terrains', its UFOs' and its crafts' (for the developer's checks below).
+ * @param mod The mod.
+ * @return The sets, each once.
+ */
+static std::vector<MapDataSet*> everyTileSet(Mod *mod)
+{
+	std::vector<MapDataSet*> sets;
+	auto add = [&](RuleTerrain *terrain)
+	{
+		if (!terrain) return;
+		for (MapDataSet *set : *terrain->getMapDataSets())
+		{
+			if (std::find(sets.begin(), sets.end(), set) == sets.end()) sets.push_back(set);
+		}
+	};
+	for (const std::string &name : mod->getTerrainList()) add(mod->getTerrain(name));
+	for (const std::string &name : mod->getUfosList()) add(mod->getUfo(name) ? mod->getUfo(name)->getBattlescapeTerrainData() : nullptr);
+	for (const std::string &name : mod->getCraftsList()) add(mod->getCraft(name) ? mod->getCraft(name)->getBattlescapeTerrainData() : nullptr);
+	return sets;
+}
+
+/**
  * A developer's check, run where a battle begins when OPENXCOM3D_ANIMATION_CHECK names a file: every animated
  * record (a tile part whose eight frames aren't one picture) of every tile set the mod knows, its terrains', its
  * UFOs' and its crafts', and whether its animation shows in the view, as the view would build it with the settings
@@ -4996,18 +5269,7 @@ void FirstPersonView::clearArtOverlays()
 void FirstPersonView::checkAnimatedParts(const char *path)
 {
 	Mod *mod = _game->getMod();
-	std::vector<MapDataSet*> sets;
-	auto add = [&](RuleTerrain *terrain)
-	{
-		if (!terrain) return;
-		for (MapDataSet *set : *terrain->getMapDataSets())
-		{
-			if (std::find(sets.begin(), sets.end(), set) == sets.end()) sets.push_back(set);
-		}
-	};
-	for (const std::string &name : mod->getTerrainList()) add(mod->getTerrain(name));
-	for (const std::string &name : mod->getUfosList()) add(mod->getUfo(name) ? mod->getUfo(name)->getBattlescapeTerrainData() : nullptr);
-	for (const std::string &name : mod->getCraftsList()) add(mod->getCraft(name) ? mod->getCraft(name)->getBattlescapeTerrainData() : nullptr);
+	std::vector<MapDataSet*> sets = everyTileSet(mod);
 
 	FILE *out = fopen(path, "w");
 	if (!out)
@@ -5057,7 +5319,7 @@ void FirstPersonView::checkAnimatedParts(const char *path)
 					for (int y = 0; y < Position::TileXY; ++y)
 						for (int x = 0; x < Position::TileXY; ++x) lit += (steady.lit[z][y] >> x) & 1;
 				const VoxelModel *shape = getModel(mapData, frames.sprite[0], false);
-				ufoPart = !shape->empty && (lit > 0 || !modelsAnimate(mapData)); // (as findUfos gives out the steady models)
+				ufoPart = !shape->empty && (lit > 0 || !modelsAnimate(mapData)) && turnedFrom(mapData) < 0; // (as findUfos gives out the steady models)
 			}
 			bool anyDrawn = false;
 			int ghostKind = 0;
@@ -5152,6 +5414,291 @@ void FirstPersonView::checkAnimatedParts(const char *path)
 	Log(LOG_INFO) << "OpenXcom3D: animated parts in " << sets.size() << " tile sets:" << summary << " (written to " << path << ")";
 }
 
+
+/// A developer's arena: the spot of its fifteen left empty (the middle one).
+static const int ArenaEmptySpot = 7;
+
+/**
+ * A developer's arena, run while OPENXCOM3D_ANIMATION_ARENA names a path: what checkAnimatedParts tells of the models,
+ * seen on the screen. Every animated record of every tile set the mod knows (but the sliding doors, whose frames are
+ * their opening) stands, twelve at a time, on a patch of the battle's map cleared from the ground up, floored and in
+ * daylight, before a camera fixed above it: rows of five, five and three spots, one of them left empty to tell what
+ * else changes on the screen. A script outside asks for the next batch by making the file <path>.go, takes pictures
+ * of the screen over a whole cycle of the animation and measures what changes where each part stands; where that is
+ * on the screen is written to <path>.tsv, a line a spot (batch, spot, set, record, part, left, top, right, bottom; the
+ * empty spot's set is "-", a spot not used "x"), and "done" after the last batch. No units are drawn meanwhile, and
+ * the battle is no good for playing after.
+ * Two files change what is shown: <path>.only lists the records to show instead, animated or not, a line each (set,
+ * record); with <path>.sparse there, a batch is three parts far apart, out of the reach of each other's light.
+ * (A part of a set UFOs are built from stands here alone, which is no UFO: it plays its frames, as with the setting
+ * "UFO lights" off; its steady model with pulsing lights shows inside a UFO only.)
+ * And with a file <path>.save there, holding a page's number, nothing of the above: the parts are laid all over the
+ * map for a player to walk among, and written as a save (see arenaSave).
+ * Called as a frame begins, before the camera's axes are made.
+ */
+void FirstPersonView::arenaStep()
+{
+	static const char *const path = getenv("OPENXCOM3D_ANIMATION_ARENA");
+	if (!path || !_save || _sharedModelsOwner || getWidth() < 320 || _arena.failed)
+	{
+		return;
+	}
+	Arena &arena = _arena;
+	// (Spots two tiles apart in a row, the rows four and three tiles apart, the camera four tiles before the nearest:
+	// seen from that high, the box round a tile reaches over the ground behind it to a third again of its distance,
+	// and no part's place on the screen holds another's. The nearest row's outer spots would be off the screen.)
+	static const int Columns = 5, Rows = 3, ColumnStep = 2, Back = 4, Margin = 2, FarMargin = 5;
+	static const int RowAt[Rows] = { 0, 4, 7 };
+	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
+	if (!arena.ready)
+	{
+		Mod *mod = _game->getMod();
+		std::set<std::pair<std::string, int>> only;
+		bool listed = false;
+		if (FILE *list = fopen((std::string(path) + ".only").c_str(), "r"))
+		{
+			listed = true;
+			char name[128];
+			int record = 0;
+			while (fscanf(list, "%127s %d", name, &record) == 2) only.emplace(name, record);
+			fclose(list);
+		}
+		if (FILE *sparse = fopen((std::string(path) + ".sparse").c_str(), "r"))
+		{
+			arena.sparse = true;
+			fclose(sparse);
+		}
+		for (MapDataSet *set : everyTileSet(mod))
+		{
+			try
+			{
+				set->loadData(mod->getMCDPatch(set->getName()));
+			}
+			catch (const std::exception &)
+			{
+				continue;
+			}
+			for (size_t record = 0; set->getSurfaceset() && record < set->getSize(); ++record)
+			{
+				MapData *mapData = set->getObject(record);
+				const bool shown = listed ? only.count(std::make_pair(set->getName(), (int)record)) > 0 : getFrames(mapData).animated && !mapData->isUFODoor();
+				if (shown) arena.parts.emplace_back(mapData, (int)record);
+			}
+		}
+		for (int index = 0; index < _save->getMapSizeXYZ() && !arena.floor; ++index)
+		{
+			MapData *floor = _save->getTile(index)->getMapData(O_FLOOR);
+			if (floor && !floor->isGravLift() && !getFrames(floor).animated && !getModel(floor, getFrames(floor).sprite[0], false)->empty)
+			{
+				arena.floor = floor;
+				_save->getTile(index)->getMapData(&arena.floorRecord, &arena.floorSet, O_FLOOR);
+			}
+		}
+		if (FILE *asked = fopen((std::string(path) + ".save").c_str(), "r"))
+		{
+			int page = 1;
+			if (fscanf(asked, "%d", &page) != 1) page = 1;
+			fclose(asked);
+			arena.failed = true; // (nothing more of the arena after it)
+			if (arena.floor) arenaSave(path, std::max(1, page));
+			return;
+		}
+		const int wide = (Columns - 1) * ColumnStep + 1 + 2 * Margin, deep = FarMargin + RowAt[Rows - 1] + 1 + Back + 1 + Margin;
+		if (sizeX < wide || sizeY < deep || sizeZ < 3 || !arena.floor)
+		{
+			Log(LOG_ERROR) << "OpenXcom3D: no room for the animation arena on this map";
+			arena.failed = true;
+			return;
+		}
+		arena.origin = Position((sizeX - wide) / 2 + Margin, (sizeY - deep) / 2 + FarMargin, 0);
+		// The patch: all of the map seen, nothing on it from the ground up but the floor, in daylight.
+		_save->setDebugMode();
+		for (int z = 0; z < sizeZ; ++z)
+			for (int y = arena.origin.y - FarMargin; y < arena.origin.y - FarMargin + deep; ++y)
+				for (int x = arena.origin.x - Margin; x < arena.origin.x - Margin + wide; ++x)
+				{
+					Tile *tile = _save->getTile(Position(x, y, z));
+					for (int part = 0; part < 4; ++part) tile->setMapData(z == 0 && part == O_FLOOR ? arena.floor : nullptr, -1, -1, (TilePart)part);
+					tile->setSmoke(0);
+					tile->setFire(0);
+				}
+		_save->setGlobalShade(0);
+		_save->getTileEngine()->calculateLighting(LL_AMBIENT, TileEngine::invalid, 0, true);
+		if (FILE *out = fopen((std::string(path) + ".tsv").c_str(), "w")) fclose(out);
+		Log(LOG_INFO) << "OpenXcom3D: the animation arena is ready, " << arena.parts.size() << " parts to show";
+		arena.ready = true;
+	}
+	// The camera: above the middle of the rows' width, before the nearest, looking north and down, half way between
+	// the nearest row's foot and the farthest's top.
+	const double eyeHeight = std::min(sizeZ * (double)Position::TileZ - 2.0, 90.0);
+	setEye((arena.origin.x + (Columns - 1) * ColumnStep * 0.5 + 0.5) * Position::TileXY, (arena.origin.y + RowAt[Rows - 1] + 0.5 + Back) * Position::TileXY, eyeHeight);
+	_yaw = -Pi / 2.0;
+	_pitch = -0.5 * (std::atan2(eyeHeight, (Back - 0.5) * Position::TileXY) + std::atan2(eyeHeight - Position::TileZ, (Back + RowAt[Rows - 1] + 0.5) * Position::TileXY));
+	// The next batch, when the script asks.
+	const std::string go = std::string(path) + ".go";
+	FILE *asked = fopen(go.c_str(), "r");
+	if (!asked)
+	{
+		return;
+	}
+	fclose(asked);
+	remove(go.c_str());
+	++arena.batch;
+	arena.spots.clear();
+	for (int spot = 0; spot < Columns * Rows; ++spot)
+	{
+		const Position at(arena.origin.x + (spot % Columns) * ColumnStep, arena.origin.y + RowAt[spot / Columns], 0);
+		Tile *tile = _save->getTile(at);
+		for (int part = 0; part < 4; ++part) tile->setMapData(part == O_FLOOR ? arena.floor : nullptr, -1, -1, (TilePart)part);
+		const bool offScreen = (spot / Columns == Rows - 1 && (spot % Columns == 0 || spot % Columns == Columns - 1))
+			|| (arena.sparse && spot != 0 && spot != Columns - 1 && spot != (Rows - 1) * Columns + Columns / 2);
+		Arena::Spot laid = { at, nullptr, -1 };
+		if (spot != ArenaEmptySpot && !offScreen && arena.next < arena.parts.size())
+		{
+			const std::pair<MapData*, int> &entry = arena.parts[arena.next++];
+			tile->setMapData(entry.first, entry.second, 0, entry.first->getObjectType());
+			artOverlay(entry.first); // (a set this battle hasn't got was not looked at for its sprites of art where the battle began)
+			laid.part = entry.first;
+			laid.record = entry.second;
+		}
+		arena.spots.push_back(laid);
+	}
+	// The view starts on the map afresh (no rubble flies for the parts gone), finds its UFOs' parts and its lifts
+	// again, and the parts with a sprite of art.
+	_wallsLastFrame[0].clear();
+	findUfos();
+	gpuForgetModels(); // (findUfos makes the UFO parts' steady models anew: the card knows a model by where it is kept)
+	findLifts();
+	_overlaySpotsAge = 0;
+	arena.toLog = true;
+}
+
+/**
+ * A developer's arena (see arenaStep): once a batch is laid and the camera's axes are made, writes where each of its
+ * spots is on the screen, the box round its tile.
+ */
+void FirstPersonView::arenaLog()
+{
+	if (!_arena.toLog)
+	{
+		return;
+	}
+	_arena.toLog = false;
+	FILE *out = fopen((std::string(getenv("OPENXCOM3D_ANIMATION_ARENA")) + ".tsv").c_str(), "a");
+	if (!out)
+	{
+		return;
+	}
+	static const char *const partNames[] = { "floor", "west", "north", "object" };
+	bool any = false;
+	for (size_t spot = 0; spot < _arena.spots.size(); ++spot)
+	{
+		const Arena::Spot &laid = _arena.spots[spot];
+		double low[2] = { 1e9, 1e9 }, high[2] = { -1e9, -1e9 };
+		for (int corner = 0; corner < 8; ++corner)
+		{
+			const double world[3] = { (laid.at.x + (corner & 1)) * (double)Position::TileXY, (laid.at.y + ((corner >> 1) & 1)) * (double)Position::TileXY,
+				(laid.at.z + ((corner >> 2) & 1)) * (double)Position::TileZ };
+			double screen[2], depth;
+			if (!projectToScreen(world, screen[0], screen[1], depth)) continue;
+			for (int axis = 0; axis < 2; ++axis)
+			{
+				low[axis] = std::min(low[axis], screen[axis]);
+				high[axis] = std::max(high[axis], screen[axis]);
+			}
+		}
+		any = any || laid.part;
+		fprintf(out, "%d\t%d\t%s\t%d\t%s\t%d\t%d\t%d\t%d\n", _arena.batch, (int)spot, laid.part ? laid.part->getDataset()->getName().c_str() : (int)spot == ArenaEmptySpot ? "-" : "x", laid.record,
+			laid.part ? partNames[laid.part->getObjectType()] : "-", (int)std::floor(low[0]), (int)std::floor(low[1]), (int)std::ceil(high[0]), (int)std::ceil(high[1]));
+	}
+	if (!any)
+	{
+		fprintf(out, "done\n");
+	}
+	fclose(out);
+}
+
+/**
+ * A developer's arena as a save to walk through (see arenaStep; the owner: "Make me also an arena save i can revisit
+ * with my own eyes"): the whole map cleared down to one floor on the ground, in daylight and all seen; the battle's
+ * units stood on the ground, the enemy's without time units (no shots at who walks by); and a page of the animated
+ * parts laid on every other tile each way, in the order of the arena's list, row by row from the rows nearest the
+ * player's soldier, a page holding as many as the map has such tiles free. The parts' sets join the battle's, so the save holds them. Written as arena_<page>.sav in the
+ * user's folder, with <path>.list.tsv beside the arena's files: tile x, tile y, set, record, part, a line a part.
+ * @param path The arena's path.
+ * @param page Which page of the parts, from 1.
+ */
+void FirstPersonView::arenaSave(const char *path, int page)
+{
+	Arena &arena = _arena;
+	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY();
+	for (int index = 0; index < _save->getMapSizeXYZ(); ++index)
+	{
+		Tile *tile = _save->getTile(index);
+		const bool ground = tile->getPosition().z == 0;
+		for (int part = 0; part < 4; ++part)
+		{
+			if (ground && part == O_FLOOR) tile->setMapData(arena.floor, arena.floorRecord, arena.floorSet, O_FLOOR);
+			else tile->setMapData(nullptr, -1, -1, (TilePart)part);
+		}
+		tile->setSmoke(0);
+		tile->setFire(0);
+	}
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (unit->isOut()) continue;
+		if (unit->getFaction() != FACTION_PLAYER) unit->clearTimeUnits();
+		const Position at = unit->getPosition();
+		bool placed = at.z == 0;
+		for (int reach = 0; reach < 16 && !placed; ++reach)
+			for (int dy = -reach; dy <= reach && !placed; ++dy)
+				for (int dx = -reach; dx <= reach && !placed; ++dx) placed = _save->setUnitPosition(unit, Position(at.x + dx, at.y + dy, 0));
+	}
+	std::vector<Position> spots;
+	for (int y = 2; y < sizeY - 2; y += 2)
+		for (int x = 2; x < sizeX - 2; x += 2)
+			if (!_save->getTile(Position(x, y, 0))->getUnit()) spots.emplace_back(x, y, 0);
+	// (The rows nearest the player's soldier first, each from the west: a page that doesn't fill the map stands round them.)
+	const BattleUnit *soldier = _save->getSelectedUnit();
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (!soldier && !unit->isOut() && unit->getFaction() == FACTION_PLAYER) soldier = unit;
+	}
+	const int soldierRow = soldier ? soldier->getPosition().y : sizeY / 2;
+	std::stable_sort(spots.begin(), spots.end(), [&](const Position &a, const Position &b) { return std::abs(a.y - soldierRow) < std::abs(b.y - soldierRow); });
+	const size_t first = (size_t)(page - 1) * spots.size();
+	std::vector<MapDataSet*> *sets = _save->getMapDataSets();
+	static const char *const partNames[] = { "floor", "west", "north", "object" };
+	FILE *list = fopen((std::string(path) + ".list.tsv").c_str(), "w");
+	size_t laid = 0;
+	for (; laid < spots.size() && first + laid < arena.parts.size(); ++laid)
+	{
+		const std::pair<MapData*, int> &entry = arena.parts[first + laid];
+		MapDataSet *set = entry.first->getDataset();
+		const size_t setIndex = std::find(sets->begin(), sets->end(), set) - sets->begin();
+		if (setIndex == sets->size()) sets->push_back(set);
+		_save->getTile(spots[laid])->setMapData(entry.first, entry.second, (int)setIndex, entry.first->getObjectType());
+		artOverlay(entry.first);
+		if (list) fprintf(list, "%d\t%d\t%s\t%d\t%s\n", spots[laid].x, spots[laid].y, set->getName().c_str(), entry.second, partNames[entry.first->getObjectType()]);
+	}
+	if (list) fclose(list);
+	_save->revealMap();
+	_save->setGlobalShade(0);
+	_save->getTileEngine()->calculateLighting(LL_AMBIENT, TileEngine::invalid, 0, true);
+	_wallsLastFrame[0].clear();
+	findUfos();
+	gpuForgetModels();
+	findLifts();
+	_overlaySpotsAge = 0;
+	const std::string name = "arena_" + std::to_string(page) + ".sav";
+	SavedGame *game = _game->getSavedGame();
+	const std::string was = game->getName();
+	game->setName("Animated parts, page " + std::to_string(page));
+	game->save(name, _game->getMod());
+	game->setName(was);
+	Log(LOG_INFO) << "OpenXcom3D: the arena's save " << name << " is written: parts " << first + 1 << " to " << first + laid << " of " << arena.parts.size()
+		<< ", " << spots.size() << " a page";
+}
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.

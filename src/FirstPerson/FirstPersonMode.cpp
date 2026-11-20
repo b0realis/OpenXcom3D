@@ -625,10 +625,14 @@ void FirstPersonMode::createInfoPanel()
 	// The stats' own colours, for when Doom IDDQD has turned them silver and stops.
 	const NumberText *numbers[4] = { _numTimeUnits, _numEnergy, _numHealth, _numMorale };
 	const Bar *bars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
+	static const char *const barIds[4] = { "barTUs", "barEnergy", "barHealth", "barMorale" };
+	const RuleInterface *battlescapeRules = _game->getMod()->getInterface("battlescape", false);
 	for (int stat = 0; stat < 4; ++stat)
 	{
 		_statColors[stat] = numbers[stat]->getColor();
 		_statColors[4 + stat] = bars[stat]->getColor();
+		const Element *barElement = battlescapeRules ? battlescapeRules->getElementOptional(barIds[stat]) : nullptr;
+		_statBorders[stat] = barElement && barElement->border != INT_MAX ? (Uint8)barElement->border : 0;
 	}
 }
 

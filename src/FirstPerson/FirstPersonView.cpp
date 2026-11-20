@@ -169,6 +169,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_openedModels.clear();
 	_openDoorModels.clear();
 	_frames.clear();
+	_turnedParts.clear();
 	_solidMasks.clear();
 	_paintedFloors.clear();
 	_anyGlass = false;
@@ -673,10 +674,12 @@ void FirstPersonView::beginFrame()
 	_upscaleFrameStart = _upscaleClock + 1;
 
 	// The camera for this frame: shake and recoil, then its axes; a camera's feed's static spells.
+	arenaStep(); // (a developer's: see there)
 	updateCameraEffects();
 	if (_staticSpells) updateStaticSpell();
 
 	updateBasis();
+	arenaLog();
 	// The flashlight sits on the right shoulder, a little below the eye (voxels); the dynamic
 	// one just under the eye, on the weapon, so its spot falls on the crosshair.
 	for (int axis = 0; axis < 3; ++axis)

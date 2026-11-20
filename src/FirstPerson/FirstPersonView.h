@@ -840,6 +840,30 @@ private:
 	std::unordered_map<const VoxelModel*, VoxelModel> _openDoorModels; // what is left of a sliding door once open, as a ghost (see openDoorModel), by the model it is made of
 	std::unordered_map<const VoxelModel*, VoxelModel> _openedModels; // models with the glass in their openings broken out (see openedModel), by the whole one
 	std::unordered_map<const MapData*, Frames> _frames; // by MapData: its animation frames
+	std::unordered_map<const MapData*, int> _turnedParts; // by MapData: the height from which its frames are turned from their art, -1 not (see turnedFrom)
+	/// The height from which an animated part's frames are turned from their art (the mod's table `turned:`), or -1.
+	int turnedFrom(const MapData *mapData);
+	/// A developer's arena (OPENXCOM3D_ANIMATION_ARENA): every animated record laid before a fixed camera, a batch at a time (see arenaStep).
+	struct Arena
+	{
+		struct Spot { Position at; const MapData *part; int record; };
+		bool ready = false, failed = false, toLog = false;
+		bool sparse = false;                         // three parts a batch, far apart (the file <path>.sparse is there)
+		std::vector<std::pair<MapData*, int>> parts; // every animated record but the sliding doors, and its number in its set
+		size_t next = 0;                             // the first of them not laid yet
+		int batch = 0;
+		Position origin;                             // the far left spot
+		MapData *floor = nullptr;                    // a floor of the map's that stands still, under them all
+		int floorRecord = -1, floorSet = -1;         // its number in its set, and its set's among the battle's
+		std::vector<Spot> spots;                     // the batch laid now
+	};
+	Arena _arena;
+	/// A developer's arena: its camera, and the next batch when asked for.
+	void arenaStep();
+	/// A developer's arena: writes where on the screen the batch just laid stands.
+	void arenaLog();
+	/// A developer's arena: lays a page of the parts all over the map and writes it as a save to walk through.
+	void arenaSave(const char *path, int page);
 	FirstPersonView *_sharedModelsOwner = nullptr;      // another view whose voxel models this one uses, or null
 	const VoxelModel *_groundModel = nullptr;           // floor repeated outside the map
 	const VoxelModel *_waterModel = nullptr;            // ... beyond the stretches of the edge where the water reaches it, or null

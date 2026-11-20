@@ -1223,6 +1223,7 @@ private:
 	Bar *_barTimeUnits = nullptr, *_barEnergy = nullptr, *_barHealth = nullptr, *_barMorale = nullptr; // and their bars
 	Bar *_barMana = nullptr;                            // a mod's mana (Piratez freshness, X-Com Files sanity): a thin bar under them, as on the map
 	Uint8 _statColors[8] = {};                          // the stats' own colours (numbers, then bars), for when they stop being silver
+	Uint8 _statBorders[4] = {};                         // the bars' own border colours, where the game's interface gives them one (TFTD's); 0: the border follows the bar
 	bool _statsSilver = false;                          // the stats are silver: Doom IDDQD, an invincible soldier
 	std::vector<Surface*> _panelParts;                  // all of the panel's surfaces, shown and hidden together
 

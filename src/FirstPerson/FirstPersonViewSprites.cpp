@@ -1454,6 +1454,7 @@ void FirstPersonView::watchUnits()
  */
 void FirstPersonView::drawUnits()
 {
+	if (_arena.ready) return; // (a developer's arena shows the map's parts alone: see arenaStep)
 	// The sprite drawer, with the diving helmets on under the sea, on the game's own animation
 	// counter (a frame every 100 ms), as the map draws: the 8-frame cycles, and the mods'
 	// recolour scripts, which may count much longer ones (a wounded unit blinking red and white).

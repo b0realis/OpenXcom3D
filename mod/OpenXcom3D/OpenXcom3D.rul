@@ -111,6 +111,19 @@ firstPerson:
   # ground past the edge); XPiratez and X-Com Files: the same sea, their SEAURBAN, and the
   # cargo ship's.
   water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }, { dataSet: CARGO3, records: [4] }]
+  # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
+  # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
+  # A list replaces the earlier one.
+  # TFTD's pedestal (the alien colony's and T'leth's: a drum, a collar and a rod rising and sinking over a slab),
+  # and the same one in XPiratez's and The X-Com Files' sets.
+  turned:
+    - { dataSet: ORGANIC2, records: [3], from: 4 }
+    - { dataSet: ENTRY, records: [3], from: 4 }
+    - { dataSet: SEAORGANIC2, records: [3], from: 4 }
+    - { dataSet: SEAORGANIC2XPZ, records: [3], from: 4 }
+    - { dataSet: USOENTRY, records: [3], from: 4 }
+    - { dataSet: LAM_WALL02, records: [45], from: 4 }
+    - { dataSet: DAGON_WALL02, records: [45], from: 4 }
   # The helmet cameras' bad signal, by mission (alien deployment) type: 1 a glitch now and then
   # (any mission not listed), 2 a lot (the aliens' own ground, where their machinery jams the
   # feed), 0 none. A later entry (or a later mod's) overrides.

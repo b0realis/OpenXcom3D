@@ -162,6 +162,7 @@ private:
 	std::map<std::string, std::string> _enviroWeather; // battle environment (enviroEffects type) -> rain, snow, dust, ... (before the data sets')
 	std::map<std::string, std::string> _enviroSkies, _missionSkies, _terrainSkies; // environment, mission type, terrain -> its sky (space, moon, ...)
 	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
+	std::map<std::pair<std::string, int>, int> _turned; // (terrain data set, record) -> the height from which its frames are turned from their art (see getTurnedFrom)
 	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -268,6 +269,25 @@ public:
 				{
 					_water.insert(entry.readVal<std::string>());
 				}
+			}
+		}
+
+		// Tile parts that are a thing in motion round its own upright axis (a pedestal whose collar and piston rise and
+		// sink): from a height up, each frame's shape is turned from that frame's art, as on a lathe, where the game
+		// has one shape for all the frames (FirstPersonView::turnedFrom). Named one by one: { dataSet, records, from }.
+		// A list replaces the earlier one.
+		if (const auto& turned = reader["turned"])
+		{
+			_turned.clear();
+			for (const auto& entry : turned.children())
+			{
+				std::string dataSet;
+				std::vector<int> records;
+				int from = 0;
+				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("records", records);
+				entry.tryRead("from", from);
+				for (const int record : records) _turned[std::make_pair(dataSet, record)] = from;
 			}
 		}
 
@@ -435,6 +455,12 @@ public:
 	{
 		auto found = _signalLevels.find(mission);
 		return found != _signalLevels.end() ? found->second : 1;
+	}
+	/// The height from which a terrain record's frames are turned from their art (the table `turned:`), or -1 if it isn't named.
+	int getTurnedFrom(const std::string &dataSet, int record) const
+	{
+		auto found = _turned.find(std::make_pair(dataSet, record));
+		return found != _turned.end() ? found->second : -1;
 	}
 	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
 	bool isWater(const std::string &dataSet, int record) const

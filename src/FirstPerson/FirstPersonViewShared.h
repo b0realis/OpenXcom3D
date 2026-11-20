@@ -136,6 +136,10 @@ const int AnimatedNearShades = 3;
 /// XPiratez's T'leth base the parts in motion have 0.21 (pedestals), 0.59 (steps folding flat) and under 0 (a
 /// hatch); a dance floor 1.00, the pyramid's floors 0.94.
 const float AnimatedPulseAlike = 0.7f;
+// A part turned from its art (the mod's table `turned:`, see turnFromArt): how much wider (voxels) than the far rims of
+// the discs below a height's row of the art has to be for a disc of its own. A row's width goes by half pixels, a third
+// of a voxel.
+const float TurnedRimSlack = 0.5f;
 /// The art of an animated part that stands still in the view, its shape showing none of what changes, is drawn as a
 /// sprite (see FirstPersonView::artOverlay) if at least this many pixels change outside the shape (counted over its
 /// eight frames): a pixel or two glinting on a lava floor's edge isn't worth a sprite on every tile of the field.

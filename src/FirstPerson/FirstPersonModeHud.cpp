@@ -793,18 +793,38 @@ void FirstPersonMode::updateInfoPanel(BattleUnit *unit)
 		panelBars[stat]->setScale(statBarScale(_state, stat, panelMaxima[stat], panelBars[stat]->getWidth()));
 	}
 
-	// Doom IDDQD: an invincible soldier's stats are silver; otherwise in their own colours.
+	// Doom IDDQD: an invincible soldier's stats are silver; otherwise in their own colours. Where the game's own colours
+	// for the numbers are as pale as silver already, silver told nothing (the owner: "IDDQD cheat colors all stats silver
+	// in UFO:enemy unknown but not in TFTD": TFTD draws every stat's number in a pale grey): there they are a darker
+	// steel. A bar's border goes with it where the game's interface gives the border a colour of its own (TFTD's again;
+	// else it follows the bar's).
 	const bool silver = invincible(_state, unit);
 	if (silver != _statsSilver)
 	{
 		_statsSilver = silver;
-		const Uint8 silverColor = nearestColor(_state->getPalette(), 215, 215, 225);
+		static const int SilverTellsFrom = 150; // (red, green and blue differences added up)
+		const SDL_Color *palette = _state->getPalette();
 		NumberText *numbers[4] = { _numTimeUnits, _numEnergy, _numHealth, _numMorale };
 		Bar *bars[4] = { _barTimeUnits, _barEnergy, _barHealth, _barMorale };
+		Uint8 numberColor = nearestColor(palette, 215, 215, 225), barColor = numberColor;
+		bool pale = false;
 		for (int stat = 0; stat < 4; ++stat)
 		{
-			numbers[stat]->setColor(silver ? silverColor : _statColors[stat]);
-			bars[stat]->setColor(silver ? silverColor : _statColors[4 + stat]);
+			// (a number shows in the colour after its own: see NumberText::draw)
+			const SDL_Color &own = palette[(Uint8)(_statColors[stat] + 1)], &asSilver = palette[(Uint8)(numberColor + 1)];
+			pale = pale || std::abs(own.r - asSilver.r) + std::abs(own.g - asSilver.g) + std::abs(own.b - asSilver.b) < SilverTellsFrom;
+		}
+		if (pale)
+		{
+			barColor = nearestColor(palette, 150, 158, 176);
+			numberColor = barColor > 1 ? barColor - 1 : barColor;
+		}
+		const Uint8 borderColor = nearestColor(palette, 96, 102, 118);
+		for (int stat = 0; stat < 4; ++stat)
+		{
+			numbers[stat]->setColor(silver ? numberColor : _statColors[stat]);
+			bars[stat]->setColor(silver ? barColor : _statColors[4 + stat]);
+			if (_statBorders[stat]) bars[stat]->setBorderColor(silver ? borderColor : _statBorders[stat]);
 		}
 	}
 }
