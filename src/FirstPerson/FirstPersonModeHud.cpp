@@ -1789,6 +1789,23 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 	// (everything on it as much bigger as the 3D view's own overlays are on this screen; and a helmet camera of the 3D
 	// view's own kind, made as the soldier card's is)
 	setup.uiScale = uiScaleFor(Options::baseXResolution, Options::baseYResolution);
+	// (the line along its bottom in this panel's own colours for a soldier's name, health, time units and weapon, and
+	// the weapon in hand worded as the panel's line words it; the ammo's tag in the line's one colour)
+	setup.hasPanelColours = true;
+	setup.nameColour = mode->_txtName->getColor();
+	setup.healthColour = mode->_statColors[2];
+	setup.timeColour = mode->_statColors[0];
+	setup.weaponColour = mode->_weaponTextColor;
+	setup.weaponWords = [mode](BattleUnit *soldier, bool rounds) -> std::string {
+		const BattleItem *weapon = mode->activeWeapon(soldier);
+		if (!weapon) return std::string();
+		const std::string name = mode->itemLabel(weapon);
+		if (!rounds) return name;
+		bool loaded = true;
+		std::string ammo = mode->ammoLabel(soldier, weapon, BA_NONE, loaded, nullptr);
+		ammo.erase(std::remove(ammo.begin(), ammo.end(), Unicode::TOK_COLOR_FLIP), ammo.end());
+		return ammo.empty() ? name : name + " " + ammo;
+	};
 	setup.makeCamera = [mode](State *screen, int width, int height) -> Surface* {
 		FirstPersonView *camera = new FirstPersonView(mode->_game, width, height, 0, 0);
 		screen->add(camera);

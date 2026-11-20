@@ -84,10 +84,11 @@ namespace
 /// map number and this (see MiniMapView).
 const int CellPixels = 4, TilePictures = 35;
 /// The map is enlarged by whole steps, 1 to ZoomMost; what the player last chose is kept for the next time, with the
-/// names and the cones on or off (0: not chosen yet, the map picks what suits the screen).
+/// names, the cones and the rest on or off (0: not chosen yet, the map picks what suits the screen). The help is off
+/// until it is asked for.
 const int ZoomMost = 8;
 int Zoom = 0;
-bool Names = true, Cones = true, Weapons = true, Reach = true, Helmet = true;
+bool Names = true, Cones = true, Weapons = true, Reach = true, Helmet = true, Help = false;
 /// A cone opens this many degrees either side of the way its unit faces (the game's units see a quarter circle).
 const double ConeHalf = 45.0;
 /// The pointer is on a dot within this many pixels of its rim; a press that moves further than DragStart is a drag.
@@ -97,6 +98,8 @@ const int DotReach = 3, DragStart = 3;
 const int ButtonHigh = 13, ButtonGap = 2, ButtonPad = 4, WordsHigh = 9;
 /// The helmet camera's picture is this big at the least (times the screen's magnification), in the bottom right corner.
 const int HelmetWide = 112, HelmetHigh = 70;
+/// The pieces of the line along the bottom (the name, the health...) are this far apart.
+const int StatusGap = 8;
 
 }
 
@@ -141,6 +144,11 @@ FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, 
 	_enemy = bright(240, 50, 50);
 	_other = bright(240, 200, 60);
 	_item = bright(200, 200, 200);
+	// (the bottom line's: the 3D view's own panel's where it handed them over, else the nearest the map has)
+	_nameColour = setup.hasPanelColours ? setup.nameColour : _selected;
+	_healthColour = setup.hasPanelColours ? setup.healthColour : _enemy;
+	_timeColour = setup.hasPanelColours ? setup.timeColour : _ours;
+	_weaponColour = setup.hasPanelColours ? setup.weaponColour : _other;
 
 	_level = std::clamp(camera->getViewLevel(), 0, save->getMapSizeZ() - 1);
 	if (Zoom <= 0)
@@ -159,7 +167,8 @@ FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, 
 		_centreY = camera->getCenterPosition().y + 0.5;
 	}
 	layOut();
-	// The helmet camera (the 3D view's own kind, made by it): in the bottom right corner, over the line of words.
+	// The helmet camera (the 3D view's own kind, made by it): in the bottom right corner, over the line of words (and
+	// over the help's rows while they show, see placeHelmet).
 	if (_setup.makeCamera && _setup.aimCamera)
 	{
 		// (three tenths of the screen's width where that is more: a bigger screen has room for a bigger picture)
@@ -168,8 +177,8 @@ FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, 
 		if (_helmet)
 		{
 			_helmet->setX(width - wide - big(ButtonGap) - _ui);
-			_helmet->setY(height - high - big(WordsHigh) - 3 * big(ButtonGap) - _ui);
 			_helmet->setVisible(false);
+			placeHelmet();
 		}
 	}
 	updateReach();
@@ -206,13 +215,14 @@ int FirstPersonMapState::cell() const
 /**
  * Lays the buttons out along the top, each as wide as its words: the level's two, the zoom's two, the map back on
  * the soldier, the next soldier, then what shows or not: the names, the weapons, the cones, the reach, the camera; and
- * OK in the top right corner. On a screen too narrow for one row they go on in a second.
+ * OK in the top right corner, the help left of it. On a screen too narrow for one row they go on in a second. And
+ * counts the rows the longest help needs on this screen.
  */
 void FirstPersonMapState::layOut()
 {
 	struct Said { ButtonKind kind; const char *words, *tip; };
 	static const Said all[] = {
-		{ BUTTON_CLOSE, "STR_FPS_TMAP_CLOSE", "STR_FPS_TMAP_CLOSE_TIP" },
+		{ BUTTON_CLOSE, "STR_FPS_TMAP_CLOSE", "STR_FPS_TMAP_CLOSE_TIP" }, { BUTTON_HELP, "STR_FPS_TMAP_HELP", "STR_FPS_TMAP_HELP_TIP" },
 		{ BUTTON_LEVEL_UP, "STR_FPS_TMAP_UP", "STR_FPS_TMAP_UP_TIP" }, { BUTTON_LEVEL_DOWN, "STR_FPS_TMAP_DOWN", "STR_FPS_TMAP_DOWN_TIP" },
 		{ BUTTON_ZOOM_OUT, "STR_FPS_TMAP_ZOOM_OUT", "STR_FPS_TMAP_ZOOM_OUT_TIP" }, { BUTTON_ZOOM_IN, "STR_FPS_TMAP_ZOOM_IN", "STR_FPS_TMAP_ZOOM_IN_TIP" },
 		{ BUTTON_CENTRE, "STR_FPS_TMAP_CENTRE", "STR_FPS_TMAP_CENTRE_TIP" }, { BUTTON_NEXT, "STR_FPS_TMAP_NEXT", "STR_FPS_TMAP_NEXT_TIP" },
@@ -229,9 +239,10 @@ void FirstPersonMapState::layOut()
 		button.tip = tr(said.tip);
 		_words->setText(button.words);
 		const int wide = std::max(big(ButtonHigh), big(_words->getTextWidth()) + 2 * big(ButtonPad));
-		if (said.kind == BUTTON_CLOSE)
+		if (said.kind == BUTTON_CLOSE || said.kind == BUTTON_HELP)
 		{
-			closeLeft = _view->getWidth() - big(ButtonGap) - wide;
+			// (the top right corner, filled from the right: OK, then the help)
+			closeLeft -= big(ButtonGap) + wide;
 			button.box.x = (Sint16)closeLeft;
 			button.box.y = (Sint16)big(ButtonGap);
 		}
@@ -253,6 +264,90 @@ void FirstPersonMapState::layOut()
 		button.box.h = (Uint16)big(ButtonHigh);
 		_buttons.push_back(button);
 	}
+	_cornerLeft = closeLeft;
+	// The help: how the map is worked, or a button's use; the rows the longest of them needs here.
+	_hint = tr("STR_FPS_TMAP_HINT");
+	const int room = _view->getWidth() - 2 * (big(ButtonGap) + _ui);
+	_helpRows = std::max(1, (int)wrapped(_hint, room).size());
+	for (const Button &button : _buttons)
+	{
+		_helpRows = std::max(_helpRows, (int)wrapped(button.tip, room).size());
+	}
+}
+
+/**
+ * How wide words are on the map (see write).
+ * @param text The words.
+ * @return The pixels.
+ */
+int FirstPersonMapState::wideOf(const std::string &text) const
+{
+	_words->setText(text);
+	return big(_words->getTextWidth());
+}
+
+/**
+ * Breaks words into rows no wider than the room there is, at their spaces (a word wider than the room has a row of
+ * its own); a row that holds whole sentences (two spaces between them) is broken after the last whole one, so a
+ * sentence isn't left with a word of it alone on the next row.
+ * @param text The words.
+ * @param room The pixels a row may be wide.
+ * @return The rows, top to bottom.
+ */
+std::vector<std::string> FirstPersonMapState::wrapped(const std::string &text, int room) const
+{
+	std::vector<std::string> rows;
+	std::string row;
+	auto close = [&]() {
+		while (!row.empty() && row.back() == ' ') row.pop_back();
+		if (!row.empty()) rows.push_back(row);
+		row.clear();
+	};
+	for (size_t from = 0; from <= text.size();)
+	{
+		size_t space = text.find(' ', from);
+		if (space == std::string::npos) space = text.size();
+		const std::string word = text.substr(from, space - from);
+		from = space + 1;
+		// (nothing between two spaces: the wider gap after a sentence is kept inside a row)
+		if (word.empty())
+		{
+			if (!row.empty()) row += ' ';
+			continue;
+		}
+		const std::string longer = row.empty() ? word : row + " " + word;
+		if (!row.empty() && wideOf(longer) > room)
+		{
+			// (the sentence begun in this row goes down with the word, if a whole one stays; none is begun where the
+			// row ends at a sentence's gap)
+			const size_t sentence = row.back() == ' ' ? std::string::npos : row.rfind("  ");
+			std::string begun;
+			if (sentence != std::string::npos && sentence > 0)
+			{
+				begun = row.substr(sentence + 2);
+				row.erase(sentence);
+			}
+			close();
+			row = begun.empty() ? word : begun + " " + word;
+		}
+		else
+		{
+			row = longer;
+		}
+	}
+	close();
+	return rows;
+}
+
+/**
+ * Puts the helmet camera's picture over the line along the bottom, and over the help's rows while the help shows.
+ */
+void FirstPersonMapState::placeHelmet()
+{
+	if (!_helmet) return;
+	const int rows = Help ? _helpRows : 0;
+	_helmet->setY(_view->getHeight() - _helmet->getHeight() - big(WordsHigh) - 3 * big(ButtonGap) - _ui - rows * (big(WordsHigh) + _ui));
+	_dirty = true;
 }
 
 /**
@@ -423,16 +518,17 @@ void FirstPersonMapState::drawDisc(int x, int y, int radius, Uint8 colour, bool 
  * whole, a longer one its words' first letters and its last word ("H.Plasma" for a Heavy Plasma). An enemy's only if
  * the game would name the item (researched): nothing is told that the game doesn't tell.
  * @param unit The unit.
+ * @param whole The whole name, however long (the line along the bottom).
  * @return The letters, or nothing.
  */
-std::string FirstPersonMapState::weaponOf(const BattleUnit *unit) const
+std::string FirstPersonMapState::weaponOf(const BattleUnit *unit, bool whole) const
 {
 	const BattleItem *item = unit->getRightHandWeapon() ? unit->getRightHandWeapon() : unit->getLeftHandWeapon();
 	if (!item) return std::string();
 	if (unit->getFaction() != FACTION_PLAYER && _game->getSavedGame() && !_game->getSavedGame()->isResearched(item->getRules()->getRequirements())) return std::string();
 	const std::string name = tr(item->getRules()->getName());
 	const UString letters = Unicode::convUtf8ToUtf32(name);
-	if (letters.size() <= 9) return name;
+	if (whole || letters.size() <= 9) return name;
 	UString brief;
 	size_t from = 0;
 	for (size_t space = letters.find(' '); space != UString::npos; space = letters.find(' ', from))
@@ -442,6 +538,42 @@ std::string FirstPersonMapState::weaponOf(const BattleUnit *unit) const
 	}
 	brief += letters.substr(from, 7);
 	return Unicode::convUtf32ToUtf8(brief);
+}
+
+/**
+ * What the line along the bottom says of a unit, piece by piece, each in its colour (the owner: "soldier name,
+ * health, TU remaining and his/hers weapon - all in colored text as in hud"). One of ours: its number and name, its
+ * health, its time units and the weapon in hand, each in the colour the 3D view's panel has it in. Anyone else: its
+ * name in its dot's colour, what it holds if the game would name it, and how far it is from the selected soldier.
+ * Anyone on another level than the one looked at: which.
+ * @param unit The unit.
+ * @param brief How much about the weapon: 0 as the 3D view's panel words it, with its rounds; 1 its name; 2 the few
+ *   letters under the dots.
+ * @return The pieces, left to right.
+ */
+std::vector<FirstPersonMapState::Piece> FirstPersonMapState::statusOf(BattleUnit *unit, int brief) const
+{
+	std::vector<Piece> pieces;
+	const bool ours = unit->getFaction() == FACTION_PLAYER;
+	std::string name = unit->getName(_game->getLanguage());
+	if (const int number = numberOf(unit)) name = std::to_string(number) + " " + name;
+	pieces.push_back({ name, ours ? _nameColour : unit->getFaction() == FACTION_HOSTILE ? _enemy : _other });
+	if (ours)
+	{
+		// (an overkill leaves the health below zero)
+		pieces.push_back({ std::string(tr("STR_FPS_TMAP_HEALTH").arg(std::max(0, unit->getHealth())).arg(unit->getBaseStats()->health)), _healthColour });
+		pieces.push_back({ std::string(tr("STR_FPS_TMAP_TIME").arg(unit->getTimeUnits()).arg(unit->getBaseStats()->tu)), _timeColour });
+	}
+	const std::string weapon = brief < 2 && ours && _setup.weaponWords ? _setup.weaponWords(unit, brief == 0) : weaponOf(unit, brief < 2);
+	if (!weapon.empty()) pieces.push_back({ weapon, _weaponColour });
+	const BattleUnit *selected = _save->getSelectedUnit();
+	if (!ours && selected && selected != unit && !selected->isOut())
+	{
+		const int dx = unit->getPosition().x - selected->getPosition().x, dy = unit->getPosition().y - selected->getPosition().y;
+		pieces.push_back({ std::string(tr("STR_FPS_TMAP_AWAY").arg((int)std::lround(std::sqrt((double)(dx * dx + dy * dy))))), _white });
+	}
+	if (unit->getPosition().z != _level) pieces.push_back({ std::string(tr("STR_FPS_TMAP_ON_LEVEL").arg(unit->getPosition().z + 1)), _grey });
+	return pieces;
 }
 
 /**
@@ -529,8 +661,9 @@ void FirstPersonMapState::updateHelmet()
 
 /**
  * Draws the map: the tiles enlarged, the items on the floors, the selected soldier's reach, the cones, the dots, the
- * names and the weapons, then the buttons, the level and the turn along the top, the helmet camera's frame and a line
- * of words along the bottom (who the pointer is on, a button's use, or how the map is worked).
+ * names and the weapons, then the buttons, the level and the turn along the top, the helmet camera's frame, and
+ * along the bottom the line about the unit the pointer is on, else the selected soldier (see statusOf), with the help
+ * over it while that is switched on (a button's use, or how the map is worked).
  */
 void FirstPersonMapState::draw()
 {
@@ -705,12 +838,12 @@ void FirstPersonMapState::draw()
 	for (const Button &button : _buttons)
 	{
 		const bool off = (button.kind == BUTTON_NAMES && !Names) || (button.kind == BUTTON_CONES && !Cones) || (button.kind == BUTTON_WEAPONS && !Weapons)
-			|| (button.kind == BUTTON_REACH && !Reach) || (button.kind == BUTTON_CAMERA && !Helmet);
+			|| (button.kind == BUTTON_REACH && !Reach) || (button.kind == BUTTON_CAMERA && !Helmet) || (button.kind == BUTTON_HELP && !Help);
 		_view->drawRect((Sint16)button.box.x, (Sint16)button.box.y, (Sint16)button.box.w, (Sint16)button.box.h, &button == under ? _white : _edge);
 		_view->drawRect((Sint16)(button.box.x + _ui), (Sint16)(button.box.y + _ui), (Sint16)(button.box.w - 2 * _ui), (Sint16)(button.box.h - 2 * _ui), _panel);
 		_words->setText(button.words);
 		write(button.words, button.box.x + (button.box.w - big(_words->getTextWidth())) / 2, button.box.y + (big(ButtonHigh) - big(WordsHigh)) / 2 + _ui, off ? _grey : _white, false);
-		if (button.kind != BUTTON_CLOSE && (button.box.y > lastTop || (button.box.y == lastTop && button.box.x + button.box.w > lastRight)))
+		if (button.kind != BUTTON_CLOSE && button.kind != BUTTON_HELP && (button.box.y > lastTop || (button.box.y == lastTop && button.box.x + button.box.w > lastRight)))
 		{
 			lastTop = button.box.y;
 			lastRight = button.box.x + button.box.w;
@@ -718,7 +851,7 @@ void FirstPersonMapState::draw()
 	}
 	const std::string level = tr("STR_FPS_TMAP_LEVEL").arg(_level + 1).arg(_save->getMapSizeZ()), turn = tr("STR_FPS_TMAP_TURN").arg(_save->getTurn());
 	_words->setText(level + "   " + turn);
-	const int rowEnd = lastTop == big(ButtonGap) ? _buttons.front().box.x : width;
+	const int rowEnd = lastTop == big(ButtonGap) ? _cornerLeft : width;
 	const bool beside = lastRight + 3 * big(ButtonGap) + big(_words->getTextWidth()) + 3 * big(ButtonGap) < rowEnd;
 	const int wordsX = beside ? lastRight + 3 * big(ButtonGap) : big(ButtonGap) + _ui;
 	const int wordsY = beside ? lastTop + (big(ButtonHigh) - big(WordsHigh)) / 2 + _ui : lastTop + big(ButtonHigh) + big(ButtonGap) + _ui;
@@ -737,30 +870,39 @@ void FirstPersonMapState::draw()
 		write(title, x + _ui, y - big(WordsHigh), _white, false);
 	}
 
-	// The line along the bottom: the button under the pointer, or the unit (its name; one of ours: its time units and
-	// health; anyone else: how far from the selected soldier), or how the map is worked.
-	std::string line = tr("STR_FPS_TMAP_HINT");
+	// The line along the bottom: the unit the pointer is on, else the selected soldier, piece by piece in their colours
+	// on one dark plate (see statusOf), with as much about the weapon as the screen has room for.
+	const int left = big(ButtonGap) + _ui, room = width - 2 * left, rowHigh = big(WordsHigh) + _ui, bottom = height - big(WordsHigh) - big(ButtonGap);
 	const Dot *pointed = under ? nullptr : dotAt(_mouseX, _mouseY);
-	if (under)
+	BattleUnit *told = pointed ? pointed->unit : _save->getSelectedUnit();
+	if (shows(told))
 	{
-		line = under->tip;
+		std::vector<Piece> pieces;
+		int wide = 0;
+		for (int brief = 0; brief < 3; ++brief)
+		{
+			pieces = statusOf(told, brief);
+			wide = -big(StatusGap);
+			for (const Piece &piece : pieces) wide += wideOf(piece.words) + big(StatusGap);
+			if (wide <= room) break;
+		}
+		_view->drawRect((Sint16)(left - _ui), (Sint16)(bottom - _ui), (Sint16)(std::min(wide, room) + 2 * _ui), (Sint16)rowHigh, _panel);
+		int x = left;
+		for (const Piece &piece : pieces)
+		{
+			x += write(piece.words, x, bottom, piece.colour, false) + big(StatusGap);
+		}
 	}
-	else if (pointed)
+	// The help, over that line while it is switched on: what the button under the pointer does, else how the map is
+	// worked; in as many rows as it needs here, the last right over the line.
+	if (Help)
 	{
-		const BattleUnit *unit = pointed->unit;
-		line = unit->getName(_game->getLanguage());
-		if (unit->getFaction() == FACTION_PLAYER)
+		const std::vector<std::string> rows = wrapped(under ? under->tip : _hint, room);
+		for (size_t row = 0; row < rows.size(); ++row)
 		{
-			line += "   " + std::string(tr("STR_FPS_TMAP_SOLDIER").arg(unit->getTimeUnits()).arg(unit->getBaseStats()->tu).arg(unit->getHealth()).arg(unit->getBaseStats()->health));
+			write(rows[row], left, bottom - (int)(rows.size() - row) * rowHigh, under ? _white : _grey, true);
 		}
-		else if (selected && !selected->isOut())
-		{
-			const int dx = unit->getPosition().x - selected->getPosition().x, dy = unit->getPosition().y - selected->getPosition().y;
-			line += "   " + std::string(tr("STR_FPS_TMAP_AWAY").arg((int)std::lround(std::sqrt((double)(dx * dx + dy * dy)))));
-		}
-		if (unit->getPosition().z != _level) line += "   " + std::string(tr("STR_FPS_TMAP_ON_LEVEL").arg(unit->getPosition().z + 1));
 	}
-	write(line, big(ButtonGap) + _ui, height - big(WordsHigh) - big(ButtonGap), pointed || under ? _white : _grey, true);
 }
 
 /**
@@ -823,13 +965,17 @@ void FirstPersonMapState::press(ButtonKind kind)
 	case BUTTON_CONES: Cones = !Cones; break;
 	case BUTTON_REACH: Reach = !Reach; break;
 	case BUTTON_CAMERA: Helmet = !Helmet; break;
+	case BUTTON_HELP:
+		Help = !Help;
+		placeHelmet(); // (the help's rows are under the camera's picture)
+		break;
 	case BUTTON_CLOSE: close(); return;
 	}
 	_dirty = true;
 }
 
 /**
- * Looks a level up or down (the game's map: its two buttons, the wheel).
+ * Looks a level up or down (the game's map: its two buttons; its wheel is the zoom's here, the level's with Ctrl).
  * @param by Levels up.
  */
 void FirstPersonMapState::changeLevel(int by)
@@ -846,6 +992,22 @@ void FirstPersonMapState::changeZoom(int by)
 {
 	Zoom = std::clamp(Zoom + by, 1, ZoomMost * _ui);
 	_dirty = true;
+}
+
+/**
+ * Enlarges the map a step, or makes it a step smaller, about a place on the screen: the tile there stays there (the
+ * wheel: the tile under the pointer; the owner: "the mouse wheel should not scroll levels of the map up down but zoom
+ * the map in/out").
+ * @param by Steps bigger.
+ * @param x, y The place on the screen.
+ */
+void FirstPersonMapState::zoomAt(int by, int x, int y)
+{
+	const double offX = x - _view->getWidth() / 2.0, offY = y - _view->getHeight() / 2.0;
+	const double tileX = _centreX + offX / cell(), tileY = _centreY + offY / cell();
+	changeZoom(by);
+	_centreX = tileX - offX / cell();
+	_centreY = tileY - offY / cell();
 }
 
 /**
@@ -960,7 +1122,8 @@ void FirstPersonMapState::viewRelease(Action *action)
 }
 
 /**
- * The pointer moves over the map: a drag scrolls it; else the button or the unit under it is told of along the bottom.
+ * The pointer moves over the map: a drag scrolls it; else the unit under it is told of along the bottom (and the
+ * button under it by the help).
  * @param action The move.
  */
 void FirstPersonMapState::viewOver(Action *action)
@@ -984,10 +1147,10 @@ void FirstPersonMapState::viewOver(Action *action)
 }
 
 /**
- * The wheel and the keys. The wheel: a level up or down (the game's map's), with Ctrl the zoom. Keys: Escape, the
- * map's key or OK closes; the arrows scroll; the game's level keys, Page Up and Page Down change the level; + and -
- * zoom; Home (or the game's key that centres on the unit) puts the selected soldier in the middle; the game's next
- * and previous unit keys select them.
+ * The wheel and the keys. The wheel: the map bigger or smaller about the tile under the pointer; with Ctrl a level up
+ * or down (the game's map's wheel). Keys: Escape, the map's key or OK closes; the arrows scroll; the game's level
+ * keys, Page Up and Page Down change the level; + and - zoom; Home (or the game's key that centres on the unit) puts
+ * the selected soldier in the middle; the game's next and previous unit keys select them; F1 the help.
  * @param action What happened.
  */
 void FirstPersonMapState::handle(Action *action)
@@ -997,8 +1160,12 @@ void FirstPersonMapState::handle(Action *action)
 	if (event->type == SDL_MOUSEBUTTONDOWN && (event->button.button == SDL_BUTTON_WHEELUP || event->button.button == SDL_BUTTON_WHEELDOWN))
 	{
 		const int by = event->button.button == SDL_BUTTON_WHEELUP ? 1 : -1;
-		if (_game->isCtrlPressed()) changeZoom(by);
-		else changeLevel(by);
+		// (where the wheel turned, as the view was told of it; never told: where the pointer was last, else the middle)
+		const int x = action->getAbsoluteXMouse() >= 0 ? (int)std::floor(action->getAbsoluteXMouse()) : _mouseX;
+		const int y = action->getAbsoluteYMouse() >= 0 ? (int)std::floor(action->getAbsoluteYMouse()) : _mouseY;
+		if (_game->isCtrlPressed()) changeLevel(by);
+		else if (x >= 0 && y >= 0) zoomAt(by, x, y);
+		else changeZoom(by);
 	}
 	else if (event->type == SDL_KEYDOWN)
 	{
@@ -1016,6 +1183,7 @@ void FirstPersonMapState::handle(Action *action)
 		else if (key == SDLK_HOME || key == Options::keyBattleCenterUnit) press(BUTTON_CENTRE);
 		else if (key == Options::keyBattleNextUnit) nextSoldier(1);
 		else if (key == Options::keyBattlePrevUnit) nextSoldier(-1);
+		else if (key == SDLK_F1) press(BUTTON_HELP);
 		_dirty = true;
 	}
 }

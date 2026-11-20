@@ -75,16 +75,22 @@ class Timer;
  * faces: ours green with its number in the squad, the selected one blue (its cone the way the 3D view looks), an enemy
  * red with its kind's first letters, anyone else yellow. A unit on another level than the one looked at is a ring,
  * with a mark for above or below.
- * All the game's map does is here: the level up and down (buttons, the wheel), a click centres the map there, a drag
- * scrolls it, OK, Escape, the map key or the right button closes it, and the battle's own view is left looking where
- * the map did. More: zoom (buttons, + and -, the wheel with Ctrl), the map back on the selected soldier, the next
- * soldier, a click on one of ours selects them, the names and the cones switched off and on, the arrow keys, and a
- * line saying who the pointer is on and how far they are from the selected soldier. And: what everyone holds, in a
- * few letters under their dots; the selected soldier's reach, a blue line round every tile they can still walk to
- * with the time units and the energy they have now, by the game's own pathfinding; and a helmet camera in a corner,
- * live: the soldier's the pointer is on, else the selected one's, turned to an enemy the pointer is on. A click on
- * the selected soldier closes the map into their 3D view. On a big screen everything is drawn bigger, by the 3D
- * view's own rule for its overlays; the tiles by the zoom alone.
+ * All the game's map does is here: the level up and down (buttons, the wheel with Ctrl), a click centres the map
+ * there, a drag scrolls it, OK, Escape, the map key or the right button closes it, and the battle's own view is left
+ * looking where the map did. More: zoom (the wheel, about the tile under the pointer; buttons, + and -), the map back
+ * on the selected soldier, the next soldier, a click on one of ours selects them, the names and the cones switched
+ * off and on, and the arrow keys. And: what everyone holds, in a few letters under their dots; the selected soldier's
+ * reach, a blue line round every tile they can still walk to with the time units and the energy they have now, by
+ * the game's own pathfinding; and a helmet camera in a corner, live: the soldier's the pointer is on, else the
+ * selected one's, turned to an enemy the pointer is on. A click on the selected soldier closes the map into their 3D
+ * view. On a big screen everything is drawn bigger, by the 3D view's own rule for its overlays; the tiles by the
+ * zoom alone.
+ * Along the bottom (the owner: "at the bottom is soldier name, health, TU remaining and his/hers weapon - all in
+ * colored text as in hud"): the selected soldier's name, health, time units and weapon in hand, each in the colour
+ * the 3D view's own panel has it in; with the pointer on a unit, that unit's (anyone not ours: its name, what it
+ * holds if the game would name it, how far it is from the selected soldier). The ? button left of OK (the owner: "a
+ * help buton that toggles the help as is now at the bottom") shows, over that line, how the map is worked, or what
+ * the button under the pointer does; off, there is no help.
  */
 class FirstPersonMapState : public State
 {
@@ -104,6 +110,12 @@ public:
 		/// it through a soldier's eyes, at a unit if one is given (the 3D view's own cameras, see aimHelmetCamera).
 		std::function<Surface*(State*, int, int)> makeCamera;
 		std::function<void(Surface*, BattleUnit*, const BattleUnit*)> aimCamera;
+		/// The colours the 3D view's own panel writes a soldier's name, health, time units and weapon in (words' colours
+		/// in the battle's palette; hasPanelColours false: the map's own), and its words for the weapon a soldier has in
+		/// hand, as its panel's line has them: the name, and with true its rounds after it (null: the item's name).
+		bool hasPanelColours = false;
+		Uint8 nameColour = 0, healthColour = 0, timeColour = 0, weaponColour = 0;
+		std::function<std::string(BattleUnit*, bool)> weaponWords;
 	};
 	/// Creates the tactical map.
 	FirstPersonMapState(Camera *camera, SavedBattleGame *save, int maxShade, const Setup &setup);
@@ -116,7 +128,7 @@ public:
 
 private:
 	/// A button of the map: what it does, its place, its words.
-	enum ButtonKind { BUTTON_LEVEL_UP, BUTTON_LEVEL_DOWN, BUTTON_ZOOM_OUT, BUTTON_ZOOM_IN, BUTTON_CENTRE, BUTTON_NEXT, BUTTON_NAMES, BUTTON_WEAPONS, BUTTON_CONES, BUTTON_REACH, BUTTON_CAMERA, BUTTON_CLOSE };
+	enum ButtonKind { BUTTON_LEVEL_UP, BUTTON_LEVEL_DOWN, BUTTON_ZOOM_OUT, BUTTON_ZOOM_IN, BUTTON_CENTRE, BUTTON_NEXT, BUTTON_NAMES, BUTTON_WEAPONS, BUTTON_CONES, BUTTON_REACH, BUTTON_CAMERA, BUTTON_HELP, BUTTON_CLOSE };
 	struct Button
 	{
 		ButtonKind kind;
@@ -128,6 +140,12 @@ private:
 	{
 		BattleUnit *unit;
 		int x, y, radius;
+	};
+	/// A piece of the line along the bottom: its words and their colour.
+	struct Piece
+	{
+		std::string words;
+		Uint8 colour;
 	};
 
 	Camera *_camera;
@@ -141,6 +159,9 @@ private:
 	Timer *_clock = nullptr;
 	std::vector<Button> _buttons;
 	std::vector<Dot> _dots;
+	int _cornerLeft = 0;                 // where the top right corner's buttons (the help, OK) begin: the first row ends there
+	std::string _hint;                   // how the map is worked (the help's words with no button under the pointer)
+	int _helpRows = 1;                   // the rows the longest help needs on this screen: kept free over the bottom line while it shows
 	int _level = 0, _terrainLevel = -1;
 	double _centreX = 0.0, _centreY = 0.0; // the tile in the middle of the screen
 	int _frame = 0;                        // the animation's (the items blink, the selected dot beats)
@@ -152,6 +173,8 @@ private:
 	double _pressCentreX = 0.0, _pressCentreY = 0.0;
 	// the colours, found in the battle's palette
 	Uint8 _black = 0, _dark = 0, _panel = 0, _edge = 0, _white = 0, _grey = 0, _ours = 0, _selected = 0, _enemy = 0, _other = 0, _item = 0;
+	// the bottom line's: a soldier's name, health, time units and weapon (the 3D view's own panel's, see Setup)
+	Uint8 _nameColour = 0, _healthColour = 0, _timeColour = 0, _weaponColour = 0;
 
 	// big screens: everything but the tiles is drawn this many times as big (see Setup::uiScale)
 	int _ui = 1;
@@ -171,7 +194,11 @@ private:
 	void updateReach();
 	void drawReach(int originX, int originY);
 	void updateHelmet();
-	std::string weaponOf(const BattleUnit *unit) const;
+	void placeHelmet();
+	std::string weaponOf(const BattleUnit *unit, bool whole = false) const;
+	std::vector<Piece> statusOf(BattleUnit *unit, int brief) const;
+	std::vector<std::string> wrapped(const std::string &text, int room) const;
+	int wideOf(const std::string &text) const;
 	void layOut();
 	void rebuildTerrain();
 	void draw();
@@ -186,6 +213,7 @@ private:
 	void press(ButtonKind kind);
 	void changeLevel(int by);
 	void changeZoom(int by);
+	void zoomAt(int by, int x, int y);
 	void centreOn(const BattleUnit *unit);
 	void nextSoldier(int by);
 	void close();
