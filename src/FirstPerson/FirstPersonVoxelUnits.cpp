@@ -805,6 +805,17 @@ const VoxelUnitModel *VoxelUnits::bodyNow(const BattleUnit *unit)
 }
 
 /**
+ * Whether the builder has no body left to make of those asked for so far: none waiting, none being made (those made
+ * are taken at the next modelFor or bodyNow).
+ * @return True if so.
+ */
+bool VoxelUnits::idle()
+{
+	std::lock_guard<std::mutex> lock(_mutex);
+	return _jobs.empty() && _building == 0;
+}
+
+/**
  * The bodies are for this battle (each 3D view says so as it gets its battle): every body is forgotten if they were
  * another battle's; views of the same battle share them.
  * @param save The battle.

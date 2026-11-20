@@ -36698,10 +36698,10 @@ index 000000000..1974311f2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..c86596d7e
+index 000000000..fc06a2953
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3451 @@
+@@ -0,0 +1,3556 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36781,6 +36781,7 @@ index 000000000..c86596d7e
 +#include "../Battlescape/WarningMessage.h"
 +#include "../Engine/Action.h"
 +#include "../Engine/Game.h"
++#include "../Engine/Logger.h"
 +#include "../Engine/Options.h"
 +#include "../Engine/Screen.h"
 +#include "../Engine/Timer.h"
@@ -37739,9 +37740,21 @@ index 000000000..c86596d7e
 + */
 +bool FirstPersonMode::canvasTarget(int &width, int &height) const
 +{
++	return canvasTargetWhen(isActive(), width, height);
++}
++
++/**
++ * What the canvas is magnified onto with 3D showing, or with the map (see canvasTarget; primeView asks what it will
++ * be once 3D shows).
++ * @param active Whether 3D shows.
++ * @param width, height Its size, in its own pixels.
++ * @return True for the display.
++ */
++bool FirstPersonMode::canvasTargetWhen(bool active, int &width, int &height) const
++{
 +	width = Options::baseXResolution;
 +	height = Options::baseYResolution;
-+	if (!isActive() || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
++	if (!active || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
 +	{
 +		return false;
 +	}
@@ -37837,6 +37850,7 @@ index 000000000..c86596d7e
 +	delete _view;
 +	_view = newView;
 +	_trackedUnit = nullptr; // re-place the camera
++	_viewPrimed = false; // (a new view sends the world to the card anew: see primeView)
 +	makeSoldierCamView(); // (its size follows the canvas)
 +}
 +
@@ -38916,8 +38930,10 @@ index 000000000..c86596d7e
 + * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
 + * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
 + * picture. (By the time it takes, not by a count: a hundred units alike used to be gathered in one frame, see modelFor.)
++ * @param milliseconds The time frames are gathered for at most (a frame's: VoxelBodiesMs; where a battle begins, more:
++ *   see primeView).
 + */
-+void FirstPersonMode::makeVoxelBodies()
++void FirstPersonMode::makeVoxelBodies(double milliseconds)
 +{
 +	if (!_bodySurface)
 +	{
@@ -38936,9 +38952,95 @@ index 000000000..c86596d7e
 +		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 +			_state->getPalette(), builds, walkPhase);
 +		// (its frames were gathered: is there time for another's?)
-+		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= VoxelBodiesMs) break;
++		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= milliseconds) break;
 +	}
 +	_bodySurface->clear();
++}
++
++/**
++ * The first 3D frame's waiting, done where a battle begins (the owner: "Can we move shader loading the first time
++ * into battle load? (players are confused as game freezes for 2s upon first click on 3D icon in battlescape)"). With
++ * the setting "Renderer" on GPU the first frame of the 3D view in a battle is slow: the driver finishes each program
++ * the first time something is drawn with it, the pictures the card draws into are made, and the whole map and the
++ * units' bodies are sent to the card. So that frame is drawn ahead here, unseen, while the map shows: through the
++ * eyes of the soldier the view will open on, the way they face, with the view's own settings, as the first click of
++ * the 3D button would draw it; that click then finds everything there.
++ * The battle's first frame comes while the screen before it still shows (the loading box, the next turn's screen),
++ * so it waits there for a card that is still being opened (PrimeCardWaitMs at most: the driver builds the shaders
++ * then), and with "Voxel units" for the bodies (PrimeBodiesMs at most), so their program is finished and they are
++ * sent too. A card ready only later (the first run on a machine, the shaders built for many seconds; the renderer
++ * switched to GPU in a battle) has its frame drawn ahead when it is, if the map still shows. With 3D showing first,
++ * the view's own first frame on the card does the same, as before. Not in VR mode, nor on a headset at all (its
++ * frames are its shell's).
++ * @param unit The soldier 3D would look through now, or null for none.
++ */
++void FirstPersonMode::primeView(BattleUnit *unit)
++{
++#ifdef __ANDROID__
++	(void)unit; // (a headset's frames, the pane's too, come as its shell asks for them: left as they were)
++#else
++	if (_viewPrimed || Options::fpsRenderer != 1 || vrOn())
++	{
++		return;
++	}
++	const bool first = !_primeAsked;
++	_primeAsked = true;
++	if (isActive())
++	{
++		// (3D shows from the battle's start: the view's own frames do it, on the card from the first if it is there in
++		// time; nothing is left once the card draws them)
++		_viewPrimed = FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0);
++		return;
++	}
++	if (!unit || unit->isOut() || !unit->getTile())
++	{
++		return;
++	}
++	const auto began = std::chrono::steady_clock::now();
++	if (!FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0))
++	{
++		return;
++	}
++	const double cardWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count();
++	// The bodies first, where the battle begins: everyone's frames gathered, and the builder's threads waited for.
++	const auto bodiesBegan = std::chrono::steady_clock::now();
++	if (Options::fpsVoxelUnits && first)
++	{
++		for (;;)
++		{
++			const double waited = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
++			makeVoxelBodies(std::max(VoxelBodiesMs, PrimeBodiesMs - waited));
++			if (_voxelUnits->idle() || waited >= PrimeBodiesMs) break;
++			SDL_Delay(2);
++		}
++		makeVoxelBodies(VoxelBodiesMs); // (takes what the builder made last)
++	}
++	const double bodiesWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
++	// The view as the first click will have it: in full colour if 3D is laid into the display then (see think), from
++	// the middle of the soldier's tile at their eyes' height, the way they face (see updateCamera, aimHelmetCamera).
++	const auto frameBegan = std::chrono::steady_clock::now();
++	int width, height;
++	_view->setWantsTrueColor(Options::fpsTrueColor && canvasTargetWhen(true, width, height));
++	_view->setCameraUnit(unit);
++	const Position position = unit->getPosition();
++	const int unitSize = unit->getArmor()->getSize();
++	_view->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
++	_view->lookAlong(unit->getDirection());
++	_view->setShowFacing(false);
++	_view->setFieldOfView(fieldOfViewNow(), 1.0);
++	_view->setSmoothLighting(Options::fpsSmoothLighting);
++	_view->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
++	_view->setNightVision(_state->_map->getNightVisionColor());
++	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
++	_view->setFlashlight(_flashlightOn, true);
++	_view->invalidate();
++	_view->draw();
++	_viewPrimed = true;
++	_trackedUnit = nullptr; // (the camera is placed afresh when 3D shows)
++	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
++		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "
++		<< (int)cardWait << " ms, the units' bodies " << (int)bodiesWait << " ms)";
++#endif
 +}
 +
 +void FirstPersonMode::think()
@@ -38984,7 +39086,7 @@ index 000000000..c86596d7e
 +	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
 +	if (Options::fpsVoxelUnits)
 +	{
-+		makeVoxelBodies();
++		makeVoxelBodies(VoxelBodiesMs);
 +	}
 +
 +	// The right button may have been let go while another screen had the mouse, or the view
@@ -39072,6 +39174,9 @@ index 000000000..c86596d7e
 +	{
 +		setActive(show3D);
 +	}
++	// The 3D view's first frame drawn ahead while the map shows (setting "Renderer": GPU): its waiting is done where
++	// the battle begins, not at the first click of the 3D button.
++	primeView(playerTurn ? selected : _lastPlayerUnit);
 +
 +	// What runs in both views: the top bar, the soldier card, the map camera, the music, aiming
 +	// on the isometric map, akimbo's second shot in turn and flight.
@@ -40155,10 +40260,10 @@ index 000000000..c86596d7e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..becbd6e3e
+index 000000000..2c22616d0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1576 @@
+@@ -0,0 +1,1582 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -40420,7 +40525,11 @@ index 000000000..becbd6e3e
 +	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
 +	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
 +	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
-+	void makeVoxelBodies();
++	void makeVoxelBodies(double milliseconds);
++	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
++	void primeView(BattleUnit *unit);
++	bool _primeAsked = false;              // the battle's first frame has had its chance to wait for the card (see primeView)
++	bool _viewPrimed = false;              // the 3D view has drawn a frame on the card: nothing is left to wait for
 +	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 +	FirstPersonAmbience *_ambience = nullptr; // the rain, the wind and the fires near the soldier (setting "Ambient sounds")
 +	bool _wants3D;                         // the player switched to 3D
@@ -40570,6 +40679,8 @@ index 000000000..becbd6e3e
 +	int canvasHeight() const;
 +	/// What the canvas is magnified onto now, and its size: the game's screen (false) or the display (true).
 +	bool canvasTarget(int &width, int &height) const;
++	/// The same with 3D showing or not, whichever shows now.
++	bool canvasTargetWhen(bool active, int &width, int &height) const;
 +	/// Lays the overlays out again if the canvas's target or scale is no longer what they were laid out for.
 +	void relayoutIfNeeded();
 +	/// Lays the overlays out for the canvas as it should be now.
@@ -48114,10 +48225,10 @@ index 000000000..68dace111
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..3b8729d0a
+index 000000000..f68c153e8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,564 @@
+@@ -0,0 +1,569 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -48576,6 +48687,11 @@ index 000000000..3b8729d0a
 +/// many milliseconds a frame (one unit's at least; see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too,
 +/// VoxelBuildsPerFrame).
 +const double VoxelBodiesMs = 2.0;
++/// The first 3D frame's waiting is done where a battle begins (see FirstPersonMode::primeView): the graphics card is
++/// waited for this long at most while it is still being opened (the driver building the shaders: under a second
++/// where it kept them from last time), and the units' bodies this long at most.
++const int PrimeCardWaitMs = 8000;
++const double PrimeBodiesMs = 1000.0;
 +/// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 +/// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 +/// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).
@@ -62472,10 +62588,10 @@ index 000000000..bd8108f56
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..074477104
+index 000000000..2b118a6ed
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1857 @@
+@@ -0,0 +1,1859 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -62826,6 +62942,8 @@ index 000000000..074477104
 +	bool shown() const { return getVisible() && !_hidden; }
 +	/// Asks for the world in full colour too (setting "True colour"): the mode, for the view it lays into the display itself.
 +	void setWantsTrueColor(bool wanted) { _wantsTrueColor = wanted; }
++	/// Whether the graphics card draws the frames now (setting "Renderer": GPU), after waiting so long at most for one being opened.
++	static bool gpuReady(int waitMilliseconds);
 +	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 +	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
 +	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
@@ -66208,10 +66326,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..d5a05cb89
+index 000000000..446909fa3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,772 @@
+@@ -0,0 +1,802 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -66286,6 +66404,7 @@ index 000000000..d5a05cb89
 +{
 +	std::unique_ptr<FirstPersonGpu> gpu;
 +	std::atomic<FirstPersonGpu*> ready { nullptr };
++	std::atomic<bool> opened { false }; // (the opening is over, with a card or without)
 +	std::thread opening;
 +	bool tried = false;
 +	~SharedGpu()
@@ -66294,9 +66413,10 @@ index 000000000..d5a05cb89
 +	}
 +};
 +
-+FirstPersonGpu *sharedGpu(bool open)
++FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
 +{
 +	static SharedGpu shared;
++	if (opened) *opened = shared.opened.load();
 +	if (open && !shared.tried)
 +	{
 +		shared.tried = true;
@@ -66307,6 +66427,7 @@ index 000000000..d5a05cb89
 +			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
 +				| (Options::fpsSupersampling > 0 ? 4 : 0));
 +			shared.ready = shared.gpu.get();
++			shared.opened = true;
 +		});
 +	}
 +	return shared.ready.load();
@@ -66602,6 +66723,33 @@ index 000000000..d5a05cb89
 +	{
 +		sharedGpu(true);
 +	}
++}
++
++/**
++ * Whether the card is there to draw on (setting "Renderer": GPU), opening it if nobody asked for it yet; and waits
++ * for one still being opened, so long at most (the driver builds the shaders then: under a second where it kept them
++ * from last time, many seconds the first time on a machine).
++ * @param waitMilliseconds How long to wait at most; 0: not at all.
++ * @return True if frames are drawn on the card from now on.
++ */
++bool FirstPersonView::gpuReady(int waitMilliseconds)
++{
++	if (Options::fpsRenderer != 1)
++	{
++		return false;
++	}
++	const auto start = std::chrono::steady_clock::now();
++	bool opened = false;
++	while (!sharedGpu(true, &opened))
++	{
++		// (opened and none ready: there is no card; or the time is up)
++		if (opened || std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= waitMilliseconds)
++		{
++			return sharedGpu(false) != nullptr;
++		}
++		std::this_thread::sleep_for(std::chrono::milliseconds(2));
++	}
++	return true;
 +}
 +
 +void FirstPersonView::gpuForgetModels()
@@ -90537,10 +90685,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..628e6fc8c
+index 000000000..dbf9e3645
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1109 @@
+@@ -0,0 +1,1120 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -91348,6 +91496,17 @@ index 000000000..628e6fc8c
 +}
 +
 +/**
++ * Whether the builder has no body left to make of those asked for so far: none waiting, none being made (those made
++ * are taken at the next modelFor or bodyNow).
++ * @return True if so.
++ */
++bool VoxelUnits::idle()
++{
++	std::lock_guard<std::mutex> lock(_mutex);
++	return _jobs.empty() && _building == 0;
++}
++
++/**
 + * The bodies are for this battle (each 3D view says so as it gets its battle): every body is forgotten if they were
 + * another battle's; views of the same battle share them.
 + * @param save The battle.
@@ -91652,10 +91811,10 @@ index 000000000..628e6fc8c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..b70e8e5cc
+index 000000000..b399b4dc8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,255 @@
+@@ -0,0 +1,257 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -91862,6 +92021,8 @@ index 000000000..b70e8e5cc
 +	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
 +	/// standing body.
 +	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
++	/// Whether the builder has no body left to make of those asked for so far (none waiting, none being made).
++	bool idle();
 +	/// The bodies are for this battle: every body forgotten if they were another's.
 +	void forBattle(const SavedBattleGame *save);
 +	/// Forgets every body, and those being made (a new battle).

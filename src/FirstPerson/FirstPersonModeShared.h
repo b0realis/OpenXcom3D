@@ -456,6 +456,11 @@ const double Pi = 3.14159265358979323846;
 /// many milliseconds a frame (one unit's at least; see FirstPersonMode::makeVoxelBodies; the 3D views make theirs too,
 /// VoxelBuildsPerFrame).
 const double VoxelBodiesMs = 2.0;
+/// The first 3D frame's waiting is done where a battle begins (see FirstPersonMode::primeView): the graphics card is
+/// waited for this long at most while it is still being opened (the driver building the shaders: under a second
+/// where it kept them from last time), and the units' bodies this long at most.
+const int PrimeCardWaitMs = 8000;
+const double PrimeBodiesMs = 1000.0;
 /// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 /// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid
 /// (yellow-green), smoke (grey); a mod's own types (10 to 19) AmmoTagModColor (purple).

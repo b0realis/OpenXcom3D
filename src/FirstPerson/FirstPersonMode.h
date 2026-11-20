@@ -259,7 +259,11 @@ private:
 	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
 	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
 	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
-	void makeVoxelBodies();
+	void makeVoxelBodies(double milliseconds);
+	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
+	void primeView(BattleUnit *unit);
+	bool _primeAsked = false;              // the battle's first frame has had its chance to wait for the card (see primeView)
+	bool _viewPrimed = false;              // the 3D view has drawn a frame on the card: nothing is left to wait for
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
 	FirstPersonAmbience *_ambience = nullptr; // the rain, the wind and the fires near the soldier (setting "Ambient sounds")
 	bool _wants3D;                         // the player switched to 3D
@@ -409,6 +413,8 @@ private:
 	int canvasHeight() const;
 	/// What the canvas is magnified onto now, and its size: the game's screen (false) or the display (true).
 	bool canvasTarget(int &width, int &height) const;
+	/// The same with 3D showing or not, whichever shows now.
+	bool canvasTargetWhen(bool active, int &width, int &height) const;
 	/// Lays the overlays out again if the canvas's target or scale is no longer what they were laid out for.
 	void relayoutIfNeeded();
 	/// Lays the overlays out for the canvas as it should be now.

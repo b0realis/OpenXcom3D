@@ -72,6 +72,7 @@ struct SharedGpu
 {
 	std::unique_ptr<FirstPersonGpu> gpu;
 	std::atomic<FirstPersonGpu*> ready { nullptr };
+	std::atomic<bool> opened { false }; // (the opening is over, with a card or without)
 	std::thread opening;
 	bool tried = false;
 	~SharedGpu()
@@ -80,9 +81,10 @@ struct SharedGpu
 	}
 };
 
-FirstPersonGpu *sharedGpu(bool open)
+FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
 {
 	static SharedGpu shared;
+	if (opened) *opened = shared.opened.load();
 	if (open && !shared.tried)
 	{
 		shared.tried = true;
@@ -93,6 +95,7 @@ FirstPersonGpu *sharedGpu(bool open)
 			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
 				| (Options::fpsSupersampling > 0 ? 4 : 0));
 			shared.ready = shared.gpu.get();
+			shared.opened = true;
 		});
 	}
 	return shared.ready.load();
@@ -388,6 +391,33 @@ void FirstPersonView::gpuWarmUp()
 	{
 		sharedGpu(true);
 	}
+}
+
+/**
+ * Whether the card is there to draw on (setting "Renderer": GPU), opening it if nobody asked for it yet; and waits
+ * for one still being opened, so long at most (the driver builds the shaders then: under a second where it kept them
+ * from last time, many seconds the first time on a machine).
+ * @param waitMilliseconds How long to wait at most; 0: not at all.
+ * @return True if frames are drawn on the card from now on.
+ */
+bool FirstPersonView::gpuReady(int waitMilliseconds)
+{
+	if (Options::fpsRenderer != 1)
+	{
+		return false;
+	}
+	const auto start = std::chrono::steady_clock::now();
+	bool opened = false;
+	while (!sharedGpu(true, &opened))
+	{
+		// (opened and none ready: there is no card; or the time is up)
+		if (opened || std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() >= waitMilliseconds)
+		{
+			return sharedGpu(false) != nullptr;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+	}
+	return true;
 }
 
 void FirstPersonView::gpuForgetModels()

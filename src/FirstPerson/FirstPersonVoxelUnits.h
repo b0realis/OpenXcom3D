@@ -204,6 +204,8 @@ public:
 	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
 	/// standing body.
 	const VoxelUnitModel *bodyNow(const BattleUnit *unit);
+	/// Whether the builder has no body left to make of those asked for so far (none waiting, none being made).
+	bool idle();
 	/// The bodies are for this battle: every body forgotten if they were another's.
 	void forBattle(const SavedBattleGame *save);
 	/// Forgets every body, and those being made (a new battle).

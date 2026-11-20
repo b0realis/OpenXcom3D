@@ -77,6 +77,7 @@
 #include "../Battlescape/WarningMessage.h"
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
+#include "../Engine/Logger.h"
 #include "../Engine/Options.h"
 #include "../Engine/Screen.h"
 #include "../Engine/Timer.h"
@@ -1035,9 +1036,21 @@ void FirstPersonMode::resized(int widthChange, int heightChange)
  */
 bool FirstPersonMode::canvasTarget(int &width, int &height) const
 {
+	return canvasTargetWhen(isActive(), width, height);
+}
+
+/**
+ * What the canvas is magnified onto with 3D showing, or with the map (see canvasTarget; primeView asks what it will
+ * be once 3D shows).
+ * @param active Whether 3D shows.
+ * @param width, height Its size, in its own pixels.
+ * @return True for the display.
+ */
+bool FirstPersonMode::canvasTargetWhen(bool active, int &width, int &height) const
+{
 	width = Options::baseXResolution;
 	height = Options::baseYResolution;
-	if (!isActive() || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
+	if (!active || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
 	{
 		return false;
 	}
@@ -1133,6 +1146,7 @@ void FirstPersonMode::remakeViewIfResized()
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
+	_viewPrimed = false; // (a new view sends the world to the card anew: see primeView)
 	makeSoldierCamView(); // (its size follows the canvas)
 }
 
@@ -2212,8 +2226,10 @@ void FirstPersonMode::updateMusic(Uint32 now)
  * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
  * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
  * picture. (By the time it takes, not by a count: a hundred units alike used to be gathered in one frame, see modelFor.)
+ * @param milliseconds The time frames are gathered for at most (a frame's: VoxelBodiesMs; where a battle begins, more:
+ *   see primeView).
  */
-void FirstPersonMode::makeVoxelBodies()
+void FirstPersonMode::makeVoxelBodies(double milliseconds)
 {
 	if (!_bodySurface)
 	{
@@ -2232,9 +2248,95 @@ void FirstPersonMode::makeVoxelBodies()
 		_voxelUnits->modelFor(unit, unitSprite, _game->getMod()->getSurfaceSet("BIGOBS.PCK"), _game->getMod()->getSurfaceSet("FLOOROB.PCK"), _save,
 			_state->getPalette(), builds, walkPhase);
 		// (its frames were gathered: is there time for another's?)
-		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= VoxelBodiesMs) break;
+		if (builds == 0 && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= milliseconds) break;
 	}
 	_bodySurface->clear();
+}
+
+/**
+ * The first 3D frame's waiting, done where a battle begins (the owner: "Can we move shader loading the first time
+ * into battle load? (players are confused as game freezes for 2s upon first click on 3D icon in battlescape)"). With
+ * the setting "Renderer" on GPU the first frame of the 3D view in a battle is slow: the driver finishes each program
+ * the first time something is drawn with it, the pictures the card draws into are made, and the whole map and the
+ * units' bodies are sent to the card. So that frame is drawn ahead here, unseen, while the map shows: through the
+ * eyes of the soldier the view will open on, the way they face, with the view's own settings, as the first click of
+ * the 3D button would draw it; that click then finds everything there.
+ * The battle's first frame comes while the screen before it still shows (the loading box, the next turn's screen),
+ * so it waits there for a card that is still being opened (PrimeCardWaitMs at most: the driver builds the shaders
+ * then), and with "Voxel units" for the bodies (PrimeBodiesMs at most), so their program is finished and they are
+ * sent too. A card ready only later (the first run on a machine, the shaders built for many seconds; the renderer
+ * switched to GPU in a battle) has its frame drawn ahead when it is, if the map still shows. With 3D showing first,
+ * the view's own first frame on the card does the same, as before. Not in VR mode, nor on a headset at all (its
+ * frames are its shell's).
+ * @param unit The soldier 3D would look through now, or null for none.
+ */
+void FirstPersonMode::primeView(BattleUnit *unit)
+{
+#ifdef __ANDROID__
+	(void)unit; // (a headset's frames, the pane's too, come as its shell asks for them: left as they were)
+#else
+	if (_viewPrimed || Options::fpsRenderer != 1 || vrOn())
+	{
+		return;
+	}
+	const bool first = !_primeAsked;
+	_primeAsked = true;
+	if (isActive())
+	{
+		// (3D shows from the battle's start: the view's own frames do it, on the card from the first if it is there in
+		// time; nothing is left once the card draws them)
+		_viewPrimed = FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0);
+		return;
+	}
+	if (!unit || unit->isOut() || !unit->getTile())
+	{
+		return;
+	}
+	const auto began = std::chrono::steady_clock::now();
+	if (!FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0))
+	{
+		return;
+	}
+	const double cardWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count();
+	// The bodies first, where the battle begins: everyone's frames gathered, and the builder's threads waited for.
+	const auto bodiesBegan = std::chrono::steady_clock::now();
+	if (Options::fpsVoxelUnits && first)
+	{
+		for (;;)
+		{
+			const double waited = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
+			makeVoxelBodies(std::max(VoxelBodiesMs, PrimeBodiesMs - waited));
+			if (_voxelUnits->idle() || waited >= PrimeBodiesMs) break;
+			SDL_Delay(2);
+		}
+		makeVoxelBodies(VoxelBodiesMs); // (takes what the builder made last)
+	}
+	const double bodiesWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
+	// The view as the first click will have it: in full colour if 3D is laid into the display then (see think), from
+	// the middle of the soldier's tile at their eyes' height, the way they face (see updateCamera, aimHelmetCamera).
+	const auto frameBegan = std::chrono::steady_clock::now();
+	int width, height;
+	_view->setWantsTrueColor(Options::fpsTrueColor && canvasTargetWhen(true, width, height));
+	_view->setCameraUnit(unit);
+	const Position position = unit->getPosition();
+	const int unitSize = unit->getArmor()->getSize();
+	_view->setEye(position.x * 16.0 + 8.0 * unitSize, position.y * 16.0 + 8.0 * unitSize, eyeHeight(unit));
+	_view->lookAlong(unit->getDirection());
+	_view->setShowFacing(false);
+	_view->setFieldOfView(fieldOfViewNow(), 1.0);
+	_view->setSmoothLighting(Options::fpsSmoothLighting);
+	_view->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
+	_view->setNightVision(_state->_map->getNightVisionColor());
+	_view->setSmokeSight(_save->getTileEngine()->getMaxViewDistance() * 16.0f, unit->getVisibilityThroughSmoke(), unit->getVisibilityThroughFire());
+	_view->setFlashlight(_flashlightOn, true);
+	_view->invalidate();
+	_view->draw();
+	_viewPrimed = true;
+	_trackedUnit = nullptr; // (the camera is placed afresh when 3D shows)
+	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
+		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "
+		<< (int)cardWait << " ms, the units' bodies " << (int)bodiesWait << " ms)";
+#endif
 }
 
 void FirstPersonMode::think()
@@ -2280,7 +2382,7 @@ void FirstPersonMode::think()
 	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
 	if (Options::fpsVoxelUnits)
 	{
-		makeVoxelBodies();
+		makeVoxelBodies(VoxelBodiesMs);
 	}
 
 	// The right button may have been let go while another screen had the mouse, or the view
@@ -2368,6 +2470,9 @@ void FirstPersonMode::think()
 	{
 		setActive(show3D);
 	}
+	// The 3D view's first frame drawn ahead while the map shows (setting "Renderer": GPU): its waiting is done where
+	// the battle begins, not at the first click of the 3D button.
+	primeView(playerTurn ? selected : _lastPlayerUnit);
 
 	// What runs in both views: the top bar, the soldier card, the map camera, the music, aiming
 	// on the isometric map, akimbo's second shot in turn and flight.
