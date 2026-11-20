@@ -136,6 +136,10 @@ const int AnimatedNearShades = 3;
 /// XPiratez's T'leth base the parts in motion have 0.21 (pedestals), 0.59 (steps folding flat) and under 0 (a
 /// hatch); a dance floor 1.00, the pyramid's floors 0.94.
 const float AnimatedPulseAlike = 0.7f;
+/// The art of an animated part that stands still in the view, its shape showing none of what changes, is drawn as a
+/// sprite (see FirstPersonView::artOverlay) if at least this many pixels change outside the shape (counted over its
+/// eight frames): a pixel or two glinting on a lava floor's edge isn't worth a sprite on every tile of the field.
+const int ArtOverlayMinPixels = 4;
 /// The marks on a UFO's tiles in FirstPersonView::_ufoPhaseOfTile, above the pulse phase (bits
 /// 0-3): a tile of the UFO, and one of its outer skin (beside a tile that isn't the UFO's).
 const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;

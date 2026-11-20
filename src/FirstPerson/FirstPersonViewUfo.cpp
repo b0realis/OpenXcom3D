@@ -470,7 +470,13 @@ void FirstPersonView::findUfos()
 				getFrames(mapData); // (makes sure its frames are known)
 				UfoModel &ufoModel = _ufoModels[mapData];
 				buildUfoModel(mapData, outward, ufoModel);
-				if (!ufoModel.model.empty)
+				// (A part whose frames' models differ and that has no light among its voxels would stand still as a
+				// steady model: a machine at work in a set a UFO is built from. It plays its frames, as anywhere else.
+				// One whose models are all alike loses nothing as a steady model, and keeps its hull's trim.)
+				bool anyLight = false;
+				for (int z = 0; z < Position::TileZ && !anyLight; ++z)
+					for (int y = 0; y < Position::TileXY && !anyLight; ++y) anyLight = ufoModel.lit[z][y] != 0;
+				if (!ufoModel.model.empty && (anyLight || !modelsAnimate(mapData)))
 				{
 					_frames[mapData].steady = &ufoModel.model;
 					++modelCount;

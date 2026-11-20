@@ -721,6 +721,8 @@ private:
 	void updateCameraEffects();
 	/// Builds every voxel model the battle can show, before it's needed.
 	void preloadModels();
+	/// A developer's check: lists every animated record of the mod's tile sets and whether its frames show in the view.
+	void checkAnimatedParts(const char *path);
 	/// The frame's work every picture of it shares (the camera's effects and axes, the tile snapshot, the colours, the
 	/// particles moved on and the shots followed): draw's first half, renderEyes's once for both eyes.
 	void beginFrame();
@@ -948,6 +950,27 @@ private:
 	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
 	const VoxelModel *partKind(const MapData *mapData, bool cutout);
 	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
+	/// The art of an animated part that its model has no voxels for, drawn as a sprite standing in its tile (see
+	/// artOverlay): a torch's flame above its holder, a hologram over its base, bubbles the game gives no shape.
+	struct ArtOverlay
+	{
+		Surface *frames[8] = {};               // the part's eight frames, only the pixels to draw (all null: nothing to draw)
+		int anchorX = 16, anchorY = 32;        // the frames' pixel that stands at the point
+		float point[3] = { 8.0f, 8.0f, 0.0f }; // the point, in the tile's voxels
+		bool lit = false;                      // the part lights its surroundings: drawn unshaded, as a flame is
+	};
+	std::unordered_map<const MapData*, ArtOverlay> _artOverlays; // by record, made the first time it is asked for
+	bool _anyArtOverlay = false;                        // ... and any of them has something to draw
+	std::vector<int> _overlaySpots;                     // where on the map such parts are (tile * 4 + part), looked for anew now and then (see drawFire)
+	int _overlaySpotsAge = 0;                           // frames until they are looked for again (0: now)
+	/// The art of an animated part its model can't show, if any.
+	const ArtOverlay *artOverlay(const MapData *mapData);
+	/// Whether a record's frames are different pictures (not only different numbers for one picture).
+	bool artAnimates(const MapData *mapData);
+	/// Whether a record's frames give different models: its animation shows in the view by its voxels.
+	bool modelsAnimate(const MapData *mapData);
+	/// Forgets them (a new battle).
+	void clearArtOverlays();
 	std::set<const MapData*> _flameParts;              // the records drawn as flames: their own art as a sprite standing on the tile (see partKind, drawFire)
 	/// What a pane of glass breaks into keeps the pane's edges in its frame (see paneOfGlass).
 	void addBrokenPaneEdges(const MapData *mapData, VoxelModel &model) const;

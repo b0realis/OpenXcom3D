@@ -3099,6 +3099,56 @@ void FirstPersonView::drawFire()
 		drawSpriteBlend(art->getFrame(object->getSprite(_calmFrame)), art->getFrame(object->getSprite((_calmFrame + 1) % 8)), _animationBlend, 16, 32 + object->getYOffset(),
 			ground, 2.0, 0, Options::fpsSmoothFire);
 	}
+	// The art of animated parts that their models can't show (see artOverlay: a torch's flame above its holder, a
+	// hologram over its base, bubbles without a shape): as sprites standing in their tiles, in the tile's light unless
+	// the part is a light itself, the frame the calm clock shows flowing into the next. With "Parts without shape" on
+	// lifts and ladders only, the lights among them; off, none.
+	FirstPersonView *owner = _sharedModelsOwner ? _sharedModelsOwner : this;
+	if (owner->_anyArtOverlay && Options::fpsGhostParts != 0)
+	{
+		// Where such parts are: every tile's parts are looked at once in a while (a part shot away, a door opened),
+		// not every frame (four look-ups a tile on a big map came to a millisecond or two a frame).
+		if (--_overlaySpotsAge <= 0)
+		{
+			_overlaySpotsAge = 64;
+			_overlaySpots.clear();
+			for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+			{
+				const Tile *tile = _save->getTile(tileIndex);
+				for (int part = 0; part < 4; ++part)
+				{
+					const MapData *mapData = tile->getMapData((TilePart)part);
+					if (!mapData) continue;
+					const auto found = owner->_artOverlays.find(mapData);
+					if (found != owner->_artOverlays.end() && found->second.frames[0]) _overlaySpots.push_back(tileIndex * 4 + part);
+				}
+			}
+		}
+		for (const int spot : _overlaySpots)
+		{
+			const int tileIndex = spot / 4;
+			if (tileIndex >= tileCount || (!_tileViews[tileIndex].discovered && !_tileViews[tileIndex].seen))
+			{
+				continue;
+			}
+			Tile *tile = _save->getTile(tileIndex);
+			const MapData *mapData = tile->getMapData((TilePart)(spot % 4));
+			const auto found = mapData ? owner->_artOverlays.find(mapData) : owner->_artOverlays.end();
+			if (found == owner->_artOverlays.end() || !found->second.frames[0] || (Options::fpsGhostParts == 1 && !found->second.lit))
+			{
+				continue; // (the part is gone, or not one of the kinds the setting shows)
+			}
+			const ArtOverlay &overlay = found->second;
+			const Position tilePosition = tile->getPosition();
+			const double point[3] = { tilePosition.x * 16.0 + overlay.point[0], tilePosition.y * 16.0 + overlay.point[1], tilePosition.z * 24.0 + overlay.point[2] };
+			if (std::abs(point[0] - _eye[0]) > _maxDistance || std::abs(point[1] - _eye[1]) > _maxDistance)
+			{
+				continue;
+			}
+			drawSpriteBlend(overlay.frames[_calmFrame], overlay.frames[(_calmFrame + 1) % 8], _animationBlend, overlay.anchorX, overlay.anchorY,
+				point, 2.0, overlay.lit ? 0 : _tileViews[tileIndex].light, Options::fpsSmoothFire);
+		}
+	}
 }
 
 /**

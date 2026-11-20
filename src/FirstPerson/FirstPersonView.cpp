@@ -122,6 +122,7 @@ FirstPersonView::~FirstPersonView()
 	for (auto &entry : _softSmoke) delete entry.second.colors;
 	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
+	clearArtOverlays();
 	// Tell the upscaling worker to stop (under its lock, so it can't miss the flag), wake it,
 	// and wait for it to end.
 	{
@@ -162,6 +163,9 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_leafyModels.clear();
 	_partKinds.clear();
 	_flameParts.clear();
+	clearArtOverlays();
+	_overlaySpots.clear();
+	_overlaySpotsAge = 0;
 	_openedModels.clear();
 	_openDoorModels.clear();
 	_frames.clear();
@@ -202,6 +206,12 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	findMirrors();
 	findUfos();
 	findLifts();
+	// (OPENXCOM3D_ANIMATION_CHECK=file: a developer's list of every animated record and how it shows; see checkAnimatedParts.)
+	static const char *const animationCheck = getenv("OPENXCOM3D_ANIMATION_CHECK");
+	if (animationCheck && save && !_sharedModelsOwner)
+	{
+		checkAnimatedParts(animationCheck);
+	}
 }
 
 /**
@@ -232,12 +242,19 @@ void FirstPersonView::preloadModels()
 				getModel(mapData, frames.sprite[frame], false);
 				if (mapData->isUFODoor() && frame > 0) getModel(mapData, frames.sprite[frame], true);
 			}
+			artOverlay(mapData); // (the art of an animated part its model can't show, if any)
 		}
 	}
 	Log(LOG_INFO) << "OpenXcom3D: " << _models.size() << " voxel models ready in " << SDL_GetTicks() - startTick << " ms";
 	if (!_flameParts.empty())
 	{
 		Log(LOG_INFO) << "OpenXcom3D: " << _flameParts.size() << " kinds of flame on the map are drawn as sprites";
+	}
+	if (_anyArtOverlay)
+	{
+		int kinds = 0;
+		for (const auto &entry : _artOverlays) kinds += entry.second.frames[0] != nullptr;
+		Log(LOG_INFO) << "OpenXcom3D: " << kinds << " kinds of animated part have art their shape can't show: drawn as sprites";
 	}
 }
 

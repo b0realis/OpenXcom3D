@@ -58,6 +58,7 @@
 #include <bitset>
 #include <climits>
 #include <cmath>
+#include <cstring>
 #include <initializer_list>
 #include <map>
 #include <set>
@@ -4743,6 +4744,412 @@ void FirstPersonView::updateDoorSwings(int tileCount)
 		_doorSwings.push_back(swing);
 		++door;
 	}
+}
+
+/**
+ * Tells whether a record's frames are different pictures: an animated part by its art, not only by its numbers (a
+ * mod's wall may have two sprite numbers for one picture, see getModel).
+ * @param mapData The tile part's record.
+ * @return True if any frame's picture differs from the first's.
+ */
+bool FirstPersonView::artAnimates(const MapData *mapData)
+{
+	const Frames &frames = getFrames(mapData);
+	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+	const Surface *first = art && frames.animated ? art->getFrame(frames.sprite[0]) : nullptr;
+	for (int frame = 1; first && frame < 8; ++frame)
+	{
+		const Surface *other = frames.sprite[frame] != frames.sprite[0] ? art->getFrame(frames.sprite[frame]) : nullptr;
+		if (!other) continue;
+		if (other->getWidth() != first->getWidth() || other->getHeight() != first->getHeight()) return true;
+		for (int y = 0; y < first->getHeight(); ++y)
+			for (int x = 0; x < first->getWidth(); ++x)
+				if (first->getPixel(x, y) != other->getPixel(x, y)) return true;
+	}
+	return false;
+}
+
+/**
+ * Tells whether a record's frames give different models: whether its animation shows in the view by its voxels (or
+ * its own ghost's).
+ * @param mapData The tile part's record.
+ * @return True if any frame's model differs from the first frame's.
+ */
+bool FirstPersonView::modelsAnimate(const MapData *mapData)
+{
+	const Frames &frames = getFrames(mapData);
+	const VoxelModel *first = getModel(mapData, frames.sprite[0], false);
+	for (int frame = 1; frames.animated && frame < 8; ++frame)
+	{
+		const VoxelModel *other = getModel(mapData, frames.sprite[frame], false);
+		if (other == first) continue;
+		if (std::memcmp(other->color, first->color, sizeof(first->color)) != 0) return true;
+		if (other->ghost != first->ghost && (!other->ghost || !first->ghost || std::memcmp(other->ghost->color, first->ghost->color, sizeof(first->color)) != 0)) return true;
+	}
+	return false;
+}
+
+/**
+ * The art of an animated part that its model has no voxels for, to be drawn as a sprite standing in its tile (the
+ * owner: "Test all animated world tiles so they actually animate in 3D"). A model is the game's shape for the part
+ * coloured from its art, and the art is often more than the shape: a torch's flame above its holder, a candelabra's
+ * candles, a hologram turning over its base, an aerial rising from a mound. Where that part of the art is what
+ * animates, the part stood still in the view though the map shows it alive: 73 of XPiratez's animated records, 26 of
+ * The X-Com Files', 3 of TFTD's, 1 of UFO's (see checkAnimatedParts). And some parts without any voxels got no ghost
+ * either, their art being nowhere their kind of ghost stands (bubbles, sea spray, a planet turning as a "floor"):
+ * those were not drawn at all.
+ *
+ * With voxels, and only where no two of its frames' models differ (the part stands still in the view): the pixels
+ * no voxel of the shape lands on, of the pieces of art that change from frame to frame
+ * (a piece: drawn pixels touching each other, among those the shape leaves out; so a flame comes whole, with the
+ * candle under it, and art that never changes stays as it was). They stand on the shape: the sprite's pixel where
+ * the middle of the shape's top lands is held there, so the piece keeps its place over the part from every side.
+ * Without voxels and without a ghost in any frame: the whole art, standing where its middle column meets the floor
+ * across the tile. A flame (see partKind) is drawn by its own rule; a sliding door's frames are its opening.
+ * @param mapData The tile part's record.
+ * @return What to draw, or null for none.
+ */
+const FirstPersonView::ArtOverlay *FirstPersonView::artOverlay(const MapData *mapData)
+{
+	if (_sharedModelsOwner)
+	{
+		return _sharedModelsOwner->artOverlay(mapData);
+	}
+	auto known = _artOverlays.find(mapData);
+	if (known != _artOverlays.end())
+	{
+		return known->second.frames[0] ? &known->second : nullptr;
+	}
+	ArtOverlay &overlay = _artOverlays[mapData];
+	const Frames &frames = getFrames(mapData);
+	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+	if (!art || mapData->isUFODoor() || !artAnimates(mapData))
+	{
+		return nullptr;
+	}
+	if (const VoxelModel *kind = partKind(mapData, false))
+	{
+		if (kind->ghostKind == 5) return nullptr; // (a flame: drawn as its sprite already)
+	}
+	const Surface *pictures[8];
+	int width = 0, height = 0;
+	for (int frame = 0; frame < 8; ++frame)
+	{
+		pictures[frame] = art->getFrame(frames.sprite[frame]);
+		if (!pictures[frame] || (frame && (pictures[frame]->getWidth() != width || pictures[frame]->getHeight() != height))) return nullptr;
+		width = pictures[frame]->getWidth();
+		height = pictures[frame]->getHeight();
+	}
+	// The models of its frames: has it voxels (its own, or a ghost's) in any of them?
+	const VoxelModel *models[8];
+	bool anyVoxels = false, ownVoxels = false;
+	for (int frame = 0; frame < 8; ++frame)
+	{
+		models[frame] = getModel(mapData, frames.sprite[frame], false);
+		anyVoxels = anyVoxels || !models[frame]->empty || models[frame]->ghost;
+		ownVoxels = ownVoxels || (!models[frame]->empty && !models[frame]->ghostly);
+	}
+	const int yOffset = mapData->getYOffset();
+	std::vector<char> shown[8];
+	int total = 0;
+	if (!anyVoxels)
+	{
+		// Nothing of it is drawn: its whole art, where its middle column meets the floor across the tile's middle.
+		long columns = 0, drawn = 0;
+		for (int frame = 0; frame < 8; ++frame)
+		{
+			shown[frame].assign((size_t)width * height, 0);
+			for (int y = 0; y < height; ++y)
+				for (int x = 0; x < width; ++x)
+					if (pictures[frame]->getPixel(x, y)) { shown[frame][(size_t)y * width + x] = 1; columns += x; ++drawn; }
+		}
+		if (!drawn) return nullptr;
+		total = (int)drawn;
+		const float column = std::clamp(columns / (float)drawn, 0.0f, 32.0f);
+		overlay.anchorX = (int)std::lround(column);
+		overlay.anchorY = 32 + yOffset;
+		overlay.point[0] = column / 2.0f;
+		overlay.point[1] = 16.0f - column / 2.0f;
+		overlay.point[2] = 0.0f;
+	}
+	else if (ownVoxels)
+	{
+		// The pixels the shape's voxels land on (the first frame's: the game's shape is one for all its frames),
+		// the middle of the shape, and its top.
+		const VoxelModel &shape = *models[0];
+		if (shape.empty || shape.ghostly) return nullptr;
+		// Only a part that stands still in the view: no two of its frames' models differ. One whose model shows its
+		// animation is left as it is, whatever more its art has round it (a first version drew a sprite for every part
+		// with changing art outside its shape: 697 of XPiratez's records, the sea's every tile among TFTD's).
+		if (modelsAnimate(mapData)) return nullptr;
+		std::vector<char> covered((size_t)width * height, 0);
+		double sumX = 0.0, sumY = 0.0;
+		int count = 0;
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int y = 0; y < Position::TileXY; ++y)
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					if (!shape.color[z][y][x]) continue;
+					sumX += x; sumY += y; ++count;
+					const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + yOffset;
+					if (spriteX >= 0 && spriteY >= 0 && spriteX < width && spriteY < height) covered[(size_t)spriteY * width + spriteX] = 1;
+				}
+		if (!count) return nullptr;
+		// The pixels that change from frame to frame.
+		std::vector<char> changing((size_t)width * height, 0);
+		for (int frame = 1; frame < 8; ++frame)
+			for (int y = 0; y < height; ++y)
+				for (int x = 0; x < width; ++x)
+					if (pictures[frame]->getPixel(x, y) != pictures[0]->getPixel(x, y)) changing[(size_t)y * width + x] = 1;
+		// Each frame: the pieces of its art outside the shape that hold a changing pixel, whole.
+		std::vector<int> toVisit;
+		int seeds = 0;
+		for (int frame = 0; frame < 8; ++frame)
+		{
+			shown[frame].assign((size_t)width * height, 0);
+			toVisit.clear();
+			for (int at = 0; at < width * height; ++at)
+			{
+				if (changing[at] && !covered[at] && pictures[frame]->getPixel(at % width, at / width))
+				{
+					shown[frame][at] = 1;
+					toVisit.push_back(at);
+					++seeds;
+				}
+			}
+			while (!toVisit.empty())
+			{
+				const int at = toVisit.back();
+				toVisit.pop_back();
+				for (int dy = -1; dy <= 1; ++dy)
+					for (int dx = -1; dx <= 1; ++dx)
+					{
+						const int x = at % width + dx, y = at / width + dy;
+						if (x < 0 || y < 0 || x >= width || y >= height) continue;
+						const int next = y * width + x;
+						if (shown[frame][next] || covered[next] || !pictures[frame]->getPixel(x, y)) continue;
+						shown[frame][next] = 1;
+						toVisit.push_back(next);
+					}
+			}
+			for (const char pixel : shown[frame]) total += pixel;
+		}
+		if (seeds < ArtOverlayMinPixels) return nullptr; // (a speck or two: not worth a sprite)
+		const float middleX = (float)(sumX / count) + 0.5f, middleY = (float)(sumY / count) + 0.5f, top = shape.max[2] + 1.0f;
+		overlay.point[0] = middleX;
+		overlay.point[1] = middleY;
+		overlay.point[2] = top;
+		overlay.anchorX = (int)std::lround(16.0f + middleX - middleY);
+		overlay.anchorY = (int)std::lround(24.0f + (middleX + middleY) / 2.0f - top + yOffset);
+	}
+	else
+	{
+		return nullptr; // (a ghost shows it)
+	}
+	overlay.lit = mapData->getLightSource() > 0;
+	for (int frame = 0; frame < 8; ++frame)
+	{
+		overlay.frames[frame] = new Surface(width, height);
+		for (int y = 0; y < height; ++y)
+			for (int x = 0; x < width; ++x)
+				if (shown[frame][(size_t)y * width + x]) overlay.frames[frame]->setPixel(x, y, pictures[frame]->getPixel(x, y));
+	}
+	_anyArtOverlay = true;
+	return &overlay;
+}
+
+void FirstPersonView::clearArtOverlays()
+{
+	for (auto &entry : _artOverlays)
+	{
+		for (Surface *&frame : entry.second.frames)
+		{
+			delete frame;
+			frame = nullptr;
+		}
+	}
+	_artOverlays.clear();
+	_anyArtOverlay = false;
+}
+
+/**
+ * A developer's check, run where a battle begins when OPENXCOM3D_ANIMATION_CHECK names a file: every animated
+ * record (a tile part whose eight frames aren't one picture) of every tile set the mod knows, its terrains', its
+ * UFOs' and its crafts', and whether its animation shows in the view, as the view would build it with the settings
+ * that are on. Written to the file, a line a record, tab between the fields:
+ *   set, record, part (floor, west, north, object), pictures, the share of its drawn pixels that changes a step
+ *   (%), its voxels, the steps of its art (frames that differ from the one before) and how many of them show (the
+ *   two frames' models differ), the share of its voxels that changes a step (%), the kind of ghost it is (0: it has
+ *   voxels), "light" or "motion" (see pulsingFrames), and the verdict:
+ *   animates  every step of its art shows;
+ *   partly    some steps show, some are the same model twice;
+ *   frozen    no step shows: the art changes where the model has nothing (above or beside the game's shape);
+ *   unseen    it is not drawn at all (no voxels and no ghost of it);
+ *   sprite    a flame, drawn as its sprite and animated so (see partKind);
+ *   door      a sliding door: its frames are its opening (see snapshotTile);
+ *   animates+sprite  ... and the art outside its shape that animates is drawn as a sprite (see artOverlay);
+ *   lights    a UFO's part with the setting "UFO lights": a steady model whose lights pulse (so many voxels);
+ *   steady+sprite  ... without lights, its models all alike: the art outside its shape that animates is a sprite;
+ *   steady    ... and nothing of it moves.
+ * @param path The file to write.
+ */
+void FirstPersonView::checkAnimatedParts(const char *path)
+{
+	Mod *mod = _game->getMod();
+	std::vector<MapDataSet*> sets;
+	auto add = [&](RuleTerrain *terrain)
+	{
+		if (!terrain) return;
+		for (MapDataSet *set : *terrain->getMapDataSets())
+		{
+			if (std::find(sets.begin(), sets.end(), set) == sets.end()) sets.push_back(set);
+		}
+	};
+	for (const std::string &name : mod->getTerrainList()) add(mod->getTerrain(name));
+	for (const std::string &name : mod->getUfosList()) add(mod->getUfo(name) ? mod->getUfo(name)->getBattlescapeTerrainData() : nullptr);
+	for (const std::string &name : mod->getCraftsList()) add(mod->getCraft(name) ? mod->getCraft(name)->getBattlescapeTerrainData() : nullptr);
+
+	FILE *out = fopen(path, "w");
+	if (!out)
+	{
+		return;
+	}
+	std::map<std::string, int> verdicts;
+	const std::vector<Uint16> *loftData = mod->getVoxelData();
+	static const char *const partNames[] = { "floor", "west", "north", "object" };
+	for (MapDataSet *set : sets)
+	{
+		try
+		{
+			set->loadData(mod->getMCDPatch(set->getName()));
+		}
+		catch (const std::exception &)
+		{
+			fprintf(out, "%s\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\tnot loaded\n", set->getName().c_str());
+			continue;
+		}
+		SurfaceSet *art = set->getSurfaceset();
+		for (size_t record = 0; art && record < set->getSize(); ++record)
+		{
+			const MapData *mapData = set->getObject(record);
+			const Frames &frames = getFrames(mapData);
+			if (!frames.animated)
+			{
+				continue;
+			}
+			int pictures[8], pictureCount = 0;
+			for (int frame = 0; frame < 8; ++frame)
+			{
+				if (std::find(pictures, pictures + pictureCount, frames.sprite[frame]) == pictures + pictureCount) pictures[pictureCount++] = frames.sprite[frame];
+			}
+			// The art's steps, and how much of the picture each changes.
+			int artSteps = 0, shownSteps = 0, voxels = 0;
+			double artShare = 0.0, voxelShare = 0.0;
+			const bool door = mapData->isUFODoor();
+			bool ufoPart = _ufoDataSets.count(set->getName()) && Options::fpsUfoLights;
+			int lit = 0;
+			if (ufoPart && !door)
+			{
+				UfoModel steady;
+				const float nowhere[2] = { 0.0f, 0.0f };
+				buildUfoModel(mapData, nowhere, steady);
+				for (int z = 0; z < Position::TileZ; ++z)
+					for (int y = 0; y < Position::TileXY; ++y)
+						for (int x = 0; x < Position::TileXY; ++x) lit += (steady.lit[z][y] >> x) & 1;
+				const VoxelModel *shape = getModel(mapData, frames.sprite[0], false);
+				ufoPart = !shape->empty && (lit > 0 || !modelsAnimate(mapData)); // (as findUfos gives out the steady models)
+			}
+			bool anyDrawn = false;
+			int ghostKind = 0;
+			for (int frame = 0; frame < 8; ++frame)
+			{
+				const int next = (frame + 1) % 8;
+				const Surface *from = art->getFrame(frames.sprite[frame]), *to = art->getFrame(frames.sprite[next]);
+				if (frames.sprite[frame] == frames.sprite[next] || !from || !to || from->getWidth() != to->getWidth() || from->getHeight() != to->getHeight())
+				{
+					continue;
+				}
+				int drawn = 0, changed = 0;
+				for (int y = 0; y < from->getHeight(); ++y)
+				{
+					for (int x = 0; x < from->getWidth(); ++x)
+					{
+						const Uint8 before = from->getPixel(x, y), after = to->getPixel(x, y);
+						drawn += before || after;
+						changed += before != after;
+					}
+				}
+				if (!changed)
+				{
+					continue; // (two numbers for one picture)
+				}
+				++artSteps;
+				artShare += drawn ? changed / (double)drawn : 0.0;
+				if (door || ufoPart)
+				{
+					continue;
+				}
+				// The two frames as the view builds them: their voxels, and those of their own ghosts.
+				const VoxelModel *models[2] = { getModel(mapData, frames.sprite[frame], false), getModel(mapData, frames.sprite[next], false) };
+				int solid = 0, differing = 0;
+				for (int layer = 0; layer < 2; ++layer)
+				{
+					const VoxelModel *now = layer ? models[0]->ghost : models[0], *then = layer ? models[1]->ghost : models[1];
+					if (!now && !then) continue;
+					for (int z = 0; z < Position::TileZ; ++z)
+						for (int y = 0; y < Position::TileXY; ++y)
+							for (int x = 0; x < Position::TileXY; ++x)
+							{
+								const Uint8 a = now && !now->empty ? now->color[z][y][x] : 0, b = then && !then->empty ? then->color[z][y][x] : 0;
+								solid += a || b;
+								differing += a != b;
+							}
+				}
+				anyDrawn = anyDrawn || solid;
+				ghostKind = std::max<int>(ghostKind, models[0]->ghostKind);
+				voxels = std::max(voxels, solid);
+				shownSteps += differing > 0;
+				voxelShare += solid ? differing / (double)solid : 0.0;
+			}
+			if (!artSteps)
+			{
+				continue;
+			}
+			std::string verdict;
+			const bool overlay = !door && Options::fpsGhostParts != 0 && artOverlay(mapData) != nullptr;
+			if (door)
+			{
+				verdict = "door";
+			}
+			else if (ufoPart)
+			{
+				voxels = lit;
+				verdict = lit ? "lights" : overlay ? "steady+sprite" : "steady";
+			}
+			else if (!anyDrawn)
+			{
+				const VoxelModel *kind = partKind(mapData, false);
+				verdict = (kind && kind->ghostKind == 5) || overlay ? "sprite" : "unseen";
+			}
+			else if (overlay)
+			{
+				verdict = "animates+sprite"; // (its art outside its shape is drawn as a sprite: see artOverlay)
+			}
+			else
+			{
+				verdict = shownSteps == artSteps ? "animates" : shownSteps ? "partly" : "frozen";
+			}
+			++verdicts[verdict];
+			fprintf(out, "%s\t%d\t%s\t%d\t%.1f\t%d\t%d\t%d\t%.1f\t%d\t%s\t%s\n", set->getName().c_str(), (int)record,
+				mapData->getObjectType() >= 0 && mapData->getObjectType() < 4 ? partNames[mapData->getObjectType()] : "?", pictureCount,
+				100.0 * artShare / artSteps, voxels, artSteps, shownSteps, 100.0 * voxelShare / artSteps, ghostKind,
+				hasNoVoxels(mapData, *loftData) ? "ghost" : pulsingFrames(mapData) ? "light" : "motion", verdict.c_str());
+		}
+	}
+	fclose(out);
+	std::string summary;
+	for (const auto &verdict : verdicts) summary += " " + verdict.first + " " + std::to_string(verdict.second);
+	Log(LOG_INFO) << "OpenXcom3D: animated parts in " << sets.size() << " tile sets:" << summary << " (written to " << path << ")";
 }
 
 }
