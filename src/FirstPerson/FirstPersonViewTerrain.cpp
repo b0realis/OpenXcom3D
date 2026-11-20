@@ -231,6 +231,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	std::fill(&model.lookOnly[0][0], &model.lookOnly[0][0] + 24 * 16, (Uint16)0);
 	std::fill(&model.clear[0][0], &model.clear[0][0] + 24 * 16, (Uint16)0);
 
+	model.pulse = false;
 	// No light source found yet.
 	model.glow[0] = model.glow[1] = model.glow[2] = 0.0f;
 	model.glowCount = 0;
@@ -2599,6 +2600,64 @@ Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, 
 }
 
 /**
+ * Tells whether an animated record's frames are a light pulsing, blinking or changing its colour, not a thing in
+ * motion: such a part always cross-fades softly from frame to frame (see AnimatedNearShades). Two pictures taking
+ * turns are (a lift's pad, a blinking light). So are frames whose shades keep their pattern while the colours
+ * change: of the pixels two successive frames both draw, in another colour, the shades (a colour's place in its
+ * hue's sixteen) rise and fall together (their correlation, AnimatedPulseAlike or more on average). A dance
+ * floor's tiles going through eight hues do, pixel for pixel; a piston's band moving up its rod doesn't.
+ * @param mapData The tile part's record.
+ * @return True for a pulse; false for a part in motion, and for one that doesn't animate.
+ */
+static bool pulsingFrames(const MapData *mapData)
+{
+	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+	int pictures[8], count = 0;
+	for (int frame = 0; frame < 8; ++frame)
+	{
+		const int picture = mapData->getSprite(frame);
+		if (std::find(pictures, pictures + count, picture) == pictures + count) pictures[count++] = picture;
+	}
+	if (count <= 2 || !art)
+	{
+		return count == 2;
+	}
+	double alike = 0.0;
+	int steps = 0;
+	for (int frame = 0; frame < 8; ++frame)
+	{
+		const int now = mapData->getSprite(frame), next = mapData->getSprite((frame + 1) % 8);
+		const Surface *from = art->getFrame(now), *to = art->getFrame(next);
+		if (now == next || !from || !to || from->getWidth() != to->getWidth() || from->getHeight() != to->getHeight())
+		{
+			continue;
+		}
+		// (the two shades of each pixel that changes: sums for their correlation)
+		double count2 = 0.0, sumA = 0.0, sumB = 0.0, sumAA = 0.0, sumBB = 0.0, sumAB = 0.0;
+		for (int y = 0; y < from->getHeight(); ++y)
+		{
+			for (int x = 0; x < from->getWidth(); ++x)
+			{
+				const Uint8 before = from->getPixel(x, y), after = to->getPixel(x, y);
+				if (!before || !after || before == after) continue;
+				const double a = before & 15, b = after & 15;
+				count2 += 1.0; sumA += a; sumB += b; sumAA += a * a; sumBB += b * b; sumAB += a * b;
+			}
+		}
+		// (Few pixels changing, or all of one shade going to all of another: nothing moves in that.)
+		double correlation = 1.0;
+		if (count2 >= 16.0)
+		{
+			const double varA = sumAA - sumA * sumA / count2, varB = sumBB - sumB * sumB / count2, both = sumAB - sumA * sumB / count2;
+			if (varA > 1e-6 && varB > 1e-6) correlation = both / std::sqrt(varA * varB);
+		}
+		alike += correlation;
+		++steps;
+	}
+	return steps && alike / steps >= AnimatedPulseAlike;
+}
+
+/**
  * Gets the voxel colour model of a MapData record (a tile part) shown with a given sprite
  * (animation frame), building it on first use (see buildModel). A view that shares another
  * view's models (the small extra view) asks that view instead.
@@ -2658,6 +2717,7 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;
 		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
+		found->second.pulse = pulsingFrames(mapData);
 		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 		// (see buildArtFill); an object the art draws as a block of crops, the block (see

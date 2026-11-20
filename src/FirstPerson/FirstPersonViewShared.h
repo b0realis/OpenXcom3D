@@ -118,6 +118,24 @@ const float TrajectorySkip = 14.0f;
 /// second: a photosensitivity hazard (WCAG 2.3 allows at most three flashes a second). At this
 /// pace a two-frame blink is a soft pulse of about 1.6 Hz.
 const Uint32 CalmFrameTime = 320;
+/// The cross-fade shows the next frame on a growing share of the pixels, in a dot pattern. Between two colours
+/// near each other (a light pulsing, water shimmering: the same hue, at most this many shades apart) the dots
+/// are the palette's ordinary shading. Between colours far apart (a piston's gold band where its grey rod was,
+/// steps folding flat) they are a coarse speckle, and a part in motion stood in it nearly all the time (the
+/// owner, on XPiratez's T'leth base: "some animated parts look bad ingame (3d) while lifts and some parts are
+/// superb"). So where a voxel's colours in the two frames are far apart it goes over whole, at the step's
+/// middle. Not a part whose animation is a light: two pictures taking turns (a pad pulsing, a lamp blinking), or
+/// frames that keep their pattern of shades while the colours change (a dance floor's tiles going through eight
+/// hues; TFTD's pyramid floors): those the cross-fade is there to soften (see CalmFrameTime), whatever their
+/// colours (VoxelModel::pulse; pulsingFrames in FirstPersonViewTerrain.cpp). At three steps a second nothing changes back and
+/// forth three times a second either way.
+/// In full colour with "Smooth light" the card mixes the two frames smoothly instead, near or far.
+const int AnimatedNearShades = 3;
+/// ... and how alike the shades of two successive frames must be, on average, for the part to count as such a
+/// light (the correlation of the shades of the pixels that change: 1 the same pattern, 0 none in common). In
+/// XPiratez's T'leth base the parts in motion have 0.21 (pedestals), 0.59 (steps folding flat) and under 0 (a
+/// hatch); a dance floor 1.00, the pyramid's floors 0.94.
+const float AnimatedPulseAlike = 0.7f;
 /// The marks on a UFO's tiles in FirstPersonView::_ufoPhaseOfTile, above the pulse phase (bits
 /// 0-3): a tile of the UFO, and one of its outer skin (beside a tile that isn't the UFO's).
 const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;

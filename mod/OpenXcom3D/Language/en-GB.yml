@@ -207,7 +207,7 @@ en-GB:
   STR_FPS_TRUE_COLOR: "True colour"
   STR_FPS_TRUE_COLOR_DESC: "With Renderer GPU and 3D resolution Display: the 3D world past the palette's 256 colours."
   STR_FPS_SMOOTH_LIGHT: "Smooth light"
-  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
+  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows, haze and animated parts blend smoothly where the palette's picture has a dot pattern."
   STR_FPS_COLORED_LIGHTS: "Coloured lights"
   STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
   STR_FPS_REFLECTIONS: "Reflections"

@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..0672bd2c0
+index 000000000..d798918bb
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,671 @@
@@ -375,7 +375,7 @@ index 000000000..0672bd2c0
 +  STR_FPS_TRUE_COLOR: "True colour"
 +  STR_FPS_TRUE_COLOR_DESC: "With Renderer GPU and 3D resolution Display: the 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
-+  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
++  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows, haze and animated parts blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
@@ -839,7 +839,7 @@ index 000000000..0672bd2c0
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..91f9c78c5
+index 000000000..87c809c43
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,671 @@
@@ -1052,7 +1052,7 @@ index 000000000..91f9c78c5
 +  STR_FPS_TRUE_COLOR: "True colour"
 +  STR_FPS_TRUE_COLOR_DESC: "With Renderer GPU and 3D resolution Display: the 3D world past the palette's 256 colours."
 +  STR_FPS_SMOOTH_LIGHT: "Smooth light"
-+  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows and haze blend smoothly where the palette's picture has a dot pattern."
++  STR_FPS_SMOOTH_LIGHT_DESC: "With True colour. Light, shadows, haze and animated parts blend smoothly where the palette's picture has a dot pattern."
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
@@ -27948,10 +27948,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..76657807c
+index 000000000..6ab4b56d5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3725 @@
+@@ -0,0 +1,3726 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28450,6 +28450,7 @@ index 000000000..76657807c
 +	number("UnexploredMistTo", UnexploredMistTo);
 +	number("UnexploredMistMax", UnexploredMistMax);
 +	number("FlareReach", FlareReach);
++	whole("AnimatedNearShades", AnimatedNearShades);
 +	number("UfoInsideTint", UfoInsideTint);
 +	number("UfoInsideTintNight", UfoInsideTintNight);
 +	whole("HazeSteps", FirstPersonView::SceneColors::HazeSteps);
@@ -29329,7 +29330,7 @@ index 000000000..76657807c
 +	if (model->lit) std::memcpy(masks + MaskRows * 3, model->lit, MaskRows * 2);
 +	else std::memset(masks + MaskRows * 3, 0, MaskRows * 2);
 +	Uint32 *info = &modelInfo[(size_t)id * 4];
-+	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0);
++	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0) | (model->pulse ? 32 : 0);
 +	info[1] = ghostId;
 +	info[2] = model->glowMinZ | (Uint32)model->ceiling << 8 | (Uint32)model->min[2] << 16 | (Uint32)model->pulseKind << 24;
 +	info[3] = 0;
@@ -32222,10 +32223,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..617c209eb
+index 000000000..68bf0602b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3119 @@
+@@ -0,0 +1,3155 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33737,7 +33738,20 @@ index 000000000..617c209eb
 +		faceIndex = hit.axis * 2 + (normal[hit.axis] < 0.0 ? 1 : 0);
 +	}
 +	bool showNextFrame = dither(pixelX + 2, pixelY + 1) < uAnimationBlend;
++	// (Where the voxel's colours in the two frames are far apart, it goes over whole at the step's middle: see AnimatedNearShades.)
++	if (hit.part >= 0 && !hit.ghost && parts[hit.part] != 0u && nextParts[hit.part] != 0u && (texelFetch(uModelInfo, int(nextParts[hit.part])).x & 32u) == 0u) // (32: VoxelModel::pulse)
++	{
++		uint nowColor = modelColor(parts[hit.part], hit.voxel), nextColor = modelColor(nextParts[hit.part], hit.voxel);
++		if (nowColor != 0u && nextColor != 0u && (((nowColor ^ nextColor) & 0xF0u) != 0u || abs(int(nowColor & 15u) - int(nextColor & 15u)) > AnimatedNearShades))
++		{
++			showNextFrame = uAnimationBlend >= 0.5;
++		}
++	}
 +	uint baseColor = hit.color;
++	// (An animated part's other frame's colour here and how much of it is in the mix, for the full-colour picture: see below.)
++	uint fadeColor = 0u;
++	float fadeShare = 0.0;
++	bool sidePicture = false;
 +	int rockCeilingMiddle = -1;
 +	float waveShade = 0.0;
 +	bool onSea = false;
@@ -33780,6 +33794,7 @@ index 000000000..617c209eb
 +		if (hit.axis >= 0 && hit.axis < 2 && rayDirection[hit.axis] > 0.0)
 +		{
 +			shownColor = mirroredColor(hit, hitTile, hit.axis, false, showNextFrame);
++			sidePicture = shownColor == 0u;
 +#ifdef RELIEF
 +			reliefFrom = shownColor != 0u ? 2 : 1;
 +#endif
@@ -33790,6 +33805,7 @@ index 000000000..617c209eb
 +			if (painted != 0u) reliefFrom = 4;
 +#endif
 +			if (painted != 0u) shownColor = painted;
++			if (painted != 0u) sidePicture = false;
 +		}
 +		else if (hit.axis >= 0 && hit.axis < 2)
 +		{
@@ -33799,6 +33815,19 @@ index 000000000..617c209eb
 +#endif
 +		}
 +		if (shownColor != 0u && !ownColorAllRound) baseColor = shownColor;
++		// Setting "Smooth light", the full-colour picture: an animated part's two frames are mixed smoothly there, where
++		// the palette's picture shows the one or the other in a dot pattern (the owner, on a base full of animated
++		// parts: some of them "look bad ingame"). The other frame's colour on this face: the part's own
++		// there, or its side picture's; a face that borrowed its colour elsewhere (a mirror, paint, an underside) keeps the dots.
++		uint otherFrame = hit.ghost ? 0u : model != part ? part : nextParts[hit.part];
++		if (uSmoothLight != 0 && otherFrame != 0u && otherFrame != model)
++		{
++			bool ownShown = shownColor == 0u || ownColorAllRound;
++			if (ownShown) fadeColor = modelColor(otherFrame, voxel);
++			else if (sidePicture && shownColor != 0u) fadeColor = hit.axis == 0 ? texelFetch(uModelSides, int(otherFrame) * 1024 + 256 + voxel.z * 16 + voxel.y).r
++				: texelFetch(uModelSides, int(otherFrame) * 1024 + 640 + voxel.z * 16 + voxel.x).r;
++			fadeShare = model != part ? 1.0 - uAnimationBlend : uAnimationBlend;
++		}
 +#ifdef RELIEF
 +		// (Where the colour came from: the part's own colours where nothing else was shown; an underside's is one colour, flat.)
 +		if (shownColor == 0u || ownColorAllRound) reliefFrom = 0;
@@ -33808,6 +33837,7 @@ index 000000000..617c209eb
 +		{
 +			onSea = faceIndex == 4;
 +			baseColor = onSea ? waterColor(rayOrigin.x + rayDirection.x * hit.t, rayOrigin.y + rayDirection.y * hit.t, hit.t, pixelX, pixelY, waveShade) : scene(SceneWater + 1);
++			fadeColor = 0u;
 +#ifdef RELIEF
 +			reliefFrom = -1;
 +#endif
@@ -34012,6 +34042,13 @@ index 000000000..617c209eb
 +			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
 +			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
 +			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
++			if (fadeColor != 0u && fadeColor != baseColor)
++			{
++				// (an animated part between two frames: the other frame's colour in the same light, mixed in)
++				uint lowFade = (fadeColor & 0xF0u) | uint(min(darkest, int(fadeColor & 15u) + min(low, cap)));
++				uint highFade = (fadeColor & 0xF0u) | uint(min(darkest, int(fadeColor & 15u) + min(low + 1, cap)));
++				rgb = mix(rgb, mix(paletteRgb(lowFade), paletteRgb(highFade), share), fadeShare);
++			}
 +			if (!onSteadyUfo && blackShare > 0.0)
 +			{
 +				rgb = mix(rgb, mix(paletteRgb(shadeColor(baseColor, low)), paletteRgb(shadeColor(baseColor, low + 1)), share), blackShare);
@@ -62908,10 +62945,10 @@ index 000000000..bd8108f56
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..cd2d90bd1
+index 000000000..cada043ab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1861 @@
+@@ -0,0 +1,1862 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63107,6 +63144,7 @@ index 000000000..cd2d90bd1
 +		bool empty;
 +		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 +		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
++		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 +		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 +		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 +		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
@@ -68552,10 +68590,10 @@ index 000000000..9f7426011
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..141005507
+index 000000000..c68214215
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2020 @@
+@@ -0,0 +1,2030 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69485,7 +69523,17 @@ index 000000000..141005507
 +	// (dithered; the share grows as the step goes on). Decided first, so that every colour below
 +	// comes from the same frame: a face the art never shows that took the next frame's raw
 +	// colour flashed a whole side of a UFO on and off with every step of its lights.
-+	const bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
++	bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
++	// (Where the voxel's colours in the two frames are far apart, it goes over whole at the step's middle: see AnimatedNearShades.)
++	if (hit.part >= 0 && !hit.ghost && tileView.part[hit.part] && tileView.next[hit.part] && !tileView.next[hit.part]->pulse)
++	{
++		const Uint8 nowColor = tileView.part[hit.part]->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
++		const Uint8 nextColor = tileView.next[hit.part]->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
++		if (nowColor && nextColor && (((nowColor ^ nextColor) & 0xF0) || std::abs((nowColor & 15) - (nextColor & 15)) > AnimatedNearShades))
++		{
++			showNextFrame = _animationBlend >= 0.5f;
++		}
++	}
 +	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
 +	Uint8 baseColor = hit.color;
 +	int rockCeilingMiddle = -1; // a ceiling under rock: its middle shade within its colour group (see the end)
@@ -71894,10 +71942,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..47ac3f7ee
+index 000000000..4292b9378
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,682 @@
+@@ -0,0 +1,700 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72018,6 +72066,24 @@ index 000000000..47ac3f7ee
 +/// second: a photosensitivity hazard (WCAG 2.3 allows at most three flashes a second). At this
 +/// pace a two-frame blink is a soft pulse of about 1.6 Hz.
 +const Uint32 CalmFrameTime = 320;
++/// The cross-fade shows the next frame on a growing share of the pixels, in a dot pattern. Between two colours
++/// near each other (a light pulsing, water shimmering: the same hue, at most this many shades apart) the dots
++/// are the palette's ordinary shading. Between colours far apart (a piston's gold band where its grey rod was,
++/// steps folding flat) they are a coarse speckle, and a part in motion stood in it nearly all the time (the
++/// owner, on XPiratez's T'leth base: "some animated parts look bad ingame (3d) while lifts and some parts are
++/// superb"). So where a voxel's colours in the two frames are far apart it goes over whole, at the step's
++/// middle. Not a part whose animation is a light: two pictures taking turns (a pad pulsing, a lamp blinking), or
++/// frames that keep their pattern of shades while the colours change (a dance floor's tiles going through eight
++/// hues; TFTD's pyramid floors): those the cross-fade is there to soften (see CalmFrameTime), whatever their
++/// colours (VoxelModel::pulse; pulsingFrames in FirstPersonViewTerrain.cpp). At three steps a second nothing changes back and
++/// forth three times a second either way.
++/// In full colour with "Smooth light" the card mixes the two frames smoothly instead, near or far.
++const int AnimatedNearShades = 3;
++/// ... and how alike the shades of two successive frames must be, on average, for the part to count as such a
++/// light (the correlation of the shades of the pixels that change: 1 the same pattern, 0 none in common). In
++/// XPiratez's T'leth base the parts in motion have 0.21 (pedestals), 0.59 (steps folding flat) and under 0 (a
++/// hatch); a dance floor 1.00, the pyramid's floors 0.94.
++const float AnimatedPulseAlike = 0.7f;
 +/// The marks on a UFO's tiles in FirstPersonView::_ufoPhaseOfTile, above the pulse phase (bits
 +/// 0-3): a tile of the UFO, and one of its outer skin (beside a tile that isn't the UFO's).
 +const Uint8 UfoTileBit = 0x80, UfoSkinBit = 0x40;
@@ -80190,10 +80256,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..4add25fd1
+index 000000000..2e61e9725
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,4690 @@
+@@ -0,0 +1,4750 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -80427,6 +80493,7 @@ index 000000000..4add25fd1
 +	std::fill(&model.lookOnly[0][0], &model.lookOnly[0][0] + 24 * 16, (Uint16)0);
 +	std::fill(&model.clear[0][0], &model.clear[0][0] + 24 * 16, (Uint16)0);
 +
++	model.pulse = false;
 +	// No light source found yet.
 +	model.glow[0] = model.glow[1] = model.glow[2] = 0.0f;
 +	model.glowCount = 0;
@@ -82795,6 +82862,64 @@ index 000000000..4add25fd1
 +}
 +
 +/**
++ * Tells whether an animated record's frames are a light pulsing, blinking or changing its colour, not a thing in
++ * motion: such a part always cross-fades softly from frame to frame (see AnimatedNearShades). Two pictures taking
++ * turns are (a lift's pad, a blinking light). So are frames whose shades keep their pattern while the colours
++ * change: of the pixels two successive frames both draw, in another colour, the shades (a colour's place in its
++ * hue's sixteen) rise and fall together (their correlation, AnimatedPulseAlike or more on average). A dance
++ * floor's tiles going through eight hues do, pixel for pixel; a piston's band moving up its rod doesn't.
++ * @param mapData The tile part's record.
++ * @return True for a pulse; false for a part in motion, and for one that doesn't animate.
++ */
++static bool pulsingFrames(const MapData *mapData)
++{
++	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
++	int pictures[8], count = 0;
++	for (int frame = 0; frame < 8; ++frame)
++	{
++		const int picture = mapData->getSprite(frame);
++		if (std::find(pictures, pictures + count, picture) == pictures + count) pictures[count++] = picture;
++	}
++	if (count <= 2 || !art)
++	{
++		return count == 2;
++	}
++	double alike = 0.0;
++	int steps = 0;
++	for (int frame = 0; frame < 8; ++frame)
++	{
++		const int now = mapData->getSprite(frame), next = mapData->getSprite((frame + 1) % 8);
++		const Surface *from = art->getFrame(now), *to = art->getFrame(next);
++		if (now == next || !from || !to || from->getWidth() != to->getWidth() || from->getHeight() != to->getHeight())
++		{
++			continue;
++		}
++		// (the two shades of each pixel that changes: sums for their correlation)
++		double count2 = 0.0, sumA = 0.0, sumB = 0.0, sumAA = 0.0, sumBB = 0.0, sumAB = 0.0;
++		for (int y = 0; y < from->getHeight(); ++y)
++		{
++			for (int x = 0; x < from->getWidth(); ++x)
++			{
++				const Uint8 before = from->getPixel(x, y), after = to->getPixel(x, y);
++				if (!before || !after || before == after) continue;
++				const double a = before & 15, b = after & 15;
++				count2 += 1.0; sumA += a; sumB += b; sumAA += a * a; sumBB += b * b; sumAB += a * b;
++			}
++		}
++		// (Few pixels changing, or all of one shade going to all of another: nothing moves in that.)
++		double correlation = 1.0;
++		if (count2 >= 16.0)
++		{
++			const double varA = sumAA - sumA * sumA / count2, varB = sumBB - sumB * sumB / count2, both = sumAB - sumA * sumB / count2;
++			if (varA > 1e-6 && varB > 1e-6) correlation = both / std::sqrt(varA * varB);
++		}
++		alike += correlation;
++		++steps;
++	}
++	return steps && alike / steps >= AnimatedPulseAlike;
++}
++
++/**
 + * Gets the voxel colour model of a MapData record (a tile part) shown with a given sprite
 + * (animation frame), building it on first use (see buildModel). A view that shares another
 + * view's models (the small extra view) asks that view instead.
@@ -82854,6 +82979,7 @@ index 000000000..4add25fd1
 +		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
 +		found = _models.emplace(key, VoxelModel()).first;
 +		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
++		found->second.pulse = pulsingFrames(mapData);
 +		// The part's own ghost (VoxelModel::ghost): a floor drawn as a box of liquid, its surface
 +		// (see buildLiquid); a floor or wall whose voxels leave out most of its art, the rest of it
 +		// (see buildArtFill); an object the art draws as a block of crops, the block (see

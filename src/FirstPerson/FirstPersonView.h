@@ -193,6 +193,7 @@ public:
 		bool empty;
 		bool ghostly;            // a ghost of a part with no voxels (setting "Parts without shape"): seen through on some pixels, never in the way (see buildGhost, buildShape)
 		bool solidGhost;         // a ghost the view draws solid, as the map draws it (low art, as crops: see buildRelief); still never in the way
+		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none

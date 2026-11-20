@@ -496,6 +496,7 @@ std::string shaderConstants()
 	number("UnexploredMistTo", UnexploredMistTo);
 	number("UnexploredMistMax", UnexploredMistMax);
 	number("FlareReach", FlareReach);
+	whole("AnimatedNearShades", AnimatedNearShades);
 	number("UfoInsideTint", UfoInsideTint);
 	number("UfoInsideTintNight", UfoInsideTintNight);
 	whole("HazeSteps", FirstPersonView::SceneColors::HazeSteps);
@@ -1375,7 +1376,7 @@ Uint32 FirstPersonGpu::State::modelId(const FirstPersonView::VoxelModel *model)
 	if (model->lit) std::memcpy(masks + MaskRows * 3, model->lit, MaskRows * 2);
 	else std::memset(masks + MaskRows * 3, 0, MaskRows * 2);
 	Uint32 *info = &modelInfo[(size_t)id * 4];
-	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0);
+	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0) | (model->pulse ? 32 : 0);
 	info[1] = ghostId;
 	info[2] = model->glowMinZ | (Uint32)model->ceiling << 8 | (Uint32)model->min[2] << 16 | (Uint32)model->pulseKind << 24;
 	info[3] = 0;

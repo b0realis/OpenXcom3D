@@ -1509,7 +1509,20 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		faceIndex = hit.axis * 2 + (normal[hit.axis] < 0.0 ? 1 : 0);
 	}
 	bool showNextFrame = dither(pixelX + 2, pixelY + 1) < uAnimationBlend;
+	// (Where the voxel's colours in the two frames are far apart, it goes over whole at the step's middle: see AnimatedNearShades.)
+	if (hit.part >= 0 && !hit.ghost && parts[hit.part] != 0u && nextParts[hit.part] != 0u && (texelFetch(uModelInfo, int(nextParts[hit.part])).x & 32u) == 0u) // (32: VoxelModel::pulse)
+	{
+		uint nowColor = modelColor(parts[hit.part], hit.voxel), nextColor = modelColor(nextParts[hit.part], hit.voxel);
+		if (nowColor != 0u && nextColor != 0u && (((nowColor ^ nextColor) & 0xF0u) != 0u || abs(int(nowColor & 15u) - int(nextColor & 15u)) > AnimatedNearShades))
+		{
+			showNextFrame = uAnimationBlend >= 0.5;
+		}
+	}
 	uint baseColor = hit.color;
+	// (An animated part's other frame's colour here and how much of it is in the mix, for the full-colour picture: see below.)
+	uint fadeColor = 0u;
+	float fadeShare = 0.0;
+	bool sidePicture = false;
 	int rockCeilingMiddle = -1;
 	float waveShade = 0.0;
 	bool onSea = false;
@@ -1552,6 +1565,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		if (hit.axis >= 0 && hit.axis < 2 && rayDirection[hit.axis] > 0.0)
 		{
 			shownColor = mirroredColor(hit, hitTile, hit.axis, false, showNextFrame);
+			sidePicture = shownColor == 0u;
 #ifdef RELIEF
 			reliefFrom = shownColor != 0u ? 2 : 1;
 #endif
@@ -1562,6 +1576,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			if (painted != 0u) reliefFrom = 4;
 #endif
 			if (painted != 0u) shownColor = painted;
+			if (painted != 0u) sidePicture = false;
 		}
 		else if (hit.axis >= 0 && hit.axis < 2)
 		{
@@ -1571,6 +1586,19 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #endif
 		}
 		if (shownColor != 0u && !ownColorAllRound) baseColor = shownColor;
+		// Setting "Smooth light", the full-colour picture: an animated part's two frames are mixed smoothly there, where
+		// the palette's picture shows the one or the other in a dot pattern (the owner, on a base full of animated
+		// parts: some of them "look bad ingame"). The other frame's colour on this face: the part's own
+		// there, or its side picture's; a face that borrowed its colour elsewhere (a mirror, paint, an underside) keeps the dots.
+		uint otherFrame = hit.ghost ? 0u : model != part ? part : nextParts[hit.part];
+		if (uSmoothLight != 0 && otherFrame != 0u && otherFrame != model)
+		{
+			bool ownShown = shownColor == 0u || ownColorAllRound;
+			if (ownShown) fadeColor = modelColor(otherFrame, voxel);
+			else if (sidePicture && shownColor != 0u) fadeColor = hit.axis == 0 ? texelFetch(uModelSides, int(otherFrame) * 1024 + 256 + voxel.z * 16 + voxel.y).r
+				: texelFetch(uModelSides, int(otherFrame) * 1024 + 640 + voxel.z * 16 + voxel.x).r;
+			fadeShare = model != part ? 1.0 - uAnimationBlend : uAnimationBlend;
+		}
 #ifdef RELIEF
 		// (Where the colour came from: the part's own colours where nothing else was shown; an underside's is one colour, flat.)
 		if (shownColor == 0u || ownColorAllRound) reliefFrom = 0;
@@ -1580,6 +1608,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		{
 			onSea = faceIndex == 4;
 			baseColor = onSea ? waterColor(rayOrigin.x + rayDirection.x * hit.t, rayOrigin.y + rayDirection.y * hit.t, hit.t, pixelX, pixelY, waveShade) : scene(SceneWater + 1);
+			fadeColor = 0u;
 #ifdef RELIEF
 			reliefFrom = -1;
 #endif
@@ -1784,6 +1813,13 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
 			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
 			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
+			if (fadeColor != 0u && fadeColor != baseColor)
+			{
+				// (an animated part between two frames: the other frame's colour in the same light, mixed in)
+				uint lowFade = (fadeColor & 0xF0u) | uint(min(darkest, int(fadeColor & 15u) + min(low, cap)));
+				uint highFade = (fadeColor & 0xF0u) | uint(min(darkest, int(fadeColor & 15u) + min(low + 1, cap)));
+				rgb = mix(rgb, mix(paletteRgb(lowFade), paletteRgb(highFade), share), fadeShare);
+			}
 			if (!onSteadyUfo && blackShare > 0.0)
 			{
 				rgb = mix(rgb, mix(paletteRgb(shadeColor(baseColor, low)), paletteRgb(shadeColor(baseColor, low + 1)), share), blackShare);

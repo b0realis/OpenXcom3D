@@ -927,7 +927,17 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 	// (dithered; the share grows as the step goes on). Decided first, so that every colour below
 	// comes from the same frame: a face the art never shows that took the next frame's raw
 	// colour flashed a whole side of a UFO on and off with every step of its lights.
-	const bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
+	bool showNextFrame = dither(pixelX + 2, pixelY + 1) < _animationBlend;
+	// (Where the voxel's colours in the two frames are far apart, it goes over whole at the step's middle: see AnimatedNearShades.)
+	if (hit.part >= 0 && !hit.ghost && tileView.part[hit.part] && tileView.next[hit.part] && !tileView.next[hit.part]->pulse)
+	{
+		const Uint8 nowColor = tileView.part[hit.part]->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
+		const Uint8 nextColor = tileView.next[hit.part]->color[hit.voxel[2]][hit.voxel[1]][hit.voxel[0]];
+		if (nowColor && nextColor && (((nowColor ^ nextColor) & 0xF0) || std::abs((nowColor & 15) - (nextColor & 15)) > AnimatedNearShades))
+		{
+			showNextFrame = _animationBlend >= 0.5f;
+		}
+	}
 	// The colour before shading: the voxel's own, unless the face is one the iso art doesn't show.
 	Uint8 baseColor = hit.color;
 	int rockCeilingMiddle = -1; // a ceiling under rock: its middle shade within its colour group (see the end)
