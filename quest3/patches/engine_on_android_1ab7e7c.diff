@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d03c20b41
+index 000000000..5fc46adbb
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,679 @@
+@@ -0,0 +1,683 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -195,7 +195,7 @@ index 000000000..d03c20b41
 +  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
 +  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
 +  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
-+  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers, a far clear view."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, full sprite hitboxes, damage numbers."
 +  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
 +  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
 +  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
@@ -753,6 +753,10 @@ index 000000000..d03c20b41
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
++  STR_FPS_GAME_OPTIONS: "Recommended game options"
++  STR_FPS_GAME_OPTIONS_DESC: "Click: sets OpenXcom's own options to a recommended lot: 640x400 scales, path costs, tooltips, auto-end. Kept with OK."
++  STR_FPS_GAME_OPTIONS_APPLY: "Apply"
++  STR_FPS_GAME_OPTIONS_APPLIED: "Applied"
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
 +  STR_FPS_LIVE_SCANNER: "Live motion scanner"
 +  STR_FPS_LIVE_SCANNER_DESC: "The motion scanner stays up as you move and through the aliens' turn. NO: one look from where it's used, as in the game."
@@ -847,10 +851,10 @@ index 000000000..d03c20b41
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..17ed3b787
+index 000000000..a6d008216
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,679 @@
+@@ -0,0 +1,683 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -880,7 +884,7 @@ index 000000000..17ed3b787
 +  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
 +  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
 +  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
-+  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers, a far clear view."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, full sprite hitboxes, damage numbers."
 +  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
 +  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
 +  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
@@ -1438,6 +1442,10 @@ index 000000000..17ed3b787
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST_DESC: "Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom's own."
++  STR_FPS_GAME_OPTIONS: "Recommended game options"
++  STR_FPS_GAME_OPTIONS_DESC: "Click: sets OpenXcom's own options to a recommended lot: 640x400 scales, path costs, tooltips, auto-end. Kept with OK."
++  STR_FPS_GAME_OPTIONS_APPLY: "Apply"
++  STR_FPS_GAME_OPTIONS_APPLIED: "Applied"
 +  STR_FPS_QUICK_DEATHS_DESC: "A unit killed or knocked out is down at once: bursts fire on, falls play on their own. NO: the game's, one by one."
 +  STR_FPS_LIVE_SCANNER: "Live motion scanner"
 +  STR_FPS_LIVE_SCANNER_DESC: "The motion scanner stays up as you move and through the aliens' turn. NO: one look from where it's used, as in the game."
@@ -23072,7 +23080,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..0edd4a4b5 100644
+index 0467dd243..d538e1de1 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -23089,8 +23097,8 @@ index 0467dd243..0edd4a4b5 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
-+OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
++OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
++OPT int fpsPreset, fpsPresetTables, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDL_Keycode keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -24119,10 +24127,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a0e4123eb
+index 000000000..476a0afa9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1838 @@
+@@ -0,0 +1,1956 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24585,9 +24593,14 @@ index 000000000..a0e4123eb
 +namespace
 +{
 +
++/// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
++/// settlePresets).
++constexpr int PresetTables = 1;
++
 +/**
 + * One of the settings a preset sets: its option (a switch or a number) and its value under
-+ * each of the group's presets, in their order.
++ * each of the group's presets, in their order; and, where the tables' last change (see
++ * PresetTables) changed them, its values before.
 + */
 +struct PresetSwitch
 +{
@@ -24595,6 +24608,7 @@ index 000000000..a0e4123eb
 +	bool *flag;
 +	int *number;
 +	std::vector<int> values;
++	std::vector<int> before = {};
 +};
 +
 +/**
@@ -24624,7 +24638,7 @@ index 000000000..a0e4123eb
 + *    clearer and farther view);
 + *  - FullQoL: every feature on that leaves the game's rules of turning, moving and shooting
 + *    alone (sound, music, UFO lights, jumping, leaning, the live scanner, the volley, instant
-+ *    chains, every room painted, the downed always marked);
++ *    chains);
 + *  - FPS: a shooter's rules on top (free turning, free walking, FPS-style shooting, quick
 + *    deaths).
 + * Aiming at the exact point is on in every one but FAITHFUL; full sprite hitboxes (a shot hits
@@ -24633,7 +24647,12 @@ index 000000000..a0e4123eb
 + * shown in all of them, FAITHFUL too, and so are all the parts without shape; the helmet
 + * cameras' artifacts are Light and night vision is the futuristic one: those are the defaults).
 + * The compass's step costs are TACTICUS's and XMbl's; sidesteps facing the view are XMbl's
-+ * alone; fall damage is FPS's alone.
++ * alone; fall damage is XMbl's and FPS's.
++ * The owner's rulings on a player's list (GitHub issue #193): the downed are always marked
++ * from Extended+ on (FAITHFUL: under the crosshair); XMbl leans with a tilt, jumps low
++ * obstacles and takes fall damage; guns come first at auto-equip and every room's walls are
++ * painted in all six. Those two are listed although no preset differs in them: choosing a
++ * preset sets them, and they are part of what makes a named preset (see settlePresets).
 + * @return The settings.
 + */
 +const std::vector<PresetSwitch> &gameplaySwitches()
@@ -24645,22 +24664,22 @@ index 000000000..a0e4123eb
 +		{ "fpsFaithfulTargeting", &fpsFaithfulTargeting, nullptr, { 1,    1,    1,    1,    1,    0 } },
 +		{ "fpsTurnCost",          &fpsTurnCost,          nullptr, { 1,    1,    1,    1,    1,    0 } },
 +		{ "fpsMovement",          nullptr, &fpsMovement,          { 1,    1,    1,    1,    1,    0 } },
-+		{ "fpsVault",             &fpsVault,             nullptr, { 0,    0,    0,    0,    1,    1 } },
-+		{ "fpsLean",              nullptr, &fpsLean,              { 0,    0,    0,    0,    1,    1 } },
++		{ "fpsVault",             &fpsVault,             nullptr, { 0,    0,    0,    1,    1,    1 }, { 0, 0, 0, 0, 1, 1 } },
++		{ "fpsLean",              nullptr, &fpsLean,              { 0,    0,    0,    2,    1,    1 }, { 0, 0, 0, 0, 1, 1 } },
 +		{ "fpsLeanShots",         &fpsLeanShots,         nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsSpriteHitboxes",    &fpsSpriteHitboxes,    nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsAimExact",          &fpsAimExact,          nullptr, { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsQuickDeaths",       &fpsQuickDeaths,       nullptr, { 0,    0,    0,    0,    0,    1 } },
 +		{ "fpsMeleeTerrain",      &fpsMeleeTerrain,      nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsLiveScanner",       &fpsLiveScanner,       nullptr, { 0,    0,    0,    0,    1,    1 } },
-+		{ "fpsFallDamage",        &fpsFallDamage,        nullptr, { 0,    0,    0,    0,    0,    1 } },
++		{ "fpsFallDamage",        &fpsFallDamage,        nullptr, { 0,    0,    0,    1,    0,    1 }, { 0, 0, 0, 0, 0, 1 } },
 +		{ "fpsAkimbo",            nullptr, &fpsAkimbo,            { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsThrowing",          nullptr, &fpsThrowing,          { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsCloseEyeShots",     &fpsCloseEyeShots,     nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsAkimboVolley",      &fpsAkimboVolley,      nullptr, { 0,    0,    0,    0,    1,    1 } },
 +		{ "fpsForceBlocked",      &fpsForceBlocked,      nullptr, { 0,    0,    0,    0,    1,    1 } },
 +		{ "fpsInstantChains",     &fpsInstantChains,     nullptr, { 0,    0,    0,    0,    1,    1 } },
-+		{ "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, nullptr, { 0,  0,    0,    0,    1,    1 } },
++		{ "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, nullptr, { 1,  1,    1,    1,    1,    1 }, { 0, 0, 0, 0, 1, 1 } },
 +		{ "fpsSidestepFaceView",  &fpsSidestepFaceView,  nullptr, { 0,    0,    0,    1,    0,    0 } },
 +		{ "fpsMapCamera",         nullptr, &fpsMapCamera,         { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsCameraEyes",        &fpsCameraEyes,        nullptr, { 0,    0,    1,    1,    1,    1 } },
@@ -24673,8 +24692,8 @@ index 000000000..a0e4123eb
 +		{ "fpsDamageNumbers",     &fpsDamageNumbers,     nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsCrosshairDamage",   &fpsCrosshairDamage,   nullptr, { 0,    0,    0,    1,    1,    1 } },
 +		{ "fpsGlowingOutlines",   &fpsGlowingOutlines,   nullptr, { 0,    0,    0,    1,    1,    1 } },
-+		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    1,    1,    1,    2,    2 } },
-+		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 1,    1,    1,    1,    2,    2 } },
++		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
++		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 2,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
 +		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
@@ -24951,9 +24970,37 @@ index 000000000..a0e4123eb
 + * Settles the presets with the settings as they are (a profile from before them, or one edited
 + * by hand): each group says the preset its settings make, or Custom, keeping them as the mix.
 + * Nothing but the two names changes: no setting of the player's is touched.
++ * But once, for a profile from before the tables' last change (PresetTables; the option
++ * "fpsPresetTables" keeps which tables a profile has seen): settings that are all as a named
++ * preset had them before are that preset as it is now. Without it, every profile on
++ * Extended+ would have turned Custom with the old values, and the new defaults would have
++ * reached no one who had played before. A mix of the player's own matches no preset's old
++ * values and is left alone.
 + */
 +void settlePresets()
 +{
++	if (Options::fpsPresetTables < PresetTables)
++	{
++		const Presets &gameplay = presetsOf(PRESET_GAMEPLAY);
++		for (int preset = 0; preset < gameplay.count; ++preset)
++		{
++			bool all = true, changes = false;
++			for (const PresetSwitch &presetSwitch : gameplay.switches())
++			{
++				const int was = presetSwitch.before.empty() ? presetSwitch.values[preset] : presetSwitch.before[preset];
++				all = all && switchValue(presetSwitch) == was;
++				changes = changes || was != presetSwitch.values[preset];
++			}
++			if (!all) continue;
++			if (changes)
++			{
++				for (const PresetSwitch &presetSwitch : gameplay.switches()) setSwitch(presetSwitch, presetSwitch.values[preset]);
++				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
++			}
++			break;
++		}
++		Options::fpsPresetTables = PresetTables;
++	}
 +	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
 +	{
 +		const Presets &presets = presetsOf(group);
@@ -24964,6 +25011,82 @@ index 000000000..a0e4123eb
 +			if (made == presets.count) *presets.mix = currentMix(presets);
 +		}
 +	}
++}
++
++/**
++ * Sets the game's own options (OpenXcom's and OpenXcom Extended's, on the game's own tabs) to the
++ * ones a player recommends for play with the add-on (GitHub issue #193: "things which, I think
++ * outside the MOST purists, think are universally better to have on"): the row "Recommended
++ * game options" on the first page of the 3D VIEW tab, when the player clicks it. No preset sets
++ * them (the owner's ruling: a separate button): a preset is the add-on's own settings, and a
++ * player's options of the game are theirs. An option a mod fixes for its players stays as the
++ * mod has it. As any change on the options screens it is kept with OK and dropped with Cancel;
++ * the scales take effect with OK.
++ * The list: the Geoscape and the Battlescape at 640x400; on the globe the countries, the radars
++ * and the flight paths, the funds shown, dragging with the middle button on the globe and on
++ * the map; the path's arrows with their time units, tooltips; info screens maximized, values
++ * changed by the wheel (by 10); the building queue, crafts launched whatever their state,
++ * transfers of crafts in the air, the globe's realistic light; stats in the inventory,
++ * grenades saved primed, explosions at height 2, battles ended by themselves, the alternate
++ * movement methods, the line of fire overridden, the smooth bullet camera, no "Next Turn"
++ * screen; OXCE's links, the clip sizes, a craft's maintenance time (2), the base's name in
++ * popups, the base's large bars scaled, the accuracy by the crosshair (2).
++ * @param mod The mod.
++ * @return How many options it changed.
++ */
++int applyGameOptions(const Mod *mod)
++{
++	using namespace Options;
++	struct GameOption { const char *id; bool *flag; int *number; int value; };
++	const GameOption recommended[] = {
++		{ "geoscapeScale", nullptr, &newGeoscapeScale, SCALE_2X },
++		{ "battlescapeScale", nullptr, &newBattlescapeScale, SCALE_2X },
++		{ "globeDetail", &globeDetail, nullptr, 1 },
++		{ "globeRadarLines", &globeRadarLines, nullptr, 1 },
++		{ "globeFlightPaths", &globeFlightPaths, nullptr, 1 },
++		{ "showFundsOnGeoscape", &showFundsOnGeoscape, nullptr, 1 },
++		{ "geoDragScrollButton", nullptr, &geoDragScrollButton, SDL_BUTTON_MIDDLE },
++		{ "battleNewPreviewPath", nullptr, (int*)&battleNewPreviewPath, PATH_ARROW_TU },
++		{ "battleTooltips", &battleTooltips, nullptr, 1 },
++		{ "battleDragScrollButton", nullptr, &battleDragScrollButton, SDL_BUTTON_MIDDLE },
++		{ "maximizeInfoScreens", &maximizeInfoScreens, nullptr, 1 },
++		{ "changeValueByMouseWheel", nullptr, &changeValueByMouseWheel, 10 },
++		{ "allowBuildingQueue", &allowBuildingQueue, nullptr, 1 },
++		{ "craftLaunchAlways", &craftLaunchAlways, nullptr, 1 },
++		{ "canTransferCraftsWhileAirborne", &canTransferCraftsWhileAirborne, nullptr, 1 },
++		{ "globeSeasons", &globeSeasons, nullptr, 1 },
++		{ "showMoreStatsInInventoryView", &showMoreStatsInInventoryView, nullptr, 1 },
++		{ "includePrimeStateInSavedLayout", &includePrimeStateInSavedLayout, nullptr, 1 },
++		{ "battleExplosionHeight", nullptr, &battleExplosionHeight, 2 },
++		{ "battleAutoEnd", &battleAutoEnd, nullptr, 1 },
++		{ "strafe", &strafe, nullptr, 1 },
++		{ "forceFire", &forceFire, nullptr, 1 },
++		{ "battleSmoothCamera", &battleSmoothCamera, nullptr, 1 },
++		{ "skipNextTurnScreen", &skipNextTurnScreen, nullptr, 1 },
++		{ "oxceLinks", &oxceLinks, nullptr, 1 },
++		{ "oxcePediaShowClipSize", &oxcePediaShowClipSize, nullptr, 1 },
++		{ "oxceInterceptGuiMaintenanceTime", nullptr, &oxceInterceptGuiMaintenanceTime, 2 },
++		{ "oxceShowBaseNameInPopups", &oxceShowBaseNameInPopups, nullptr, 1 },
++		{ "oxceBaseInfoScaleEnabled", &oxceBaseInfoScaleEnabled, nullptr, 1 },
++		{ "oxceShowAccuracyOnCrosshair", nullptr, &oxceShowAccuracyOnCrosshair, 2 },
++	};
++	int changed = 0, fixed = 0;
++	for (const GameOption &option : recommended)
++	{
++		if (mod && mod->getFixedUserOptions().count(option.id)) { ++fixed; continue; }
++		if (option.flag)
++		{
++			if (*option.flag != (option.value != 0)) ++changed;
++			*option.flag = option.value != 0;
++		}
++		else
++		{
++			if (*option.number != option.value) ++changed;
++			*option.number = option.value;
++		}
++	}
++	Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
++	return changed;
 +}
 +
 +/**
@@ -25036,8 +25159,11 @@ index 000000000..a0e4123eb
 +	// (unlisted: no description).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsPresetTables", &fpsPresetTables, 0, "", category)); // (which tables of presets the profile has seen: see settlePresets; unlisted)
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
++	// The game's own options set to a recommended lot, when the player clicks the row (see applyGameOptions): whether that was done.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsGameOptions", &fpsGameOptions, false, "STR_FPS_GAME_OPTIONS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSoldierPreview", &fpsSoldierPreview, true, "STR_FPS_SOLDIER_PREVIEW", category));
 +	// And on the isometric map, the selected soldier's helmet camera in a window: off, small,
 +	// medium or large (0 to 3).
@@ -25125,7 +25251,7 @@ index 000000000..a0e4123eb
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsAkimboVolley", &fpsAkimboVolley, false, "STR_FPS_AKIMBO_VOLLEY", category));
 +	// The game's auto-equip hands out guns before melee weapons, in the mod's item order (a player's
 +	// report, GitHub issue #46; patch 113's way, now a choice). Off: OXCE's own auto-equip, unchanged.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, false, "STR_FPS_AUTO_EQUIP_GUNS_FIRST", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsAutoEquipGunsFirst", &fpsAutoEquipGunsFirst, true, "STR_FPS_AUTO_EQUIP_GUNS_FIRST", category));
 +	// Leaning: standing to one side of the tile's middle shoots from that side (the game's
 +	// off-centre origins), to peek round corners; and leaning out with the lean keys: off (0),
 +	// the eye moves to the side (1, peek), and the view tilts with it (2, tilt).
@@ -25173,7 +25299,7 @@ index 000000000..a0e4123eb
 +	// they face, its outside or the room inside. All rooms (2): the walls between its rooms too, each
 +	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
 +	// glass, keep theirs.
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 1, "STR_FPS_WALL_PAINT", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 2, "STR_FPS_WALL_PAINT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
 +	// The 3D view's ambient sounds (the owner: "The weather effects should also have nonobtrusive
@@ -25347,7 +25473,7 @@ index 000000000..a0e4123eb
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGlowingOutlines", &fpsGlowingOutlines, false, "STR_FPS_GLOWING_OUTLINES", category));
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
 +	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 1, "STR_FPS_DOWNED_ICONS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 2, "STR_FPS_DOWNED_ICONS", category));
 +	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 +	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 +	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
@@ -25963,10 +26089,10 @@ index 000000000..a0e4123eb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..812406a83
+index 000000000..f9dc20bc2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,516 @@
+@@ -0,0 +1,518 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26148,6 +26274,8 @@ index 000000000..812406a83
 +void rendererChanged();
 +/// Settles the presets' names with the settings as they are.
 +void settlePresets();
++/// Sets the game's own options to the recommended ones (the 3D VIEW tab's "Recommended game options"); how many it changed.
++int applyGameOptions(const Mod *mod);
 +/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 +/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 +/// stays off.
@@ -102396,10 +102524,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..26f41f8b0
+index 000000000..694e000c3
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1142 @@
+@@ -0,0 +1,1154 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -102617,7 +102745,7 @@ index 000000000..26f41f8b0
 +	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 +	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
 +	// and what goes by the hand and the habit, which no preset can know.
-+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
++	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 +	{
 +		for (const OptionInfo &option : gathered)
 +		{
@@ -102652,7 +102780,7 @@ index 000000000..26f41f8b0
 +	std::vector<bool> placed(gathered.size(), false);
 +	for (size_t index = 0; index < gathered.size(); ++index)
 +	{
-+		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail"; // (the first page's alone)
++		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail" || gathered[index].id() == "fpsGameOptions"; // (the first page's alone)
 +	}
 +	for (const auto &section : sections)
 +	{
@@ -102753,6 +102881,11 @@ index 000000000..26f41f8b0
 +	switch (option.type())
 +	{
 +	case OPTION_BOOL:
++		// The game's own options set to the recommended ones: a thing to do, not a switch.
++		if (option.id() == "fpsGameOptions")
++		{
++			return std::string(tr(*option.asBool() ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
++		}
 +		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
 +		if (option.id() == "fpsFaithfulTargeting")
 +		{
@@ -103113,8 +103246,15 @@ index 000000000..26f41f8b0
 +		}
 +		return;
 +	}
++	// The recommended game options: a click sets them (again, if they were set before; there is no taking them
++	// back but by Cancel, or on the game's own tabs).
++	if (option->type() == OPTION_BOOL && option->asBool() == &Options::fpsGameOptions)
++	{
++		FirstPerson::applyGameOptions(_game->getMod());
++		Options::fpsGameOptions = true;
++	}
 +	// A switch: either button flips it. The frame counter shows or hides at once.
-+	if (option->type() == OPTION_BOOL)
++	else if (option->type() == OPTION_BOOL)
 +	{
 +		*option->asBool() = !*option->asBool();
 +		if (option->asBool() == &Options::fpsCounter)

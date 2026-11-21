@@ -215,7 +215,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
 	// and what goes by the hand and the habit, which no preset can know.
-	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson" })
+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 	{
 		for (const OptionInfo &option : gathered)
 		{
@@ -250,7 +250,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	std::vector<bool> placed(gathered.size(), false);
 	for (size_t index = 0; index < gathered.size(); ++index)
 	{
-		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail"; // (the first page's alone)
+		placed[index] = gathered[index].id() == "fpsPreset" || gathered[index].id() == "fpsGraphicsDetail" || gathered[index].id() == "fpsGameOptions"; // (the first page's alone)
 	}
 	for (const auto &section : sections)
 	{
@@ -351,6 +351,11 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 	switch (option.type())
 	{
 	case OPTION_BOOL:
+		// The game's own options set to the recommended ones: a thing to do, not a switch.
+		if (option.id() == "fpsGameOptions")
+		{
+			return std::string(tr(*option.asBool() ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
+		}
 		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
 		if (option.id() == "fpsFaithfulTargeting")
 		{
@@ -711,8 +716,15 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		return;
 	}
+	// The recommended game options: a click sets them (again, if they were set before; there is no taking them
+	// back but by Cancel, or on the game's own tabs).
+	if (option->type() == OPTION_BOOL && option->asBool() == &Options::fpsGameOptions)
+	{
+		FirstPerson::applyGameOptions(_game->getMod());
+		Options::fpsGameOptions = true;
+	}
 	// A switch: either button flips it. The frame counter shows or hides at once.
-	if (option->type() == OPTION_BOOL)
+	else if (option->type() == OPTION_BOOL)
 	{
 		*option->asBool() = !*option->asBool();
 		if (option->asBool() == &Options::fpsCounter)

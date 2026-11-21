@@ -179,6 +179,8 @@ void presetSwitchChanged(const std::string &id);
 void rendererChanged();
 /// Settles the presets' names with the settings as they are.
 void settlePresets();
+/// Sets the game's own options to the recommended ones (the 3D VIEW tab's "Recommended game options"); how many it changed.
+int applyGameOptions(const Mod *mod);
 /// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 /// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 /// stays off.

@@ -90,7 +90,7 @@ KEYS = [
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
     ('Presets (the first page)', [
-        ('Gameplay', 'Extended+', 'FAITHFUL / Extended+ / TACTICUS / XMbl / FullQoL / FPS / Custom', 'How it plays, as one choice setting 45 settings. FAITHFUL: soldiers\' 3D view on top of OXCE. Extended+: the map camera, unit names, hitboxes shown, exact aim. TACTICUS: cameras as the eyes see, the accuracy line, the rangefinder, step costs. XMbl: akimbo, lean shots, modern throwing, full sprite hitboxes, damage numbers. FullQoL: every feature on. FPS: free turning and walking, FPS-style shooting, quick deaths.',
+        ('Gameplay', 'Extended+', 'FAITHFUL / Extended+ / TACTICUS / XMbl / FullQoL / FPS / Custom', 'How it plays, as one choice setting 45 settings. FAITHFUL: soldiers\' 3D view on top of OXCE. Extended+: the map camera, unit names, hitboxes shown, exact aim. TACTICUS: cameras as the eyes see, the accuracy line, the rangefinder, step costs. XMbl: akimbo, leaning with a tilt, lean shots, jumping low obstacles, fall damage, modern throwing, full sprite hitboxes, damage numbers. FullQoL: every feature on. FPS: free turning and walking, FPS-style shooting, quick deaths.',
          'Change one of its settings by hand and it becomes Custom; your mix is kept while you try the others.'),
         ('Graphics detail', 'Medium', 'Low / Medium / High / Custom', 'How finely the 3D world is drawn, as one choice setting thirteen Screen settings, by the Renderer. CPU: Low has pixels twice as big and no sun shadows, Medium the HUD\'s resolution, High the battlescape\'s. GPU: Low the HUD\'s resolution, Medium the display\'s with Render scale on Auto, High that with true colour, smooth light, soft shadows, ambient occlusion and the lights\' effects.',
          'Low on a slow machine; with Renderer GPU, Medium on built-in graphics and High on a dedicated card.'),
@@ -111,6 +111,7 @@ SETTINGS = [
         ('Invert mouse', 'NO', 'YES / NO', 'Mouse forward looks down, as in a flight simulator.', ''),
         ('Field of view', '75', '50 to 110', 'How wide the 3D view is, in degrees.', 'Wider shows more around you; narrower makes far targets bigger.'),
         ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
+        ('Recommended game options', 'Apply', 'Apply / Applied', 'A click sets OpenXcom\'s own options (the game\'s other tabs) to a recommended lot: Geoscape and Battlescape at 640x400, the path\'s arrows and costs, tooltips, the middle button to drag, auto-end battle, no "Next Turn" screen, the building queue, inventory stats, accuracy by the crosshair and more. Kept with OK, dropped with Cancel. No Gameplay preset touches them, and what a mod fixes stays as the mod has it.', 'One click instead of thirty; change any of them back on the game\'s own tabs.'),
         ('Alien turn in 3D', 'YES', 'YES / NO', 'Stay in 3D during the aliens\' turn, through your last soldier\'s eyes. NO: the map for their turn.', ''),
         ('Alien turn: look as the soldier faces', 'NO', 'YES / NO', 'YES: in the alien turn the view stays with your soldier\'s facing, at most 45 degrees to either side: you see what they can see.', ''),
         ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien, a soldier shot at by an alien nobody sees; helmet camera cards pop up for soldiers shot at, hit or mind controlled.', ''),
@@ -161,7 +162,7 @@ SETTINGS = [
          'What you see is what you hit: a shot between the legs passes, one at a gun held out hits, and a kneeling soldier is as small as he looks: a shot just over his head goes over. Only the art a unit\'s picture lays flat on the floor in front of its feet is never hit. Arcs too: a bow\'s arrow hits the picture it comes down on, a big unit aimed at its middle. NO: the game\'s own hit shapes.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
         ('Live motion scanner', 'NO', 'YES / NO', 'YES: the motion scanner stays up as you move and through the aliens\' turn, a live radar for one use. NO: one look from where it was used, as the game\'s own scanner.', 'An edge the game never gives; on from the FullQoL preset.'),
-        ('Auto-equip guns first', 'NO', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
+        ('Auto-equip guns first', 'YES', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
         ('Fall damage', 'NO', 'YES / NO', 'With Falling, the landing hurts by the height fallen. NO: a fall never hurts.', 'NO makes every ledge a free shortcut.'),
     ]),
     ('Graphics and light', [
@@ -174,7 +175,7 @@ SETTINGS = [
          'Further costs a little more. With Unseen terrain Visible and Light haze: whole-map screenshots.'),
         ('Fog of war in 3D', 'Off', 'Off / As map', 'Off: terrain the view sees within your soldiers\' sight range shows as seen, explored or not (no dark floor below the stairs). As map: only explored terrain.',
          'The 3D view only: the map and its exploring stay the game\'s; units stay hidden until seen.'),
-        ('Wall paint', 'Each side', 'As the art / Each side / All rooms', 'The wall faces the map never shows. Each side: in the paint of the side they face (from behind a house its outside, inside a room the room\'s). All rooms: the walls between rooms too. As the art: as the face the map shows.',
+        ('Wall paint', 'All rooms', 'As the art / Each side / All rooms', 'The wall faces the map never shows. Each side: in the paint of the side they face (from behind a house its outside, inside a room the room\'s). All rooms: the walls between rooms too. As the art: as the face the map shows.',
          'The faces the map shows stay as it draws them; doors keep theirs, windows their frames and glass.'),
         ('Smoke', 'Modern', 'Modern / Original', 'Modern: the game\'s smoke as soft see-through clouds. Original: the games\' own smoke animation, as the map draws it.',
          'Either way units the game hides stay hidden.'),
@@ -220,7 +221,7 @@ SETTINGS = [
         ('Hitboxes', 'Always', 'Off / Aimed at / Blink / Always', 'Outlines where shots can hit units: the unit you aim at, or every unit in sight (blinking or always). Without Full sprite hitboxes, the game\'s own hit shapes (often smaller than the pictures); with it, a line round what the lines of fire really test, worked out the same way they are, so the outline is the hit shape itself.',
          'With Full sprite hitboxes the outline hugs the picture; where it doesn\'t, that part can\'t be hit (the art lying flat on the floor in front of a unit\'s feet), or something nearer covers it.'),
         ('Glowing outlines', 'NO', 'YES / NO', 'The hitboxes and a throw\'s path glow.', ''),
-        ('Downed unit icons', 'Crosshair', 'Crosshair / Always / Off', 'Icons for an unconscious unit: burning, bleeding, shock, out cold.', 'Know whom to carry out first.'),
+        ('Downed unit icons', 'Always', 'Crosshair / Always / Off', 'Icons for an unconscious unit: burning, bleeding, shock, out cold.', 'Know whom to carry out first.'),
         ('Enemy markers', 'Clear shot', 'Clear shot / All red / As map', 'The arrows over the enemies, coloured as their buttons: red if this soldier sees it, green if only the squad does. Clear shot: yellow if his line to a green one is clear (smoke, the dark, camouflage or the distance hide it from him).',
          'Yellow: a shot can get there, though he can\'t see it.'),
         ('Wounded markers', 'On', 'On / Off', 'Arrows over your own the game flags at the right, in their buttons\' colours and numbers: blue wounded, purple about to pass out; a body\'s over where it lies, none over the soldier you look through.',
