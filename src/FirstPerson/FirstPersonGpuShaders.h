@@ -1052,6 +1052,7 @@ vec3 skyRgbTowards(vec3 direction, int pixelX, int pixelY)
 }
 
 const float PondSwell = 0.35; // still water's ripples, of the sea's waves (see seaMirror)
+const float GlassMirror = 0.2, GlassMirrorMost = 0.85; // window glass: how much of it is the mirrored picture, seen straight on and at the most
 
 /**
  * The way the sea mirrors a ray at a point (setting "Reflections"): off the water's face, tilted by the waves' slope
@@ -2077,21 +2078,27 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
 		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 		// changed with every shot's light.)
+		vec3 through = fullColor;
 		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 #ifdef MIRROR_FLAGS
-		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
 #endif
 #ifdef REFLECTIONS
-		if (uReflections != 0 && uGoggles == 0 && fullColorSet && hit.glassAxis >= 0)
+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
 		{
 			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
-			// Faint seen straight on, as glass is, and stronger the flatter the pane is looked along.)
+			// Weaker seen straight on, as glass is, and stronger the flatter the pane is looked along.)
+			// (A fifth of the picture straight on, GlassMirror, and all but GlassMirrorMost of it along the pane; and the
+			// pane's own pale blue, the sky a pane was painted with, is half as strong: the mirrored picture is that
+			// now. It was 8 in 100 straight on over the pale blue, more only from 60 degrees aside: a player, GitHub
+			// issue #224, "I don't think I've noticed it, not once". Through the goggles too, in their colours.)
 			vec3 pane = uEye + rayDirection * hit.glassT;
 			vec3 mirrored = rayDirection;
 			mirrored[hit.glassAxis] = -mirrored[hit.glassAxis];
 			float glancing = 1.0 - abs(rayDirection[hit.glassAxis]);
-			float share = 0.08 + 0.5 * glancing * glancing * glancing;
+			float share = min(GlassMirrorMost, GlassMirror + (1.0 - GlassMirror) * glancing * glancing);
+			if (uGoggles == 0) fullColor = through * 0.85 + vec3(150.0, 180.0, 205.0) * 0.15;
 			Hit met;
 			int metTile, metAxis;
 			float metDistance;
@@ -2099,7 +2106,11 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 			if (castRay(pane + mirrored * 0.5, mirrored, min(uMaxDistance, 480.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
 			{
 				float metGlow;
-				float metShade = max(0.0, lightAt(pane + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
+				// (the light before the face met, on the side it is seen from, as a face seen straight has it: at the face
+				// itself a room's far wall took the light of the tile behind it, the night outside)
+				vec3 before = pane + mirrored * met.t;
+				if (met.axis >= 0) before[met.axis] -= sign(mirrored[met.axis]) * 1.5;
+				float metShade = max(0.0, lightAt(before, metGlow) + distanceShade(met.t) + 1.5);
 				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
 					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
 			}
