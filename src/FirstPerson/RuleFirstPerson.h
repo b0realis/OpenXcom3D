@@ -166,6 +166,8 @@ private:
 	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
 	std::map<std::pair<std::string, int>, int> _turned; // (terrain data set, record) -> the height from which its frames are turned from their art (see getTurnedFrom)
 	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
+	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
+	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
@@ -249,6 +251,27 @@ public:
 		{
 			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 		}
+		// Still water (a pond, a swamp, a paddy, a puddle, the shallows of a beach): terrain data sets on whose floors
+		// the pixels of some of the palette's colour groups are water, which mirrors (setting "Reflections") and keeps
+		// its own colours; each `{ dataSet, groups: [0..15], records: [...] }`, the records left out for all of its
+		// floors. Unlike the sea's (`water:` below), such a floor is as its art has it, bank and reeds and all, and
+		// nothing of it goes on beyond the map's edge. A list replaces the earlier one.
+		if (const auto& still = reader["stillWater"])
+		{
+			_stillWater.clear();
+			for (const auto& entry : still.children())
+			{
+				std::string dataSet;
+				std::vector<int> groups, records;
+				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("groups", groups);
+				entry.tryRead("records", records);
+				StillWater &water = _stillWater[dataSet];
+				for (int group : groups) if (group >= 0 && group < 16) water.groups |= (Uint16)(1 << group);
+				water.records.insert(records.begin(), records.end());
+			}
+		}
+
 		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
 		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
 		// floors, or its name and records for some (a ship's data set with the sea round the ship
@@ -467,6 +490,12 @@ public:
 	{
 		auto found = _turned.find(std::make_pair(dataSet, record));
 		return found != _turned.end() ? found->second : -1;
+	}
+	/// The palette's colour groups (a bit each) that are still water on a terrain record's floor (`stillWater:`), or 0.
+	Uint16 getStillWater(const std::string &dataSet, int record) const
+	{
+		auto found = _stillWater.find(dataSet);
+		return found != _stillWater.end() && (found->second.records.empty() || found->second.records.count(record) > 0) ? found->second.groups : (Uint16)0;
 	}
 	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
 	bool isWater(const std::string &dataSet, int record) const

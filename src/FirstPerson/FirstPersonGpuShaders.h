@@ -51,7 +51,7 @@ uniform usamplerBuffer uTileFlags;  // a byte per tile: FirstPersonView::TileFla
 uniform usamplerBuffer uTiles;      // four texels per tile (see FirstPersonGpu.cpp, encodeTiles)
 uniform usamplerBuffer uModelColor; // 6144 bytes per model: [z][y][x]
 uniform usamplerBuffer uModelBits;  // 4 x 384 rows per model: glass, lookOnly, clear, lit; [z][y], bit x
-uniform usamplerBuffer uModelInfo;  // a texel per model: flags, its ghost's number, glowMinZ | ceiling | min z | pulseKind
+uniform usamplerBuffer uModelInfo;  // a texel per model: flags (and, in the high half, the colour groups of its still water), its ghost's number, glowMinZ | ceiling | min z | pulseKind
 uniform usamplerBuffer uModelSides; // 1024 bytes per model: plan [y][x], east [z][y], south [z][x]
 uniform usamplerBuffer uSolid;      // 384 rows per solid mask: [z][y], bit x
 uniform usamplerBuffer uModelExposed; // 6144 bytes per steady UFO model: each voxel's open faces (the model's info says which block)
@@ -1051,14 +1051,17 @@ vec3 skyRgbTowards(vec3 direction, int pixelX, int pixelY)
 	return rgb;
 }
 
+const float PondSwell = 0.35; // still water's ripples, of the sea's waves (see seaMirror)
+
 /**
  * The way the sea mirrors a ray at a point (setting "Reflections"): off the water's face, tilted by the waves' slope
  * there, never down into it; and how much of the mirrored picture shows, more the flatter the ray meets the water.
  */
-vec3 seaMirror(vec3 rayDirection, float x, float y, float span, out float share)
+vec3 seaMirror(vec3 rayDirection, float x, float y, float span, float swell, out float share)
 {
+	// (swell: 1 the sea's waves; less, still water's ripples, a pond's or a swamp's)
 	float slopeX = waveHeight(x + 1.0, y, span) - waveHeight(x - 1.0, y, span), slopeY = waveHeight(x, y + 1.0, span) - waveHeight(x, y - 1.0, span);
-	vec3 waterNormal = normalize(vec3(-slopeX * 0.5, -slopeY * 0.5, 1.0));
+	vec3 waterNormal = normalize(vec3(-slopeX * 0.5 * swell, -slopeY * 0.5 * swell, 1.0));
 	vec3 mirrored = reflect(rayDirection, waterNormal);
 	mirrored.z = max(mirrored.z, 0.03);
 	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
@@ -1164,7 +1167,7 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 				if (mirrors)
 				{
 					float share;
-					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, share);
+					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, 1.0, share);
 					rgb = mix(rgb, skyRgbTowards(mirrored, pixelX, pixelY), share);
 				}
 #endif
@@ -1547,6 +1550,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	int rockCeilingMiddle = -1;
 	float waveShade = 0.0;
 	bool onSea = false;
+	bool onPond = false; // (on still water: a pixel of a pond's, a swamp's or a paddy's face, see VoxelModel::stillWater)
 	float hitHeight = rayOrigin.z + rayDirection.z * hit.t;
 	if (hit.part >= 0 && parts[hit.part] != 0u)
 	{
@@ -1633,6 +1637,11 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #ifdef RELIEF
 			reliefFrom = -1;
 #endif
+		}
+		else if ((info.x >> 16) != 0u && faceIndex == 4 && !hit.ghost)
+		{
+			// (still water: the floor's top where its own colour is one of the water's groups)
+			onPond = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
 		}
 #ifdef RELIEF
 		// The face's tilt: the slope of its drawing's brightness there, from the voxel's four neighbours along the face.
@@ -1809,12 +1818,12 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		color = table(UnseenRow, color);
 	}
 #ifdef REFLECTIONS
-	bool mirrors = uReflections != 0 && onSea && uUnderwater == 0;
+	bool mirrors = uReflections != 0 && (onSea || onPond) && uUnderwater == 0;
 #else
 	bool mirrors = false;
 #endif
 #ifdef MIRROR_FLAGS
-	if (uReflections != 0 && onSea && uUnderwater == 0) mirrorWanted = true;
+	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 #endif
 #ifdef COLORED_LIGHTS
 	bool colorLit = uColorLightCount > 0;
@@ -1862,7 +1871,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		{
 			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
 			float share;
-			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, share);
+			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 			Hit met;
 			int metTile, metAxis;
 			float metDistance;

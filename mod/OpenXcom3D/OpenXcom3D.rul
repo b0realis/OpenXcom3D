@@ -111,6 +111,23 @@ firstPerson:
   # ground past the edge); XPiratez and X-Com Files: the same sea, their SEAURBAN, and the
   # cargo ship's.
   water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }, { dataSet: CARGO3, records: [4] }]
+  # Still water: a pond, a swamp, a paddy, a puddle, the shallows of a beach. Terrain data sets on whose floors the
+  # pixels of some of the palette's colour groups (0 to 15: a colour's number over 16) are water: there the floor
+  # mirrors (setting "Reflections", the GPU renderer) and keeps its own colours, green in a waste's swamp. Unlike the
+  # sea's above, such a floor stays as its art has it, bank, reeds and lilies beside the water, and nothing of it goes
+  # on beyond the map's edge. A floor counts where 15 in 100 of its art's pixels or more are of those groups. With
+  # `records: [...]`, only those records of the set. A list replaces the earlier one.
+  # XPiratez and The X-Com Files: the swamps (blue; green in the wastes), the beach, the rice farm's paddies, the
+  # mountain's puddles, the nuclear waste's pools.
+  stillWater:
+    - { dataSet: FORESTSWAMP, groups: [8] }
+    - { dataSet: FORESTSWAMP_SNOW, groups: [8] }
+    - { dataSet: FORESTSWAMP_WASTE, groups: [3] }
+    - { dataSet: TUNDRASWAMP, groups: [8] }
+    - { dataSet: BEACH, groups: [8] }
+    - { dataSet: IDT_FARM_WATER, groups: [7] }
+    - { dataSet: MOUNTMUD, groups: [7] }
+    - { dataSet: NUKE_WATER_2, groups: [3] }
   # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
   # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
   # A list replaces the earlier one.

@@ -196,6 +196,7 @@ public:
 		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
+		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; 0 for none
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
@@ -908,7 +909,7 @@ private:
 	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
 	std::map<std::array<const VoxelModel*, 8>, std::unique_ptr<VoxelModel>> _paintedFloors;
-	mutable bool _anyGlass = false; // a model made so far has window glass in it: the card's program with the reflections is wanted (setting "Reflections")
+	mutable bool _anyGlass = false; // a model made so far has window glass in it, or still water on it (VoxelModel::stillWater): the card's program with the reflections is wanted (setting "Reflections")
 	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
 	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).

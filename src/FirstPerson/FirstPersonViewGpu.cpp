@@ -204,7 +204,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, or window glass)
+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, window glass or still water)
 	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 	frame.colorLightCount = 0;

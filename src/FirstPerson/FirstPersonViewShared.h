@@ -416,6 +416,9 @@ const int LiquidBottomShades = 3;
 const int ArtFillPlaneDepth = 4;
 const float ArtFillShare = 0.5f;
 const int ArtFillMinCells = 40;
+/// A floor is still water (see buildModel, RuleFirstPerson::getStillWater) where this much of its art or more is of
+/// the water's colour groups: a tile of grass with a few blue flowers is none.
+const float StillWaterLeast = 0.15f;
 /// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 /// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 /// player's report: items on stairs and slopes sank into them): the ground looked for up to

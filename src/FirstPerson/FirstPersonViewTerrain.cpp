@@ -256,6 +256,7 @@ void clearModel(FirstPersonView::VoxelModel &model)
 	model.solidGhost = false;
 	model.wayThrough = false;
 	model.water = false;
+	model.stillWater = 0;
 	model.liquidHeight = 0;
 	model.artFill = false;
 	model.openingGlass = false;
@@ -3358,6 +3359,49 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 	{
 		model.artFill = firstFrame ? firstFrame->artFill : sparseArt(model, sprite, mapData->getObjectType(), yOffset);
+	}
+	// Still water (the mod's table `stillWater:`, a pond, a swamp, a paddy, the shallows of a beach: a player, GitHub
+	// issue #213, of the sea's mirror: "it could be expanded to additional surfaces ... especially if you can make it
+	// green"): a floor on which StillWaterLeast of the art's pixels or more are of the water's colour groups. Those
+	// pixels mirror on its top (setting "Reflections", see the shaders' onPond) and keep their colours; the bank, the
+	// reeds and the lilies beside them stay what they are. Where the game gives such a floor only a few voxels (the
+	// deep water of the big mods' swamps and beaches: five of its tile's 256 columns), the rest of its art is filled
+	// in solid, not as a ghost seen through: it is the water's face.
+	if (mapData->getObjectType() == O_FLOOR && !waterFloor && !model.empty && !cutout)
+	{
+		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
+		int drawn = 0, wet = 0;
+		for (int spriteY = 0; groups && spriteY < sprite->getHeight(); ++spriteY)
+			for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+			{
+				const Uint8 color = sprite->getPixel(spriteX, spriteY);
+				if (!color) continue;
+				++drawn;
+				wet += (groups >> (color >> 4)) & 1;
+			}
+		if (drawn > 0 && wet >= StillWaterLeast * drawn)
+		{
+			model.stillWater = groups;
+			_anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
+			if (model.artFill)
+			{
+				// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
+				const int top = model.max[2];
+				for (int y = 0; y < Position::TileXY; ++y)
+					for (int x = 0; x < Position::TileXY; ++x)
+					{
+						bool filled = false;
+						for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
+						const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
+						const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
+						if (!color) continue;
+						model.color[top][y][x] = color;
+						model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
+						model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
+					}
+				model.artFill = false;
+			}
+		}
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels
 	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).

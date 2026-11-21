@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..56b668326
+index 000000000..d03c20b41
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,679 @@
@@ -341,7 +341,7 @@ index 000000000..56b668326
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it. Window glass mirrors what is in front of it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water (a swamp, a pond, a paddy) mirror the sky, the clouds and what stands by them, more the flatter you look. Window glass mirrors what is in front of it."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -809,7 +809,7 @@ index 000000000..56b668326
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..f7f5de937
+index 000000000..17ed3b787
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,679 @@
@@ -1026,7 +1026,7 @@ index 000000000..f7f5de937
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea mirrors the sky, the clouds and what stands in it, more the flatter you look at it. Window glass mirrors what is in front of it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water (a swamp, a pond, a paddy) mirror the sky, the clouds and what stands by them, more the flatter you look. Window glass mirrors what is in front of it."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -1494,10 +1494,10 @@ index 000000000..f7f5de937
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..6f4d35dcd
+index 000000000..67038ec7a
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,277 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1611,6 +1611,23 @@ index 000000000..6f4d35dcd
 +  # ground past the edge); XPiratez and X-Com Files: the same sea, their SEAURBAN, and the
 +  # cargo ship's.
 +  water: [SEA, SEAURBAN, { dataSet: LINERB, records: [1] }, { dataSet: CARGO3, records: [4] }]
++  # Still water: a pond, a swamp, a paddy, a puddle, the shallows of a beach. Terrain data sets on whose floors the
++  # pixels of some of the palette's colour groups (0 to 15: a colour's number over 16) are water: there the floor
++  # mirrors (setting "Reflections", the GPU renderer) and keeps its own colours, green in a waste's swamp. Unlike the
++  # sea's above, such a floor stays as its art has it, bank, reeds and lilies beside the water, and nothing of it goes
++  # on beyond the map's edge. A floor counts where 15 in 100 of its art's pixels or more are of those groups. With
++  # `records: [...]`, only those records of the set. A list replaces the earlier one.
++  # XPiratez and The X-Com Files: the swamps (blue; green in the wastes), the beach, the rice farm's paddies, the
++  # mountain's puddles, the nuclear waste's pools.
++  stillWater:
++    - { dataSet: FORESTSWAMP, groups: [8] }
++    - { dataSet: FORESTSWAMP_SNOW, groups: [8] }
++    - { dataSet: FORESTSWAMP_WASTE, groups: [3] }
++    - { dataSet: TUNDRASWAMP, groups: [8] }
++    - { dataSet: BEACH, groups: [8] }
++    - { dataSet: IDT_FARM_WATER, groups: [7] }
++    - { dataSet: MOUNTMUD, groups: [7] }
++    - { dataSet: NUKE_WATER_2, groups: [3] }
 +  # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
 +  # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
 +  # A list replaces the earlier one.
@@ -27933,10 +27950,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..f943f9c88
+index 000000000..796b25f48
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3838 @@
+@@ -0,0 +1,3839 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -29328,7 +29345,8 @@ index 000000000..f943f9c88
 +	if (model->lit) std::memcpy(masks + MaskRows * 3, model->lit, MaskRows * 2);
 +	else std::memset(masks + MaskRows * 3, 0, MaskRows * 2);
 +	Uint32 *info = &modelInfo[(size_t)id * 4];
-+	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0) | (model->pulse ? 32 : 0);
++	info[0] = (model->ghostly ? 1 : 0) | (model->solidGhost ? 2 : 0) | (model->lit ? 4 : 0) | (model->water ? 8 : 0) | (model->wayThrough ? 16 : 0) | (model->pulse ? 32 : 0)
++		| (Uint32)model->stillWater << 16; // (the still water's colour groups: the high half)
 +	info[1] = ghostId;
 +	info[2] = model->glowMinZ | (Uint32)model->ceiling << 8 | (Uint32)model->min[2] << 16 | (Uint32)model->pulseKind << 24;
 +	info[3] = 0;
@@ -32320,10 +32338,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..e3452d81d
+index 000000000..024ca6059
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3191 @@
+@@ -0,0 +1,3200 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32377,7 +32395,7 @@ index 000000000..e3452d81d
 +uniform usamplerBuffer uTiles;      // four texels per tile (see FirstPersonGpu.cpp, encodeTiles)
 +uniform usamplerBuffer uModelColor; // 6144 bytes per model: [z][y][x]
 +uniform usamplerBuffer uModelBits;  // 4 x 384 rows per model: glass, lookOnly, clear, lit; [z][y], bit x
-+uniform usamplerBuffer uModelInfo;  // a texel per model: flags, its ghost's number, glowMinZ | ceiling | min z | pulseKind
++uniform usamplerBuffer uModelInfo;  // a texel per model: flags (and, in the high half, the colour groups of its still water), its ghost's number, glowMinZ | ceiling | min z | pulseKind
 +uniform usamplerBuffer uModelSides; // 1024 bytes per model: plan [y][x], east [z][y], south [z][x]
 +uniform usamplerBuffer uSolid;      // 384 rows per solid mask: [z][y], bit x
 +uniform usamplerBuffer uModelExposed; // 6144 bytes per steady UFO model: each voxel's open faces (the model's info says which block)
@@ -33377,14 +33395,17 @@ index 000000000..e3452d81d
 +	return rgb;
 +}
 +
++const float PondSwell = 0.35; // still water's ripples, of the sea's waves (see seaMirror)
++
 +/**
 + * The way the sea mirrors a ray at a point (setting "Reflections"): off the water's face, tilted by the waves' slope
 + * there, never down into it; and how much of the mirrored picture shows, more the flatter the ray meets the water.
 + */
-+vec3 seaMirror(vec3 rayDirection, float x, float y, float span, out float share)
++vec3 seaMirror(vec3 rayDirection, float x, float y, float span, float swell, out float share)
 +{
++	// (swell: 1 the sea's waves; less, still water's ripples, a pond's or a swamp's)
 +	float slopeX = waveHeight(x + 1.0, y, span) - waveHeight(x - 1.0, y, span), slopeY = waveHeight(x, y + 1.0, span) - waveHeight(x, y - 1.0, span);
-+	vec3 waterNormal = normalize(vec3(-slopeX * 0.5, -slopeY * 0.5, 1.0));
++	vec3 waterNormal = normalize(vec3(-slopeX * 0.5 * swell, -slopeY * 0.5 * swell, 1.0));
 +	vec3 mirrored = reflect(rayDirection, waterNormal);
 +	mirrored.z = max(mirrored.z, 0.03);
 +	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
@@ -33490,7 +33511,7 @@ index 000000000..e3452d81d
 +				if (mirrors)
 +				{
 +					float share;
-+					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, share);
++					vec3 mirrored = seaMirror(rayDirection, groundX, groundY, groundDistance, 1.0, share);
 +					rgb = mix(rgb, skyRgbTowards(mirrored, pixelX, pixelY), share);
 +				}
 +#endif
@@ -33873,6 +33894,7 @@ index 000000000..e3452d81d
 +	int rockCeilingMiddle = -1;
 +	float waveShade = 0.0;
 +	bool onSea = false;
++	bool onPond = false; // (on still water: a pixel of a pond's, a swamp's or a paddy's face, see VoxelModel::stillWater)
 +	float hitHeight = rayOrigin.z + rayDirection.z * hit.t;
 +	if (hit.part >= 0 && parts[hit.part] != 0u)
 +	{
@@ -33959,6 +33981,11 @@ index 000000000..e3452d81d
 +#ifdef RELIEF
 +			reliefFrom = -1;
 +#endif
++		}
++		else if ((info.x >> 16) != 0u && faceIndex == 4 && !hit.ghost)
++		{
++			// (still water: the floor's top where its own colour is one of the water's groups)
++			onPond = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
 +		}
 +#ifdef RELIEF
 +		// The face's tilt: the slope of its drawing's brightness there, from the voxel's four neighbours along the face.
@@ -34135,12 +34162,12 @@ index 000000000..e3452d81d
 +		color = table(UnseenRow, color);
 +	}
 +#ifdef REFLECTIONS
-+	bool mirrors = uReflections != 0 && onSea && uUnderwater == 0;
++	bool mirrors = uReflections != 0 && (onSea || onPond) && uUnderwater == 0;
 +#else
 +	bool mirrors = false;
 +#endif
 +#ifdef MIRROR_FLAGS
-+	if (uReflections != 0 && onSea && uUnderwater == 0) mirrorWanted = true;
++	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 +#endif
 +#ifdef COLORED_LIGHTS
 +	bool colorLit = uColorLightCount > 0;
@@ -34188,7 +34215,7 @@ index 000000000..e3452d81d
 +		{
 +			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
 +			float share;
-+			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, share);
++			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 +			Hit met;
 +			int metTile, metAxis;
 +			float metDistance;
@@ -63149,10 +63176,10 @@ index 000000000..e032240c7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..daafd7816
+index 000000000..2174bda20
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1919 @@
+@@ -0,0 +1,1920 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63351,6 +63378,7 @@ index 000000000..daafd7816
 +		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 +		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 +		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
++		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; 0 for none
 +		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 +		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
 +		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
@@ -64063,7 +64091,7 @@ index 000000000..daafd7816
 +	std::vector<TileMemo> _tileMemos;                   // per tile: its parts last frame, and their solid mask
 +	/// Floors under a UFO's hull with its floor going on inside (see paintedFloor), by the four parts' models and the UFO floors on the four sides (null: none there).
 +	std::map<std::array<const VoxelModel*, 8>, std::unique_ptr<VoxelModel>> _paintedFloors;
-+	mutable bool _anyGlass = false; // a model made so far has window glass in it: the card's program with the reflections is wanted (setting "Reflections")
++	mutable bool _anyGlass = false; // a model made so far has window glass in it, or still water on it (VoxelModel::stillWater): the card's program with the reflections is wanted (setting "Reflections")
 +	/// The floor of a tile under a UFO's hull, with the UFO's floor going on inside (null: as it is).
 +	const VoxelModel *paintedFloor(int index, const std::array<const VoxelModel*, 4> &parts);
 +	/// What a tile part was last frame, so its models are looked up again only when something changed (see snapshotTile).
@@ -66961,7 +66989,7 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..5109bd8f9
+index 000000000..086fd34d0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
 @@ -0,0 +1,819 @@
@@ -67171,7 +67199,7 @@ index 000000000..5109bd8f9
 +	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, or window glass)
++	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, window glass or still water)
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
@@ -72213,10 +72241,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..bb650da79
+index 000000000..145f5e65c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,727 @@
+@@ -0,0 +1,730 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72635,6 +72663,9 @@ index 000000000..bb650da79
 +const int ArtFillPlaneDepth = 4;
 +const float ArtFillShare = 0.5f;
 +const int ArtFillMinCells = 40;
++/// A floor is still water (see buildModel, RuleFirstPerson::getStillWater) where this much of its art or more is of
++/// the water's colour groups: a tile of grass with a few blue flowers is none.
++const float StillWaterLeast = 0.15f;
 +/// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 +/// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 +/// player's report: items on stairs and slopes sank into them): the ground looked for up to
@@ -80684,10 +80715,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..a36044bb2
+index 000000000..8ff280563
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,5788 @@
+@@ -0,0 +1,5832 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -80946,6 +80977,7 @@ index 000000000..a36044bb2
 +	model.solidGhost = false;
 +	model.wayThrough = false;
 +	model.water = false;
++	model.stillWater = 0;
 +	model.liquidHeight = 0;
 +	model.artFill = false;
 +	model.openingGlass = false;
@@ -84048,6 +84080,49 @@ index 000000000..a36044bb2
 +	if (!model.liquidHeight && !cutout && !mapData->isDoor() && !mapData->isUFODoor() && mapData->getAltMCD() == 0)
 +	{
 +		model.artFill = firstFrame ? firstFrame->artFill : sparseArt(model, sprite, mapData->getObjectType(), yOffset);
++	}
++	// Still water (the mod's table `stillWater:`, a pond, a swamp, a paddy, the shallows of a beach: a player, GitHub
++	// issue #213, of the sea's mirror: "it could be expanded to additional surfaces ... especially if you can make it
++	// green"): a floor on which StillWaterLeast of the art's pixels or more are of the water's colour groups. Those
++	// pixels mirror on its top (setting "Reflections", see the shaders' onPond) and keep their colours; the bank, the
++	// reeds and the lilies beside them stay what they are. Where the game gives such a floor only a few voxels (the
++	// deep water of the big mods' swamps and beaches: five of its tile's 256 columns), the rest of its art is filled
++	// in solid, not as a ghost seen through: it is the water's face.
++	if (mapData->getObjectType() == O_FLOOR && !waterFloor && !model.empty && !cutout)
++	{
++		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
++		int drawn = 0, wet = 0;
++		for (int spriteY = 0; groups && spriteY < sprite->getHeight(); ++spriteY)
++			for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
++			{
++				const Uint8 color = sprite->getPixel(spriteX, spriteY);
++				if (!color) continue;
++				++drawn;
++				wet += (groups >> (color >> 4)) & 1;
++			}
++		if (drawn > 0 && wet >= StillWaterLeast * drawn)
++		{
++			model.stillWater = groups;
++			_anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
++			if (model.artFill)
++			{
++				// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
++				const int top = model.max[2];
++				for (int y = 0; y < Position::TileXY; ++y)
++					for (int x = 0; x < Position::TileXY; ++x)
++					{
++						bool filled = false;
++						for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
++						const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
++						const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
++						if (!color) continue;
++						model.color[top][y][x] = color;
++						model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
++						model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
++					}
++				model.artFill = false;
++			}
++		}
 +	}
 +	// An object the art draws as a block of crops though the game gives it only a few voxels
 +	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
@@ -103059,10 +103134,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..96637a4aa
+index 000000000..33907a84b
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,507 @@
+@@ -0,0 +1,536 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -103231,6 +103306,8 @@ index 000000000..96637a4aa
 +	std::set<std::string> _water;                // terrain data sets whose floors are water (the sea)
 +	std::map<std::pair<std::string, int>, int> _turned; // (terrain data set, record) -> the height from which its frames are turned from their art (see getTurnedFrom)
 +	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
++	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
++	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 +	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
@@ -103314,6 +103391,27 @@ index 000000000..96637a4aa
 +		{
 +			_builtInItemsShown = std::set<std::string>(builtInItemsShown.begin(), builtInItemsShown.end());
 +		}
++		// Still water (a pond, a swamp, a paddy, a puddle, the shallows of a beach): terrain data sets on whose floors
++		// the pixels of some of the palette's colour groups are water, which mirrors (setting "Reflections") and keeps
++		// its own colours; each `{ dataSet, groups: [0..15], records: [...] }`, the records left out for all of its
++		// floors. Unlike the sea's (`water:` below), such a floor is as its art has it, bank and reeds and all, and
++		// nothing of it goes on beyond the map's edge. A list replaces the earlier one.
++		if (const auto& still = reader["stillWater"])
++		{
++			_stillWater.clear();
++			for (const auto& entry : still.children())
++			{
++				std::string dataSet;
++				std::vector<int> groups, records;
++				entry.tryRead("dataSet", dataSet);
++				entry.tryRead("groups", groups);
++				entry.tryRead("records", records);
++				StillWater &water = _stillWater[dataSet];
++				for (int group : groups) if (group >= 0 && group < 16) water.groups |= (Uint16)(1 << group);
++				water.records.insert(records.begin(), records.end());
++			}
++		}
++
 +		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
 +		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
 +		// floors, or its name and records for some (a ship's data set with the sea round the ship
@@ -103532,6 +103630,12 @@ index 000000000..96637a4aa
 +	{
 +		auto found = _turned.find(std::make_pair(dataSet, record));
 +		return found != _turned.end() ? found->second : -1;
++	}
++	/// The palette's colour groups (a bit each) that are still water on a terrain record's floor (`stillWater:`), or 0.
++	Uint16 getStillWater(const std::string &dataSet, int record) const
++	{
++		auto found = _stillWater.find(dataSet);
++		return found != _stillWater.end() && (found->second.records.empty() || found->second.records.count(record) > 0) ? found->second.groups : (Uint16)0;
 +	}
 +	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
 +	bool isWater(const std::string &dataSet, int record) const
