@@ -5444,6 +5444,40 @@ static const int ArenaEmptySpot = 7;
  */
 void FirstPersonView::arenaStep()
 {
+	// (A developer's camera on a unit: while OPENXCOM3D_WATCH_UNIT names a file holding "id degrees tiles", the view
+	// looks at that unit from so many tiles away, so many degrees round from its front: for a look at a voxel body in
+	// the game itself, from any side. The file is read again every half second. The battle's debug mode goes on.)
+	static const char *const watch = getenv("OPENXCOM3D_WATCH_UNIT");
+	if (watch && _save && !_sharedModelsOwner && getWidth() >= 320)
+	{
+		static int id = -1;
+		static float degrees = 0.0f, tiles = 3.0f;
+		static Uint32 read = 0;
+		if (!_save->getDebugMode()) _save->setDebugMode(); // (every unit shown, seen by the player or not)
+		if (SDL_GetTicks() - read > 500 || !read)
+		{
+			read = SDL_GetTicks();
+			if (FILE *asked = fopen(watch, "r"))
+			{
+				if (fscanf(asked, "%d %f %f", &id, &degrees, &tiles) != 3) id = -1;
+				fclose(asked);
+			}
+		}
+		for (BattleUnit *unit : *_save->getUnits())
+		{
+			if (unit->getId() != id || unit->isOut()) continue;
+			const int size = unit->getArmor()->getSize();
+			const Tile *tile = _save->getTile(unit->getPosition());
+			const double feet[3] = { unit->getPosition().x * 16.0 + 8.0 * size, unit->getPosition().y * 16.0 + 8.0 * size,
+				unit->getPosition().z * 24.0 - (tile ? tile->getTerrainLevel() : 0) };
+			// (a unit's direction 0 looks north, clockwise; the view's yaw 0 looks east)
+			const double from = (unit->getDirection() * 45.0 - 90.0 + degrees) * Pi / 180.0, away = tiles * 16.0;
+			setEye(feet[0] + std::cos(from) * away, feet[1] + std::sin(from) * away, feet[2] + 14.0 + 4.0 * size);
+			_yaw = from + Pi;
+			_pitch = -std::atan2(6.0, away);
+			break;
+		}
+	}
 	static const char *const path = getenv("OPENXCOM3D_ANIMATION_ARENA");
 	if (!path || !_save || _sharedModelsOwner || getWidth() < 320 || _arena.failed)
 	{
