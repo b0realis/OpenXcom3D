@@ -84,8 +84,10 @@ namespace
 /// map number and this (see MiniMapView).
 const int CellPixels = 4, TilePictures = 35;
 /// The map is enlarged by whole steps, 1 to ZoomMost; what the player last chose is kept for the next time, with the
-/// names, the cones and the rest on or off (0: not chosen yet, the map picks what suits the screen). The help is off
-/// until it is asked for.
+/// names, the cones and the rest on or off (0: not chosen yet, the map picks what suits the screen). The zoom is kept
+/// with the player's options too (the unlisted "fpsMapZoom"), so the next battle and the next day's game open the
+/// map as it was left (the owner: "minimap should remember your previously set zoom level"). The help is off until
+/// it is asked for.
 const int ZoomMost = 8;
 int Zoom = 0;
 bool Names = true, Cones = true, Weapons = true, Reach = true, Helmet = true, Help = false;
@@ -153,7 +155,7 @@ FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, 
 	_level = std::clamp(camera->getViewLevel(), 0, save->getMapSizeZ() - 1);
 	if (Zoom <= 0)
 	{
-		Zoom = std::min(width, height) / (40 * CellPixels);
+		Zoom = Options::fpsMapZoom > 0 ? Options::fpsMapZoom : std::min(width, height) / (40 * CellPixels);
 	}
 	Zoom = std::clamp(Zoom, 1, ZoomMost * _ui);
 	const BattleUnit *selected = save->getSelectedUnit();
@@ -993,6 +995,7 @@ void FirstPersonMapState::changeLevel(int by)
 void FirstPersonMapState::changeZoom(int by)
 {
 	Zoom = std::clamp(Zoom + by, 1, ZoomMost * _ui);
+	Options::fpsMapZoom = Zoom; // (kept with the options: see Zoom)
 	_dirty = true;
 }
 

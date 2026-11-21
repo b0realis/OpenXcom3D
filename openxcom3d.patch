@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..9931f7982
+index 000000000..04292d522
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,683 @@
@@ -315,7 +315,7 @@ index 000000000..9931f7982
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
 +  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
-+  STR_FPS_PREPARING_3D: "PREPARING THE 3D VIEW"
++  STR_FPS_PREPARING_3D: "PREPARING 3D..."
 +  STR_FPS_PREPARING_3D_NOTE: "The graphics card gets ready: a moment, longer the first time."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
@@ -813,7 +813,7 @@ index 000000000..9931f7982
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..01941c884
+index 000000000..c3338601d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,683 @@
@@ -1004,7 +1004,7 @@ index 000000000..01941c884
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
 +  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
-+  STR_FPS_PREPARING_3D: "PREPARING THE 3D VIEW"
++  STR_FPS_PREPARING_3D: "PREPARING 3D..."
 +  STR_FPS_PREPARING_3D_NOTE: "The graphics card gets ready: a moment, longer the first time."
 +  STR_FPS_RENDERER_CPU: "CPU"
 +  STR_FPS_RENDERER_GPU: "GPU"
@@ -22982,7 +22982,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..e0daad2f9 100644
+index a08796ced..3f3c1cf1d 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23000,7 +23000,7 @@ index a08796ced..e0daad2f9 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
-+OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
++OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -24050,10 +24050,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..058f2e5af
+index 000000000..e1b4691a1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2001 @@
+@@ -0,0 +1,2010 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24517,6 +24517,14 @@ index 000000000..058f2e5af
 +			if (Options::keyBattleFirstPerson2 == SDLK_UNKNOWN) Options::keyBattleFirstPerson2 = SDLK_v;
 +		}
 +		Options::fpsKeyDefaults = 1;
++	}
++	// And the tactical map's wheel goes up and down the map's levels (the owner: "for minimap the wheel should
++	// rather change levels of map and not zoom"; Ctrl and the wheel zoom): the setting "Tactical map: wheel changes
++	// level" is on by default, and a profile from before, written with the old default, is given it once too.
++	if (Options::fpsKeyDefaults < 2)
++	{
++		Options::fpsMapWheelLevels = true;
++		Options::fpsKeyDefaults = 2;
 +	}
 +	// (both on one key, by the player's hand: it is the switch's, in the 3D view too)
 +	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
@@ -25127,7 +25135,8 @@ index 000000000..058f2e5af
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsPresetTables", &fpsPresetTables, 0, "", category)); // (which tables of presets the profile has seen: see settlePresets; unlisted)
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsKeyDefaults", &fpsKeyDefaults, 0, "", category)); // (the keys' defaults a profile from before was given, once: see settleOptions; unlisted)
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsKeyDefaults", &fpsKeyDefaults, 0, "", category)); // (the defaults a profile from before was given, once each: see settleOptions; unlisted)
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapZoom", &fpsMapZoom, 0, "", category)); // (the tactical map's zoom as the player last had it; 0: not chosen yet; unlisted)
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
 +	// The game's own options set to a recommended lot, when the player clicks the row (see applyGameOptions): whether that was done.
@@ -25144,7 +25153,7 @@ index 000000000..058f2e5af
 +	// On the tactical map the wheel changes the level and zooms with Ctrl (a player, GitHub issue #215: "mouse wheel
 +	// should default to elevation change, not zoom"). Off by default: the owner had the wheel zoom ("the mouse wheel
 +	// should not scroll levels of the map up down but zoom the map in/out").
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, false, "STR_FPS_MAP_WHEEL_LEVELS", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, true, "STR_FPS_MAP_WHEEL_LEVELS", category));
 +	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 +	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 +	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
@@ -35932,10 +35941,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMapState.cpp b/src/FirstPerson/FirstPersonMapState.cpp
 new file mode 100644
-index 000000000..21d6529ea
+index 000000000..dcb0ab405
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMapState.cpp
-@@ -0,0 +1,1215 @@
+@@ -0,0 +1,1218 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -36022,8 +36031,10 @@ index 000000000..21d6529ea
 +/// map number and this (see MiniMapView).
 +const int CellPixels = 4, TilePictures = 35;
 +/// The map is enlarged by whole steps, 1 to ZoomMost; what the player last chose is kept for the next time, with the
-+/// names, the cones and the rest on or off (0: not chosen yet, the map picks what suits the screen). The help is off
-+/// until it is asked for.
++/// names, the cones and the rest on or off (0: not chosen yet, the map picks what suits the screen). The zoom is kept
++/// with the player's options too (the unlisted "fpsMapZoom"), so the next battle and the next day's game open the
++/// map as it was left (the owner: "minimap should remember your previously set zoom level"). The help is off until
++/// it is asked for.
 +const int ZoomMost = 8;
 +int Zoom = 0;
 +bool Names = true, Cones = true, Weapons = true, Reach = true, Helmet = true, Help = false;
@@ -36091,7 +36102,7 @@ index 000000000..21d6529ea
 +	_level = std::clamp(camera->getViewLevel(), 0, save->getMapSizeZ() - 1);
 +	if (Zoom <= 0)
 +	{
-+		Zoom = std::min(width, height) / (40 * CellPixels);
++		Zoom = Options::fpsMapZoom > 0 ? Options::fpsMapZoom : std::min(width, height) / (40 * CellPixels);
 +	}
 +	Zoom = std::clamp(Zoom, 1, ZoomMost * _ui);
 +	const BattleUnit *selected = save->getSelectedUnit();
@@ -36931,6 +36942,7 @@ index 000000000..21d6529ea
 +void FirstPersonMapState::changeZoom(int by)
 +{
 +	Zoom = std::clamp(Zoom + by, 1, ZoomMost * _ui);
++	Options::fpsMapZoom = Zoom; // (kept with the options: see Zoom)
 +	_dirty = true;
 +}
 +
@@ -102492,10 +102504,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..13bc3757d
+index 000000000..dde829830
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1154 @@
+@@ -0,0 +1,1167 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -103546,6 +103558,19 @@ index 000000000..13bc3757d
 +	if (key != 0 && key != SDLK_ESCAPE && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
 +	{
 +		*_selKey->asKey() = key;
++		// One key, one control (the owner: "if you bind the same key - it should unbind elsewhere ... now it stays bound
++		// to multiple things; one key one control!"): every other control of this list that had the key, the add-on's
++		// own and the game's that work in 3D, has none now, and its row shows that.
++		for (OptionInfo &other : _keys)
++		{
++			if (other.asKey() != _selKey->asKey() && *other.asKey() == key) *other.asKey() = SDLK_UNKNOWN;
++		}
++		for (int row = 0; row < (int)_lstOptions->getTexts(); ++row)
++		{
++			bool rowIsKey = false;
++			OptionInfo *shown = getEntry(row, &rowIsKey);
++			if (shown && rowIsKey && row != _selectedKey && *shown->asKey() == SDLK_UNKNOWN) _lstOptions->setCellText(row, 1, "");
++		}
 +	}
 +	_lstOptions->setCellText(_selectedKey, 1, keyName(*_selKey->asKey()));
 +	// The row goes back to its normal colour.

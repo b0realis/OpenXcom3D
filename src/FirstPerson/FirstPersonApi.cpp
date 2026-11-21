@@ -462,6 +462,14 @@ void settleOptions()
 		}
 		Options::fpsKeyDefaults = 1;
 	}
+	// And the tactical map's wheel goes up and down the map's levels (the owner: "for minimap the wheel should
+	// rather change levels of map and not zoom"; Ctrl and the wheel zoom): the setting "Tactical map: wheel changes
+	// level" is on by default, and a profile from before, written with the old default, is given it once too.
+	if (Options::fpsKeyDefaults < 2)
+	{
+		Options::fpsMapWheelLevels = true;
+		Options::fpsKeyDefaults = 2;
+	}
 	// (both on one key, by the player's hand: it is the switch's, in the 3D view too)
 	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
 	{
@@ -1071,7 +1079,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPresetTables", &fpsPresetTables, 0, "", category)); // (which tables of presets the profile has seen: see settlePresets; unlisted)
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsKeyDefaults", &fpsKeyDefaults, 0, "", category)); // (the keys' defaults a profile from before was given, once: see settleOptions; unlisted)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsKeyDefaults", &fpsKeyDefaults, 0, "", category)); // (the defaults a profile from before was given, once each: see settleOptions; unlisted)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapZoom", &fpsMapZoom, 0, "", category)); // (the tactical map's zoom as the player last had it; 0: not chosen yet; unlisted)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
 	// The game's own options set to a recommended lot, when the player clicks the row (see applyGameOptions): whether that was done.
@@ -1088,7 +1097,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// On the tactical map the wheel changes the level and zooms with Ctrl (a player, GitHub issue #215: "mouse wheel
 	// should default to elevation change, not zoom"). Off by default: the owner had the wheel zoom ("the mouse wheel
 	// should not scroll levels of the map up down but zoom the map in/out").
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, false, "STR_FPS_MAP_WHEEL_LEVELS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, true, "STR_FPS_MAP_WHEEL_LEVELS", category));
 	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the

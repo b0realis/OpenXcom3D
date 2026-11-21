@@ -1048,6 +1048,19 @@ void OptionsFirstPersonState::lstOptionsKeyPress(Action *action)
 	if (key != 0 && key != SDLK_ESCAPE && (!modifier || _selKey->asKey() == &Options::keyFpsLeanHold || _selKey->asKey() == &Options::keyFpsShowFacing))
 	{
 		*_selKey->asKey() = key;
+		// One key, one control (the owner: "if you bind the same key - it should unbind elsewhere ... now it stays bound
+		// to multiple things; one key one control!"): every other control of this list that had the key, the add-on's
+		// own and the game's that work in 3D, has none now, and its row shows that.
+		for (OptionInfo &other : _keys)
+		{
+			if (other.asKey() != _selKey->asKey() && *other.asKey() == key) *other.asKey() = SDLK_UNKNOWN;
+		}
+		for (int row = 0; row < (int)_lstOptions->getTexts(); ++row)
+		{
+			bool rowIsKey = false;
+			OptionInfo *shown = getEntry(row, &rowIsKey);
+			if (shown && rowIsKey && row != _selectedKey && *shown->asKey() == SDLK_UNKNOWN) _lstOptions->setCellText(row, 1, "");
+		}
 	}
 	_lstOptions->setCellText(_selectedKey, 1, keyName(*_selKey->asKey()));
 	// The row goes back to its normal colour.
