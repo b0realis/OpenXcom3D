@@ -162,6 +162,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_facingsWell.clear();
 	_leafyModels.clear();
 	_partKinds.clear();
+	_liftRecords.clear();
 	_flameParts.clear();
 	clearArtOverlays();
 	_overlaySpots.clear();

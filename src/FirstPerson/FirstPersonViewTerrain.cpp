@@ -2758,6 +2758,33 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 }
 
 /**
+ * Is a floor the game calls a grav lift one on this map: has some tile it floors another grav lift's floor directly
+ * over or under it? The game floats a unit up or down only from one such floor to another, so a single one is no
+ * lift. Found once for a record and kept for the battle.
+ * @param floor The floor's record (a grav lift's).
+ * @return True if it is a lift somewhere on the map.
+ */
+bool FirstPersonView::liftInUse(const MapData *floor) const
+{
+	auto known = _liftRecords.find(floor);
+	if (known != _liftRecords.end()) return known->second;
+	bool used = false;
+	const int level = _save->getMapSizeX() * _save->getMapSizeY(), tiles = _save->getMapSizeXYZ();
+	for (int index = 0; index < tiles && !used; ++index)
+	{
+		if (_save->getTile(index)->getMapData(O_FLOOR) != floor) continue;
+		for (int other : { index - level, index + level })
+		{
+			if (other < 0 || other >= tiles) continue;
+			const MapData *beside = _save->getTile(other)->getMapData(O_FLOOR);
+			used = used || (beside && beside->isGravLift());
+		}
+	}
+	_liftRecords[floor] = used;
+	return used;
+}
+
+/**
  * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
  * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
  * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
@@ -3158,15 +3185,22 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		// the setting on at all (a player, GitHub issue #142: half its pixels showed, "loose tiles of
 		// water"; with lifts and ladders only, nothing of it, a pit). A lift's pad stays see-through:
 		// who is above or below it is a threat to watch.
-		bool flatFloor = mapData->getObjectType() == O_FLOOR && !mapData->isGravLift() && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
+		// (A lift's pad: a floor the game calls a grav lift that has one over or under it somewhere on this map, see
+		// liftInUse. One that never has is a floor like any other: XPiratez lays whole rooms with such a record, a
+		// house's upper storey, and seen through as a pad it was a glass floor: a player, GitHub issue #216.)
+		const bool lift = mapData->isGravLift() && (mapData->getObjectType() != O_FLOOR || liftInUse(mapData));
+		bool flatFloor = mapData->getObjectType() == O_FLOOR && !lift && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
 		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
 		// lamp without shape. A flame among them isn't built here: see partKind.)
 		const bool lit = mapData->getObjectType() == O_OBJECT && mapData->getLightSource() > 0;
 		// An object the game lets no one walk through, its art big: a body made from the art, solid, with
 		// the setting on at all (see artBody).
 		bool body = !ghostShape && !low && !block && artBody(mapData, sprite);
+		// (A floor lying flat that units stand on is there with the setting off too: it is the tile's floor, and left
+		// out it was a pit from above and the sky from below.)
 		bool ghostWanted = Options::fpsGhostParts == 2
-			|| (Options::fpsGhostParts == 1 && (ghostShape || mapData->isGravLift() || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit || body));
+			|| (Options::fpsGhostParts == 1 && (ghostShape || lift || cageArt(sprite, mapData->getObjectType(), yOffset) || low || block || flatFloor || lit || body))
+			|| (flatFloor && !mapData->isNoFloor());
 		// A part that animates is what its first frame is, in every frame: what kind of ghost it gets is read off the
 		// art (how low it is, how like a block or a cage), and a frame whose art falls just the other side of a line
 		// (a fireplace's flames, one frame in four; a player, GitHub issue #134) lost its ghost, or stood as another kind.

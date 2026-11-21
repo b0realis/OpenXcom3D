@@ -976,6 +976,8 @@ private:
 	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
 	const VoxelModel *partKind(const MapData *mapData, bool cutout);
 	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
+	bool liftInUse(const MapData *floor) const;         // is a grav lift's floor a lift somewhere on this map (another over or under it)?
+	mutable std::map<const MapData*, bool> _liftRecords; // ... found once a record, for the battle
 	/// The art of an animated part that its model has no voxels for, drawn as a sprite standing in its tile (see
 	/// artOverlay): a torch's flame above its holder, a hologram over its base, bubbles the game gives no shape.
 	struct ArtOverlay
