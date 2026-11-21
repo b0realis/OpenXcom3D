@@ -94,6 +94,9 @@ struct VoxelUnitModel
 	/// pixel left out so the map shows through it (XPiratez's stealth and spectre suits: VoxelDitherFaint), or one the
 	/// mod's rules name a ghost (the unit table's seeThrough, see RuleFirstPerson::UnitLook).
 	float opacity = 1.0f;
+	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
+	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
+	float lowest = 0.0f;
 	/// Which part of the unit a voxel is.
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

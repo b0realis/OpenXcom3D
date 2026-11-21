@@ -564,7 +564,7 @@ void bodyStance(SavedBattleGame *save, const BattleUnit *unit, const VoxelUnitMo
 		{
 			stance.feet[0] = feet[0];
 			stance.feet[1] = feet[1];
-			stance.feet[2] = height;
+			stance.feet[2] = height + ownView->drawnLift(unit); // (a unit held off the ground: its body lifted, see drawUnits)
 		}
 		ownView->getSteadyEye(eye);
 	}

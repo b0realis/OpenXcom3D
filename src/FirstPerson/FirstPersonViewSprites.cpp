@@ -1073,6 +1073,12 @@ bool FirstPersonView::drawnFeet(const BattleUnit *unit, double feet[3]) const
 	return true;
 }
 
+double FirstPersonView::drawnLift(const BattleUnit *unit) const
+{
+	auto glide = _unitGlides.find(unit);
+	return glide != _unitGlides.end() && _unitLastTick && glide->second.seen == _unitLastTick ? glide->second.lift : 0.0;
+}
+
 bool FirstPersonView::standingHeightNow(const double world[3], double &height) const
 {
 	if (!_save || (int)_tileViews.size() != _save->getMapSizeXYZ())
@@ -1741,6 +1747,16 @@ void FirstPersonView::drawUnits()
 			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
 			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
+			// A unit the game holds off the ground (its float height: its hit box starts there) whose body, by its
+			// drawings, reaches lower, is lifted until its lowest cube is at that height (a player, GitHub issue #211:
+			// XPiratez's Cacodemon "right against the floor when hitbox (and doom behavior) should indicate it hovering
+			// slightly"). One whose drawings hold it up already, a Floater, stays as drawn.
+			{
+				const double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
+				standing[2] += lift;
+				auto glide = _unitGlides.find(unit);
+				if (glide != _unitGlides.end()) glide->second.lift = lift;
+			}
 			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
 			{
 				// (the Celatid, see CelatidBob: each one in its own step)

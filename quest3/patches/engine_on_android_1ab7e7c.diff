@@ -60970,7 +60970,7 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..80181af3a
+index 000000000..c280a20c1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
 @@ -0,0 +1,1087 @@
@@ -61540,7 +61540,7 @@ index 000000000..80181af3a
 +		{
 +			stance.feet[0] = feet[0];
 +			stance.feet[1] = feet[1];
-+			stance.feet[2] = height;
++			stance.feet[2] = height + ownView->drawnLift(unit); // (a unit held off the ground: its body lifted, see drawUnits)
 +		}
 +		ownView->getSteadyEye(eye);
 +	}
@@ -63143,10 +63143,10 @@ index 000000000..2833f3211
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..c0cc01428
+index 000000000..0daac44ef
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1909 @@
+@@ -0,0 +1,1911 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63554,6 +63554,8 @@ index 000000000..c0cc01428
 +	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
 +	/// eases them, see drawUnits), if it drew it then.
 +	bool drawnFeet(const BattleUnit *unit, double feet[3]) const;
++	/// How much this view lifted a unit's voxel body off its floor in its last frame (a unit the game holds off the ground), voxels.
++	double drawnLift(const BattleUnit *unit) const;
 +	/// Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
 +	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
 +	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
@@ -64327,7 +64329,7 @@ index 000000000..c0cc01428
 +	// Units, items and markers as sprites in the world (FirstPersonViewSprites.cpp)
 +	// =====================================================================================
 +
-+	struct Glide { double pos[3]; Uint32 seen; };
++	struct Glide { double pos[3]; Uint32 seen; double lift = 0.0; }; // (lift: how much its voxel body was lifted off the floor, see hoverLift)
 +	std::unordered_map<const BattleUnit*, Glide> _unitGlides; // where each unit is drawn: eases after the game's steps
 +	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
 +	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
@@ -75246,10 +75248,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..40c880ca6
+index 000000000..583dda41a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4317 @@
+@@ -0,0 +1,4333 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -76325,6 +76327,12 @@ index 000000000..40c880ca6
 +	return true;
 +}
 +
++double FirstPersonView::drawnLift(const BattleUnit *unit) const
++{
++	auto glide = _unitGlides.find(unit);
++	return glide != _unitGlides.end() && _unitLastTick && glide->second.seen == _unitLastTick ? glide->second.lift : 0.0;
++}
++
 +bool FirstPersonView::standingHeightNow(const double world[3], double &height) const
 +{
 +	if (!_save || (int)_tileViews.size() != _save->getMapSizeXYZ())
@@ -76993,6 +77001,16 @@ index 000000000..40c880ca6
 +			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 +			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
 +			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
++			// A unit the game holds off the ground (its float height: its hit box starts there) whose body, by its
++			// drawings, reaches lower, is lifted until its lowest cube is at that height (a player, GitHub issue #211:
++			// XPiratez's Cacodemon "right against the floor when hitbox (and doom behavior) should indicate it hovering
++			// slightly"). One whose drawings hold it up already, a Floater, stays as drawn.
++			{
++				const double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
++				standing[2] += lift;
++				auto glide = _unitGlides.find(unit);
++				if (glide != _unitGlides.end()) glide->second.lift = lift;
++			}
 +			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
 +			{
 +				// (the Celatid, see CelatidBob: each one in its own step)
@@ -88194,10 +88212,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..56c4ba01e
+index 000000000..7c8f296ea
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,3583 @@
+@@ -0,0 +1,3656 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88420,6 +88438,14 @@ index 000000000..56c4ba01e
 +
 +/// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 +const float SliceDepthMost = 1.5f;
++/// A row of the front drawing below the floor's row lies on the ground ahead (see fillSlice): how far ahead a row down
++/// is, and how thick what lies there is made (body units).
++const float GroundAheadARow = 1.41421356f, GroundPlate = 1.0f * VOXELSCALE;
++/// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
++/// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
++/// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
++/// none on the coarse build.
++const int LimbCarveReach = VOXELSCALE / 2;
 +
 +/// A hull's drawings are made from 30 degrees above the ground (the isometric view): the camera's way, along the ground
 +/// and up; a voxel within HullSkinDepth of the nearest on its pixel is on the skin a drawing sees (see makeModel).
@@ -88458,9 +88484,27 @@ index 000000000..56c4ba01e
 +/// A part's shape from all 8 of its frames: a cell is kept where at most `tolerance` frames put it outside the
 +/// part's outline (the visual hull, a little forgiving of hand drawn frames that don't quite agree). Only the cells of
 +/// `only` are looked at (the part's slices: the rest isn't kept anyway).
-+std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only)
++std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only, int reach = 0)
 +{
 +	std::vector<Uint8> kept(GridCells, 0);
++	// (With a reach: the outlines grown by so many pixels, see LimbCarveReach.)
++	std::vector<Uint8> about[8];
++	for (int d = 0; d < 8 && reach > 0; ++d)
++	{
++		about[d].assign(FrameSize * FrameSize, 0);
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				if (!part.frame[d][row * FrameSize + column]) continue;
++				for (int r = std::max(0, row - reach); r <= std::min(FrameSize - 1, row + reach); ++r)
++					for (int c = std::max(0, column - reach); c <= std::min(FrameSize - 1, column + reach); ++c) about[d][r * FrameSize + c] = 1;
++			}
++	}
++	auto inside = [&](int d, int column, int row) -> bool
++	{
++		if (!reach) return part.at(d, column, row) != 0;
++		return column >= 0 && row >= 0 && column < FrameSize && row < FrameSize && about[d][row * FrameSize + column];
++	};
 +	for (int across = 0; across < GridAcross; ++across)
 +	{
 +		for (int along = 0; along < GridAlong; ++along)
@@ -88477,13 +88521,32 @@ index 000000000..56c4ba01e
 +				int outside = 0;
 +				for (int d = 0; d < 8 && outside <= tolerance; ++d)
 +				{
-+					if (!part.at(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))) ++outside;
++					if (!inside(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))) ++outside;
 +				}
 +				kept[cellIndex(across, along, up)] = outside <= tolerance;
 +			}
 +		}
 +	}
 +	return kept;
++}
++
++/// Whether a part's drawings are of a thin thing: under ThinInner of their pixels have a drawn pixel on all four sides
++/// (a sprite's pixel away). The X-Com Files' cobra 0.34, its Chupacabra and bat 0.37; its dog 0.55, XPiratez's demons
++/// 0.66 and more.
++const float ThinInner = 0.42f;
++bool thinDrawing(const PartFrames &part)
++{
++	int drawn = 0, inner = 0;
++	const int step = VOXELSCALE;
++	for (int d = 0; d < 8; ++d)
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				if (!part.frame[d][row * FrameSize + column]) continue;
++				++drawn;
++				inner += part.at(d, column - step, row) && part.at(d, column + step, row) && part.at(d, column, row - step) && part.at(d, column, row + step);
++			}
++	return drawn > 0 && inner < drawn * ThinInner;
 +}
 +
 +/// A turret's shape (a big unit that can't move, mounted on a vehicle: see makeModel), made a plain block. Its 8 frames are all
@@ -88771,6 +88834,29 @@ index 000000000..56c4ba01e
 +	const float inset = SliceInset;
 +	halfRight = std::max(halfRight - inset, 0.35f);
 +	halfAhead = std::max(halfAhead - inset, 0.35f);
++	// A row below the floor's row is no slice under the floor: the front drawing looks down along the slant, and what
++	// it has below the floor's row lies on the ground ahead, so many rows down, so far ahead (a row is 1.41 of the
++	// ahead axis: see project). Read as a height it sank into the floor the unit stands on: a foot's toes, the length
++	// of a snake lying on the ground (a player, GitHub issue #211: "feet don't exist in voxel land", a cobra "slightly
++	// inside the ground"). A plate GroundPlate thick on the floor, as wide as the row's run.
++	const float below = row + 0.5f - FloorY;
++	if (below > 0.0f && !BigUnit)
++	{
++		const float ahead = below * GroundAheadARow, half = 0.5f * GroundAheadARow;
++		for (int up = 0; up < GridUp; ++up)
++		{
++			if (cellUp(up) < 0.0f || cellUp(up) > GroundPlate) continue;
++			for (int across = 0; across < GridAcross; ++across)
++			{
++				if (std::abs(cellRight(across) - centreRight) > halfRight) continue;
++				for (int along = 0; along < GridAlong; ++along)
++				{
++					if (std::abs(cellAhead(along) - ahead) <= half) cells[cellIndex(across, along, up)] = 1;
++				}
++			}
++		}
++		return;
++	}
 +	for (int up = 0; up < GridUp; ++up)
 +	{
 +		if (!atRow(up, row)) continue;
@@ -90939,7 +91025,8 @@ index 000000000..56c4ba01e
 +		// agree, and a strict hull of them lost its shell and horns)
 +		// (a long body, a beast on four legs: its side drawings' outline, see profile)
 +		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop) : limb(solid, RightSide);
-+		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
++		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
++		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape, !routine.big && thinDrawing(solid) ? LimbCarveReach : 0);
 +		if (turret) levelOff(solid, hull);
 +		if (tank) flattenHull(hull);
 +		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -91136,7 +91223,7 @@ index 000000000..56c4ba01e
 +		if (!parts[p].any || tank) continue;
 +		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
 +		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide);
-+		const std::vector<Uint8> hull = carve(parts[p], 2, shape);
++		const std::vector<Uint8> hull = carve(parts[p], 2, shape, LimbCarveReach);
 +		const bool skeleton = !skeletons[p].empty();
 +		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
 +		// (arms outside the body, see above: the bones lie over the body where they touch it)
@@ -91526,7 +91613,11 @@ index 000000000..56c4ba01e
 +		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
 +		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
 +		// have a dark flank on light legs.)
-+		const bool hull = turret || beast || tank;
++		// (And so any body drawn on one frame, a creature: a frog, a demon. Its drawings show it from all round, and
++		// thrown straight through it the front drawing's colours ran along its sides in streaks: a player, GitHub issue
++		// #211, a Bullfrog's face "as if the front decided to adopt textures from the left". A body drawn in parts, a
++		// human's, stays painted by its front and back.)
++		const bool hull = turret || beast || tank || routine.whole;
 +		std::vector<float> seenSkin[8];
 +		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 +			float column, row;
@@ -92427,10 +92518,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..dbf9e3645
+index 000000000..704ff93d7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1120 @@
+@@ -0,0 +1,1129 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -93394,7 +93485,16 @@ index 000000000..dbf9e3645
 +			routine.tankTop = job->tankTop;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
-+		if (model) model->opacity = job->shows;
++		if (model)
++		{
++			model->opacity = job->shows;
++			float lowest = 1e9f;
++			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
++			{
++				if (model->part[voxel] != VoxelUnitModel::Item) lowest = std::min(lowest, model->up[voxel] * model->unit);
++			}
++			model->lowest = lowest < 1e8f ? lowest : 0.0f;
++		}
 +		// (a body for each frame of its sprite's own animation: see modelFor; each made as the unit's own body is, from
 +		// that frame's 8 drawings, and kept as a shape of its own, as the fall's are)
 +		for (size_t frame = 0; model && (frame + 1) * 8 <= job->anim.size(); ++frame)
@@ -93553,10 +93653,10 @@ index 000000000..dbf9e3645
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..b399b4dc8
+index 000000000..7ea8e5d47
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,257 @@
+@@ -0,0 +1,260 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -93653,6 +93753,9 @@ index 000000000..b399b4dc8
 +	/// pixel left out so the map shows through it (XPiratez's stealth and spectre suits: VoxelDitherFaint), or one the
 +	/// mod's rules name a ghost (the unit table's seeThrough, see RuleFirstPerson::UnitLook).
 +	float opacity = 1.0f;
++	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
++	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
++	float lowest = 0.0f;
 +	/// Which part of the unit a voxel is.
 +	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 +	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

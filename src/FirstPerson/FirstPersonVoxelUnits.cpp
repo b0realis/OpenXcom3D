@@ -961,7 +961,16 @@ void VoxelUnits::build()
 			routine.tankTop = job->tankTop;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
-		if (model) model->opacity = job->shows;
+		if (model)
+		{
+			model->opacity = job->shows;
+			float lowest = 1e9f;
+			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
+			{
+				if (model->part[voxel] != VoxelUnitModel::Item) lowest = std::min(lowest, model->up[voxel] * model->unit);
+			}
+			model->lowest = lowest < 1e8f ? lowest : 0.0f;
+		}
 		// (a body for each frame of its sprite's own animation: see modelFor; each made as the unit's own body is, from
 		// that frame's 8 drawings, and kept as a shape of its own, as the fall's are)
 		for (size_t frame = 0; model && (frame + 1) * 8 <= job->anim.size(); ++frame)

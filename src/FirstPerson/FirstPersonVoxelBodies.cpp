@@ -220,6 +220,14 @@ const float FaceDepth = 2.0f * VOXELSCALE;
 
 /// A limb's slice among several in its row is at most this many times as deep as it is wide (see limb).
 const float SliceDepthMost = 1.5f;
+/// A row of the front drawing below the floor's row lies on the ground ahead (see fillSlice): how far ahead a row down
+/// is, and how thick what lies there is made (body units).
+const float GroundAheadARow = 1.41421356f, GroundPlate = 1.0f * VOXELSCALE;
+/// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
+/// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
+/// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
+/// none on the coarse build.
+const int LimbCarveReach = VOXELSCALE / 2;
 
 /// A hull's drawings are made from 30 degrees above the ground (the isometric view): the camera's way, along the ground
 /// and up; a voxel within HullSkinDepth of the nearest on its pixel is on the skin a drawing sees (see makeModel).
@@ -258,9 +266,27 @@ inline bool atRow(int up, int row)
 /// A part's shape from all 8 of its frames: a cell is kept where at most `tolerance` frames put it outside the
 /// part's outline (the visual hull, a little forgiving of hand drawn frames that don't quite agree). Only the cells of
 /// `only` are looked at (the part's slices: the rest isn't kept anyway).
-std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only)
+std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only, int reach = 0)
 {
 	std::vector<Uint8> kept(GridCells, 0);
+	// (With a reach: the outlines grown by so many pixels, see LimbCarveReach.)
+	std::vector<Uint8> about[8];
+	for (int d = 0; d < 8 && reach > 0; ++d)
+	{
+		about[d].assign(FrameSize * FrameSize, 0);
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+			{
+				if (!part.frame[d][row * FrameSize + column]) continue;
+				for (int r = std::max(0, row - reach); r <= std::min(FrameSize - 1, row + reach); ++r)
+					for (int c = std::max(0, column - reach); c <= std::min(FrameSize - 1, column + reach); ++c) about[d][r * FrameSize + c] = 1;
+			}
+	}
+	auto inside = [&](int d, int column, int row) -> bool
+	{
+		if (!reach) return part.at(d, column, row) != 0;
+		return column >= 0 && row >= 0 && column < FrameSize && row < FrameSize && about[d][row * FrameSize + column];
+	};
 	for (int across = 0; across < GridAcross; ++across)
 	{
 		for (int along = 0; along < GridAlong; ++along)
@@ -277,13 +303,32 @@ std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vecto
 				int outside = 0;
 				for (int d = 0; d < 8 && outside <= tolerance; ++d)
 				{
-					if (!part.at(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))) ++outside;
+					if (!inside(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))) ++outside;
 				}
 				kept[cellIndex(across, along, up)] = outside <= tolerance;
 			}
 		}
 	}
 	return kept;
+}
+
+/// Whether a part's drawings are of a thin thing: under ThinInner of their pixels have a drawn pixel on all four sides
+/// (a sprite's pixel away). The X-Com Files' cobra 0.34, its Chupacabra and bat 0.37; its dog 0.55, XPiratez's demons
+/// 0.66 and more.
+const float ThinInner = 0.42f;
+bool thinDrawing(const PartFrames &part)
+{
+	int drawn = 0, inner = 0;
+	const int step = VOXELSCALE;
+	for (int d = 0; d < 8; ++d)
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+			{
+				if (!part.frame[d][row * FrameSize + column]) continue;
+				++drawn;
+				inner += part.at(d, column - step, row) && part.at(d, column + step, row) && part.at(d, column, row - step) && part.at(d, column, row + step);
+			}
+	return drawn > 0 && inner < drawn * ThinInner;
 }
 
 /// A turret's shape (a big unit that can't move, mounted on a vehicle: see makeModel), made a plain block. Its 8 frames are all
@@ -571,6 +616,29 @@ void fillSlice(std::vector<Uint8> &cells, int row, float centreRight, float half
 	const float inset = SliceInset;
 	halfRight = std::max(halfRight - inset, 0.35f);
 	halfAhead = std::max(halfAhead - inset, 0.35f);
+	// A row below the floor's row is no slice under the floor: the front drawing looks down along the slant, and what
+	// it has below the floor's row lies on the ground ahead, so many rows down, so far ahead (a row is 1.41 of the
+	// ahead axis: see project). Read as a height it sank into the floor the unit stands on: a foot's toes, the length
+	// of a snake lying on the ground (a player, GitHub issue #211: "feet don't exist in voxel land", a cobra "slightly
+	// inside the ground"). A plate GroundPlate thick on the floor, as wide as the row's run.
+	const float below = row + 0.5f - FloorY;
+	if (below > 0.0f && !BigUnit)
+	{
+		const float ahead = below * GroundAheadARow, half = 0.5f * GroundAheadARow;
+		for (int up = 0; up < GridUp; ++up)
+		{
+			if (cellUp(up) < 0.0f || cellUp(up) > GroundPlate) continue;
+			for (int across = 0; across < GridAcross; ++across)
+			{
+				if (std::abs(cellRight(across) - centreRight) > halfRight) continue;
+				for (int along = 0; along < GridAlong; ++along)
+				{
+					if (std::abs(cellAhead(along) - ahead) <= half) cells[cellIndex(across, along, up)] = 1;
+				}
+			}
+		}
+		return;
+	}
 	for (int up = 0; up < GridUp; ++up)
 	{
 		if (!atRow(up, row)) continue;
@@ -2739,7 +2807,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// agree, and a strict hull of them lost its shell and horns)
 		// (a long body, a beast on four legs: its side drawings' outline, see profile)
 		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop) : limb(solid, RightSide);
-		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape);
+		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
+		std::vector<Uint8> hull = carve(solid, bigHull ? 0 : 1, shape, !routine.big && thinDrawing(solid) ? LimbCarveReach : 0);
 		if (turret) levelOff(solid, hull);
 		if (tank) flattenHull(hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -2936,7 +3005,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		if (!parts[p].any || tank) continue;
 		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
 		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide);
-		const std::vector<Uint8> hull = carve(parts[p], 2, shape);
+		const std::vector<Uint8> hull = carve(parts[p], 2, shape, LimbCarveReach);
 		const bool skeleton = !skeletons[p].empty();
 		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
 		// (arms outside the body, see above: the bones lie over the body where they touch it)
@@ -3326,7 +3395,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
 		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
 		// have a dark flank on light legs.)
-		const bool hull = turret || beast || tank;
+		// (And so any body drawn on one frame, a creature: a frog, a demon. Its drawings show it from all round, and
+		// thrown straight through it the front drawing's colours ran along its sides in streaks: a player, GitHub issue
+		// #211, a Bullfrog's face "as if the front decided to adopt textures from the left". A body drawn in parts, a
+		// human's, stays painted by its front and back.)
+		const bool hull = turret || beast || tank || routine.whole;
 		std::vector<float> seenSkin[8];
 		auto slantPixel = [&](size_t k, int d, float &nearness) -> size_t {
 			float column, row;

@@ -405,6 +405,8 @@ public:
 	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
 	/// eases them, see drawUnits), if it drew it then.
 	bool drawnFeet(const BattleUnit *unit, double feet[3]) const;
+	/// How much this view lifted a unit's voxel body off its floor in its last frame (a unit the game holds off the ground), voxels.
+	double drawnLift(const BattleUnit *unit) const;
 	/// Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
 	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
 	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
@@ -1178,7 +1180,7 @@ private:
 	// Units, items and markers as sprites in the world (FirstPersonViewSprites.cpp)
 	// =====================================================================================
 
-	struct Glide { double pos[3]; Uint32 seen; };
+	struct Glide { double pos[3]; Uint32 seen; double lift = 0.0; }; // (lift: how much its voxel body was lifted off the floor, see hoverLift)
 	std::unordered_map<const BattleUnit*, Glide> _unitGlides; // where each unit is drawn: eases after the game's steps
 	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
 	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
