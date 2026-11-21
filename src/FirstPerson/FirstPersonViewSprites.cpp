@@ -1086,7 +1086,7 @@ double FirstPersonView::standingHeight(const double world[3]) const
 }
 
 /**
- * Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see
+ * Setting "Realistic hitboxes": the height this view stands a unit on at a point (see
  * standingHeight), so that the lines of fire meet a unit's picture where the view draws it (see
  * FirstPersonSpriteHits.cpp): only once it has drawn the map (its snapshot of the tiles is there).
  * @param world The point on the ground, in voxels.
@@ -1094,7 +1094,7 @@ double FirstPersonView::standingHeight(const double world[3]) const
  * @return False if the view hasn't drawn the map yet.
  */
 /**
- * Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last (up
+ * Setting "Realistic hitboxes": the smooth (upscaled) picture of a unit this view drew last (up
  * close, setting "Sprite upscaling", see useSmoothVersion), if it drew this very frame smooth: the
  * same animation frame, seen from the same side, the same pixels as composed. The lines of the
  * soldier looked through meet that picture, as drawn (see FirstPersonSpriteHits.cpp).
@@ -1116,7 +1116,7 @@ const Surface *FirstPersonView::smoothPicture(const BattleUnit *unit, int rotati
 }
 
 /**
- * Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (see drawUnits:
+ * Setting "Realistic hitboxes": where this view drew a unit's feet in its last frame (see drawUnits:
  * a unit on the move between the tiles of its step, every unit eased between the game's small steps;
  * not the flinch of a hit), so that the lines of the soldier looked through meet its picture there.
  * @param unit The unit.
@@ -1151,7 +1151,7 @@ bool FirstPersonView::standingHeightNow(const double world[3], double &height) c
 }
 
 /**
- * Setting "Full sprite hitboxes": the card a unit's picture stands on at a point, as drawSprite
+ * Setting "Realistic hitboxes": the card a unit's picture stands on at a point, as drawSprite
  * draws it (the same reckoning): square to the view across the map, leaning back as the view looks
  * down (up to CardTiltMax) and forward as it looks up (CardTiltUpMax; a card steeply above the eye
  * leans towards it, up to CardTiltSteepMax). Gives one picture column to the right (SpritePixelX
@@ -1515,7 +1515,7 @@ void FirstPersonView::watchUnits()
  * is, turned to show the side facing the camera. Walking units glide between tiles, and every
  * unit eases between the game's small steps; a hit unit flinches and flashes; each stands on a
  * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers), and
- * outlines their hitboxes (setting "Hitboxes"; with "Full sprite hitboxes", the pictures the lines
+ * outlines their hitboxes (setting "Hitboxes"; with "Realistic hitboxes", the pictures the lines
  * from the eye test: see noteTestedPictures, drawUnitOutlines). The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
  * see-through smoke drawn later veils them only thinly (see _unitVeil).
  * Everything is worked out here, on the game's thread, and recorded (see DrawStep); then all of
@@ -1547,7 +1547,7 @@ void FirstPersonView::drawUnits()
 	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
-	// With "Full sprite hitboxes" the hitbox is the picture: the same setting outlines that instead,
+	// With "Realistic hitboxes" the hitbox is the picture: the same setting outlines that instead,
 	// a line round it (the owner: "the sprites should be then surrounded by red line to show where you
 	// can hit them"): round what the lines from the eye test, from the test's own cards (a player:
 	// "a visualization of the actual hitbox would help"), noted once the units are drawn and drawn
@@ -1831,7 +1831,7 @@ void FirstPersonView::drawUnits()
 			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
 				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
-			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
+			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
 			double bodyX, bodyY, bodyDepth;
@@ -1933,7 +1933,7 @@ void FirstPersonView::drawUnits()
 			step.sprite.unit = unit;
 			step.sprite.layBack = FirstPerson::hullLayBack(unit);
 			useSmoothVersion(step.sprite);
-			// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
+			// With realistic hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
 			// soldier looked through meet: noted with the frame it is (see smoothPicture).
 			if (Options::fpsSpriteHitboxes)
 			{
@@ -1956,7 +1956,7 @@ void FirstPersonView::drawUnits()
 					_smoothPictures.erase(unit);
 				}
 			}
-			// With full sprite hitboxes, what the lines test outlined where the box would be drawn (see
+			// With realistic hitboxes, what the lines test outlined where the box would be drawn (see
 			// noteTestedPictures); not for one so close that it fades out, dithered (drawSprite: nearer
 			// than 10 voxels), where the holes would be outlined.
 			double screenX, screenY, screenDepth;
@@ -1971,7 +1971,7 @@ void FirstPersonView::drawUnits()
 			}
 			_drawList.push_back(step);
 		}
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox, outlined above; one falling is down)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with realistic hitboxes the picture is the hitbox, outlined above; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}
@@ -1990,7 +1990,7 @@ void FirstPersonView::drawUnits()
 	{
 		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
 	}
-	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures, by
+	// Then draw them all, and with realistic hitboxes the outlines of what the lines test over them (pictures, by
 	// their cards; a voxel body by the pixels it was drawn on, see drawVoxelUnit).
 	replayDrawList();
 	if (_outlining)
@@ -2001,7 +2001,7 @@ void FirstPersonView::drawUnits()
 }
 
 /**
- * Setting "Hitboxes" with "Full sprite hitboxes": notes on the screen where each outlined unit's
+ * Setting "Hitboxes" with "Realistic hitboxes": notes on the screen where each outlined unit's
  * picture is hit by the lines from the eye (the test's own card, see FirstPerson::viewCard: in the
  * view showing the battle, the very card drawn, its feet on the floor's top; the art below the feet
  * lying on the floor is never hit, nor what the picture reaches below a floor), so that the outline
@@ -2116,7 +2116,7 @@ void FirstPersonView::testedPictureBands()
 }
 
 /**
- * Setting "Hitboxes" with "Full sprite hitboxes", where the hitbox is the unit's picture: outlines
+ * Setting "Hitboxes" with "Realistic hitboxes", where the hitbox is the unit's picture: outlines
  * what the lines from the eye test of each picture (noted by noteTestedPictures), a line a pixel wide just
  * outside its edge in the colour of its side, as the boxes are drawn. A pixel is outlined when it
  * isn't that unit's, borders one of its pixels (the eight round it) and what shows there is behind

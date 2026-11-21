@@ -166,7 +166,7 @@ struct VoxelUnitModel
 	size_t addedFrom = (size_t)-1;
 	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
 	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }
-	/// What a shot meets (settings "Voxel units" and "Full sprite hitboxes": the body is the hitbox): the body's solid
+	/// What a shot meets (settings "Voxel units" and "Realistic hitboxes": the body is the hitbox): the body's solid
 	/// voxels, whole voxels (right, ahead, up) from hitFrom, hitSize of them each way, each the views it shows in (as
 	/// views; 0: empty).
 	std::vector<Uint16> hits;

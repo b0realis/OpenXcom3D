@@ -42,7 +42,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 /*
- * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows (with "Voxel units",
+ * FirstPersonSpriteHits.cpp: setting "Realistic hitboxes": a unit is hit where its picture shows (with "Voxel units",
  * where its body is).
  *
  * A line of fire meets a unit's picture where it crosses the picture's card (see SpriteCard): the
@@ -473,7 +473,7 @@ void drawnCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonV
 }
 
 /**
- * The voxel body a unit is hit by (settings "Voxel units" and "Full sprite hitboxes", the owner's: "hit-boxes should be
+ * The voxel body a unit is hit by (settings "Voxel units" and "Realistic hitboxes", the owner's: "hit-boxes should be
  * their whole bodies"): the one made for it as it is now (every unit's is made from the battle's start, see
  * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture). A unit going down (the game's own
  * fall; one tile big, as the view draws the fall) is hit by the shape the body it was last drawn with has at the fall
@@ -767,7 +767,7 @@ void prepareLine(SavedBattleGame *save, const Position &origin, const Position &
 }
 
 /**
- * Setting "Full sprite hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
+ * Setting "Realistic hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
  * as sprites!"; the battle's rule, for everyone's shots and the game's line of fire checks, and so
  * its sight too, which walks the same lines (TileEngine::visible, canTargetUnit), in 3D and on the
  * map): on, and the mod's 3D view in the battle.
@@ -780,7 +780,7 @@ bool spriteHitboxes(BattlescapeState *state)
 }
 
 /**
- * Which unit's picture a voxel of a line of fire hits (setting "Full sprite hitboxes"): the line
+ * Which unit's picture a voxel of a line of fire hits (setting "Realistic hitboxes"): the line
  * meets a picture where it crosses its card (see SpriteCard), on the very pixel it goes through
  * there (see cardRay), at the voxel of the line at that crossing; see-through pixels let it on.
  * Any unit's whose card reaches the line, not only the one on the voxel's tile: a picture
@@ -1059,7 +1059,7 @@ bool lastExactCrossing(double point[3])
 
 /**
  * Where a round that met a unit's picture struck it, for the armour side and the body part it hits
- * (setting "Full sprite hitboxes"; BattleUnit::damage tells the side by which way that point lies
+ * (setting "Realistic hitboxes"; BattleUnit::damage tells the side by which way that point lies
  * from the unit's middle). The picture is a card through the middle, so the point lies to the side
  * along the card and hardly towards the shooter at all: a round from straight ahead would hit the
  * flank, or the rear. It's pushed out towards the shooter by SpriteHitPush, as the game's own hit

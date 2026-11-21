@@ -2521,7 +2521,7 @@ uniform float uEyeZ, uFocal;            // the eye's height in voxels; the focal
 uniform vec2 uAxis;                     // where the view axis meets the picture, in pixels: its middle, but an eye's picture in VR is off centre
 uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
 uniform int uPixelSize;                 // pixels a ray coloured each way
-// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") is drawn in two goes:
+// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes") is drawn in two goes:
 // the primitives up to the outlines, then, from that go's pictures (an outline looks at the pixels beside it), the outlines
 // and the rest.
 uniform usampler2D uNotes;              // the first go's notes (the second go starts from them)

@@ -210,15 +210,15 @@ const double VoxelOverlayNearer = 8.0;
 const float ZScaleF = (float)ZScale;
 /// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 const double SpritePixelX = 0.70710678118654752;
-/// Setting "Full sprite hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
+/// Setting "Realistic hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
 /// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
 /// the card is that thick that no line slips through it between two steps.
 const double SpriteHitSlab = 0.8;
-/// Setting "Full sprite hitboxes": how far a round's point of impact on a unit's picture is pushed out towards the
+/// Setting "Realistic hitboxes": how far a round's point of impact on a unit's picture is pushed out towards the
 /// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
 /// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
 const double SpriteHitPush = 6.0;
-/// Setting "Hitboxes" with "Full sprite hitboxes": a unit's tested picture is outlined where it shows (see
+/// Setting "Hitboxes" with "Realistic hitboxes": a unit's tested picture is outlined where it shows (see
 /// FirstPersonView::noteTestedPictures): no farther than what's drawn there and this much more, in voxels (in the
 /// view showing the battle the card tested is the one drawn, the picture as near; in another camera's it stands
 /// upright, a little off the leaning card drawn).

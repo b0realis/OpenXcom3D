@@ -213,7 +213,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	}
 	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
 	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
-	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
+	// speed on a graphics card), two settings players commonly change (the shot's preview, realistic hitboxes),
 	// and what goes by the hand and the habit, which no preset can know.
 	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 	{

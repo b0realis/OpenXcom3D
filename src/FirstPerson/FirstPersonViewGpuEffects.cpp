@@ -576,7 +576,7 @@ void FirstPersonView::gpuRecordQuad(const double corners[4][2], Uint8 color, flo
 }
 
 /**
- * Records the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes";
+ * Records the outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes";
  * see noteTestedPictures, which worked out each outlined unit's card and its box on the screen, and
  * drawUnitOutlines): they are drawn after everything recorded so far, in a second go on the card,
  * from the first one's pictures. A record for each picture (Effects::OutlineTexels texels):

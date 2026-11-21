@@ -2225,7 +2225,7 @@ void FirstPersonMode::updateMusic(Uint32 now)
  */
 /**
  * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
- * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
+ * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Realistic hitboxes" a
  * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, those still without a body for how they
  * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
  * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
@@ -2423,7 +2423,7 @@ void FirstPersonMode::think()
 	updateDamageNumbers(now);
 
 	// With "Voxel units" every unit's body is made from the battle's start (or from when the setting is switched on),
-	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
+	// seen or not: none is left to make when the 3D view opens, and with "Realistic hitboxes" a shot hits the body.
 	if (Options::fpsVoxelUnits)
 	{
 		makeVoxelBodies(VoxelBodiesMs);

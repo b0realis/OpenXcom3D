@@ -399,16 +399,16 @@ public:
 	void setCameraUnit(const BattleUnit *unit) { _cameraUnit = unit; }
 	/// Gets the unit being looked through (null: none).
 	const BattleUnit *getCameraUnit() const { return _cameraUnit; }
-	/// Setting "Full sprite hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
+	/// Setting "Realistic hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
 	void cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack = 0.0) const;
-	/// Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
+	/// Setting "Realistic hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
 	bool standingHeightNow(const double world[3], double &height) const;
-	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
+	/// Setting "Realistic hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
 	/// eases them, see drawUnits), if it drew it then.
 	bool drawnFeet(const BattleUnit *unit, double feet[3]) const;
 	/// How much this view lifted a unit's voxel body off its floor in its last frame (a unit the game holds off the ground), voxels.
 	double drawnLift(const BattleUnit *unit) const;
-	/// Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
+	/// Setting "Realistic hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
 	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
 	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
 	/// Places the eye, in voxels.
@@ -1423,7 +1423,7 @@ private:
 	void recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius);
 	/// Records the outline of the voxels the game counts as a unit when it's hit (setting "Hitboxes"), to be drawn with the units.
 	void recordHitbox(const BattleUnit *unit, const double feet[3], float opacity);
-	/// With "Full sprite hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): once the units
+	/// With "Realistic hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): once the units
 	/// are drawn, which outlined unit's tested picture shows on each pixel (its number; 0 none, see
 	/// noteTestedPictures) and each row's first and last such pixel; then a line round each (see drawUnitOutlines).
 	bool _outlining = false;                 // the units are being drawn with their outlines noted
@@ -1442,7 +1442,7 @@ private:
 		int left, top, right, bottom;
 	};
 	std::vector<OutlinedUnit> _outlinedUnits;
-	/// Setting "Full sprite hitboxes": the units drawn smooth (upscaled, up close) the last time, each frame's picture as drawn: the
+	/// Setting "Realistic hitboxes": the units drawn smooth (upscaled, up close) the last time, each frame's picture as drawn: the
 	/// battle's animation frame, the side seen from, its solid pixels as composed and the smooth version (see smoothPicture).
 	struct SmoothPicture
 	{

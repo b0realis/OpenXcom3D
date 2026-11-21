@@ -138,7 +138,7 @@ const int DoorMarkLightRed = 160, DoorMarkLightGreen = 240, DoorMarkLightBlue = 
 /// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
 /// costs no penalty a nearer one wouldn't, and the round flies on past it along the same line.
 const double SkyAimReach = 320.0;
-/// An FPS-style round at a unit's picture (setting "Full sprite hitboxes") goes for a point this far beyond where
+/// An FPS-style round at a unit's picture (setting "Realistic hitboxes") goes for a point this far beyond where
 /// it leaves, through the very point of the picture under the crosshair (see FirstPersonMode::freeAimTarget), in
 /// voxels: far enough that the whole voxels of the target keep its way true to a hundredth of a voxel at the picture.
 const double FreeAimRoundReach = 2000.0;

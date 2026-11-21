@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..5fc46adbb
+index 000000000..9931f7982
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,683 @@
@@ -157,7 +157,7 @@ index 000000000..5fc46adbb
 +  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
 +  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
 +  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
-+  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, full sprite hitboxes, damage numbers."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, realistic hitboxes, damage numbers."
 +  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
 +  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
 +  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
@@ -480,7 +480,7 @@ index 000000000..5fc46adbb
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes. {ALT}Takes a few seconds."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -703,14 +703,14 @@ index 000000000..5fc46adbb
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
 +  STR_FPS_CONFIRM_FIRE_HINT: "Click again to fire"
 +  STR_FPS_HITBOXES: "Hitboxes"
-+  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always. Full sprite hitboxes: the sprite."
++  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always. Realistic hitboxes: the sprite."
 +  STR_FPS_GLOWING_OUTLINES: "Glowing outlines"
 +  STR_FPS_GLOWING_OUTLINES_DESC: "YES: the hitboxes and the path of a throw glow. NO: plain lines."
 +  STR_FPS_HITBOXES_OFF: "Off"
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
-+  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
++  STR_FPS_SPRITE_HITBOXES: "Realistic hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "YES: a unit is hit wherever its whole body shows (its sprite, or its 3D voxel body), for everyone. NO: the original game's hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
@@ -813,7 +813,7 @@ index 000000000..5fc46adbb
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..a6d008216
+index 000000000..01941c884
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,683 @@
@@ -846,7 +846,7 @@ index 000000000..a6d008216
 +  STR_FPS_PRESET_FAITHFUL_DESC: "Soldiers' 3D view on top of OXCE: a graphics layer over the game, its rules and turns untouched."
 +  STR_FPS_PRESET_EXTENDED_DESC: "Additional features, the intended play for most: map camera, unit names, hitboxes shown, exact aim. The default."
 +  STR_FPS_PRESET_TACTICUS_DESC: "A fuller tactical picture, information dense, fewer frills: cameras see as the eyes, accuracy line, rangefinder, step costs."
-+  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, full sprite hitboxes, damage numbers."
++  STR_FPS_PRESET_XMBL_DESC: "TACTICUS for the veteran: akimbo, leaning, jumping, fall damage, modern throwing, realistic hitboxes, damage numbers."
 +  STR_FPS_PRESET_FULLQOL_DESC: "Every feature on: sound, music, UFO lights and aura, jumping, leaning, live scanner, akimbo volley, instant chains."
 +  STR_FPS_PRESET_FPS_DESC: "FullQoL by a shooter's rules: free turning and walking, FPS-style shooting, quick deaths, fall damage."
 +  STR_FPS_PRESET_CUSTOM_DESC: "Your own mix: a preset with a setting of its own changed under Advanced. Kept while you try the others."
@@ -1169,7 +1169,7 @@ index 000000000..a6d008216
 +  STR_FPS_UNIT_SIZE: "Unit size"
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
-+  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Full sprite hitboxes. {ALT}Takes a few seconds."
++  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -1392,14 +1392,14 @@ index 000000000..a6d008216
 +  STR_FPS_CONFIRM_FIRE_DESC: "The first click marks the target and shows the path; click the same spot again to fire. Right button: never mind."
 +  STR_FPS_CONFIRM_FIRE_HINT: "Click again to fire"
 +  STR_FPS_HITBOXES: "Hitboxes"
-+  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always. Full sprite hitboxes: the sprite."
++  STR_FPS_HITBOXES_DESC: "Outlines where shots hit units: the one under the crosshair (Aimed at), all in sight blinking, or always. Realistic hitboxes: the sprite."
 +  STR_FPS_GLOWING_OUTLINES: "Glowing outlines"
 +  STR_FPS_GLOWING_OUTLINES_DESC: "YES: the hitboxes and the path of a throw glow. NO: plain lines."
 +  STR_FPS_HITBOXES_OFF: "Off"
 +  STR_FPS_HITBOXES_BLINK: "Blink"
 +  STR_FPS_HITBOXES_ALWAYS: "Always"
 +  STR_FPS_HITBOXES_AIMED: "Aimed at"
-+  STR_FPS_SPRITE_HITBOXES: "Full sprite hitboxes"
++  STR_FPS_SPRITE_HITBOXES: "Realistic hitboxes"
 +  STR_FPS_SPRITE_HITBOXES_DESC: "YES: a unit is hit wherever its whole body shows (its sprite, or its 3D voxel body), for everyone. NO: the original game's hit shapes."
 +  STR_FPS_QUICK_DEATHS: "Quick deaths"
 +  STR_FPS_AUTO_EQUIP_GUNS_FIRST: "Auto-equip guns first"
@@ -20225,7 +20225,7 @@ index 861c7702a..c27a96c33 100644
  	const std::vector<int> &getPath() const;
  	/// Makes a copy to the path.
 diff --git a/src/Battlescape/Projectile.cpp b/src/Battlescape/Projectile.cpp
-index 7f7697c1d..8c514791f 100644
+index 7f7697c1d..cbc23aadd 100644
 --- a/src/Battlescape/Projectile.cpp
 +++ b/src/Battlescape/Projectile.cpp
 @@ -31,6 +31,7 @@
@@ -20309,7 +20309,7 @@ index 7f7697c1d..8c514791f 100644
  			tu->getVisible()))
  		{ //unit
  			targetVoxel.z += tu->getFloatHeight(); //ground level is the base
-+			// (OpenXcom3D: setting "Full sprite hitboxes": a big unit aimed at its middle, where its picture
++			// (OpenXcom3D: setting "Realistic hitboxes": a big unit aimed at its middle, where its picture
 +			// stands, rather than at the tile's; see FirstPerson::arcAimAtPicture)
 +			FirstPerson::arcAimAtPicture(_save->getBattleState(), tu, targetVoxel);
  			targets.push_back(targetVoxel + Position(0, 0, tu->getHeight()/2 + 1));
@@ -21598,7 +21598,7 @@ index 067c7b3ba..61a8b856f 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..634be31e5 100644
+index 6e6846977..1c14870c1 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -21623,7 +21623,7 @@ index 6e6846977..634be31e5 100644
  
  	if (potentialUnit == excludeUnit) return false; //skip self
  
-+	// (OpenXcom3D: setting "Full sprite hitboxes": a big unit's picture stands in its middle, where
++	// (OpenXcom3D: setting "Realistic hitboxes": a big unit's picture stands in its middle, where
 +	// its tiles meet, so the tile's middle can lie short of it, and lines aimed there never reach
 +	// it: the scan aims at the unit's middle instead, and a hit on any of its tiles counts
 +	// (GitHub issue #57). One-tile units have their middle there already.)
@@ -21715,7 +21715,7 @@ index 6e6846977..634be31e5 100644
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
 -			const Position relative = (center - target) - Position(0,0,verticaloffset);
 +			Position relative = (center - target) - Position(0,0,verticaloffset);
-+			// (OpenXcom3D: setting "Full sprite hitboxes": a round met the unit's picture, a card
++			// (OpenXcom3D: setting "Realistic hitboxes": a round met the unit's picture, a card
 +			// through its middle, so where it struck says little about the side it came from: the
 +			// point is pushed out towards the shooter, see FirstPerson::spriteHitRelative.)
 +			if (rangeAtack && attack.attacker && attack.attacker != bu && FirstPerson::spriteHitboxes(_save->getBattleState()))
@@ -21784,7 +21784,7 @@ index 6e6846977..634be31e5 100644
  {
  	if (target == origin) return V_EMPTY;//just in case
  
-+	// (OpenXcom3D: setting "Full sprite hitboxes": the pictures the curve's steps meet face its start,
++	// (OpenXcom3D: setting "Realistic hitboxes": the pictures the curve's steps meet face its start,
 +	// as a straight line's do; see FirstPerson::ArcLines)
 +	const FirstPerson::ArcLines arcLines(_save, origin);
 +
@@ -21804,7 +21804,7 @@ index 6e6846977..634be31e5 100644
  		_cacheTileBelow = tileBelow;
   	}
  
-+	// (OpenXcom3D: setting "Full sprite hitboxes": in a line of fire a unit is hit where the line
++	// (OpenXcom3D: setting "Realistic hitboxes": in a line of fire a unit is hit where the line
 +	// crosses its picture, a card standing where the 3D view draws it, on the voxel of the line
 +	// there, whichever tile that is: its own, or one beside or above it that the picture reaches
 +	// over; see FirstPerson::spriteHitAt. A shot's impact, which its line already found on the
@@ -21848,7 +21848,7 @@ index 6e6846977..634be31e5 100644
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
 -						if (canTargetUnit(&originVoxel, targetTile, &targetVoxel, attacker, false))
-+						// (OpenXcom3D: setting "Full sprite hitboxes": melee reach by the game's own shapes,
++						// (OpenXcom3D: setting "Realistic hitboxes": melee reach by the game's own shapes,
 +						// for everyone: it aims at the tile's middle, short of a big unit's picture,
 +						// which stands in the unit's middle (GitHub issue #57).)
 +						const bool shapesBefore = setGameShapesOnly(true);
@@ -21874,7 +21874,7 @@ index 6e6846977..634be31e5 100644
  		//position where item will land
  		Position tilePos = Projectile::getPositionFromEnd(trajectory, Projectile::ItemDropVoxelOffset).toTile();
 -		if (forced || (test != V_OUTOFBOUNDS && tilePos == targetPos))
-+		// (OpenXcom3D: setting "Full sprite hitboxes": a shot's curve that meets the unit aimed at, on
++		// (OpenXcom3D: setting "Realistic hitboxes": a shot's curve that meets the unit aimed at, on
 +		// any of its tiles, lands on it; see FirstPerson::arcMeetsAimedUnit)
 +		if (forced || (test != V_OUTOFBOUNDS && (tilePos == targetPos
 +			|| FirstPerson::arcMeetsAimedUnit(_save, action.type == BA_THROW, test, trajectory.back(), targetPos))))
@@ -21907,18 +21907,18 @@ index 6e6846977..634be31e5 100644
  	else
  	{
 diff --git a/src/Battlescape/TileEngine.h b/src/Battlescape/TileEngine.h
-index 849787736..62298848c 100644
+index 849787736..4a810ad85 100644
 --- a/src/Battlescape/TileEngine.h
 +++ b/src/Battlescape/TileEngine.h
 @@ -118,6 +118,11 @@ private:
  	Tile *_cacheTile;
  	Tile *_cacheTileBelow;
  	Position _cacheTilePos;
-+	Position _lineOrigin = invalid;    // OpenXcom3D: where the line being walked starts (a unit's picture faces it: setting "Full sprite hitboxes")
++	Position _lineOrigin = invalid;    // OpenXcom3D: where the line being walked starts (a unit's picture faces it: setting "Realistic hitboxes")
 +	Position _lineTarget = invalid;    // OpenXcom3D: and where it goes (a unit's picture is hit where the line crosses it)
 +	unsigned _lineSerial = 0, _linesWalked = 0; // OpenXcom3D: the line being walked, by number (its pictures are worked out once for it)
-+	BattleUnit *_spriteHitUnit = nullptr; // OpenXcom3D: the unit whose picture the last voxel checked hit (setting "Full sprite hitboxes")
-+	bool _gameShapesOnly = false;      // OpenXcom3D: lines meet units by the game's own shapes even with "Full sprite hitboxes" (melee reach)
++	BattleUnit *_spriteHitUnit = nullptr; // OpenXcom3D: the unit whose picture the last voxel checked hit (setting "Realistic hitboxes")
++	bool _gameShapesOnly = false;      // OpenXcom3D: lines meet units by the game's own shapes even with "Realistic hitboxes" (melee reach)
  	const int _maxViewDistance;        // 20 tiles by default
  	const int _maxViewDistanceSq;      // 20 * 20
  	const int _maxVoxelViewDistance;   // maxViewDistance * 16
@@ -21926,7 +21926,7 @@ index 849787736..62298848c 100644
  
  	/// Returns melee validity between two units.
  	bool validMeleeRange(BattleUnit *attacker, BattleUnit *target, int dir);
-+	/// OpenXcom3D: lines meet units by the game's own shapes, even with "Full sprite hitboxes" (melee reach, see validMeleeRange); returns how it was.
++	/// OpenXcom3D: lines meet units by the game's own shapes, even with "Realistic hitboxes" (melee reach, see validMeleeRange); returns how it was.
 +	bool setGameShapesOnly(bool on) { const bool was = _gameShapesOnly; _gameShapesOnly = on; return was; }
  	/// Returns validity of a melee attack from a given position.
  	bool validMeleeRange(Position pos, int direction, BattleUnit *attacker, BattleUnit *target, Position *dest, bool preferEnemy = true);
@@ -24050,10 +24050,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..476a0afa9
+index 000000000..b79083dd5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1956 @@
+@@ -0,0 +1,1987 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24520,10 +24520,15 @@ index 000000000..476a0afa9
 +/// settlePresets).
 +constexpr int PresetTables = 1;
 +
++/// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
++constexpr int Kept = -9999;
++
 +/**
 + * One of the settings a preset sets: its option (a switch or a number) and its value under
-+ * each of the group's presets, in their order; and, where the tables' last change (see
-+ * PresetTables) changed them, its values before.
++ * each of the group's presets, in their order (Kept: that preset leaves it as it is); where the
++ * tables' last change (see PresetTables) changed them, its values before (Kept: it wasn't
++ * listed); and whether it is only set when a preset is chosen, and is no part of what makes
++ * the preset (a setting another group owns: see gameplaySwitches, the pixel size).
 + */
 +struct PresetSwitch
 +{
@@ -24532,6 +24537,7 @@ index 000000000..476a0afa9
 +	int *number;
 +	std::vector<int> values;
 +	std::vector<int> before = {};
++	bool onChoice = false;
 +};
 +
 +/**
@@ -24564,7 +24570,7 @@ index 000000000..476a0afa9
 + *    chains);
 + *  - FPS: a shooter's rules on top (free turning, free walking, FPS-style shooting, quick
 + *    deaths).
-+ * Aiming at the exact point is on in every one but FAITHFUL; full sprite hitboxes (a shot hits
++ * Aiming at the exact point is on in every one but FAITHFUL; realistic hitboxes (a shot hits
 + * what is drawn there) from XMbl on.
 + * A setting no preset changes isn't listed: it is the player's alone (every shot's line is
 + * shown in all of them, FAITHFUL too, and so are all the parts without shape; the helmet
@@ -24576,6 +24582,12 @@ index 000000000..476a0afa9
 + * obstacles and takes fall damage; guns come first at auto-equip and every room's walls are
 + * painted in all six. Those two are listed although no preset differs in them: choosing a
 + * preset sets them, and they are part of what makes a named preset (see settlePresets).
++ * And, of the same list, the owner's "Yes make both": from XMbl on the light is smooth
++ * between tiles (the first three leave "Smooth lighting" as the player has it), and XMbl,
++ * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
++ * detail"'s (see graphicsSwitches: 2 at Low on the CPU): it is set on the choice only and is
++ * no part of what makes XMbl, so a player on Low, or with a size of their own, is on XMbl
++ * all the same.
 + * @return The settings.
 + */
 +const std::vector<PresetSwitch> &gameplaySwitches()
@@ -24620,6 +24632,8 @@ index 000000000..476a0afa9
 +		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
 +		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
++		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
++		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
 +		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
 +		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
 +		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },
@@ -24731,6 +24745,7 @@ index 000000000..476a0afa9
 +		bool all = true;
 +		for (const PresetSwitch &presetSwitch : presets.switches())
 +		{
++			if (presetSwitch.onChoice || presetSwitch.values[preset] == Kept) continue;
 +			all = all && switchValue(presetSwitch) == presetSwitch.values[preset];
 +		}
 +		if (all) return preset;
@@ -24752,7 +24767,7 @@ index 000000000..476a0afa9
 + * Chooses a preset (settings "Gameplay" and "Graphics detail"): a named one sets its settings;
 + * Custom sets them back as the player had them (the group's kept mix). Leaving Custom keeps
 + * the mix first, so trying a preset and coming back loses nothing. Nothing but the group's
-+ * settings is touched.
++ * settings is touched (one of them may be the other group's too: that group's name follows).
 + * @param group Which presets.
 + * @param preset One of them (0 ..), or their number for Custom.
 + */
@@ -24768,16 +24783,27 @@ index 000000000..476a0afa9
 +	{
 +		if (*presets.chosen < presets.count)
 +		{
-+			setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
++			if (presetSwitch.values[*presets.chosen] != Kept) setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
 +			continue;
 +		}
-+		// Custom: the kept value, where there is one ("id=value;").
++		// Custom: the kept value, where there is one ("id=value;"); not of a setting only set on a choice (another
++		// group's own).
++		if (presetSwitch.onChoice) continue;
 +		const std::string key = std::string(presetSwitch.id) + "=";
 +		const size_t at = presets.mix->find(key);
 +		if (at != std::string::npos && (at == 0 || (*presets.mix)[at - 1] == ';'))
 +		{
 +			setSwitch(presetSwitch, std::atoi(presets.mix->c_str() + at + key.size()));
 +		}
++	}
++	// A setting set here that the other group lists too (the pixel size, XMbl's on its choice and "Graphics
++	// detail"'s own): that group says the preset its settings make now, or Custom, keeping them as its mix.
++	const Presets &others = presetsOf(group == PRESET_GAMEPLAY ? PRESET_GRAPHICS : PRESET_GAMEPLAY);
++	const int made = presetOfSwitches(others);
++	if (made != *others.chosen)
++	{
++		*others.chosen = made;
++		if (made == others.count) *others.mix = currentMix(others);
 +	}
 +}
 +
@@ -24910,14 +24936,19 @@ index 000000000..476a0afa9
 +			bool all = true, changes = false;
 +			for (const PresetSwitch &presetSwitch : gameplay.switches())
 +			{
-+				const int was = presetSwitch.before.empty() ? presetSwitch.values[preset] : presetSwitch.before[preset];
-+				all = all && switchValue(presetSwitch) == was;
-+				changes = changes || was != presetSwitch.values[preset];
++				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
++				if (presetSwitch.onChoice) continue;
++				const int now = presetSwitch.values[preset], was = presetSwitch.before.empty() ? now : presetSwitch.before[preset];
++				if (was != Kept) all = all && switchValue(presetSwitch) == was;
++				changes = changes || (now != Kept && now != was);
 +			}
 +			if (!all) continue;
 +			if (changes)
 +			{
-+				for (const PresetSwitch &presetSwitch : gameplay.switches()) setSwitch(presetSwitch, presetSwitch.values[preset]);
++				for (const PresetSwitch &presetSwitch : gameplay.switches())
++				{
++					if (!presetSwitch.onChoice && presetSwitch.values[preset] != Kept) setSwitch(presetSwitch, presetSwitch.values[preset]);
++				}
 +				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
 +			}
 +			break;
@@ -26012,7 +26043,7 @@ index 000000000..476a0afa9
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..f9dc20bc2
+index 000000000..270268bf8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
 @@ -0,0 +1,518 @@
@@ -26236,25 +26267,25 @@ index 000000000..f9dc20bc2
 +/// Is FPS-style shooting on for this unit's shots in the first-person view? Their bullet hits
 +/// then play quicker (a burst at a bullet's pace).
 +bool fastShots(BattlescapeState *state, const BattleUnit *attacker);
-+/// Setting "Full sprite hitboxes": is a unit hit where its picture shows, in a line of fire (the
++/// Setting "Realistic hitboxes": is a unit hit where its picture shows, in a line of fire (the
 +/// battle's rule, in 3D and on the map, whoever fires), rather than by the game's voxel shapes?
 +bool spriteHitboxes(BattlescapeState *state);
-+/// Setting "Full sprite hitboxes": which unit's picture this voxel of a line of fire hits (the line
++/// Setting "Realistic hitboxes": which unit's picture this voxel of a line of fire hits (the line
 +/// from origin to target, the serial number TileEngine gave it; the unit left out, units unseen
 +/// passed through, or only one tested, as the game asks): where the line crosses the picture's
 +/// card, as the 3D view draws it, on a solid pixel; any unit's that reaches the line, not only the
 +/// one on the voxel's tile (see FirstPersonSpriteHits.cpp). Null for none.
 +BattleUnit *spriteHitAt(SavedBattleGame *save, const Position &voxel, const Position &origin, const Position &target, unsigned serial,
 +	const BattleUnit *excludeUnit, bool onlyVisible, const BattleUnit *excludeAllBut);
-+/// Setting "Full sprite hitboxes": where the game counts a round that met a unit's picture as
++/// Setting "Realistic hitboxes": where the game counts a round that met a unit's picture as
 +/// stopping: the voxel, or the nearest of the unit's own tiles' (a picture reaching over a
 +/// neighbouring tile, or above its level, was hit there; the hit is worked out on the unit's tile).
 +Position spriteImpact(SavedBattleGame *save, const BattleUnit *unit, const Position &voxel);
-+/// Setting "Full sprite hitboxes": where a round that met a unit's picture struck it, relative to
++/// Setting "Realistic hitboxes": where a round that met a unit's picture struck it, relative to
 +/// its middle, for the armour side and body part hit: pushed out towards the shooter, as the
 +/// game's own hit shape would have stopped it on that side.
 +Position spriteHitRelative(const Position &relative, const BattleUnit *unit, const BattleUnit *shooter);
-+/// Setting "Full sprite hitboxes": the curve of a throw or an arcing shot is walked as many short
++/// Setting "Realistic hitboxes": the curve of a throw or an arcing shot is walked as many short
 +/// lines, a step of the curve each (TileEngine::calculateParabolaVoxel); while one of these lives,
 +/// the pictures those lines meet face the curve's start (the hand it left), as a straight line's
 +/// face its start, each step still tested where it crosses the picture. Each step's own start (the
@@ -26273,11 +26304,11 @@ index 000000000..f9dc20bc2
 +	bool _outerActive;      // the curve's start as it was before (none: no curve is walked inside another)
 +	double _outerFrom[3];
 +};
-+/// Setting "Full sprite hitboxes": where an arcing shot at a unit aims across the map (the game aims
++/// Setting "Realistic hitboxes": where an arcing shot at a unit aims across the map (the game aims
 +/// at the tile's middle, Projectile::calculateThrow): a big unit at its own middle, where its tiles
 +/// meet and its picture stands; any other left as it is. With the setting off, left as it is.
 +void arcAimAtPicture(BattlescapeState *state, const BattleUnit *unit, Position &aim);
-+/// Setting "Full sprite hitboxes": does a curve the game tries for an arcing shot land on what it's
++/// Setting "Realistic hitboxes": does a curve the game tries for an arcing shot land on what it's
 +/// aimed at by meeting the unit on the aimed tile, on any of that unit's tiles (TileEngine::
 +/// validateThrow takes only a curve that comes down on the aimed tile, and a big unit's picture,
 +/// met in its middle, often stops it over another of its tiles: the curve went higher and higher
@@ -31948,7 +31979,7 @@ index 000000000..796b25f48
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..3f7aa28a1
+index 000000000..e07cc29ee
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
 @@ -0,0 +1,325 @@
@@ -32140,7 +32171,7 @@ index 000000000..3f7aa28a1
 +		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
 +		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
 +		int binColumns = 0, binRows = 0;
-+		// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes"), if the frame has them: drawn
++		// The outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes"), if the frame has them: drawn
 +		// after the primitives before outlineAt, in a second go from the first one's pictures (an outline looks at the pixels beside it).
 +		int outlineAt = -1;            // the number of the first primitive after them; -1: none
 +		int outlineCount = 0;          // the outlined pictures: a record each after the primitives in prims (see FirstPersonView::gpuRecordOutlines)
@@ -32491,7 +32522,7 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..2d06256c4
+index 000000000..28d453d86
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
 @@ -0,0 +1,3211 @@
@@ -35018,7 +35049,7 @@ index 000000000..2d06256c4
 +uniform vec2 uAxis;                     // where the view axis meets the picture, in pixels: its middle, but an eye's picture in VR is off centre
 +uniform ivec2 uViewSize, uBinGrid;      // the view in pixels; the bins across and down
 +uniform int uPixelSize;                 // pixels a ray coloured each way
-+// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes") is drawn in two goes:
++// A frame with the outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes") is drawn in two goes:
 +// the primitives up to the outlines, then, from that go's pictures (an outline looks at the pixels beside it), the outlines
 +// and the rest.
 +uniform usampler2D uNotes;              // the first go's notes (the second go starts from them)
@@ -37340,7 +37371,7 @@ index 000000000..1974311f2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..3a680304d
+index 000000000..7c9b2b0c7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3600 @@
@@ -39571,7 +39602,7 @@ index 000000000..3a680304d
 + */
 +/**
 + * Setting "Voxel units": every unit's body is made from the battle's start, on the map too, not only those the 3D view
-+ * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Full sprite hitboxes" a
++ * has seen (the owner: the wait must not come at the first click of the 3D button; and with "Realistic hitboxes" a
 + * shot hits a unit where its body is, see FirstPerson::spriteHit): each frame, those still without a body for how they
 + * stand now have their frames gathered, for VoxelBodiesMs at most (see VoxelUnits::modelFor; the builder's threads make
 + * the bodies, the units in the battle's order: the player's first). A unit without one yet is drawn, and hit, as its
@@ -39769,7 +39800,7 @@ index 000000000..3a680304d
 +	updateDamageNumbers(now);
 +
 +	// With "Voxel units" every unit's body is made from the battle's start (or from when the setting is switched on),
-+	// seen or not: none is left to make when the 3D view opens, and with "Full sprite hitboxes" a shot hits the body.
++	// seen or not: none is left to make when the 3D view opens, and with "Realistic hitboxes" a shot hits the body.
 +	if (Options::fpsVoxelUnits)
 +	{
 +		makeVoxelBodies(VoxelBodiesMs);
@@ -40946,7 +40977,7 @@ index 000000000..3a680304d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..fa2a52e82
+index 000000000..e07e9a58a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1586 @@
@@ -41108,12 +41139,12 @@ index 000000000..fa2a52e82
 +	static bool instantChains(BattlescapeState *state);
 +	/// Does the battle wait for a chain settled at once to ripple through (its dead falling after it)?
 +	static bool chainRippleHolds(BattlescapeState *state);
-+	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
++	/// Setting "Realistic hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 +	static bool spriteHitboxes(BattlescapeState *state);
 +	/// The units' voxel bodies of the battle on this screen (setting "Voxel units"), or null: what a shot meets with
-+	/// "Full sprite hitboxes" (see FirstPerson::spriteHit).
++	/// "Realistic hitboxes" (see FirstPerson::spriteHit).
 +	static VoxelUnits *voxelUnits(BattlescapeState *state);
-+	/// Setting "Full sprite hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
++	/// Setting "Realistic hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
 +	static const FirstPersonView *shootingView(BattlescapeState *state);
 +	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 +	static bool quickDeaths(BattlescapeState *state);
@@ -41210,7 +41241,7 @@ index 000000000..fa2a52e82
 +	FirstPersonView *_view = nullptr;      // the full-screen 3D view
 +	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
 +	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
-+	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
++	/// Setting "Voxel units" with "Realistic hitboxes" (a shot hits the body): every unit's body made, a few a frame.
 +	void makeVoxelBodies(double milliseconds);
 +	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
 +	void primeView(BattleUnit *unit);
@@ -48947,7 +48978,7 @@ index 000000000..68dace111
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..f68c153e8
+index 000000000..e3f8be5a3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
 @@ -0,0 +1,569 @@
@@ -49091,7 +49122,7 @@ index 000000000..f68c153e8
 +/// the ray leaves the map or the weapon's range ends. A point the soldier sees and can reach
 +/// costs no penalty a nearer one wouldn't, and the round flies on past it along the same line.
 +const double SkyAimReach = 320.0;
-+/// An FPS-style round at a unit's picture (setting "Full sprite hitboxes") goes for a point this far beyond where
++/// An FPS-style round at a unit's picture (setting "Realistic hitboxes") goes for a point this far beyond where
 +/// it leaves, through the very point of the picture under the crosshair (see FirstPersonMode::freeAimTarget), in
 +/// voxels: far enough that the whole voxels of the target keep its way true to a hundredth of a voxel at the picture.
 +const double FreeAimRoundReach = 2000.0;
@@ -49522,7 +49553,7 @@ index 000000000..f68c153e8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..7be5624f1
+index 000000000..bb68a7257
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
 @@ -0,0 +1,5600 @@
@@ -50765,7 +50796,7 @@ index 000000000..7be5624f1
 +				Position originVoxel = origin->getPosition().toVoxel() + Position(8, 8, unit->getHeight() + unit->getFloatHeight() - 4
 +					- origin->getTerrainLevel() + unit->getArmor()->getMeleeOriginVoxelVerticalOffset());
 +				Position targetVoxel;
-+				// (by the game's own shapes, as its melee reach: setting "Full sprite hitboxes",
++				// (by the game's own shapes, as its melee reach: setting "Realistic hitboxes",
 +				// see TileEngine::validMeleeRange)
 +				const bool shapesBefore = _save->getTileEngine()->setGameShapesOnly(true);
 +				const bool reached = _save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false);
@@ -51078,7 +51109,7 @@ index 000000000..7be5624f1
 +	// game keeps only the point where the line stopped. The arguments after the trajectory:
 +	// leave the soldier out, test every unit, and skip units the player can't see. The line walks
 +	// the voxels from the one the eye is in, whose middle can be half a voxel off the eye each
-+	// way; with "Full sprite hitboxes" the units' pictures it meets are tested along the eye's own
++	// way; with "Realistic hitboxes" the units' pictures it meets are tested along the eye's own
 +	// ray (see FirstPerson::ExactLine), so the crosshair finds a unit exactly where it shows.
 +	std::vector<Position> trajectory;
 +	int hitType;
@@ -51725,7 +51756,7 @@ index 000000000..7be5624f1
 + * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
 + * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
 + * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
-+ * then a unit's middle, low and high, with "Full sprite hitboxes" a big unit's across the map, see
++ * then a unit's middle, low and high, with "Realistic hitboxes" a big unit's across the map, see
 + * FirstPerson::arcAimAtPicture; an object, a wall, each at a few heights; the floor; a
 + * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
 + * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
@@ -53472,7 +53503,7 @@ index 000000000..7be5624f1
 +}
 +
 +/**
-+ * Are units hit by their pictures in this battle (setting "Full sprite hitboxes", see
++ * Are units hit by their pictures in this battle (setting "Realistic hitboxes", see
 + * FirstPerson::spriteHitboxes): the setting on, in a battle with the mod's 3D view (in 3D or on
 + * the map alike: the battle's rule)?
 + * @param state The battlescape screen.
@@ -53495,7 +53526,7 @@ index 000000000..7be5624f1
 +}
 +
 +/**
-+ * The 3D view while it shows the battle (setting "Full sprite hitboxes": the units stand as it draws
++ * The 3D view while it shows the battle (setting "Realistic hitboxes": the units stand as it draws
 + * them, and the looked-through soldier's own lines meet the very cards it draws; see
 + * FirstPersonSpriteHits.cpp).
 + * @param state The battlescape screen.
@@ -53695,7 +53726,7 @@ index 000000000..7be5624f1
 +	// the view they point through (the focal length in pixels comes from the field of view).
 +	const double angleX = gaussian() * sigmaRadians, angleY = gaussian() * sigmaRadians;
 +	// (VR with a right hand: off the weapon's barrel, from its muzzle, see vrRifleRay; the sky far along that line. A
-+	// unit's picture or body met there, setting "Full sprite hitboxes": through the very point of it from the muzzle,
++	// unit's picture or body met there, setting "Realistic hitboxes": through the very point of it from the muzzle,
 +	// where the round leaves (see freeAimFrom), far beyond, as below.)
 +	if (vrRifleAims())
 +	{
@@ -53733,7 +53764,7 @@ index 000000000..7be5624f1
 +
 +	// The round goes for whatever the game's line of fire meets through that pixel; with
 +	// nothing there (the sky), for a point far along the ray. A unit's picture met there (setting
-+	// "Full sprite hitboxes"): through the very point of it, from where the round leaves (the
++	// "Realistic hitboxes"): through the very point of it, from where the round leaves (the
 +	// round's own line crosses the picture there, see FirstPerson::spriteHitAt), far beyond.
 +	Position hitVoxel;
 +	int hitType = V_EMPTY;
@@ -61166,7 +61197,7 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..c280a20c1
+index 000000000..5ccebc4fe
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
 @@ -0,0 +1,1087 @@
@@ -61214,7 +61245,7 @@ index 000000000..c280a20c1
 + * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +/*
-+ * FirstPersonSpriteHits.cpp: setting "Full sprite hitboxes": a unit is hit where its picture shows (with "Voxel units",
++ * FirstPersonSpriteHits.cpp: setting "Realistic hitboxes": a unit is hit where its picture shows (with "Voxel units",
 + * where its body is).
 + *
 + * A line of fire meets a unit's picture where it crosses the picture's card (see SpriteCard): the
@@ -61645,7 +61676,7 @@ index 000000000..c280a20c1
 +}
 +
 +/**
-+ * The voxel body a unit is hit by (settings "Voxel units" and "Full sprite hitboxes", the owner's: "hit-boxes should be
++ * The voxel body a unit is hit by (settings "Voxel units" and "Realistic hitboxes", the owner's: "hit-boxes should be
 + * their whole bodies"): the one made for it as it is now (every unit's is made from the battle's start, see
 + * FirstPersonMode::makeVoxelBodies; a unit without one yet is hit by its picture). A unit going down (the game's own
 + * fall; one tile big, as the view draws the fall) is hit by the shape the body it was last drawn with has at the fall
@@ -61939,7 +61970,7 @@ index 000000000..c280a20c1
 +}
 +
 +/**
-+ * Setting "Full sprite hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
++ * Setting "Realistic hitboxes" (the owner's, GitHub issue #42: "Setting for hit-boxes the same size
 + * as sprites!"; the battle's rule, for everyone's shots and the game's line of fire checks, and so
 + * its sight too, which walks the same lines (TileEngine::visible, canTargetUnit), in 3D and on the
 + * map): on, and the mod's 3D view in the battle.
@@ -61952,7 +61983,7 @@ index 000000000..c280a20c1
 +}
 +
 +/**
-+ * Which unit's picture a voxel of a line of fire hits (setting "Full sprite hitboxes"): the line
++ * Which unit's picture a voxel of a line of fire hits (setting "Realistic hitboxes"): the line
 + * meets a picture where it crosses its card (see SpriteCard), on the very pixel it goes through
 + * there (see cardRay), at the voxel of the line at that crossing; see-through pixels let it on.
 + * Any unit's whose card reaches the line, not only the one on the voxel's tile: a picture
@@ -62231,7 +62262,7 @@ index 000000000..c280a20c1
 +
 +/**
 + * Where a round that met a unit's picture struck it, for the armour side and the body part it hits
-+ * (setting "Full sprite hitboxes"; BattleUnit::damage tells the side by which way that point lies
++ * (setting "Realistic hitboxes"; BattleUnit::damage tells the side by which way that point lies
 + * from the unit's middle). The picture is a card through the middle, so the point lies to the side
 + * along the card and hardly towards the shooter at all: a round from straight ahead would hit the
 + * flank, or the rear. It's pushed out towards the shooter by SpriteHitPush, as the game's own hit
@@ -62259,7 +62290,7 @@ index 000000000..c280a20c1
 +}
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.h b/src/FirstPerson/FirstPersonSpriteHits.h
 new file mode 100644
-index 000000000..66c35a97a
+index 000000000..ad9454552
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.h
 @@ -0,0 +1,153 @@
@@ -62309,7 +62340,7 @@ index 000000000..66c35a97a
 + */
 +
 +/*
-+ * FirstPersonSpriteHits.h: setting "Full sprite hitboxes", the pictures the lines of fire test
++ * FirstPersonSpriteHits.h: setting "Realistic hitboxes", the pictures the lines of fire test
 + * (see FirstPersonSpriteHits.cpp): shared with the 3D view, which outlines what they test
 + * (setting "Hitboxes"), and with the aim under the crosshair.
 + */
@@ -62329,7 +62360,7 @@ index 000000000..66c35a97a
 +{
 +
 +/**
-+ * A unit's picture as a line of fire tests it (setting "Full sprite hitboxes"): a flat card in
++ * A unit's picture as a line of fire tests it (setting "Realistic hitboxes"): a flat card in
 + * the world with the unit's sprite on it, its frame the one seen from where the line comes from.
 + * The card stands where the 3D view draws the picture: the middle of the unit's tiles, its feet
 + * on the floor's top, at the setting "Unit size". For the lines of the soldier looked through in
@@ -62370,7 +62401,7 @@ index 000000000..66c35a97a
 + * map), where no side is turned towards it, from the south-east, as the map shows the unit (a
 + * player, GitHub issue #112: shooting straight down at a unit, the shot's shake tipped the eye
 + * from side to side over it and the unit spun round and twitched). The view draws it so and the
-+ * lines of fire test that very picture (setting "Full sprite hitboxes"), both from the view's
++ * lines of fire test that very picture (setting "Realistic hitboxes"), both from the view's
 + * steady eye (FirstPersonView::getSteadyEye).
 + * @param eye The eye, in voxels.
 + * @param feet The unit's feet (its picture's anchor), in voxels.
@@ -63340,7 +63371,7 @@ index 000000000..eb85a5c78
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..2174bda20
+index 000000000..55a9c467c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1920 @@
@@ -63745,16 +63776,16 @@ index 000000000..2174bda20
 +	void setCameraUnit(const BattleUnit *unit) { _cameraUnit = unit; }
 +	/// Gets the unit being looked through (null: none).
 +	const BattleUnit *getCameraUnit() const { return _cameraUnit; }
-+	/// Setting "Full sprite hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
++	/// Setting "Realistic hitboxes": a unit's picture card as this view draws it standing at a point (see drawSprite): one picture column to the right and one row up, in voxels.
 +	void cardAxes(const double world[3], double scale, double column[3], double row[3], double layBack = 0.0) const;
-+	/// Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
++	/// Setting "Realistic hitboxes": the height this view stands a unit on at a point (see standingHeight), if it has drawn the map.
 +	bool standingHeightNow(const double world[3], double &height) const;
-+	/// Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
++	/// Setting "Realistic hitboxes": where this view drew a unit's feet in its last frame (between the game's small steps as it
 +	/// eases them, see drawUnits), if it drew it then.
 +	bool drawnFeet(const BattleUnit *unit, double feet[3]) const;
 +	/// How much this view lifted a unit's voxel body off its floor in its last frame (a unit the game holds off the ground), voxels.
 +	double drawnLift(const BattleUnit *unit) const;
-+	/// Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
++	/// Setting "Realistic hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
 +	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
 +	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
 +	/// Places the eye, in voxels.
@@ -64769,7 +64800,7 @@ index 000000000..2174bda20
 +	void recordFlareShadow(const BattleUnit *unit, const double feet[3], double radius);
 +	/// Records the outline of the voxels the game counts as a unit when it's hit (setting "Hitboxes"), to be drawn with the units.
 +	void recordHitbox(const BattleUnit *unit, const double feet[3], float opacity);
-+	/// With "Full sprite hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): once the units
++	/// With "Realistic hitboxes" the hitbox is the unit's picture (setting "Hitboxes"): once the units
 +	/// are drawn, which outlined unit's tested picture shows on each pixel (its number; 0 none, see
 +	/// noteTestedPictures) and each row's first and last such pixel; then a line round each (see drawUnitOutlines).
 +	bool _outlining = false;                 // the units are being drawn with their outlines noted
@@ -64788,7 +64819,7 @@ index 000000000..2174bda20
 +		int left, top, right, bottom;
 +	};
 +	std::vector<OutlinedUnit> _outlinedUnits;
-+	/// Setting "Full sprite hitboxes": the units drawn smooth (upscaled, up close) the last time, each frame's picture as drawn: the
++	/// Setting "Realistic hitboxes": the units drawn smooth (upscaled, up close) the last time, each frame's picture as drawn: the
 +	/// battle's animation frame, the side seen from, its solid pixels as composed and the smooth version (see smoothPicture).
 +	struct SmoothPicture
 +	{
@@ -67978,7 +68009,7 @@ index 000000000..086fd34d0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..9f7426011
+index 000000000..dc3318e65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 @@ -0,0 +1,1073 @@
@@ -68560,7 +68591,7 @@ index 000000000..9f7426011
 +}
 +
 +/**
-+ * Records the outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes";
++ * Records the outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes";
 + * see noteTestedPictures, which worked out each outlined unit's card and its box on the screen, and
 + * drawUnitOutlines): they are drawn after everything recorded so far, in a second go on the card,
 + * from the first one's pictures. A record for each picture (Effects::OutlineTexels texels):
@@ -72405,7 +72436,7 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..65b30cdb5
+index 000000000..e77a95cb7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
 @@ -0,0 +1,732 @@
@@ -72621,15 +72652,15 @@ index 000000000..65b30cdb5
 +const float ZScaleF = (float)ZScale;
 +/// An isometric sprite pixel across is 1/sqrt(2) of a voxel (32 pixels span a tile's diagonal).
 +const double SpritePixelX = 0.70710678118654752;
-+/// Setting "Full sprite hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
++/// Setting "Realistic hitboxes" (see FirstPersonSpriteHits.cpp): how far a voxel of a line of fire may be in front of or
 +/// behind a unit's picture card and still meet it, in voxels: a line steps up to a voxel along each axis at a time, so
 +/// the card is that thick that no line slips through it between two steps.
 +const double SpriteHitSlab = 0.8;
-+/// Setting "Full sprite hitboxes": how far a round's point of impact on a unit's picture is pushed out towards the
++/// Setting "Realistic hitboxes": how far a round's point of impact on a unit's picture is pushed out towards the
 +/// shooter for the armour side and body part it hits, in voxels (about the radius of the game's hit shape of a
 +/// soldier, which would have stopped the round on its near side; see FirstPerson::spriteHitRelative).
 +const double SpriteHitPush = 6.0;
-+/// Setting "Hitboxes" with "Full sprite hitboxes": a unit's tested picture is outlined where it shows (see
++/// Setting "Hitboxes" with "Realistic hitboxes": a unit's tested picture is outlined where it shows (see
 +/// FirstPersonView::noteTestedPictures): no farther than what's drawn there and this much more, in voxels (in the
 +/// view showing the battle the card tested is the one drawn, the picture as near; in another camera's it stands
 +/// upright, a little off the leaning card drawn).
@@ -75493,7 +75524,7 @@ index 000000000..c2ce32f58
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..f1efa44a1
+index 000000000..989de7b34
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,4408 @@
@@ -76585,7 +76616,7 @@ index 000000000..f1efa44a1
 +}
 +
 +/**
-+ * Setting "Full sprite hitboxes": the height this view stands a unit on at a point (see
++ * Setting "Realistic hitboxes": the height this view stands a unit on at a point (see
 + * standingHeight), so that the lines of fire meet a unit's picture where the view draws it (see
 + * FirstPersonSpriteHits.cpp): only once it has drawn the map (its snapshot of the tiles is there).
 + * @param world The point on the ground, in voxels.
@@ -76593,7 +76624,7 @@ index 000000000..f1efa44a1
 + * @return False if the view hasn't drawn the map yet.
 + */
 +/**
-+ * Setting "Full sprite hitboxes": the smooth (upscaled) picture of a unit this view drew last (up
++ * Setting "Realistic hitboxes": the smooth (upscaled) picture of a unit this view drew last (up
 + * close, setting "Sprite upscaling", see useSmoothVersion), if it drew this very frame smooth: the
 + * same animation frame, seen from the same side, the same pixels as composed. The lines of the
 + * soldier looked through meet that picture, as drawn (see FirstPersonSpriteHits.cpp).
@@ -76615,7 +76646,7 @@ index 000000000..f1efa44a1
 +}
 +
 +/**
-+ * Setting "Full sprite hitboxes": where this view drew a unit's feet in its last frame (see drawUnits:
++ * Setting "Realistic hitboxes": where this view drew a unit's feet in its last frame (see drawUnits:
 + * a unit on the move between the tiles of its step, every unit eased between the game's small steps;
 + * not the flinch of a hit), so that the lines of the soldier looked through meet its picture there.
 + * @param unit The unit.
@@ -76650,7 +76681,7 @@ index 000000000..f1efa44a1
 +}
 +
 +/**
-+ * Setting "Full sprite hitboxes": the card a unit's picture stands on at a point, as drawSprite
++ * Setting "Realistic hitboxes": the card a unit's picture stands on at a point, as drawSprite
 + * draws it (the same reckoning): square to the view across the map, leaning back as the view looks
 + * down (up to CardTiltMax) and forward as it looks up (CardTiltUpMax; a card steeply above the eye
 + * leans towards it, up to CardTiltSteepMax). Gives one picture column to the right (SpritePixelX
@@ -77014,7 +77045,7 @@ index 000000000..f1efa44a1
 + * is, turned to show the side facing the camera. Walking units glide between tiles, and every
 + * unit eases between the game's small steps; a hit unit flinches and flashes; each stands on a
 + * soft shadow. Also notes where the numbered enemy markers go this frame (drawMarkers), and
-+ * outlines their hitboxes (setting "Hitboxes"; with "Full sprite hitboxes", the pictures the lines
++ * outlines their hitboxes (setting "Hitboxes"; with "Realistic hitboxes", the pictures the lines
 + * from the eye test: see noteTestedPictures, drawUnitOutlines). The unit being looked through is not drawn. Their pixels are noted as a unit's, so the
 + * see-through smoke drawn later veils them only thinly (see _unitVeil).
 + * Everything is worked out here, on the game's thread, and recorded (see DrawStep); then all of
@@ -77046,7 +77077,7 @@ index 000000000..f1efa44a1
 +	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
 +	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 +		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
-+	// With "Full sprite hitboxes" the hitbox is the picture: the same setting outlines that instead,
++	// With "Realistic hitboxes" the hitbox is the picture: the same setting outlines that instead,
 +	// a line round it (the owner: "the sprites should be then surrounded by red line to show where you
 +	// can hit them"): round what the lines from the eye test, from the test's own cards (a player:
 +	// "a visualization of the actual hitbox would help"), noted once the units are drawn and drawn
@@ -77330,7 +77361,7 @@ index 000000000..f1efa44a1
 +			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 +			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
 +				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
-+			// With full sprite hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
++			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
 +			double bodyX, bodyY, bodyDepth;
@@ -77432,7 +77463,7 @@ index 000000000..f1efa44a1
 +			step.sprite.unit = unit;
 +			step.sprite.layBack = FirstPerson::hullLayBack(unit);
 +			useSmoothVersion(step.sprite);
-+			// With full sprite hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
++			// With realistic hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
 +			// soldier looked through meet: noted with the frame it is (see smoothPicture).
 +			if (Options::fpsSpriteHitboxes)
 +			{
@@ -77455,7 +77486,7 @@ index 000000000..f1efa44a1
 +					_smoothPictures.erase(unit);
 +				}
 +			}
-+			// With full sprite hitboxes, what the lines test outlined where the box would be drawn (see
++			// With realistic hitboxes, what the lines test outlined where the box would be drawn (see
 +			// noteTestedPictures); not for one so close that it fades out, dithered (drawSprite: nearer
 +			// than 10 voxels), where the holes would be outlined.
 +			double screenX, screenY, screenDepth;
@@ -77470,7 +77501,7 @@ index 000000000..f1efa44a1
 +			}
 +			_drawList.push_back(step);
 +		}
-+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with full sprite hitboxes the picture is the hitbox, outlined above; one falling is down)
++		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with realistic hitboxes the picture is the hitbox, outlined above; one falling is down)
 +		{
 +			recordHitbox(unit, feet, hitboxOpacity);
 +		}
@@ -77489,7 +77520,7 @@ index 000000000..f1efa44a1
 +	{
 +		started = started->first->getStatus() == STATUS_COLLAPSING || collapseFall(started->first, now) < 1.0 ? std::next(started) : _collapseStarts.erase(started);
 +	}
-+	// Then draw them all, and with full sprite hitboxes the outlines of what the lines test over them (pictures, by
++	// Then draw them all, and with realistic hitboxes the outlines of what the lines test over them (pictures, by
 +	// their cards; a voxel body by the pixels it was drawn on, see drawVoxelUnit).
 +	replayDrawList();
 +	if (_outlining)
@@ -77500,7 +77531,7 @@ index 000000000..f1efa44a1
 +}
 +
 +/**
-+ * Setting "Hitboxes" with "Full sprite hitboxes": notes on the screen where each outlined unit's
++ * Setting "Hitboxes" with "Realistic hitboxes": notes on the screen where each outlined unit's
 + * picture is hit by the lines from the eye (the test's own card, see FirstPerson::viewCard: in the
 + * view showing the battle, the very card drawn, its feet on the floor's top; the art below the feet
 + * lying on the floor is never hit, nor what the picture reaches below a floor), so that the outline
@@ -77615,7 +77646,7 @@ index 000000000..f1efa44a1
 +}
 +
 +/**
-+ * Setting "Hitboxes" with "Full sprite hitboxes", where the hitbox is the unit's picture: outlines
++ * Setting "Hitboxes" with "Realistic hitboxes", where the hitbox is the unit's picture: outlines
 + * what the lines from the eye test of each picture (noted by noteTestedPictures), a line a pixel wide just
 + * outside its edge in the colour of its side, as the boxes are drawn. A pixel is outlined when it
 + * isn't that unit's, borders one of its pixels (the eight round it) and what shows there is behind
@@ -87940,7 +87971,7 @@ index 000000000..773f6e0f4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUpscaling.cpp b/src/FirstPerson/FirstPersonViewUpscaling.cpp
 new file mode 100644
-index 000000000..cec85b14c
+index 000000000..a0e2da1ec
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUpscaling.cpp
 @@ -0,0 +1,708 @@
@@ -88504,7 +88535,7 @@ index 000000000..cec85b14c
 +		std::lock_guard<std::mutex> lock(_upscaleMutex);
 +		for (auto &entry : _upscaledSprites) delete entry.second.surface;
 +		_upscaledSprites.clear();
-+		_smoothPictures.clear(); // (setting "Full sprite hitboxes": the pictures drawn smooth are gone too)
++		_smoothPictures.clear(); // (setting "Realistic hitboxes": the pictures drawn smooth are gone too)
 +		_upscaleDone.clear();
 +		_upscaleQueued.clear();
 +		_upscaleJobs.clear();
@@ -96301,7 +96332,7 @@ index 000000000..807b588b7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..4deeb28c9
+index 000000000..816dba46c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
 @@ -0,0 +1,274 @@
@@ -96473,7 +96504,7 @@ index 000000000..4deeb28c9
 +	size_t addedFrom = (size_t)-1;
 +	/// Whether voxel k shows from direction (0-7) with level painting (or slanted).
 +	bool shows(size_t k, int direction, bool level) const { return views.empty() || (views[k] >> ((level ? 0 : 8) + direction) & 1); }
-+	/// What a shot meets (settings "Voxel units" and "Full sprite hitboxes": the body is the hitbox): the body's solid
++	/// What a shot meets (settings "Voxel units" and "Realistic hitboxes": the body is the hitbox): the body's solid
 +	/// voxels, whole voxels (right, ahead, up) from hitFrom, hitSize of them each way, each the views it shows in (as
 +	/// views; 0: empty).
 +	std::vector<Uint16> hits;
@@ -102447,7 +102478,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..694e000c3
+index 000000000..13bc3757d
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1154 @@
@@ -102666,7 +102697,7 @@ index 000000000..694e000c3
 +	}
 +	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
 +	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
-+	// speed on a graphics card), two settings players commonly change (the shot's preview, full sprite hitboxes),
++	// speed on a graphics card), two settings players commonly change (the shot's preview, realistic hitboxes),
 +	// and what goes by the hand and the habit, which no preset can know.
 +	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 +	{

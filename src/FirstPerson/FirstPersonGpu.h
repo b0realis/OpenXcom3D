@@ -186,7 +186,7 @@ public:
 		Uint32 bytesGeneration = 0;    // ... until they are begun anew (another number here): what the card has of them stays good till then
 		std::vector<Uint32> bins;      // per bin (and one more) where its list starts in here; then the lists: a primitive's number each, in order
 		int binColumns = 0, binRows = 0;
-		// The outlines round the units' pictures (settings "Hitboxes" with "Full sprite hitboxes"), if the frame has them: drawn
+		// The outlines round the units' pictures (settings "Hitboxes" with "Realistic hitboxes"), if the frame has them: drawn
 		// after the primitives before outlineAt, in a second go from the first one's pictures (an outline looks at the pixels beside it).
 		int outlineAt = -1;            // the number of the first primitive after them; -1: none
 		int outlineCount = 0;          // the outlined pictures: a record each after the primitives in prims (see FirstPersonView::gpuRecordOutlines)

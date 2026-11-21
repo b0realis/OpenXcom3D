@@ -156,12 +156,12 @@ public:
 	static bool instantChains(BattlescapeState *state);
 	/// Does the battle wait for a chain settled at once to ripple through (its dead falling after it)?
 	static bool chainRippleHolds(BattlescapeState *state);
-	/// Setting "Full sprite hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
+	/// Setting "Realistic hitboxes": are units hit by their pictures in this battle (see FirstPerson::spriteHitboxes)?
 	static bool spriteHitboxes(BattlescapeState *state);
 	/// The units' voxel bodies of the battle on this screen (setting "Voxel units"), or null: what a shot meets with
-	/// "Full sprite hitboxes" (see FirstPerson::spriteHit).
+	/// "Realistic hitboxes" (see FirstPerson::spriteHit).
 	static VoxelUnits *voxelUnits(BattlescapeState *state);
-	/// Setting "Full sprite hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
+	/// Setting "Realistic hitboxes": the 3D view while it shows the battle (its pictures are the ones hit, see FirstPersonSpriteHits.cpp); null on the map.
 	static const FirstPersonView *shootingView(BattlescapeState *state);
 	/// Setting "Quick deaths": are deaths quick in this battle (see FirstPerson::quickDeaths)?
 	static bool quickDeaths(BattlescapeState *state);
@@ -258,7 +258,7 @@ private:
 	FirstPersonView *_view = nullptr;      // the full-screen 3D view
 	std::unique_ptr<VoxelUnits> _voxelUnits; // the units' voxel bodies (setting "Voxel units"), the views' and the battle's
 	Surface *_bodySurface = nullptr;       // where the unit drawer draws while bodies are made for the battle (see makeVoxelBodies)
-	/// Setting "Voxel units" with "Full sprite hitboxes" (a shot hits the body): every unit's body made, a few a frame.
+	/// Setting "Voxel units" with "Realistic hitboxes" (a shot hits the body): every unit's body made, a few a frame.
 	void makeVoxelBodies(double milliseconds);
 	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
 	void primeView(BattleUnit *unit);

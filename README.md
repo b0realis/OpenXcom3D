@@ -62,7 +62,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Damage numbers:** a hit's damage rises over the unit, in 3D and on the map: health red, armour blue, stun purple, a grey 0 when the armour stopped it.
 - **Ambient sounds:** rain and wind, muffled under a roof, and fires crackling near you.
 - **Camera artifacts:** the helmet cameras' static and glitches as they are, lighter (no glitch over 0.15 s) or gone; a fallen soldier's camera keeps its static.
-- **Hit as drawn:** with *Full sprite hitboxes* a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too (a big unit aimed at its middle); *Hitboxes* outlines what the shots test.
+- **Hit as drawn:** with *Realistic hitboxes* a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too (a big unit aimed at its middle); *Hitboxes* outlines what the shots test.
 - **Fixed:** a sprint walks on past enemies coming into sight, and any walk stops when the soldier is shot at, as on the map; a laser up close starts at the gun, with its flash and kick; a guided missile takes only its launcher's waypoints in 3D; a built-in weapon counts as one when both hands are full; a unit straight below or above no longer spins as you shoot it; a sidestep short of time units no longer jitters; downed unit icons only for the body under the crosshair; no red marker over your own wounded; *Pixel size* goes round; seven setting values renamed to fit their column (Each side, All rooms, Clear shot, As map, Percent, Smooth+).
 
 ## New in 1.11

@@ -1237,7 +1237,7 @@ FirstPersonMode::MeleeAim FirstPersonMode::meleeTarget(BattleUnit *unit) const
 				Position originVoxel = origin->getPosition().toVoxel() + Position(8, 8, unit->getHeight() + unit->getFloatHeight() - 4
 					- origin->getTerrainLevel() + unit->getArmor()->getMeleeOriginVoxelVerticalOffset());
 				Position targetVoxel;
-				// (by the game's own shapes, as its melee reach: setting "Full sprite hitboxes",
+				// (by the game's own shapes, as its melee reach: setting "Realistic hitboxes",
 				// see TileEngine::validMeleeRange)
 				const bool shapesBefore = _save->getTileEngine()->setGameShapesOnly(true);
 				const bool reached = _save->getTileEngine()->canTargetUnit(&originVoxel, target, &targetVoxel, unit, false);
@@ -1550,7 +1550,7 @@ bool FirstPersonMode::aimAlong(const double eye[3], const double rayDirection[3]
 	// game keeps only the point where the line stopped. The arguments after the trajectory:
 	// leave the soldier out, test every unit, and skip units the player can't see. The line walks
 	// the voxels from the one the eye is in, whose middle can be half a voxel off the eye each
-	// way; with "Full sprite hitboxes" the units' pictures it meets are tested along the eye's own
+	// way; with "Realistic hitboxes" the units' pictures it meets are tested along the eye's own
 	// ray (see FirstPerson::ExactLine), so the crosshair finds a unit exactly where it shows.
 	std::vector<Position> trajectory;
 	int hitType;
@@ -2197,7 +2197,7 @@ Position FirstPersonMode::throwPoint(const Position &targetTile, const Position 
  * The curve the game's own aim finds for a throw or an arcing shot at a tile, as the game works
  * it out (Projectile::calculateThrow) but without the accuracy roll: the points on the tile it
  * tries, in its order (an arcing shot aimed at an exact point, see launchShot, that point first;
- * then a unit's middle, low and high, with "Full sprite hitboxes" a big unit's across the map, see
+ * then a unit's middle, low and high, with "Realistic hitboxes" a big unit's across the map, see
  * FirstPerson::arcAimAtPicture; an object, a wall, each at a few heights; the floor; a
  * throw always the floor), from the game's origin voxel (the hand), the first one it finds a
  * curve for that lands on the tile (TileEngine::validateThrow), and that curve followed to where
@@ -3944,7 +3944,7 @@ bool FirstPersonMode::chainRippleHolds(BattlescapeState *state)
 }
 
 /**
- * Are units hit by their pictures in this battle (setting "Full sprite hitboxes", see
+ * Are units hit by their pictures in this battle (setting "Realistic hitboxes", see
  * FirstPerson::spriteHitboxes): the setting on, in a battle with the mod's 3D view (in 3D or on
  * the map alike: the battle's rule)?
  * @param state The battlescape screen.
@@ -3967,7 +3967,7 @@ VoxelUnits *FirstPersonMode::voxelUnits(BattlescapeState *state)
 }
 
 /**
- * The 3D view while it shows the battle (setting "Full sprite hitboxes": the units stand as it draws
+ * The 3D view while it shows the battle (setting "Realistic hitboxes": the units stand as it draws
  * them, and the looked-through soldier's own lines meet the very cards it draws; see
  * FirstPersonSpriteHits.cpp).
  * @param state The battlescape screen.
@@ -4167,7 +4167,7 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 	// the view they point through (the focal length in pixels comes from the field of view).
 	const double angleX = gaussian() * sigmaRadians, angleY = gaussian() * sigmaRadians;
 	// (VR with a right hand: off the weapon's barrel, from its muzzle, see vrRifleRay; the sky far along that line. A
-	// unit's picture or body met there, setting "Full sprite hitboxes": through the very point of it from the muzzle,
+	// unit's picture or body met there, setting "Realistic hitboxes": through the very point of it from the muzzle,
 	// where the round leaves (see freeAimFrom), far beyond, as below.)
 	if (vrRifleAims())
 	{
@@ -4205,7 +4205,7 @@ void FirstPersonMode::freeAimTarget(const BattleAction &action, Position &target
 
 	// The round goes for whatever the game's line of fire meets through that pixel; with
 	// nothing there (the sky), for a point far along the ray. A unit's picture met there (setting
-	// "Full sprite hitboxes"): through the very point of it, from where the round leaves (the
+	// "Realistic hitboxes"): through the very point of it, from where the round leaves (the
 	// round's own line crosses the picture there, see FirstPerson::spriteHitAt), far beyond.
 	Position hitVoxel;
 	int hitType = V_EMPTY;

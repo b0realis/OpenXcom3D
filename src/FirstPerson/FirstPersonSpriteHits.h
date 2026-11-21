@@ -44,7 +44,7 @@
  */
 
 /*
- * FirstPersonSpriteHits.h: setting "Full sprite hitboxes", the pictures the lines of fire test
+ * FirstPersonSpriteHits.h: setting "Realistic hitboxes", the pictures the lines of fire test
  * (see FirstPersonSpriteHits.cpp): shared with the 3D view, which outlines what they test
  * (setting "Hitboxes"), and with the aim under the crosshair.
  */
@@ -64,7 +64,7 @@ namespace FirstPerson
 {
 
 /**
- * A unit's picture as a line of fire tests it (setting "Full sprite hitboxes"): a flat card in
+ * A unit's picture as a line of fire tests it (setting "Realistic hitboxes"): a flat card in
  * the world with the unit's sprite on it, its frame the one seen from where the line comes from.
  * The card stands where the 3D view draws the picture: the middle of the unit's tiles, its feet
  * on the floor's top, at the setting "Unit size". For the lines of the soldier looked through in
@@ -105,7 +105,7 @@ bool viewCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonVi
  * map), where no side is turned towards it, from the south-east, as the map shows the unit (a
  * player, GitHub issue #112: shooting straight down at a unit, the shot's shake tipped the eye
  * from side to side over it and the unit spun round and twitched). The view draws it so and the
- * lines of fire test that very picture (setting "Full sprite hitboxes"), both from the view's
+ * lines of fire test that very picture (setting "Realistic hitboxes"), both from the view's
  * steady eye (FirstPersonView::getSteadyEye).
  * @param eye The eye, in voxels.
  * @param feet The unit's feet (its picture's anchor), in voxels.

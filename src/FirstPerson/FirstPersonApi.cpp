@@ -464,10 +464,15 @@ namespace
 /// settlePresets).
 constexpr int PresetTables = 1;
 
+/// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
+constexpr int Kept = -9999;
+
 /**
  * One of the settings a preset sets: its option (a switch or a number) and its value under
- * each of the group's presets, in their order; and, where the tables' last change (see
- * PresetTables) changed them, its values before.
+ * each of the group's presets, in their order (Kept: that preset leaves it as it is); where the
+ * tables' last change (see PresetTables) changed them, its values before (Kept: it wasn't
+ * listed); and whether it is only set when a preset is chosen, and is no part of what makes
+ * the preset (a setting another group owns: see gameplaySwitches, the pixel size).
  */
 struct PresetSwitch
 {
@@ -476,6 +481,7 @@ struct PresetSwitch
 	int *number;
 	std::vector<int> values;
 	std::vector<int> before = {};
+	bool onChoice = false;
 };
 
 /**
@@ -508,7 +514,7 @@ struct Presets
  *    chains);
  *  - FPS: a shooter's rules on top (free turning, free walking, FPS-style shooting, quick
  *    deaths).
- * Aiming at the exact point is on in every one but FAITHFUL; full sprite hitboxes (a shot hits
+ * Aiming at the exact point is on in every one but FAITHFUL; realistic hitboxes (a shot hits
  * what is drawn there) from XMbl on.
  * A setting no preset changes isn't listed: it is the player's alone (every shot's line is
  * shown in all of them, FAITHFUL too, and so are all the parts without shape; the helmet
@@ -520,6 +526,12 @@ struct Presets
  * obstacles and takes fall damage; guns come first at auto-equip and every room's walls are
  * painted in all six. Those two are listed although no preset differs in them: choosing a
  * preset sets them, and they are part of what makes a named preset (see settlePresets).
+ * And, of the same list, the owner's "Yes make both": from XMbl on the light is smooth
+ * between tiles (the first three leave "Smooth lighting" as the player has it), and XMbl,
+ * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
+ * detail"'s (see graphicsSwitches: 2 at Low on the CPU): it is set on the choice only and is
+ * no part of what makes XMbl, so a player on Low, or with a size of their own, is on XMbl
+ * all the same.
  * @return The settings.
  */
 const std::vector<PresetSwitch> &gameplaySwitches()
@@ -564,6 +576,8 @@ const std::vector<PresetSwitch> &gameplaySwitches()
 		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
 		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
 		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
+		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
+		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
 		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
 		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
 		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },
@@ -675,6 +689,7 @@ int presetOfSwitches(const Presets &presets)
 		bool all = true;
 		for (const PresetSwitch &presetSwitch : presets.switches())
 		{
+			if (presetSwitch.onChoice || presetSwitch.values[preset] == Kept) continue;
 			all = all && switchValue(presetSwitch) == presetSwitch.values[preset];
 		}
 		if (all) return preset;
@@ -696,7 +711,7 @@ int presetCount(PresetGroup group)
  * Chooses a preset (settings "Gameplay" and "Graphics detail"): a named one sets its settings;
  * Custom sets them back as the player had them (the group's kept mix). Leaving Custom keeps
  * the mix first, so trying a preset and coming back loses nothing. Nothing but the group's
- * settings is touched.
+ * settings is touched (one of them may be the other group's too: that group's name follows).
  * @param group Which presets.
  * @param preset One of them (0 ..), or their number for Custom.
  */
@@ -712,16 +727,27 @@ void choosePreset(PresetGroup group, int preset)
 	{
 		if (*presets.chosen < presets.count)
 		{
-			setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
+			if (presetSwitch.values[*presets.chosen] != Kept) setSwitch(presetSwitch, presetSwitch.values[*presets.chosen]);
 			continue;
 		}
-		// Custom: the kept value, where there is one ("id=value;").
+		// Custom: the kept value, where there is one ("id=value;"); not of a setting only set on a choice (another
+		// group's own).
+		if (presetSwitch.onChoice) continue;
 		const std::string key = std::string(presetSwitch.id) + "=";
 		const size_t at = presets.mix->find(key);
 		if (at != std::string::npos && (at == 0 || (*presets.mix)[at - 1] == ';'))
 		{
 			setSwitch(presetSwitch, std::atoi(presets.mix->c_str() + at + key.size()));
 		}
+	}
+	// A setting set here that the other group lists too (the pixel size, XMbl's on its choice and "Graphics
+	// detail"'s own): that group says the preset its settings make now, or Custom, keeping them as its mix.
+	const Presets &others = presetsOf(group == PRESET_GAMEPLAY ? PRESET_GRAPHICS : PRESET_GAMEPLAY);
+	const int made = presetOfSwitches(others);
+	if (made != *others.chosen)
+	{
+		*others.chosen = made;
+		if (made == others.count) *others.mix = currentMix(others);
 	}
 }
 
@@ -854,14 +880,19 @@ void settlePresets()
 			bool all = true, changes = false;
 			for (const PresetSwitch &presetSwitch : gameplay.switches())
 			{
-				const int was = presetSwitch.before.empty() ? presetSwitch.values[preset] : presetSwitch.before[preset];
-				all = all && switchValue(presetSwitch) == was;
-				changes = changes || was != presetSwitch.values[preset];
+				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
+				if (presetSwitch.onChoice) continue;
+				const int now = presetSwitch.values[preset], was = presetSwitch.before.empty() ? now : presetSwitch.before[preset];
+				if (was != Kept) all = all && switchValue(presetSwitch) == was;
+				changes = changes || (now != Kept && now != was);
 			}
 			if (!all) continue;
 			if (changes)
 			{
-				for (const PresetSwitch &presetSwitch : gameplay.switches()) setSwitch(presetSwitch, presetSwitch.values[preset]);
+				for (const PresetSwitch &presetSwitch : gameplay.switches())
+				{
+					if (!presetSwitch.onChoice && presetSwitch.values[preset] != Kept) setSwitch(presetSwitch, presetSwitch.values[preset]);
+				}
 				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
 			}
 			break;
