@@ -1532,10 +1532,10 @@ index 000000000..f7f5de937
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..6cc25fd66
+index 000000000..6f4d35dcd
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,260 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1702,6 +1702,9 @@ index 000000000..6cc25fd66
 +  #   bow: true      held as a bow: upright, its curve towards the crosshair, the arrow leaving
 +  #                  from the curve's middle (worked out for a ranged weapon with BOW in its type
 +  #                  that isn't a crossbow: CROSSBOW, XBOW); bow: false holds it as a gun
++  #   underside: right   which side of its picture, as drawn, is the weapon's underside in the hand view (left,
++  #                  right, top or bottom); worked out as the side that stands out further from the picture's
++  #                  middle line (a grip, a magazine), which fails where a sight stands out as far
 +  # A later entry (or a later mod's) overrides what it sets.
 +  items:
 +    # XPiratez: wide blades (too broad in their pictures to be worked out as blades)
@@ -1714,6 +1717,9 @@ index 000000000..6cc25fd66
 +    # and the crossbows
 +    - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
 +      shot: object
++    # The X-Com Files: the P90 (its sight stands out a pixel further than its grip)
++    - types: [STR_FN_P90]
++      underside: right
 +  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). What the voxel bodies do
 +  # for one kind of unit, they do for the units named here and for no others: a unit the table doesn't name is made by
 +  # the general rules, as ever. Each entry lists words to look for in a unit's names (its type, its armor's, the
@@ -57495,10 +57501,10 @@ index 000000000..28b79eea5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..3bcdae0dc
+index 000000000..9e900e074
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1317 @@
+@@ -0,0 +1,1326 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -57875,6 +57881,15 @@ index 000000000..3bcdae0dc
 +	if (shape.bow)
 +	{
 +		shape.upSign = shape.across[1] > 0 ? -1 : 1;
++	}
++	// The mod's item table can say which side of its picture is a weapon's underside (`underside:` in an entry of
++	// `items:`), where the measure above takes the wrong one: a gun whose sight stands out as far as its grip (The
++	// X-Com Files' P90, by a pixel: "upside down in first person", a player, GitHub issue #220).
++	if (const RuleFirstPerson::ItemLook *look = _heldRules ? _game->getMod()->getFirstPerson().getItemLook(_heldRules->getType()) : nullptr)
++	{
++		static const double Sides[5][2] = { { 0.0, 0.0 }, { -1.0, 0.0 }, { 1.0, 0.0 }, { 0.0, -1.0 }, { 0.0, 1.0 } };
++		const double towards = shape.across[0] * Sides[look->underside][0] + shape.across[1] * Sides[look->underside][1];
++		if (look->underside && std::abs(towards) > 1e-6) shape.upSign = towards > 0 ? -1 : 1;
 +	}
 +
 +	// The bore: the middle (across) of the last two pixels' worth at the muzzle end. That's the
@@ -103121,10 +103136,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..33613fd18
+index 000000000..96637a4aa
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,504 @@
+@@ -0,0 +1,507 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -103231,6 +103246,7 @@ index 000000000..33613fd18
 +		HeldShape held = HELD_AUTO; // how its picture is given volume
 +		ShotKind shot = SHOT_AUTO;  // what its shots are (a weapon's, or an ammo's)
 +		HeldAsBow bow = BOW_AUTO;   // held as a bow
++		int underside = 0;          // the side of its picture that is its underside in the hand: 1 left, 2 right, 3 top, 4 bottom (0: measured)
 +	};
 +private:
 +public:
@@ -103427,18 +103443,20 @@ index 000000000..33613fd18
 +			for (const auto& entry : items.children())
 +			{
 +				std::vector<std::string> types;
-+				std::string held, shot;
++				std::string held, shot, underside;
 +				bool bow = false;
 +				const bool bowSaid = entry.tryRead("bow", bow);
 +				entry.tryRead("types", types);
 +				entry.tryRead("held", held);
 +				entry.tryRead("shot", shot);
++				entry.tryRead("underside", underside);
 +				for (const std::string &type : types)
 +				{
 +					ItemLook &look = _itemLooks[type];
 +					if (!held.empty()) look.held = held == "plate" ? HELD_PLATE : held == "cushion" ? HELD_CUSHION : HELD_AUTO;
 +					if (!shot.empty()) look.shot = shot == "object" ? SHOT_OBJECT : shot == "powder" ? SHOT_POWDER : SHOT_AUTO;
 +					if (bowSaid) look.bow = bow ? BOW_YES : BOW_NO;
++					if (!underside.empty()) look.underside = underside == "left" ? 1 : underside == "right" ? 2 : underside == "top" ? 3 : underside == "bottom" ? 4 : 0;
 +				}
 +			}
 +		}

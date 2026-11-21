@@ -375,6 +375,15 @@ void FirstPersonMode::analyzeWeapon(bool gun, bool melee, bool bow)
 	{
 		shape.upSign = shape.across[1] > 0 ? -1 : 1;
 	}
+	// The mod's item table can say which side of its picture is a weapon's underside (`underside:` in an entry of
+	// `items:`), where the measure above takes the wrong one: a gun whose sight stands out as far as its grip (The
+	// X-Com Files' P90, by a pixel: "upside down in first person", a player, GitHub issue #220).
+	if (const RuleFirstPerson::ItemLook *look = _heldRules ? _game->getMod()->getFirstPerson().getItemLook(_heldRules->getType()) : nullptr)
+	{
+		static const double Sides[5][2] = { { 0.0, 0.0 }, { -1.0, 0.0 }, { 1.0, 0.0 }, { 0.0, -1.0 }, { 0.0, 1.0 } };
+		const double towards = shape.across[0] * Sides[look->underside][0] + shape.across[1] * Sides[look->underside][1];
+		if (look->underside && std::abs(towards) > 1e-6) shape.upSign = towards > 0 ? -1 : 1;
+	}
 
 	// The bore: the middle (across) of the last two pixels' worth at the muzzle end. That's the
 	// point put on the ray to the crosshair (the shot leaves from there), not the middle of

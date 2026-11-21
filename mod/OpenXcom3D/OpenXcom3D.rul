@@ -164,6 +164,9 @@ firstPerson:
   #   bow: true      held as a bow: upright, its curve towards the crosshair, the arrow leaving
   #                  from the curve's middle (worked out for a ranged weapon with BOW in its type
   #                  that isn't a crossbow: CROSSBOW, XBOW); bow: false holds it as a gun
+  #   underside: right   which side of its picture, as drawn, is the weapon's underside in the hand view (left,
+  #                  right, top or bottom); worked out as the side that stands out further from the picture's
+  #                  middle line (a grip, a magazine), which fails where a sight stands out as far
   # A later entry (or a later mod's) overrides what it sets.
   items:
     # XPiratez: wide blades (too broad in their pictures to be worked out as blades)
@@ -176,6 +179,9 @@ firstPerson:
     # and the crossbows
     - types: [STR_HARPOON, STR_HARPOON_AUTO, STR_HARPOON_CARBINE, STR_DART_PISTOL, STR_AIR_MUSKET, STR_XBOW, STR_XBOW_CORAL, STR_EXECUTIONER_XBOW, STR_BALLISTA]
       shot: object
+    # The X-Com Files: the P90 (its sight stands out a pixel further than its grip)
+    - types: [STR_FN_P90]
+      underside: right
   # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). What the voxel bodies do
   # for one kind of unit, they do for the units named here and for no others: a unit the table doesn't name is made by
   # the general rules, as ever. Each entry lists words to look for in a unit's names (its type, its armor's, the

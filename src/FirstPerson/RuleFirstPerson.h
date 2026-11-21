@@ -104,6 +104,7 @@ public:
 		HeldShape held = HELD_AUTO; // how its picture is given volume
 		ShotKind shot = SHOT_AUTO;  // what its shots are (a weapon's, or an ammo's)
 		HeldAsBow bow = BOW_AUTO;   // held as a bow
+		int underside = 0;          // the side of its picture that is its underside in the hand: 1 left, 2 right, 3 top, 4 bottom (0: measured)
 	};
 private:
 public:
@@ -300,18 +301,20 @@ public:
 			for (const auto& entry : items.children())
 			{
 				std::vector<std::string> types;
-				std::string held, shot;
+				std::string held, shot, underside;
 				bool bow = false;
 				const bool bowSaid = entry.tryRead("bow", bow);
 				entry.tryRead("types", types);
 				entry.tryRead("held", held);
 				entry.tryRead("shot", shot);
+				entry.tryRead("underside", underside);
 				for (const std::string &type : types)
 				{
 					ItemLook &look = _itemLooks[type];
 					if (!held.empty()) look.held = held == "plate" ? HELD_PLATE : held == "cushion" ? HELD_CUSHION : HELD_AUTO;
 					if (!shot.empty()) look.shot = shot == "object" ? SHOT_OBJECT : shot == "powder" ? SHOT_POWDER : SHOT_AUTO;
 					if (bowSaid) look.bow = bow ? BOW_YES : BOW_NO;
+					if (!underside.empty()) look.underside = underside == "left" ? 1 : underside == "right" ? 2 : underside == "top" ? 3 : underside == "bottom" ? 4 : 0;
 				}
 			}
 		}
