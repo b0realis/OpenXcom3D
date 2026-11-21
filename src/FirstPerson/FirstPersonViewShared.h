@@ -641,6 +641,25 @@ inline Uint32 hash2(int x, int y)
 	return mixed ^ (mixed >> 16);
 }
 
+/// How many star cells go to a radian of the sky, up and down (see starCell).
+const float StarCellsARadian = 160.0f;
+
+/**
+ * The star cell a direction of the sky lies in, hashed (a share of the cells are stars: see
+ * skyColor, airlessSkyColor). The sky is in rings, StarCellsARadian to the radian of elevation,
+ * and each ring in as many cells as go round it at its height: a cell is as near square overhead
+ * as at the horizon. (With as many cells to the radian of azimuth at every height, they narrowed
+ * to slivers towards the zenith, all pointing at it: a player looking straight up at the stars
+ * saw "warp speed".)
+ */
+inline Uint32 starCell(const float rayDirection[3])
+{
+	const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
+	const float ring = std::floor(elevationAngle * StarCellsARadian);
+	const float round = std::max(1.0f, std::floor(2.0f * (float)Pi * StarCellsARadian * std::cos((ring + 0.5f) / StarCellsARadian) + 0.5f));
+	return hash2((int)std::floor((azimuth + (float)Pi) / (2.0f * (float)Pi) * round), (int)ring);
+}
+
 /**
  * Smooth value noise in [0, 1): a random value at every whole point of the plane, blended
  * smoothly in between.

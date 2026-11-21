@@ -473,6 +473,7 @@ std::string shaderConstants()
 	auto number = [&](const char *name, double value) { text += std::string("const float ") + name + " = " + glslFloat(value) + ";\n"; };
 	auto whole = [&](const char *name, int value) { text += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
 	number("ZScale", ZScale);
+	number("StarCellsARadian", StarCellsARadian);
 	number("SeeThroughCropOpacity", SeeThroughCropOpacity);
 	number("DistanceShadeVoxels", DistanceShadeVoxels);
 	number("DistanceShadeReachParts", DistanceShadeReachParts);

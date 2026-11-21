@@ -27884,10 +27884,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..e34e1ea49
+index 000000000..f943f9c88
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3837 @@
+@@ -0,0 +1,3838 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28363,6 +28363,7 @@ index 000000000..e34e1ea49
 +	auto number = [&](const char *name, double value) { text += std::string("const float ") + name + " = " + glslFloat(value) + ";\n"; };
 +	auto whole = [&](const char *name, int value) { text += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
 +	number("ZScale", ZScale);
++	number("StarCellsARadian", StarCellsARadian);
 +	number("SeeThroughCropOpacity", SeeThroughCropOpacity);
 +	number("DistanceShadeVoxels", DistanceShadeVoxels);
 +	number("DistanceShadeReachParts", DistanceShadeReachParts);
@@ -32270,10 +32271,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..5c66c6092
+index 000000000..e3452d81d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3184 @@
+@@ -0,0 +1,3191 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32821,6 +32822,15 @@ index 000000000..5c66c6092
 +	return mixed ^ (mixed >> 16);
 +}
 +
++// (the star cell a direction of the sky lies in, hashed: FirstPersonViewShared.h's starCell)
++uint starCell(vec3 rayDirection)
++{
++	float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(clamp(rayDirection.z, -1.0, 1.0));
++	float ring = floor(elevationAngle * StarCellsARadian);
++	float around = max(1.0, floor(6.28318530718 * StarCellsARadian * cos((ring + 0.5) / StarCellsARadian) + 0.5));
++	return hash2(int(floor((azimuth + 3.14159265359) / 6.28318530718 * around)), int(ring));
++}
++
 +float cornerValue(int gridX, int gridY) { return float(hash2(gridX, gridY) & 0xFFFFu) / 65536.0; }
 +
 +float valueNoise(float x, float y)
@@ -33206,8 +33216,7 @@ index 000000000..5c66c6092
 +	}
 +	if (uSky != SkyMoon || rayDirection.z > 0.0)
 +	{
-+		float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(clamp(rayDirection.z, -1.0, 1.0));
-+		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0))) % 1000u;
++		uint cellHash = starCell(rayDirection) % 1000u;
 +		if (cellHash < 6u)
 +		{
 +			return scene(SceneStar);
@@ -33293,8 +33302,7 @@ index 000000000..5c66c6092
 +	}
 +	if (uNight > 0.5 && elevation > 0.03)
 +	{
-+		float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(min(rayDirection.z, 1.0));
-+		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0)));
++		uint cellHash = starCell(rayDirection);
 +		if ((cellHash % 1000u) < 6u)
 +		{
 +			fullColorSet = false;
@@ -68760,10 +68768,10 @@ index 000000000..9f7426011
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..c68214215
+index 000000000..08c3214ab
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2030 @@
+@@ -0,0 +1,2026 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -70336,13 +70344,11 @@ index 000000000..c68214215
 +		}
 +	}
 +
-+	// Stars at night: the sky divided into small cells by azimuth and elevation angle, and a
-+	// hash of each cell lights up 6 in 1000 of them.
++	// Stars at night: the sky divided into small cells (see starCell), and a hash of each cell
++	// lights up 6 in 1000 of them.
 +	if (_colors.night > 0.5f && elevation > 0.03f)
 +	{
-+		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
-+			elevationAngle = std::asin(std::min(rayDirection[2], 1.0f));
-+		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f));
++		const Uint32 cellHash = starCell(rayDirection);
 +		if ((cellHash % 1000) < 6)
 +		{
 +			return _colors.star;
@@ -70420,14 +70426,12 @@ index 000000000..c68214215
 +			return cloudNoise(across[0] * 3.0f + 7.0f, across[1] * 3.0f + across[2] * 3.0f) > 0.55f ? _colors.earth[2] : _colors.earth[0];
 +		}
 +	}
-+	// The stars: the sky divided into small cells by azimuth and elevation angle, and a hash of
-+	// each cell lights up 6 in 1000 of them, and 12 more faintly (over the Moon only above its
-+	// horizon: its ground hides the rest).
++	// The stars: the sky divided into small cells (see starCell), and a hash of each cell lights
++	// up 6 in 1000 of them, and 12 more faintly (over the Moon only above its horizon: its ground
++	// hides the rest).
 +	if (_sky != SkyMoon || rayDirection[2] > 0.0f)
 +	{
-+		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
-+			elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
-+		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f)) % 1000;
++		const Uint32 cellHash = starCell(rayDirection) % 1000;
 +		if (cellHash < 6)
 +		{
 +			return _colors.star;
@@ -72112,10 +72116,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..6660f1e0f
+index 000000000..bb650da79
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,708 @@
+@@ -0,0 +1,727 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72757,6 +72761,25 @@ index 000000000..6660f1e0f
 +	Uint32 mixed = (Uint32)x * 374761393u + (Uint32)y * 668265263u;
 +	mixed = (mixed ^ (mixed >> 13)) * 1274126177u;
 +	return mixed ^ (mixed >> 16);
++}
++
++/// How many star cells go to a radian of the sky, up and down (see starCell).
++const float StarCellsARadian = 160.0f;
++
++/**
++ * The star cell a direction of the sky lies in, hashed (a share of the cells are stars: see
++ * skyColor, airlessSkyColor). The sky is in rings, StarCellsARadian to the radian of elevation,
++ * and each ring in as many cells as go round it at its height: a cell is as near square overhead
++ * as at the horizon. (With as many cells to the radian of azimuth at every height, they narrowed
++ * to slivers towards the zenith, all pointing at it: a player looking straight up at the stars
++ * saw "warp speed".)
++ */
++inline Uint32 starCell(const float rayDirection[3])
++{
++	const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
++	const float ring = std::floor(elevationAngle * StarCellsARadian);
++	const float round = std::max(1.0f, std::floor(2.0f * (float)Pi * StarCellsARadian * std::cos((ring + 0.5f) / StarCellsARadian) + 0.5f));
++	return hash2((int)std::floor((azimuth + (float)Pi) / (2.0f * (float)Pi) * round), (int)ring);
 +}
 +
 +/**
@@ -75171,7 +75194,7 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..b0153a872
+index 000000000..7e553c542
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,4336 @@
@@ -76706,7 +76729,7 @@ index 000000000..b0153a872
 +	int framesUsed = 0;
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
-+		if (WatchedAlone >= 0 && unit->getId() != WatchedAlone) continue; // (the developer's camera on one unit: see arenaStep)
++		if (WatchedAlone != -1 && unit->getId() != WatchedAlone) continue; // (the developer's camera on one unit: see arenaStep)
 +		// Only units still in the fight (not dead or unconscious), not the one looked through,
 +		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
 +		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
@@ -80504,10 +80527,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..da23c6c2d
+index 000000000..8d316a903
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,5749 @@
+@@ -0,0 +1,5754 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -85952,19 +85975,22 @@ index 000000000..da23c6c2d
 + * map for a player to walk among, and written as a save (see arenaSave).
 + * Called as a frame begins, before the camera's axes are made.
 + */
-+int WatchedAlone = -1; // (the developer's camera, below: the id of the only unit drawn, -1 for all of them as ever)
++int WatchedAlone = -1; // (the developer's camera, below: the id of the only unit drawn; -1 for all of them as ever, -2 for none)
 +
 +void FirstPersonView::arenaStep()
 +{
 +	// (A developer's camera on a unit: while OPENXCOM3D_WATCH_UNIT names a file holding "id degrees tiles", the view
 +	// looks at that unit from so many tiles away, so many degrees round from its front: for a look at a voxel body in
 +	// the game itself, from any side. The file is read again every half second. The battle's debug mode goes on. A
-+	// fourth number, 1, leaves the other units undrawn: a unit standing in a crowd is seen whole, see WatchedAlone.)
++	// fourth number, 1, leaves the other units undrawn: a unit standing in a crowd is seen whole, see WatchedAlone;
++	// 2 leaves every unit undrawn: the same picture without it, to tell its pixels by. A fifth number is the view's
++	// pitch in degrees instead of a look at the unit: 90 straight up, for the sky.)
 +	static const char *const watch = getenv("OPENXCOM3D_WATCH_UNIT");
 +	if (watch && _save && !_sharedModelsOwner && getWidth() >= 320)
 +	{
 +		static int id = -1, alone = 0;
-+		static float degrees = 0.0f, tiles = 3.0f;
++		static float degrees = 0.0f, tiles = 3.0f, pitchDegrees = 0.0f;
++		static bool pitched = false;
 +		static Uint32 read = 0;
 +		if (!_save->getDebugMode()) _save->setDebugMode(); // (every unit shown, seen by the player or not)
 +		if (SDL_GetTicks() - read > 500 || !read)
@@ -85973,9 +85999,11 @@ index 000000000..da23c6c2d
 +			if (FILE *asked = fopen(watch, "r"))
 +			{
 +				alone = 0;
-+				if (fscanf(asked, "%d %f %f %d", &id, &degrees, &tiles, &alone) < 3) id = -1;
++				const int read = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
++				if (read < 3) id = -1;
++				pitched = read >= 5;
 +				fclose(asked);
-+				WatchedAlone = alone ? id : -1;
++				WatchedAlone = alone == 2 ? -2 : alone ? id : -1;
 +			}
 +		}
 +		for (BattleUnit *unit : *_save->getUnits())
@@ -85989,7 +86017,7 @@ index 000000000..da23c6c2d
 +			const double from = (unit->getDirection() * 45.0 - 90.0 + degrees) * Pi / 180.0, away = tiles * 16.0;
 +			setEye(feet[0] + std::cos(from) * away, feet[1] + std::sin(from) * away, feet[2] + 14.0 + 4.0 * size);
 +			_yaw = from + Pi;
-+			_pitch = -std::atan2(6.0, away);
++			_pitch = pitched ? pitchDegrees * Pi / 180.0 : -std::atan2(6.0, away);
 +			break;
 +		}
 +	}
@@ -88177,10 +88205,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..8d7a3402b
+index 000000000..13f1e3fa9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,4149 @@
+@@ -0,0 +1,4211 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88933,18 +88961,19 @@ index 000000000..8d7a3402b
 +struct LongReading
 +{
 +	float slant = 0.0f, middle[2] = { (float)FloorX, (float)FloorX };
++	float length = 1.0f; // (how long the body is, of its side drawing's length: see longShape)
 +	bool drawn[2] = { false, false };
 +	/// The row of an end's drawing (0 the front's, 1 the back's) a height at a place along the body is drawn on.
 +	int row(int end, float ahead, float up) const { return (int)std::floor(FloorY - up + (end ? -ahead : ahead) * slant); }
 +};
 +
-+LongReading readLong(const PartFrames &part)
++LongReading readLong(const PartFrames &part, bool legged)
 +{
 +	LongReading reading;
 +	int left, right, top, bottom;
 +	if (!drawnBox(part, RightSide, left, right, top, bottom)) return reading;
 +	int rows = 0, count = 0;
-+	for (int end = 0; end < 2; ++end)
++	for (int end = 0; legged && end < 2; ++end)
 +	{
 +		int l, r, t, b;
 +		if (!drawnBox(part, end ? (Front + 4) % 8 : Front, l, r, t, b)) continue;
@@ -88957,7 +88986,7 @@ index 000000000..8d7a3402b
 +	return reading;
 +}
 +
-+std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
++std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, const LongReading &reading)
 +{
 +	std::vector<Uint8> cells(GridCells, 0);
 +	legsTop = 0.0f;
@@ -89003,7 +89032,6 @@ index 000000000..8d7a3402b
 +	if (drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) widest = (frontRight - frontLeft + 1) * 0.5f / PixelsAcross;
 +	// (An animal's breadth, where it is thick, is its frontal drawings': see below. Each row of the two: its first and
 +	// last columns, and how many stretches it is drawn in.)
-+	const LongReading reading = legged ? readLong(part) : LongReading();
 +	std::vector<int> rowFirst[2], rowLast[2], rowRuns[2];
 +	for (int end = 0; end < 2; ++end)
 +	{
@@ -89133,7 +89161,9 @@ index 000000000..8d7a3402b
 +	const std::vector<std::pair<float, float>> frontBars = legBars(frontLegs, true), hindBars = legBars(hindLegs, false);
 +	for (int along = 0; along < GridAlong; ++along)
 +	{
-+		const int sideRight = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross);
++		// (the body's place along its side drawing: see LongReading's length)
++		const float drawnAhead = cellAhead(along) / reading.length;
++		const int sideRight = (int)std::floor(FloorX + drawnAhead * PixelsAcross);
 +		for (int up = 0; up < GridUp; ++up)
 +		{
 +			// (nothing under the floor; what the side drawing has below the floor's row lies on it)
@@ -89159,11 +89189,11 @@ index 000000000..8d7a3402b
 +			while (runFirst > 0 && part.at(RightSide, runFirst - 1, row)) --runFirst;
 +			while (runLast < FrameSize - 1 && part.at(RightSide, runLast + 1, row)) ++runLast;
 +			const float tall = (runBottom - runTop + 1) * 0.5f, lengthways = (runLast - runFirst + 1) * 0.5f;
-+			const bool lying = tall <= lengthways / PixelsAcross;
++			const bool lying = tall <= lengthways / PixelsAcross * reading.length;
 +			const float off = lying ? (row + 0.5f - (runTop + runBottom + 1) * 0.5f) / tall : (sideRight + 0.5f - (runFirst + runLast + 1) * 0.5f) / lengthways;
 +			// (A round bar lying is drawn thicker than it is: the drawings look down on it, and its near side's lower
 +			// edge stands below its middle's. Drawn 1.22 times its thickness: so much less across.)
-+			float breadth = lying ? tall * ProfileLyingRound : lengthways / PixelsAcross;
++			float breadth = lying ? tall * ProfileLyingRound : lengthways / PixelsAcross * reading.length;
 +			// (An animal's thick parts, its trunk and its head, are as broad as its frontal drawings have them at their
 +			// height: the front's for its front half, the back's for its hind half. A part lying, the trunk, as its
 +			// broadest row there; a part standing, a head on a neck, row by row. So a dog's head is narrower than its
@@ -89171,7 +89201,7 @@ index 000000000..8d7a3402b
 +			// its front half the front drawing has in two stretches or more, its ears, its horns, stands where they
 +			// are: on either side, the same on both.)
 +			const int end = cellAhead(along) >= 0.0f ? 0 : 1;
-+			const int endRow = reading.row(end, cellAhead(along), cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
++			const int endRow = reading.row(end, drawnAhead, cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
 +			bool pair = false;
 +			if (reading.drawn[end] && !leg)
 +			{
@@ -89224,6 +89254,66 @@ index 000000000..8d7a3402b
 +		}
 +	}
 +	return cells;
++}
++
++/// A long body's shape at the length its drawings have it (the owner: "The dog and cobra should not be too large! Take
++/// care on the size and keep original sprite sizes approximately"). Its side drawing alone makes it as long as that
++/// drawing is wide, and the drawings from the quarters, drawn by hand, have most animals shorter: The X-Com Files' dog
++/// is 28 pixels long from the side, 19.8 voxels, and 18 to 21 wide from the quarters, where a body that long would be
++/// 22. Seen in the game beside its own sprites, from the same places, it was 7% wider from the side and 13% from a
++/// quarter. So the six drawings that show its length each have a say: the body is made at its side drawing's length,
++/// its width on each of the six is measured as the drawing's is, and it is made again at the length (LongLeast of the
++/// side drawing's or more) that brings the six nearest their drawings' widths, each by its own share. The dog comes
++/// out 0.9 of its side drawing's length; a snake drawn as long from every side stays as it is.
++/// Reading's length is set to what was found.
++const float LongLeast = 0.75f, LongStep = 0.025f;
++std::vector<Uint8> longShape(const PartFrames &part, float &legsTop, bool legged, LongReading &reading)
++{
++	reading.length = 1.0f;
++	std::vector<Uint8> shape = profile(part, legsTop, legged, reading);
++	// where the body stands: its cells seen from above
++	std::vector<std::pair<float, float>> stood;
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up)
++			{
++				if (!shape[cellIndex(across, along, up)]) continue;
++				stood.push_back({ cellRight(across), cellAhead(along) });
++				break;
++			}
++	static const int Lengthways[6] = { RightSide, LeftSide, 0, 2, 4, 6 };
++	float drawn[6];
++	for (int i = 0; i < 6; ++i)
++	{
++		int left, right, top, bottom;
++		drawn[i] = drawnBox(part, Lengthways[i], left, right, top, bottom) ? (float)(right - left + 1) : 0.0f;
++	}
++	float best = 1.0f, least = 1e30f;
++	for (float length = 1.0f; length > LongLeast - 0.001f && !stood.empty(); length -= LongStep)
++	{
++		float off = 0.0f;
++		for (int i = 0; i < 6; ++i)
++		{
++			if (drawn[i] <= 0.0f) continue;
++			float first = 1e9f, last = -1e9f;
++			for (const std::pair<float, float> &cell : stood)
++			{
++				float column, row, nearness;
++				project(cell.first, cell.second * length, 0.0f, Lengthways[i], false, column, row, nearness);
++				first = std::min(first, column);
++				last = std::max(last, column);
++			}
++			const float share = (last - first + 1.0f - drawn[i]) / drawn[i];
++			off += share * share;
++		}
++		if (off < least - 1e-6f) { least = off; best = length; }
++	}
++	if (best < 1.0f)
++	{
++		reading.length = best;
++		shape = profile(part, legsTop, legged, reading);
++	}
++	return shape;
 +}
 +
 +/// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.
@@ -91395,6 +91485,7 @@ index 000000000..8d7a3402b
 +	// and profile.)
 +	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
 +	const bool beast = routine.whole && !routine.big && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
++	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 +	float beastLegsTop = 0.0f;
 +	std::vector<int> onTop[8], solidOnTop[8];
 +	partsOnTop(parts, composite, onTop);
@@ -91428,7 +91519,7 @@ index 000000000..8d7a3402b
 +		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 +		// agree, and a strict hull of them lost its shell and horns)
 +		// (a long body, a beast on four legs: its side drawings' outline, see profile)
-+		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop, routine.beast) : limb(solid, RightSide);
++		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? longShape(solid, beastLegsTop, routine.beast, longReading) : limb(solid, RightSide);
 +		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
 +		// (a long body has its width from its own side drawing, see profile: the other drawings don't cut it)
 +		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : carve(solid, bigHull ? 0 : 1, shape, !routine.big && thinDrawing(solid) ? LimbCarveReach : 0);
@@ -92036,7 +92127,6 @@ index 000000000..8d7a3402b
 +		// human's, stays painted by its front and back.)
 +		const bool hull = turret || beast || tank || routine.whole;
 +		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
-+		const LongReading longReading = beast && routine.beast ? readLong(parts[0]) : LongReading();
 +		std::vector<int> foremost, rearmost;
 +		if (beast && routine.beast)
 +		{
@@ -92109,12 +92199,12 @@ index 000000000..8d7a3402b
 +				{
 +					// (the front drawing has the unit's right on its left, the back drawing on its right)
 +					const int column = (int)std::floor(longReading.middle[end] + (end ? 1.0f : -1.0f) * model->right[k] * PixelsAcross);
-+					colour = parts[0].at(end ? (Front + 4) % 8 : Front, column, longReading.row(end, model->ahead[k], model->up[k]));
++					colour = parts[0].at(end ? (Front + 4) % 8 : Front, column, longReading.row(end, model->ahead[k] / longReading.length, model->up[k]));
 +				}
 +			}
 +			if (beast && !colour)
 +			{
-+				const int column = (int)std::floor(FloorX + model->ahead[k] * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
++				const int column = (int)std::floor(FloorX + model->ahead[k] / longReading.length * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
 +				for (int lower = 0; lower <= ProfileBelow && !colour; ++lower) colour = parts[0].at(RightSide, column, row + lower);
 +				for (int reach = 1; reach <= 2 * VOXELSCALE && !colour; ++reach)
 +					for (int dy = -reach; dy <= reach && !colour; ++dy)

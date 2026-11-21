@@ -1570,13 +1570,11 @@ Uint8 FirstPersonView::skyColor(const float rayDirection[3], int pixelX, int pix
 		}
 	}
 
-	// Stars at night: the sky divided into small cells by azimuth and elevation angle, and a
-	// hash of each cell lights up 6 in 1000 of them.
+	// Stars at night: the sky divided into small cells (see starCell), and a hash of each cell
+	// lights up 6 in 1000 of them.
 	if (_colors.night > 0.5f && elevation > 0.03f)
 	{
-		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
-			elevationAngle = std::asin(std::min(rayDirection[2], 1.0f));
-		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f));
+		const Uint32 cellHash = starCell(rayDirection);
 		if ((cellHash % 1000) < 6)
 		{
 			return _colors.star;
@@ -1654,14 +1652,12 @@ Uint8 FirstPersonView::airlessSkyColor(const float rayDirection[3], int pixelX, 
 			return cloudNoise(across[0] * 3.0f + 7.0f, across[1] * 3.0f + across[2] * 3.0f) > 0.55f ? _colors.earth[2] : _colors.earth[0];
 		}
 	}
-	// The stars: the sky divided into small cells by azimuth and elevation angle, and a hash of
-	// each cell lights up 6 in 1000 of them, and 12 more faintly (over the Moon only above its
-	// horizon: its ground hides the rest).
+	// The stars: the sky divided into small cells (see starCell), and a hash of each cell lights
+	// up 6 in 1000 of them, and 12 more faintly (over the Moon only above its horizon: its ground
+	// hides the rest).
 	if (_sky != SkyMoon || rayDirection[2] > 0.0f)
 	{
-		const float azimuth = std::atan2(rayDirection[1], rayDirection[0]), // radians
-			elevationAngle = std::asin(std::clamp(rayDirection[2], -1.0f, 1.0f));
-		const Uint32 cellHash = hash2((int)std::floor(azimuth * 160.0f), (int)std::floor(elevationAngle * 160.0f)) % 1000;
+		const Uint32 cellHash = starCell(rayDirection) % 1000;
 		if (cellHash < 6)
 		{
 			return _colors.star;

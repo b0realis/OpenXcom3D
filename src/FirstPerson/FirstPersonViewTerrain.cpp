@@ -5442,19 +5442,22 @@ static const int ArenaEmptySpot = 7;
  * map for a player to walk among, and written as a save (see arenaSave).
  * Called as a frame begins, before the camera's axes are made.
  */
-int WatchedAlone = -1; // (the developer's camera, below: the id of the only unit drawn, -1 for all of them as ever)
+int WatchedAlone = -1; // (the developer's camera, below: the id of the only unit drawn; -1 for all of them as ever, -2 for none)
 
 void FirstPersonView::arenaStep()
 {
 	// (A developer's camera on a unit: while OPENXCOM3D_WATCH_UNIT names a file holding "id degrees tiles", the view
 	// looks at that unit from so many tiles away, so many degrees round from its front: for a look at a voxel body in
 	// the game itself, from any side. The file is read again every half second. The battle's debug mode goes on. A
-	// fourth number, 1, leaves the other units undrawn: a unit standing in a crowd is seen whole, see WatchedAlone.)
+	// fourth number, 1, leaves the other units undrawn: a unit standing in a crowd is seen whole, see WatchedAlone;
+	// 2 leaves every unit undrawn: the same picture without it, to tell its pixels by. A fifth number is the view's
+	// pitch in degrees instead of a look at the unit: 90 straight up, for the sky.)
 	static const char *const watch = getenv("OPENXCOM3D_WATCH_UNIT");
 	if (watch && _save && !_sharedModelsOwner && getWidth() >= 320)
 	{
 		static int id = -1, alone = 0;
-		static float degrees = 0.0f, tiles = 3.0f;
+		static float degrees = 0.0f, tiles = 3.0f, pitchDegrees = 0.0f;
+		static bool pitched = false;
 		static Uint32 read = 0;
 		if (!_save->getDebugMode()) _save->setDebugMode(); // (every unit shown, seen by the player or not)
 		if (SDL_GetTicks() - read > 500 || !read)
@@ -5463,9 +5466,11 @@ void FirstPersonView::arenaStep()
 			if (FILE *asked = fopen(watch, "r"))
 			{
 				alone = 0;
-				if (fscanf(asked, "%d %f %f %d", &id, &degrees, &tiles, &alone) < 3) id = -1;
+				const int read = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
+				if (read < 3) id = -1;
+				pitched = read >= 5;
 				fclose(asked);
-				WatchedAlone = alone ? id : -1;
+				WatchedAlone = alone == 2 ? -2 : alone ? id : -1;
 			}
 		}
 		for (BattleUnit *unit : *_save->getUnits())
@@ -5479,7 +5484,7 @@ void FirstPersonView::arenaStep()
 			const double from = (unit->getDirection() * 45.0 - 90.0 + degrees) * Pi / 180.0, away = tiles * 16.0;
 			setEye(feet[0] + std::cos(from) * away, feet[1] + std::sin(from) * away, feet[2] + 14.0 + 4.0 * size);
 			_yaw = from + Pi;
-			_pitch = -std::atan2(6.0, away);
+			_pitch = pitched ? pitchDegrees * Pi / 180.0 : -std::atan2(6.0, away);
 			break;
 		}
 	}

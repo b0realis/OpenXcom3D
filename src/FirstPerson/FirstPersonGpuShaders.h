@@ -545,6 +545,15 @@ uint hash2(int x, int y)
 	return mixed ^ (mixed >> 16);
 }
 
+// (the star cell a direction of the sky lies in, hashed: FirstPersonViewShared.h's starCell)
+uint starCell(vec3 rayDirection)
+{
+	float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(clamp(rayDirection.z, -1.0, 1.0));
+	float ring = floor(elevationAngle * StarCellsARadian);
+	float around = max(1.0, floor(6.28318530718 * StarCellsARadian * cos((ring + 0.5) / StarCellsARadian) + 0.5));
+	return hash2(int(floor((azimuth + 3.14159265359) / 6.28318530718 * around)), int(ring));
+}
+
 float cornerValue(int gridX, int gridY) { return float(hash2(gridX, gridY) & 0xFFFFu) / 65536.0; }
 
 float valueNoise(float x, float y)
@@ -930,8 +939,7 @@ uint airlessSkyColor(vec3 rayDirection, int pixelX, int pixelY)
 	}
 	if (uSky != SkyMoon || rayDirection.z > 0.0)
 	{
-		float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(clamp(rayDirection.z, -1.0, 1.0));
-		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0))) % 1000u;
+		uint cellHash = starCell(rayDirection) % 1000u;
 		if (cellHash < 6u)
 		{
 			return scene(SceneStar);
@@ -1017,8 +1025,7 @@ uint skyColor(vec3 rayDirection, int pixelX, int pixelY)
 	}
 	if (uNight > 0.5 && elevation > 0.03)
 	{
-		float azimuth = atan(rayDirection.y, rayDirection.x), elevationAngle = asin(min(rayDirection.z, 1.0));
-		uint cellHash = hash2(int(floor(azimuth * 160.0)), int(floor(elevationAngle * 160.0)));
+		uint cellHash = starCell(rayDirection);
 		if ((cellHash % 1000u) < 6u)
 		{
 			fullColorSet = false;

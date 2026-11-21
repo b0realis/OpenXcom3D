@@ -750,18 +750,19 @@ bool longBody(const PartFrames &part)
 struct LongReading
 {
 	float slant = 0.0f, middle[2] = { (float)FloorX, (float)FloorX };
+	float length = 1.0f; // (how long the body is, of its side drawing's length: see longShape)
 	bool drawn[2] = { false, false };
 	/// The row of an end's drawing (0 the front's, 1 the back's) a height at a place along the body is drawn on.
 	int row(int end, float ahead, float up) const { return (int)std::floor(FloorY - up + (end ? -ahead : ahead) * slant); }
 };
 
-LongReading readLong(const PartFrames &part)
+LongReading readLong(const PartFrames &part, bool legged)
 {
 	LongReading reading;
 	int left, right, top, bottom;
 	if (!drawnBox(part, RightSide, left, right, top, bottom)) return reading;
 	int rows = 0, count = 0;
-	for (int end = 0; end < 2; ++end)
+	for (int end = 0; legged && end < 2; ++end)
 	{
 		int l, r, t, b;
 		if (!drawnBox(part, end ? (Front + 4) % 8 : Front, l, r, t, b)) continue;
@@ -774,7 +775,7 @@ LongReading readLong(const PartFrames &part)
 	return reading;
 }
 
-std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
+std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, const LongReading &reading)
 {
 	std::vector<Uint8> cells(GridCells, 0);
 	legsTop = 0.0f;
@@ -820,7 +821,6 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
 	if (drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom)) widest = (frontRight - frontLeft + 1) * 0.5f / PixelsAcross;
 	// (An animal's breadth, where it is thick, is its frontal drawings': see below. Each row of the two: its first and
 	// last columns, and how many stretches it is drawn in.)
-	const LongReading reading = legged ? readLong(part) : LongReading();
 	std::vector<int> rowFirst[2], rowLast[2], rowRuns[2];
 	for (int end = 0; end < 2; ++end)
 	{
@@ -950,7 +950,9 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
 	const std::vector<std::pair<float, float>> frontBars = legBars(frontLegs, true), hindBars = legBars(hindLegs, false);
 	for (int along = 0; along < GridAlong; ++along)
 	{
-		const int sideRight = (int)std::floor(FloorX + cellAhead(along) * PixelsAcross);
+		// (the body's place along its side drawing: see LongReading's length)
+		const float drawnAhead = cellAhead(along) / reading.length;
+		const int sideRight = (int)std::floor(FloorX + drawnAhead * PixelsAcross);
 		for (int up = 0; up < GridUp; ++up)
 		{
 			// (nothing under the floor; what the side drawing has below the floor's row lies on it)
@@ -976,11 +978,11 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
 			while (runFirst > 0 && part.at(RightSide, runFirst - 1, row)) --runFirst;
 			while (runLast < FrameSize - 1 && part.at(RightSide, runLast + 1, row)) ++runLast;
 			const float tall = (runBottom - runTop + 1) * 0.5f, lengthways = (runLast - runFirst + 1) * 0.5f;
-			const bool lying = tall <= lengthways / PixelsAcross;
+			const bool lying = tall <= lengthways / PixelsAcross * reading.length;
 			const float off = lying ? (row + 0.5f - (runTop + runBottom + 1) * 0.5f) / tall : (sideRight + 0.5f - (runFirst + runLast + 1) * 0.5f) / lengthways;
 			// (A round bar lying is drawn thicker than it is: the drawings look down on it, and its near side's lower
 			// edge stands below its middle's. Drawn 1.22 times its thickness: so much less across.)
-			float breadth = lying ? tall * ProfileLyingRound : lengthways / PixelsAcross;
+			float breadth = lying ? tall * ProfileLyingRound : lengthways / PixelsAcross * reading.length;
 			// (An animal's thick parts, its trunk and its head, are as broad as its frontal drawings have them at their
 			// height: the front's for its front half, the back's for its hind half. A part lying, the trunk, as its
 			// broadest row there; a part standing, a head on a neck, row by row. So a dog's head is narrower than its
@@ -988,7 +990,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
 			// its front half the front drawing has in two stretches or more, its ears, its horns, stands where they
 			// are: on either side, the same on both.)
 			const int end = cellAhead(along) >= 0.0f ? 0 : 1;
-			const int endRow = reading.row(end, cellAhead(along), cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
+			const int endRow = reading.row(end, drawnAhead, cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
 			bool pair = false;
 			if (reading.drawn[end] && !leg)
 			{
@@ -1041,6 +1043,66 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged)
 		}
 	}
 	return cells;
+}
+
+/// A long body's shape at the length its drawings have it (the owner: "The dog and cobra should not be too large! Take
+/// care on the size and keep original sprite sizes approximately"). Its side drawing alone makes it as long as that
+/// drawing is wide, and the drawings from the quarters, drawn by hand, have most animals shorter: The X-Com Files' dog
+/// is 28 pixels long from the side, 19.8 voxels, and 18 to 21 wide from the quarters, where a body that long would be
+/// 22. Seen in the game beside its own sprites, from the same places, it was 7% wider from the side and 13% from a
+/// quarter. So the six drawings that show its length each have a say: the body is made at its side drawing's length,
+/// its width on each of the six is measured as the drawing's is, and it is made again at the length (LongLeast of the
+/// side drawing's or more) that brings the six nearest their drawings' widths, each by its own share. The dog comes
+/// out 0.9 of its side drawing's length; a snake drawn as long from every side stays as it is.
+/// Reading's length is set to what was found.
+const float LongLeast = 0.75f, LongStep = 0.025f;
+std::vector<Uint8> longShape(const PartFrames &part, float &legsTop, bool legged, LongReading &reading)
+{
+	reading.length = 1.0f;
+	std::vector<Uint8> shape = profile(part, legsTop, legged, reading);
+	// where the body stands: its cells seen from above
+	std::vector<std::pair<float, float>> stood;
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up)
+			{
+				if (!shape[cellIndex(across, along, up)]) continue;
+				stood.push_back({ cellRight(across), cellAhead(along) });
+				break;
+			}
+	static const int Lengthways[6] = { RightSide, LeftSide, 0, 2, 4, 6 };
+	float drawn[6];
+	for (int i = 0; i < 6; ++i)
+	{
+		int left, right, top, bottom;
+		drawn[i] = drawnBox(part, Lengthways[i], left, right, top, bottom) ? (float)(right - left + 1) : 0.0f;
+	}
+	float best = 1.0f, least = 1e30f;
+	for (float length = 1.0f; length > LongLeast - 0.001f && !stood.empty(); length -= LongStep)
+	{
+		float off = 0.0f;
+		for (int i = 0; i < 6; ++i)
+		{
+			if (drawn[i] <= 0.0f) continue;
+			float first = 1e9f, last = -1e9f;
+			for (const std::pair<float, float> &cell : stood)
+			{
+				float column, row, nearness;
+				project(cell.first, cell.second * length, 0.0f, Lengthways[i], false, column, row, nearness);
+				first = std::min(first, column);
+				last = std::max(last, column);
+			}
+			const float share = (last - first + 1.0f - drawn[i]) / drawn[i];
+			off += share * share;
+		}
+		if (off < least - 1e-6f) { least = off; best = length; }
+	}
+	if (best < 1.0f)
+	{
+		reading.length = best;
+		shape = profile(part, legsTop, legged, reading);
+	}
+	return shape;
 }
 
 /// Fills the cells of an elliptical slice at a frame row's height: centre (right, ahead) and half sizes, voxels.
@@ -3212,6 +3274,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
 	const bool beast = routine.whole && !routine.big && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
+	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 	float beastLegsTop = 0.0f;
 	std::vector<int> onTop[8], solidOnTop[8];
 	partsOnTop(parts, composite, onTop);
@@ -3245,7 +3308,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 		// agree, and a strict hull of them lost its shell and horns)
 		// (a long body, a beast on four legs: its side drawings' outline, see profile)
-		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? profile(solid, beastLegsTop, routine.beast) : limb(solid, RightSide);
+		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? longShape(solid, beastLegsTop, routine.beast, longReading) : limb(solid, RightSide);
 		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
 		// (a long body has its width from its own side drawing, see profile: the other drawings don't cut it)
 		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : carve(solid, bigHull ? 0 : 1, shape, !routine.big && thinDrawing(solid) ? LimbCarveReach : 0);
@@ -3853,7 +3916,6 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// human's, stays painted by its front and back.)
 		const bool hull = turret || beast || tank || routine.whole;
 		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
-		const LongReading longReading = beast && routine.beast ? readLong(parts[0]) : LongReading();
 		std::vector<int> foremost, rearmost;
 		if (beast && routine.beast)
 		{
@@ -3926,12 +3988,12 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 				{
 					// (the front drawing has the unit's right on its left, the back drawing on its right)
 					const int column = (int)std::floor(longReading.middle[end] + (end ? 1.0f : -1.0f) * model->right[k] * PixelsAcross);
-					colour = parts[0].at(end ? (Front + 4) % 8 : Front, column, longReading.row(end, model->ahead[k], model->up[k]));
+					colour = parts[0].at(end ? (Front + 4) % 8 : Front, column, longReading.row(end, model->ahead[k] / longReading.length, model->up[k]));
 				}
 			}
 			if (beast && !colour)
 			{
-				const int column = (int)std::floor(FloorX + model->ahead[k] * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
+				const int column = (int)std::floor(FloorX + model->ahead[k] / longReading.length * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
 				for (int lower = 0; lower <= ProfileBelow && !colour; ++lower) colour = parts[0].at(RightSide, column, row + lower);
 				for (int reach = 1; reach <= 2 * VOXELSCALE && !colour; ++reach)
 					for (int dy = -reach; dy <= reach && !colour; ++dy)

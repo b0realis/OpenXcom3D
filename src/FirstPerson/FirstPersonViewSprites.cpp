@@ -1529,7 +1529,7 @@ void FirstPersonView::drawUnits()
 	int framesUsed = 0;
 	for (BattleUnit *unit : *_save->getUnits())
 	{
-		if (WatchedAlone >= 0 && unit->getId() != WatchedAlone) continue; // (the developer's camera on one unit: see arenaStep)
+		if (WatchedAlone != -1 && unit->getId() != WatchedAlone) continue; // (the developer's camera on one unit: see arenaStep)
 		// Only units still in the fight (not dead or unconscious), not the one looked through,
 		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
 		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
