@@ -1317,6 +1317,7 @@ private:
 	/// The banner across the top: hidden movement, enemy spotted, burning.
 	void updateBanner(bool playerTurn);
 	/// Works out which unit each squad button stands for.
+	std::vector<BattleUnit*> squadList() const;
 	void refreshSquad();
 	/// Lays out the squad buttons that are in use.
 	void layoutTopBar();

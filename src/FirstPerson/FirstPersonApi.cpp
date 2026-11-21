@@ -918,6 +918,14 @@ void createOptions(std::vector<OptionInfo> &options)
 	// medium or large (0 to 3).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 1, "STR_FPS_MAP_CAMERA", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalMap", &fpsTacticalMap, true, "STR_FPS_TACTICAL_MAP", category));
+	// The tactical map from the isometric battlescape too, in place of the game's own map screen (a player, GitHub
+	// issue #217: "Tac map replace Normal map in iso? ... Still could make it toggle if you want for the purists").
+	// Off by default: the isometric game stays the game's own unless asked.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalMapIso", &fpsTacticalMapIso, false, "STR_FPS_TACTICAL_MAP_ISO", category));
+	// On the tactical map the wheel changes the level and zooms with Ctrl (a player, GitHub issue #215: "mouse wheel
+	// should default to elevation change, not zoom"). Off by default: the owner had the wheel zoom ("the mouse wheel
+	// should not scroll levels of the map up down but zoom the map in/out").
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, false, "STR_FPS_MAP_WHEEL_LEVELS", category));
 	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the

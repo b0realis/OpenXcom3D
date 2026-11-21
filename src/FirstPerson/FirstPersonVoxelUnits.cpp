@@ -336,8 +336,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// (All of it at the first frame of the battle's animation, whenever the unit is first seen: two units alike are
 	// drawn alike then, and share a body; one whose colours the animation changes had a body for whichever frame it
 	// was first seen at, each made anew.)
+	// (The first frame at which its mod's recolouring of its sprite is at rest, see restFrame: XPiratez's and The X-Com
+	// Files' energy shields flash a unit's sprite blue for 4 frames in every 32, each unit at its own time, and a body
+	// made in those frames was blue for good.)
 	const int animNow = save->getAnimFrame();
-	unitSprite.setAnimationFrame(0);
+	unitSprite.setAnimationFrame(restFrame(unit, save));
 	auto drawFacing = [&](int d) {
 		for (auto &frame : frames) frame->clear();
 		unitSprite.setViewRotation(d - unit->getDirection());
@@ -784,6 +787,39 @@ int VoxelUnits::lastFacing(const BattleUnit *unit) const
  * @param unit The unit.
  * @return The body, or null if it was never drawn as one.
  */
+bool VoxelUnits::recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256])
+{
+	if (!unit->getArmor()->getScript<ModScript::RecolorUnitSprite>()) return false;
+	// (a strip of every colour drawn as the unit's torso is: the game's own way through the script, see UnitSprite::blitBody)
+	static thread_local Surface strip(256, 1), drawn(256, 1);
+	strip.lock(); drawn.lock();
+	for (int colour = 0; colour < 256; ++colour) { *strip.getRaw(colour, 0) = (Uint8)colour; *drawn.getRaw(colour, 0) = 0; }
+	ScriptWorkerBlit work;
+	BattleUnit::ScriptFill(&work, unit, save, BODYPART_TORSO, frame, 0, 0);
+	work.executeBlit(&strip, &drawn, 0, 0, 0);
+	for (int colour = 0; colour < 256; ++colour) table[colour] = *drawn.getRaw(colour, 0) ? *drawn.getRaw(colour, 0) : (Uint8)colour;
+	strip.unlock(); drawn.unlock();
+	return true;
+}
+
+int VoxelUnits::restFrame(const BattleUnit *unit, const SavedBattleGame *save)
+{
+	auto known = _restFrames.find(unit->getId());
+	if (known != _restFrames.end()) return known->second;
+	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
+	// rest at once). Looked for over 32 frames; none: the first, as ever.
+	int rest = 0;
+	Uint8 tables[48][256];
+	bool scripted = true;
+	for (int frame = 0; scripted && frame < 48; ++frame) scripted = recolourTable(unit, save, frame, tables[frame]);
+	for (int frame = 0; scripted && frame < 32; ++frame)
+	{
+		if (std::equal(tables[frame], tables[frame] + 256, tables[frame + 8]) && std::equal(tables[frame], tables[frame] + 256, tables[frame + 16])) { rest = frame; break; }
+	}
+	_restFrames[unit->getId()] = rest;
+	return rest;
+}
+
 const VoxelUnitModel *VoxelUnits::lastBody(const BattleUnit *unit) const
 {
 	auto found = _lastBodies.find(unit->getId());

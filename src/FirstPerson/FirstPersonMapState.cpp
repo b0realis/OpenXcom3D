@@ -236,7 +236,9 @@ void FirstPersonMapState::layOut()
 		Button button;
 		button.kind = said.kind;
 		button.words = tr(said.words);
-		button.tip = tr(said.tip);
+		// (the level's and the zoom's tips name the wheel as the setting "Tactical map: wheel changes level" has it)
+		const bool wheelTip = Options::fpsMapWheelLevels && (said.kind == BUTTON_LEVEL_UP || said.kind == BUTTON_LEVEL_DOWN || said.kind == BUTTON_ZOOM_OUT || said.kind == BUTTON_ZOOM_IN);
+		button.tip = tr(wheelTip ? std::string(said.tip) + "_WHEEL" : std::string(said.tip));
 		_words->setText(button.words);
 		const int wide = std::max(big(ButtonHigh), big(_words->getTextWidth()) + 2 * big(ButtonPad));
 		if (said.kind == BUTTON_CLOSE || said.kind == BUTTON_HELP)
@@ -1148,7 +1150,7 @@ void FirstPersonMapState::viewOver(Action *action)
 
 /**
  * The wheel and the keys. The wheel: the map bigger or smaller about the tile under the pointer; with Ctrl a level up
- * or down (the game's map's wheel). Keys: Escape, the map's key or OK closes; the arrows scroll; the game's level
+ * or down (the game's map's wheel); the other way round with the setting "Tactical map: wheel changes level". Keys: Escape, the map's key or OK closes; the arrows scroll; the game's level
  * keys, Page Up and Page Down change the level; + and - zoom; Home (or the game's key that centres on the unit) puts
  * the selected soldier in the middle; the game's next and previous unit keys select them; F1 the help.
  * @param action What happened.
@@ -1163,7 +1165,8 @@ void FirstPersonMapState::handle(Action *action)
 		// (where the wheel turned, as the view was told of it; never told: where the pointer was last, else the middle)
 		const int x = action->getAbsoluteXMouse() >= 0 ? (int)std::floor(action->getAbsoluteXMouse()) : _mouseX;
 		const int y = action->getAbsoluteYMouse() >= 0 ? (int)std::floor(action->getAbsoluteYMouse()) : _mouseY;
-		if (_game->isCtrlPressed()) changeLevel(by);
+		// (the setting "Tactical map: wheel changes level" swaps the two: a player, GitHub issue #215)
+		if (_game->isCtrlPressed() != Options::fpsMapWheelLevels) changeLevel(by);
 		else if (x >= 0 && y >= 0) zoomAt(by, x, y);
 		else changeZoom(by);
 	}

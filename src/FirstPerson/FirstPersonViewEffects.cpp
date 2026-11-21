@@ -467,11 +467,18 @@ void FirstPersonView::spawnBlastEffects(const float centre[3], bool big, bool mi
 	}
 }
 
+/// A fire's flames are full within FlamesNear voxels of the eye, across the map (20 tiles); further off, as far as the
+/// view reaches, there are fewer of them, FlamesNear over the distance and FlamesFarLeast at least, each a size
+/// bigger: a fire far away still burns, for a fraction of the particles. They stopped at 20 tiles, and a fire seen
+/// from further "appear[ed] to be extinguished" (a player, GitHub issue #212: "pretty fire effect turns off with over
+/// 22 tiles in distance. I wouldn't mind if a lower fidelity option was used").
+const float FlamesNear = 320.0f, FlamesFarLeast = 0.3f;
+
 /**
- * Burning tiles near the camera send up flames, and with the setting "Smoke" on Modern smoky
+ * Burning tiles send up flames, and near the camera, with the setting "Smoke" on Modern, smoky
  * ones a few wisps of their smoke (a burning tile smokes too; on Original, none). Only tiles
- * that have been discovered and are within 320 voxels (20 tiles) of the eye, across the map,
- * take part.
+ * that have been discovered take part: the flames as far as the view reaches (fewer far off, see
+ * FlamesNear), the wisps within 320 voxels (20 tiles) of the eye, across the map.
  * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
  */
 void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
@@ -490,14 +497,17 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 		const Position tilePosition = tile->getPosition();
 		const float centreX = tilePosition.x * 16 + 8.0f, centreY = tilePosition.y * 16 + 8.0f;
 		const float groundZ = tilePosition.z * 24 - tile->getTerrainLevel() + 2.0f;
-		if (std::abs(centreX - _eye[0]) > 320 || std::abs(centreY - _eye[1]) > 320)
+		const float far = std::max(std::abs(centreX - (float)_eye[0]), std::abs(centreY - (float)_eye[1]));
+		if (far > std::max(_maxDistance, FlamesNear))
 		{
 			continue;
 		}
+		const bool near = far <= FlamesNear;
+		const float thin = near ? 1.0f : std::max(FlamesFarLeast, FlamesNear / far);
 		// Fire: about ten flames a second, rising fast from somewhere on the tile and glowing
 		// for a second or so in the fire colours (a chain of explosions' fire once its ripple has
 		// passed over the tile: see shownFire).
-		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * elapsedSeconds)
+		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * thin * elapsedSeconds)
 		{
 			P::Particle flame;
 			flame.pos[0] = centreX + _particles.random(-6, 6);
@@ -505,14 +515,14 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 			flame.pos[2] = groundZ + _particles.random(0, 10);
 			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = _particles.random(14, 34);
 			flame.age = 0; flame.life = _particles.random(0.7f, 1.6f); flame.gravity = -10; flame.drag = 0.8f;
-			flame.color = _colors.fire[(int)_particles.random(0, 4)]; flame.size = 2; flame.kind = P::GLOW; flame.group = P::EFFECT;
+			flame.color = _colors.fire[(int)_particles.random(0, 4)]; flame.size = near ? 2 : 3; flame.kind = P::GLOW; flame.group = P::EFFECT;
 			_particles.add(flame);
 		}
 		// Modern smoke (setting "Smoke"): now and then a wisp of the smoke rises off a smoky tile, a
 		// few more the thicker it is (about one every three seconds off fresh smoke, more off a
 		// fire), drifting slowly up and east as it spreads and thins out (see drawSeeThroughSmoke).
 		// Original: the original games' own smoke only, no wisps.
-		if (FirstPerson::smokeMode() == 2 && tile->getSmoke()
+		if (near && FirstPerson::smokeMode() == 2 && tile->getSmoke()
 			&& _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
 		{
 			P::Particle wisp;
@@ -529,8 +539,9 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 
 /**
  * Burning units in sight (all of them in debug mode), but not our own soldier nor anyone
- * down: flames lick up all over them, more on a big unit, and smoke rises off the top. Units
- * more than 320 voxels (20 tiles) from the eye, across the map, are left out.
+ * down: flames lick up all over them, more on a big unit, and smoke rises off the top. As far
+ * as the view reaches: more than 320 voxels (20 tiles) from the eye, across the map, with fewer
+ * flames, each bigger, and neither sparks nor smoke (see FlamesNear).
  * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
  */
 void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
@@ -561,10 +572,13 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 			feet[1] = tilePosition.y * 16 + 8.0f * unitSize;
 			feet[2] = tilePosition.z * 24 - (tile ? tile->getTerrainLevel() : 0);
 		}
-		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320)
+		const float far = std::max(std::abs(feet[0] - (float)_eye[0]), std::abs(feet[1] - (float)_eye[1]));
+		if (far > std::max(_maxDistance, FlamesNear))
 		{
 			continue;
 		}
+		const bool near = far <= FlamesNear;
+		const float thin = near ? 1.0f : std::max(FlamesFarLeast, FlamesNear / far);
 		// A unit drawn as its voxel body (setting "Voxel units") burns all over that body, and hard: the owner, "burning
 		// of the unit and other effects should be dramatic". Flames start on the body's own voxels (at its facing and
 		// size), nearly twice as many, each a tongue of flame, longer lived and rising higher; sparks fly up and fall; the smoke is thick.
@@ -587,7 +601,7 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 		};
 		// Flames: 45 a second per tile of the unit's size (the fraction carried by chance; 80 on a voxel body), from
 		// anywhere on its body up to nine tenths of its height, rising fast and short-lived.
-		const int flameCount = (int)(elapsedSeconds * (body ? 80.0f : 45.0f) * unitSize + _particles.random());
+		const int flameCount = (int)(elapsedSeconds * (body ? 80.0f : 45.0f) * unitSize * thin + _particles.random());
 		for (int k = 0; k < flameCount; ++k)
 		{
 			P::Particle flame;
@@ -602,11 +616,11 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 			}
 			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = body ? _particles.random(22, 48) : _particles.random(16, 36);
 			flame.age = 0; flame.life = body ? _particles.random(0.45f, 1.1f) : _particles.random(0.35f, 0.8f); flame.gravity = -12; flame.drag = 0.8f;
-			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = body ? (Uint8)_particles.random(2, 5.99f) : 3; flame.kind = body ? P::FLAME : P::GLOW; flame.group = P::EFFECT;
+			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = (Uint8)((body ? (Uint8)_particles.random(2, 5.99f) : 3) + (near ? 0 : 1)); flame.kind = body ? P::FLAME : P::GLOW; flame.group = P::EFFECT;
 			_particles.add(flame);
 		}
 		// (sparks off a voxel body: about 30 a second, flung up and out, falling back)
-		const int sparkCount = body ? (int)(elapsedSeconds * 60.0f * unitSize + _particles.random()) : 0;
+		const int sparkCount = body && near ? (int)(elapsedSeconds * 60.0f * unitSize + _particles.random()) : 0;
 		for (int k = 0; k < sparkCount; ++k)
 		{
 			P::Particle spark;
@@ -618,7 +632,7 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 		}
 		// Smoke: about five puffs a second off the top of the unit (fourteen, bigger, off a voxel body), rising and
 		// drifting east (+x, the way the rain slants).
-		if (_particles.random() < elapsedSeconds * (body ? 14.0f : 5.0f))
+		if (near && _particles.random() < elapsedSeconds * (body ? 14.0f : 5.0f))
 		{
 			P::Particle puff;
 			puff.pos[0] = feet[0] + _particles.random(-3, 3); puff.pos[1] = feet[1] + _particles.random(-3, 3);

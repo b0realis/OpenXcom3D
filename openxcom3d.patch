@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d798918bb
+index 000000000..56b668326
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,671 @@
+@@ -0,0 +1,679 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -362,6 +362,10 @@ index 000000000..d798918bb
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_TACTICAL_MAP: "Tactical map"
 +  STR_FPS_TACTICAL_MAP_DESC: "YES: the map opened from the 3D view fills the screen: each unit a dot with a cone the way it looks (yours green with their numbers, the selected one blue, enemies red with their kind's first letters), zoom, a click on a soldier selects them. NO: the game's own map screen."
++  STR_FPS_TACTICAL_MAP_ISO: "Tactical map from the isometric view"
++  STR_FPS_TACTICAL_MAP_ISO_DESC: "YES: the game's map button and key open the tactical map from the isometric battlescape too. NO: the game's own map screen there."
++  STR_FPS_MAP_WHEEL_LEVELS: "Tactical map: wheel changes level"
++  STR_FPS_MAP_WHEEL_LEVELS_DESC: "YES: on the tactical map the mouse wheel goes a level up or down, and zooms with Ctrl. NO: the wheel zooms, and changes the level with Ctrl."
 +  STR_FPS_TMAP_UP: "UP"
 +  STR_FPS_TMAP_UP_TIP: "A level up (Page Up, Ctrl and the wheel)"
 +  STR_FPS_TMAP_DOWN: "DN"
@@ -370,6 +374,10 @@ index 000000000..d798918bb
 +  STR_FPS_TMAP_ZOOM_OUT_TIP: "Smaller (the wheel, the - key)"
 +  STR_FPS_TMAP_ZOOM_IN: "+"
 +  STR_FPS_TMAP_ZOOM_IN_TIP: "Bigger (the wheel, the + key)"
++  STR_FPS_TMAP_UP_TIP_WHEEL: "A level up (Page Up, the wheel)"
++  STR_FPS_TMAP_DOWN_TIP_WHEEL: "A level down (Page Down, the wheel)"
++  STR_FPS_TMAP_ZOOM_OUT_TIP_WHEEL: "Smaller (Ctrl and the wheel, the - key)"
++  STR_FPS_TMAP_ZOOM_IN_TIP_WHEEL: "Bigger (Ctrl and the wheel, the + key)"
 +  STR_FPS_TMAP_CENTRE: "CTR"
 +  STR_FPS_TMAP_CENTRE_TIP: "The selected soldier in the middle, on their level (Home)"
 +  STR_FPS_TMAP_NEXT: "NEXT"
@@ -801,10 +809,10 @@ index 000000000..d798918bb
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..87c809c43
+index 000000000..f7f5de937
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,671 @@
+@@ -0,0 +1,679 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1039,6 +1047,10 @@ index 000000000..87c809c43
 +  STR_FPS_SOLDIER_PREVIEW_DESC: "Soldier cards on the top bar show a live helmet camera."
 +  STR_FPS_TACTICAL_MAP: "Tactical map"
 +  STR_FPS_TACTICAL_MAP_DESC: "YES: the map opened from the 3D view fills the screen: each unit a dot with a cone the way it looks (yours green with their numbers, the selected one blue, enemies red with their kind's first letters), zoom, a click on a soldier selects them. NO: the game's own map screen."
++  STR_FPS_TACTICAL_MAP_ISO: "Tactical map from the isometric view"
++  STR_FPS_TACTICAL_MAP_ISO_DESC: "YES: the game's map button and key open the tactical map from the isometric battlescape too. NO: the game's own map screen there."
++  STR_FPS_MAP_WHEEL_LEVELS: "Tactical map: wheel changes level"
++  STR_FPS_MAP_WHEEL_LEVELS_DESC: "YES: on the tactical map the mouse wheel goes a level up or down, and zooms with Ctrl. NO: the wheel zooms, and changes the level with Ctrl."
 +  STR_FPS_TMAP_UP: "UP"
 +  STR_FPS_TMAP_UP_TIP: "A level up (Page Up, Ctrl and the wheel)"
 +  STR_FPS_TMAP_DOWN: "DN"
@@ -1047,6 +1059,10 @@ index 000000000..87c809c43
 +  STR_FPS_TMAP_ZOOM_OUT_TIP: "Smaller (the wheel, the - key)"
 +  STR_FPS_TMAP_ZOOM_IN: "+"
 +  STR_FPS_TMAP_ZOOM_IN_TIP: "Bigger (the wheel, the + key)"
++  STR_FPS_TMAP_UP_TIP_WHEEL: "A level up (Page Up, the wheel)"
++  STR_FPS_TMAP_DOWN_TIP_WHEEL: "A level down (Page Down, the wheel)"
++  STR_FPS_TMAP_ZOOM_OUT_TIP_WHEEL: "Smaller (Ctrl and the wheel, the - key)"
++  STR_FPS_TMAP_ZOOM_IN_TIP_WHEEL: "Bigger (Ctrl and the wheel, the + key)"
 +  STR_FPS_TMAP_CENTRE: "CTR"
 +  STR_FPS_TMAP_CENTRE_TIP: "The selected soldier in the middle, on their level (Home)"
 +  STR_FPS_TMAP_NEXT: "NEXT"
@@ -22904,7 +22920,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..c664a4e68 100644
+index a08796ced..69b1a507b 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -22921,7 +22937,7 @@ index a08796ced..c664a4e68 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsTacticalMap, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
++OPT bool fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
 +OPT int fpsPreset, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -23972,10 +23988,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a531b695a
+index 000000000..a0e4123eb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,1830 @@
+@@ -0,0 +1,1838 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24896,6 +24912,14 @@ index 000000000..a531b695a
 +	// medium or large (0 to 3).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapCamera", &fpsMapCamera, 1, "STR_FPS_MAP_CAMERA", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalMap", &fpsTacticalMap, true, "STR_FPS_TACTICAL_MAP", category));
++	// The tactical map from the isometric battlescape too, in place of the game's own map screen (a player, GitHub
++	// issue #217: "Tac map replace Normal map in iso? ... Still could make it toggle if you want for the purists").
++	// Off by default: the isometric game stays the game's own unless asked.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsTacticalMapIso", &fpsTacticalMapIso, false, "STR_FPS_TACTICAL_MAP_ISO", category));
++	// On the tactical map the wheel changes the level and zooms with Ctrl (a player, GitHub issue #215: "mouse wheel
++	// should default to elevation change, not zoom"). Off by default: the owner had the wheel zoom ("the mouse wheel
++	// should not scroll levels of the map up down but zoom the map in/out").
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMapWheelLevels", &fpsMapWheelLevels, false, "STR_FPS_MAP_WHEEL_LEVELS", category));
 +	// The helmet cameras see as the soldier's eyes do (a player, GitHub issue #90: an X-Com Files
 +	// X-Bat's heat vision saw through smoke, its camera didn't): their heat vision through smoke
 +	// and fire. Off (the owner: a realistic camera, as before, by default): a camera hasn't the
@@ -35660,10 +35684,10 @@ index 000000000..eaa9f409a
 +#endif
 diff --git a/src/FirstPerson/FirstPersonMapState.cpp b/src/FirstPerson/FirstPersonMapState.cpp
 new file mode 100644
-index 000000000..1dd65e40d
+index 000000000..21d6529ea
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMapState.cpp
-@@ -0,0 +1,1212 @@
+@@ -0,0 +1,1215 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -35902,7 +35926,9 @@ index 000000000..1dd65e40d
 +		Button button;
 +		button.kind = said.kind;
 +		button.words = tr(said.words);
-+		button.tip = tr(said.tip);
++		// (the level's and the zoom's tips name the wheel as the setting "Tactical map: wheel changes level" has it)
++		const bool wheelTip = Options::fpsMapWheelLevels && (said.kind == BUTTON_LEVEL_UP || said.kind == BUTTON_LEVEL_DOWN || said.kind == BUTTON_ZOOM_OUT || said.kind == BUTTON_ZOOM_IN);
++		button.tip = tr(wheelTip ? std::string(said.tip) + "_WHEEL" : std::string(said.tip));
 +		_words->setText(button.words);
 +		const int wide = std::max(big(ButtonHigh), big(_words->getTextWidth()) + 2 * big(ButtonPad));
 +		if (said.kind == BUTTON_CLOSE || said.kind == BUTTON_HELP)
@@ -36814,7 +36840,7 @@ index 000000000..1dd65e40d
 +
 +/**
 + * The wheel and the keys. The wheel: the map bigger or smaller about the tile under the pointer; with Ctrl a level up
-+ * or down (the game's map's wheel). Keys: Escape, the map's key or OK closes; the arrows scroll; the game's level
++ * or down (the game's map's wheel); the other way round with the setting "Tactical map: wheel changes level". Keys: Escape, the map's key or OK closes; the arrows scroll; the game's level
 + * keys, Page Up and Page Down change the level; + and - zoom; Home (or the game's key that centres on the unit) puts
 + * the selected soldier in the middle; the game's next and previous unit keys select them; F1 the help.
 + * @param action What happened.
@@ -36829,7 +36855,8 @@ index 000000000..1dd65e40d
 +		// (where the wheel turned, as the view was told of it; never told: where the pointer was last, else the middle)
 +		const int x = action->getAbsoluteXMouse() >= 0 ? (int)std::floor(action->getAbsoluteXMouse()) : _mouseX;
 +		const int y = action->getAbsoluteYMouse() >= 0 ? (int)std::floor(action->getAbsoluteYMouse()) : _mouseY;
-+		if (_game->isCtrlPressed()) changeLevel(by);
++		// (the setting "Tactical map: wheel changes level" swaps the two: a player, GitHub issue #215)
++		if (_game->isCtrlPressed() != Options::fpsMapWheelLevels) changeLevel(by);
 +		else if (x >= 0 && y >= 0) zoomAt(by, x, y);
 +		else changeZoom(by);
 +	}
@@ -40716,10 +40743,10 @@ index 000000000..3a680304d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..938606c2a
+index 000000000..fa2a52e82
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1585 @@
+@@ -0,0 +1,1586 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42039,6 +42066,7 @@ index 000000000..938606c2a
 +	/// The banner across the top: hidden movement, enemy spotted, burning.
 +	void updateBanner(bool playerTurn);
 +	/// Works out which unit each squad button stands for.
++	std::vector<BattleUnit*> squadList() const;
 +	void refreshSquad();
 +	/// Lays out the squad buttons that are in use.
 +	void layoutTopBar();
@@ -43309,10 +43337,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..e71fc0e33
+index 000000000..8271481f6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2782 @@
+@@ -0,0 +1,2794 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45107,7 +45135,9 @@ index 000000000..e71fc0e33
 +bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 +{
 +	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
-+	if (!mode || !mode->isActive() || !Options::fpsTacticalMap)
++	// (from the isometric battlescape too with the setting "Tactical map from the isometric view": a player, GitHub
++	// issue #217)
++	if (!mode || !(mode->isActive() ? Options::fpsTacticalMap : Options::fpsTacticalMapIso))
 +	{
 +		return false;
 +	}
@@ -45117,9 +45147,11 @@ index 000000000..e71fc0e33
 +		state->_map->getCamera()->centerOnPosition(unit->getPosition());
 +	}
 +	FirstPersonMapState::Setup setup;
-+	setup.squad = mode->_squadUnits;
++	// (the squad's numbers as the 3D view's buttons have them; from the isometric view, where the buttons may never
++	// have been made, the same list)
++	setup.squad = mode->isActive() ? mode->_squadUnits : mode->squadList();
 +	setup.viewYawDegrees = mode->_view->getYawDegrees();
-+	setup.hasViewYaw = unit != nullptr && unit == mode->_trackedUnit;
++	setup.hasViewYaw = mode->isActive() && unit != nullptr && unit == mode->_trackedUnit;
 +	setup.select = [mode](BattleUnit *soldier) { mode->selectUnit(soldier); };
 +	// (everything on it as much bigger as the 3D view's own overlays are on this screen; and a helmet camera of the 3D
 +	// view's own kind, made as the soldier card's is)
@@ -45369,17 +45401,11 @@ index 000000000..e71fc0e33
 +}
 +
 +/**
-+ * Works out which unit each squad button stands for: the player's own units in a stable order
-+ * (so the numbers don't shift when someone falls), then any aliens under the player's mind
-+ * control. Makes more buttons (each with an icon surface) when the squad has grown, and updates
-+ * each button's look when its soldier's state changed: a fallen or turned soldier's button
-+ * shows an icon instead of the number, in a colour of its own. Lays the bar out again if
-+ * anything changed.
++ * The squad in its buttons' order: everyone who came with the player (the fallen too, so their button keeps its place),
++ * then the aliens the player controls right now.
 + */
-+void FirstPersonMode::refreshSquad()
++std::vector<BattleUnit*> FirstPersonMode::squadList() const
 +{
-+	// Everyone who came with the player (the fallen too, so their button keeps its place),
-+	// then the aliens the player controls right now.
 +	std::vector<BattleUnit*> squad;
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
@@ -45395,6 +45421,20 @@ index 000000000..e71fc0e33
 +			squad.push_back(unit);
 +		}
 +	}
++	return squad;
++}
++
++/**
++ * Works out which unit each squad button stands for: the player's own units in a stable order
++ * (so the numbers don't shift when someone falls), then any aliens under the player's mind
++ * control. Makes more buttons (each with an icon surface) when the squad has grown, and updates
++ * each button's look when its soldier's state changed: a fallen or turned soldier's button
++ * shows an icon instead of the number, in a colour of its own. Lays the bar out again if
++ * anything changed.
++ */
++void FirstPersonMode::refreshSquad()
++{
++	std::vector<BattleUnit*> squad = squadList();
 +	// Make a button, an icon and a state slot for every unit beyond the buttons there are
 +	// (buttons are never removed; spare ones stay hidden).
 +	while (_btnSquad.size() < squad.size())
@@ -63087,10 +63127,10 @@ index 000000000..2833f3211
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..0daac44ef
+index 000000000..e7df5f82d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1911 @@
+@@ -0,0 +1,1917 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -64468,6 +64508,12 @@ index 000000000..0daac44ef
 +		double ceilingCut = NoCeilingCut);
 +	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
 +	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
++	/// A unit's body's colours as its mod recolours its sprite now (see bodyRecolour): the table found for a frame of
++	/// the battle's animation, and whether it changes anything.
++	struct UnitRecolour { int frame = -1; bool changes = false; Uint64 hash = 0; Uint8 table[256]; };
++	std::map<const BattleUnit*, UnitRecolour> _unitRecolours;
++	std::map<std::pair<const Uint8*, Uint64>, std::vector<Uint8>> _bodiesRecoloured; // a body's cubes' colours through such a table, kept while the table comes round again (see recordVoxelUnit)
++	const Uint8 *bodyRecolour(const BattleUnit *unit);
 +	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
 +	double collapseFall(const BattleUnit *unit, Uint32 now) const;
 +	/// Draws a recorded voxel body's splats, all of them or those on the screen rows from bandTop up to bandBottom.
@@ -65004,10 +65050,10 @@ index 000000000..0daac44ef
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..9cb70a667
+index 000000000..fd9b0e4a4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1460 @@
+@@ -0,0 +1,1474 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -65477,11 +65523,18 @@ index 000000000..9cb70a667
 +	}
 +}
 +
++/// A fire's flames are full within FlamesNear voxels of the eye, across the map (20 tiles); further off, as far as the
++/// view reaches, there are fewer of them, FlamesNear over the distance and FlamesFarLeast at least, each a size
++/// bigger: a fire far away still burns, for a fraction of the particles. They stopped at 20 tiles, and a fire seen
++/// from further "appear[ed] to be extinguished" (a player, GitHub issue #212: "pretty fire effect turns off with over
++/// 22 tiles in distance. I wouldn't mind if a lower fidelity option was used").
++const float FlamesNear = 320.0f, FlamesFarLeast = 0.3f;
++
 +/**
-+ * Burning tiles near the camera send up flames, and with the setting "Smoke" on Modern smoky
++ * Burning tiles send up flames, and near the camera, with the setting "Smoke" on Modern, smoky
 + * ones a few wisps of their smoke (a burning tile smokes too; on Original, none). Only tiles
-+ * that have been discovered and are within 320 voxels (20 tiles) of the eye, across the map,
-+ * take part.
++ * that have been discovered take part: the flames as far as the view reaches (fewer far off, see
++ * FlamesNear), the wisps within 320 voxels (20 tiles) of the eye, across the map.
 + * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
 + */
 +void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
@@ -65500,14 +65553,17 @@ index 000000000..9cb70a667
 +		const Position tilePosition = tile->getPosition();
 +		const float centreX = tilePosition.x * 16 + 8.0f, centreY = tilePosition.y * 16 + 8.0f;
 +		const float groundZ = tilePosition.z * 24 - tile->getTerrainLevel() + 2.0f;
-+		if (std::abs(centreX - _eye[0]) > 320 || std::abs(centreY - _eye[1]) > 320)
++		const float far = std::max(std::abs(centreX - (float)_eye[0]), std::abs(centreY - (float)_eye[1]));
++		if (far > std::max(_maxDistance, FlamesNear))
 +		{
 +			continue;
 +		}
++		const bool near = far <= FlamesNear;
++		const float thin = near ? 1.0f : std::max(FlamesFarLeast, FlamesNear / far);
 +		// Fire: about ten flames a second, rising fast from somewhere on the tile and glowing
 +		// for a second or so in the fire colours (a chain of explosions' fire once its ripple has
 +		// passed over the tile: see shownFire).
-+		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * elapsedSeconds)
++		if (shownFire(tileIndex, tile) && _particles.random() < 10.0f * thin * elapsedSeconds)
 +		{
 +			P::Particle flame;
 +			flame.pos[0] = centreX + _particles.random(-6, 6);
@@ -65515,14 +65571,14 @@ index 000000000..9cb70a667
 +			flame.pos[2] = groundZ + _particles.random(0, 10);
 +			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = _particles.random(14, 34);
 +			flame.age = 0; flame.life = _particles.random(0.7f, 1.6f); flame.gravity = -10; flame.drag = 0.8f;
-+			flame.color = _colors.fire[(int)_particles.random(0, 4)]; flame.size = 2; flame.kind = P::GLOW; flame.group = P::EFFECT;
++			flame.color = _colors.fire[(int)_particles.random(0, 4)]; flame.size = near ? 2 : 3; flame.kind = P::GLOW; flame.group = P::EFFECT;
 +			_particles.add(flame);
 +		}
 +		// Modern smoke (setting "Smoke"): now and then a wisp of the smoke rises off a smoky tile, a
 +		// few more the thicker it is (about one every three seconds off fresh smoke, more off a
 +		// fire), drifting slowly up and east as it spreads and thins out (see drawSeeThroughSmoke).
 +		// Original: the original games' own smoke only, no wisps.
-+		if (FirstPerson::smokeMode() == 2 && tile->getSmoke()
++		if (near && FirstPerson::smokeMode() == 2 && tile->getSmoke()
 +			&& _particles.random() < (tile->getFire() ? 0.5f : 0.08f + tile->getSmoke() * 0.016f) * elapsedSeconds)
 +		{
 +			P::Particle wisp;
@@ -65539,8 +65595,9 @@ index 000000000..9cb70a667
 +
 +/**
 + * Burning units in sight (all of them in debug mode), but not our own soldier nor anyone
-+ * down: flames lick up all over them, more on a big unit, and smoke rises off the top. Units
-+ * more than 320 voxels (20 tiles) from the eye, across the map, are left out.
++ * down: flames lick up all over them, more on a big unit, and smoke rises off the top. As far
++ * as the view reaches: more than 320 voxels (20 tiles) from the eye, across the map, with fewer
++ * flames, each bigger, and neither sparks nor smoke (see FlamesNear).
 + * @param elapsedSeconds Seconds since the last frame: flames and smoke rise at rates per second.
 + */
 +void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
@@ -65571,10 +65628,13 @@ index 000000000..9cb70a667
 +			feet[1] = tilePosition.y * 16 + 8.0f * unitSize;
 +			feet[2] = tilePosition.z * 24 - (tile ? tile->getTerrainLevel() : 0);
 +		}
-+		if (std::abs(feet[0] - _eye[0]) > 320 || std::abs(feet[1] - _eye[1]) > 320)
++		const float far = std::max(std::abs(feet[0] - (float)_eye[0]), std::abs(feet[1] - (float)_eye[1]));
++		if (far > std::max(_maxDistance, FlamesNear))
 +		{
 +			continue;
 +		}
++		const bool near = far <= FlamesNear;
++		const float thin = near ? 1.0f : std::max(FlamesFarLeast, FlamesNear / far);
 +		// A unit drawn as its voxel body (setting "Voxel units") burns all over that body, and hard: the owner, "burning
 +		// of the unit and other effects should be dramatic". Flames start on the body's own voxels (at its facing and
 +		// size), nearly twice as many, each a tongue of flame, longer lived and rising higher; sparks fly up and fall; the smoke is thick.
@@ -65597,7 +65657,7 @@ index 000000000..9cb70a667
 +		};
 +		// Flames: 45 a second per tile of the unit's size (the fraction carried by chance; 80 on a voxel body), from
 +		// anywhere on its body up to nine tenths of its height, rising fast and short-lived.
-+		const int flameCount = (int)(elapsedSeconds * (body ? 80.0f : 45.0f) * unitSize + _particles.random());
++		const int flameCount = (int)(elapsedSeconds * (body ? 80.0f : 45.0f) * unitSize * thin + _particles.random());
 +		for (int k = 0; k < flameCount; ++k)
 +		{
 +			P::Particle flame;
@@ -65612,11 +65672,11 @@ index 000000000..9cb70a667
 +			}
 +			flame.vel[0] = _particles.random(-4, 4); flame.vel[1] = _particles.random(-4, 4); flame.vel[2] = body ? _particles.random(22, 48) : _particles.random(16, 36);
 +			flame.age = 0; flame.life = body ? _particles.random(0.45f, 1.1f) : _particles.random(0.35f, 0.8f); flame.gravity = -12; flame.drag = 0.8f;
-+			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = body ? (Uint8)_particles.random(2, 5.99f) : 3; flame.kind = body ? P::FLAME : P::GLOW; flame.group = P::EFFECT;
++			flame.color = _colors.fire[(int)_particles.random(0, 3.99f)]; flame.size = (Uint8)((body ? (Uint8)_particles.random(2, 5.99f) : 3) + (near ? 0 : 1)); flame.kind = body ? P::FLAME : P::GLOW; flame.group = P::EFFECT;
 +			_particles.add(flame);
 +		}
 +		// (sparks off a voxel body: about 30 a second, flung up and out, falling back)
-+		const int sparkCount = body ? (int)(elapsedSeconds * 60.0f * unitSize + _particles.random()) : 0;
++		const int sparkCount = body && near ? (int)(elapsedSeconds * 60.0f * unitSize + _particles.random()) : 0;
 +		for (int k = 0; k < sparkCount; ++k)
 +		{
 +			P::Particle spark;
@@ -65628,7 +65688,7 @@ index 000000000..9cb70a667
 +		}
 +		// Smoke: about five puffs a second off the top of the unit (fourteen, bigger, off a voxel body), rising and
 +		// drifting east (+x, the way the rain slants).
-+		if (_particles.random() < elapsedSeconds * (body ? 14.0f : 5.0f))
++		if (near && _particles.random() < elapsedSeconds * (body ? 14.0f : 5.0f))
 +		{
 +			P::Particle puff;
 +			puff.pos[0] = feet[0] + _particles.random(-3, 3); puff.pos[1] = feet[1] + _particles.random(-3, 3);
@@ -75207,10 +75267,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..4ad6902ca
+index 000000000..847ffeef6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4335 @@
+@@ -0,0 +1,4396 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -75855,6 +75915,45 @@ index 000000000..4ad6902ca
 + * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
 + * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
 + */
++/**
++ * A unit's voxel body's colours as its mod recolours its sprite at this frame of the battle's animation: the big mods'
++ * energy shields flash a shielded unit's sprite (XPiratez, The X-Com Files: blue, 4 frames in every 32), a hit makes it
++ * blink. A body is made once, from the sprite at rest (see VoxelUnits::restFrame), and showed none of it (a player,
++ * GitHub issue #214: "shield flicker ... doesn't properly engage on voxel models"). So each frame of the animation the
++ * unit's script is asked what it makes of every colour now and what it made of it when the body was made; where the
++ * two differ, the body's cubes are drawn in the colours of now.
++ * @param unit The unit.
++ * @return For each of the body's palette colours the colour to draw, or null: as they are.
++ */
++const Uint8 *FirstPersonView::bodyRecolour(const BattleUnit *unit)
++{
++	if (!unit || !_voxelUnits) return nullptr;
++	UnitRecolour &known = _unitRecolours[unit];
++	const int frame = _save->getAnimFrame();
++	if (known.frame != frame)
++	{
++		known.frame = frame;
++		known.changes = false;
++		Uint8 now[256], made[256];
++		if (VoxelUnits::recolourTable(unit, _save, frame, now) && VoxelUnits::recolourTable(unit, _save, _voxelUnits->restFrame(unit, _save), made))
++		{
++			// (a colour of the body is what the script made of some colour of the sprite then: the same colour, where it
++			// left that alone)
++			Uint8 from[256];
++			for (int colour = 0; colour < 256; ++colour) from[colour] = (Uint8)colour;
++			for (int colour = 255; colour > 0; --colour) if (made[made[colour]] != made[colour]) from[made[colour]] = (Uint8)colour;
++			known.hash = 1469598103934665603ull;
++			for (int colour = 0; colour < 256; ++colour)
++			{
++				known.table[colour] = now[from[colour]];
++				known.changes = known.changes || known.table[colour] != colour;
++				known.hash = (known.hash ^ known.table[colour]) * 1099511628211ull;
++			}
++		}
++	}
++	return known.changes ? known.table : nullptr;
++}
++
 +void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
 +	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint, double ceilingCut)
 +{
@@ -75865,6 +75964,9 @@ index 000000000..4ad6902ca
 +	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
 +	// (or, standing: its shape at this frame of its sprite's own animation, a body of its own too: see VoxelUnitModel::frames)
 +	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : body.frameAt(_save->getAnimFrame());
++	// (a standing unit's body in the colours its mod's script gives its sprite now: a shield's flash, see bodyRecolour;
++	// not what it holds, nor a body going down or lying)
++	const Uint8 *recolour = !lyingBody && !pile && fall <= 0.0 ? bodyRecolour(unit) : nullptr;
 +	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
 +	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
 +	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
@@ -75960,6 +76062,24 @@ index 000000000..4ad6902ca
 +		// (a body is one colour a cube from every side, see VoxelBodies::makeModel: its first painting's is sent, once)
 +		step.bodyColours = fallen ? fallen->colour.data() : body.colours.data();
 +		step.bodyColourStep = fallen ? 1 : 16;
++		if (recolour)
++		{
++			// (its cubes' colours through the table, kept by the table: a flash comes round again, and the card finds
++			// the body it was sent before, see FirstPersonGpu::drawBodies)
++			if (_bodiesRecoloured.size() > 256) _bodiesRecoloured.clear();
++			std::vector<Uint8> &again = _bodiesRecoloured[{ step.bodyColours, _unitRecolours[unit].hash }];
++			if (again.size() != voxels)
++			{
++				again.resize(voxels);
++				for (size_t k = 0; k < voxels; ++k)
++				{
++					const Uint8 colour = step.bodyColours[k * step.bodyColourStep];
++					again[k] = !fallen && body.part[k] == VoxelUnitModel::Item ? colour : recolour[colour];
++				}
++			}
++			step.bodyColours = again.data();
++			step.bodyColourStep = 1;
++		}
 +		step.bodyParts = fallen ? nullptr : body.part.data();
 +		step.bodyCount = voxels;
 +		std::copy(feet, feet + 3, step.bodyFeet);
@@ -76060,7 +76180,8 @@ index 000000000..4ad6902ca
 +		splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer);
 +		splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer);
 +		splat.depth = depth;
-+		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
++		const Uint8 own = fallen ? fallen->colour[k] : body.colour(k, direction, level);
++		splat.colour = shadeColor(recolour && (fallen || body.part[k] != VoxelUnitModel::Item) ? recolour[own] : own, shade);
 +		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 +		_voxelSplats.push_back(splat);
 +	}
@@ -94230,10 +94351,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..bc7f030b0
+index 000000000..e45a9fa84
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1145 @@
+@@ -0,0 +1,1181 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94572,8 +94693,11 @@ index 000000000..bc7f030b0
 +	// (All of it at the first frame of the battle's animation, whenever the unit is first seen: two units alike are
 +	// drawn alike then, and share a body; one whose colours the animation changes had a body for whichever frame it
 +	// was first seen at, each made anew.)
++	// (The first frame at which its mod's recolouring of its sprite is at rest, see restFrame: XPiratez's and The X-Com
++	// Files' energy shields flash a unit's sprite blue for 4 frames in every 32, each unit at its own time, and a body
++	// made in those frames was blue for good.)
 +	const int animNow = save->getAnimFrame();
-+	unitSprite.setAnimationFrame(0);
++	unitSprite.setAnimationFrame(restFrame(unit, save));
 +	auto drawFacing = [&](int d) {
 +		for (auto &frame : frames) frame->clear();
 +		unitSprite.setViewRotation(d - unit->getDirection());
@@ -95020,6 +95144,39 @@ index 000000000..bc7f030b0
 + * @param unit The unit.
 + * @return The body, or null if it was never drawn as one.
 + */
++bool VoxelUnits::recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256])
++{
++	if (!unit->getArmor()->getScript<ModScript::RecolorUnitSprite>()) return false;
++	// (a strip of every colour drawn as the unit's torso is: the game's own way through the script, see UnitSprite::blitBody)
++	static thread_local Surface strip(256, 1), drawn(256, 1);
++	strip.lock(); drawn.lock();
++	for (int colour = 0; colour < 256; ++colour) { *strip.getRaw(colour, 0) = (Uint8)colour; *drawn.getRaw(colour, 0) = 0; }
++	ScriptWorkerBlit work;
++	BattleUnit::ScriptFill(&work, unit, save, BODYPART_TORSO, frame, 0, 0);
++	work.executeBlit(&strip, &drawn, 0, 0, 0);
++	for (int colour = 0; colour < 256; ++colour) table[colour] = *drawn.getRaw(colour, 0) ? *drawn.getRaw(colour, 0) : (Uint8)colour;
++	strip.unlock(); drawn.unlock();
++	return true;
++}
++
++int VoxelUnits::restFrame(const BattleUnit *unit, const SavedBattleGame *save)
++{
++	auto known = _restFrames.find(unit->getId());
++	if (known != _restFrames.end()) return known->second;
++	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
++	// rest at once). Looked for over 32 frames; none: the first, as ever.
++	int rest = 0;
++	Uint8 tables[48][256];
++	bool scripted = true;
++	for (int frame = 0; scripted && frame < 48; ++frame) scripted = recolourTable(unit, save, frame, tables[frame]);
++	for (int frame = 0; scripted && frame < 32; ++frame)
++	{
++		if (std::equal(tables[frame], tables[frame] + 256, tables[frame + 8]) && std::equal(tables[frame], tables[frame] + 256, tables[frame + 16])) { rest = frame; break; }
++	}
++	_restFrames[unit->getId()] = rest;
++	return rest;
++}
++
 +const VoxelUnitModel *VoxelUnits::lastBody(const BattleUnit *unit) const
 +{
 +	auto found = _lastBodies.find(unit->getId());
@@ -95381,10 +95538,10 @@ index 000000000..bc7f030b0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..7ea8e5d47
+index 000000000..4b920ff7b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,260 @@
+@@ -0,0 +1,268 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -95589,6 +95746,13 @@ index 000000000..7ea8e5d47
 +		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 +	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 +	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
++	/// What a unit's mod makes of each palette colour of its sprite at a frame of the battle's animation (its armor's
++	/// script that recolours the sprite as it is drawn: an energy shield's flash, a hit's blink): `table[colour]`, the
++	/// colour itself where the script leaves it. False, and nothing done, for an armor without such a script.
++	static bool recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256]);
++	/// The frame of the battle's animation a unit's body is made at: one at which its sprite's recolouring is at rest
++	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on.
++	int restFrame(const BattleUnit *unit, const SavedBattleGame *save);
 +	/// The way a unit faced when it was last drawn as a body, up.
 +	int lastFacing(const BattleUnit *unit) const;
 +	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
@@ -95601,6 +95765,7 @@ index 000000000..7ea8e5d47
 +	/// Forgets every body, and those being made (a new battle).
 +	void clear();
 +private:
++	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
 +	/// The frames and pictures a body is being made from (defined with the builder).
 +	struct Job;
 +	/// What a body is made for: the unit, its armour, kneeling, aiming, flying, what it holds, a big unit's turret's turn.
@@ -101513,7 +101678,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..56165af18
+index 000000000..26f41f8b0
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1142 @@
@@ -101746,7 +101911,7 @@ index 000000000..56165af18
 +	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
 +	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
-+		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsTacticalMap", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
++		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsTacticalMap", "fpsTacticalMapIso", "fpsMapWheelLevels", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
 +		{ "STR_FPS_SECTION_MOVEMENT", { "fpsTurnCost", "fpsSidestepFaceView", "fpsMovement", "fpsWalkSpeed", "fpsFlightCost", "fpsFlightCostOverride", "fpsVault",
 +			"fpsFalling", "fpsSafeLanding", "fpsFallDamage" } },

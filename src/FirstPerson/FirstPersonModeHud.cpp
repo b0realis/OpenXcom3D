@@ -1792,7 +1792,9 @@ void FirstPersonMode::updateSoldierCam(BattleUnit *unit, int frameX)
 bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
-	if (!mode || !mode->isActive() || !Options::fpsTacticalMap)
+	// (from the isometric battlescape too with the setting "Tactical map from the isometric view": a player, GitHub
+	// issue #217)
+	if (!mode || !(mode->isActive() ? Options::fpsTacticalMap : Options::fpsTacticalMapIso))
 	{
 		return false;
 	}
@@ -1802,9 +1804,11 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 		state->_map->getCamera()->centerOnPosition(unit->getPosition());
 	}
 	FirstPersonMapState::Setup setup;
-	setup.squad = mode->_squadUnits;
+	// (the squad's numbers as the 3D view's buttons have them; from the isometric view, where the buttons may never
+	// have been made, the same list)
+	setup.squad = mode->isActive() ? mode->_squadUnits : mode->squadList();
 	setup.viewYawDegrees = mode->_view->getYawDegrees();
-	setup.hasViewYaw = unit != nullptr && unit == mode->_trackedUnit;
+	setup.hasViewYaw = mode->isActive() && unit != nullptr && unit == mode->_trackedUnit;
 	setup.select = [mode](BattleUnit *soldier) { mode->selectUnit(soldier); };
 	// (everything on it as much bigger as the 3D view's own overlays are on this screen; and a helmet camera of the 3D
 	// view's own kind, made as the soldier card's is)
@@ -2054,17 +2058,11 @@ void FirstPersonMode::updateBanner(bool playerTurn)
 }
 
 /**
- * Works out which unit each squad button stands for: the player's own units in a stable order
- * (so the numbers don't shift when someone falls), then any aliens under the player's mind
- * control. Makes more buttons (each with an icon surface) when the squad has grown, and updates
- * each button's look when its soldier's state changed: a fallen or turned soldier's button
- * shows an icon instead of the number, in a colour of its own. Lays the bar out again if
- * anything changed.
+ * The squad in its buttons' order: everyone who came with the player (the fallen too, so their button keeps its place),
+ * then the aliens the player controls right now.
  */
-void FirstPersonMode::refreshSquad()
+std::vector<BattleUnit*> FirstPersonMode::squadList() const
 {
-	// Everyone who came with the player (the fallen too, so their button keeps its place),
-	// then the aliens the player controls right now.
 	std::vector<BattleUnit*> squad;
 	for (BattleUnit *unit : *_save->getUnits())
 	{
@@ -2080,6 +2078,20 @@ void FirstPersonMode::refreshSquad()
 			squad.push_back(unit);
 		}
 	}
+	return squad;
+}
+
+/**
+ * Works out which unit each squad button stands for: the player's own units in a stable order
+ * (so the numbers don't shift when someone falls), then any aliens under the player's mind
+ * control. Makes more buttons (each with an icon surface) when the squad has grown, and updates
+ * each button's look when its soldier's state changed: a fallen or turned soldier's button
+ * shows an icon instead of the number, in a colour of its own. Lays the bar out again if
+ * anything changed.
+ */
+void FirstPersonMode::refreshSquad()
+{
+	std::vector<BattleUnit*> squad = squadList();
 	// Make a button, an icon and a state slot for every unit beyond the buttons there are
 	// (buttons are never removed; spare ones stay hidden).
 	while (_btnSquad.size() < squad.size())

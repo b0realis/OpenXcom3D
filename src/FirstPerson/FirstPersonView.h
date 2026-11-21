@@ -1375,6 +1375,12 @@ private:
 		double ceilingCut = NoCeilingCut);
 	std::map<const BattleUnit*, Uint32> _collapseStarts; // when each unit collapsing (the game's own fall) was first seen so
 	std::map<const BattleUnit*, int> _facingsWell;       // the way each unit faced, last seen well (a voxel body going down keeps it)
+	/// A unit's body's colours as its mod recolours its sprite now (see bodyRecolour): the table found for a frame of
+	/// the battle's animation, and whether it changes anything.
+	struct UnitRecolour { int frame = -1; bool changes = false; Uint64 hash = 0; Uint8 table[256]; };
+	std::map<const BattleUnit*, UnitRecolour> _unitRecolours;
+	std::map<std::pair<const Uint8*, Uint64>, std::vector<Uint8>> _bodiesRecoloured; // a body's cubes' colours through such a table, kept while the table comes round again (see recordVoxelUnit)
+	const Uint8 *bodyRecolour(const BattleUnit *unit);
 	/// How far a voxel body going down by the game's own fall has come (see drawUnits): 0 to 1, or -1 if it isn't.
 	double collapseFall(const BattleUnit *unit, Uint32 now) const;
 	/// Draws a recorded voxel body's splats, all of them or those on the screen rows from bandTop up to bandBottom.

@@ -642,6 +642,45 @@ void FirstPersonView::drawListBands()
  * @param pile The floor tile whose pile it pictures, if any (the pointer finds it).
  * @param faint How much of it shows (1 all; a pile made faint to see past it, setting "See-through corpses": dithered).
  */
+/**
+ * A unit's voxel body's colours as its mod recolours its sprite at this frame of the battle's animation: the big mods'
+ * energy shields flash a shielded unit's sprite (XPiratez, The X-Com Files: blue, 4 frames in every 32), a hit makes it
+ * blink. A body is made once, from the sprite at rest (see VoxelUnits::restFrame), and showed none of it (a player,
+ * GitHub issue #214: "shield flicker ... doesn't properly engage on voxel models"). So each frame of the animation the
+ * unit's script is asked what it makes of every colour now and what it made of it when the body was made; where the
+ * two differ, the body's cubes are drawn in the colours of now.
+ * @param unit The unit.
+ * @return For each of the body's palette colours the colour to draw, or null: as they are.
+ */
+const Uint8 *FirstPersonView::bodyRecolour(const BattleUnit *unit)
+{
+	if (!unit || !_voxelUnits) return nullptr;
+	UnitRecolour &known = _unitRecolours[unit];
+	const int frame = _save->getAnimFrame();
+	if (known.frame != frame)
+	{
+		known.frame = frame;
+		known.changes = false;
+		Uint8 now[256], made[256];
+		if (VoxelUnits::recolourTable(unit, _save, frame, now) && VoxelUnits::recolourTable(unit, _save, _voxelUnits->restFrame(unit, _save), made))
+		{
+			// (a colour of the body is what the script made of some colour of the sprite then: the same colour, where it
+			// left that alone)
+			Uint8 from[256];
+			for (int colour = 0; colour < 256; ++colour) from[colour] = (Uint8)colour;
+			for (int colour = 255; colour > 0; --colour) if (made[made[colour]] != made[colour]) from[made[colour]] = (Uint8)colour;
+			known.hash = 1469598103934665603ull;
+			for (int colour = 0; colour < 256; ++colour)
+			{
+				known.table[colour] = now[from[colour]];
+				known.changes = known.changes || known.table[colour] != colour;
+				known.hash = (known.hash ^ known.table[colour]) * 1099511628211ull;
+			}
+		}
+	}
+	return known.changes ? known.table : nullptr;
+}
+
 void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase, int facing, int direction, bool level, const double feet[3], double floorCut,
 	int shade, double scale, BattleUnit *unit, double fall, bool items, BattleUnit *lyingBody, const Tile *pile, double faint, double ceilingCut)
 {
@@ -652,6 +691,9 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 	// (going down or lying: the fall's shape for how far it has come, a body of its own, see VoxelUnitModel::falls)
 	// (or, standing: its shape at this frame of its sprite's own animation, a body of its own too: see VoxelUnitModel::frames)
 	const VoxelUnitModel::FallShape *fallen = fall > 0.0 ? body.fallAt(fall) : body.frameAt(_save->getAnimFrame());
+	// (a standing unit's body in the colours its mod's script gives its sprite now: a shield's flash, see bodyRecolour;
+	// not what it holds, nor a body going down or lying)
+	const Uint8 *recolour = !lyingBody && !pile && fall <= 0.0 ? bodyRecolour(unit) : nullptr;
 	const bool walking = !fallen && walkPhase >= 0 && walkPhase < 8;
 	const std::vector<float> &right = fallen ? fallen->right : walking ? body.walkRight[walkPhase] : body.right;
 	const std::vector<float> &ahead = fallen ? fallen->ahead : walking ? body.walkAhead[walkPhase] : body.ahead;
@@ -747,6 +789,24 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		// (a body is one colour a cube from every side, see VoxelBodies::makeModel: its first painting's is sent, once)
 		step.bodyColours = fallen ? fallen->colour.data() : body.colours.data();
 		step.bodyColourStep = fallen ? 1 : 16;
+		if (recolour)
+		{
+			// (its cubes' colours through the table, kept by the table: a flash comes round again, and the card finds
+			// the body it was sent before, see FirstPersonGpu::drawBodies)
+			if (_bodiesRecoloured.size() > 256) _bodiesRecoloured.clear();
+			std::vector<Uint8> &again = _bodiesRecoloured[{ step.bodyColours, _unitRecolours[unit].hash }];
+			if (again.size() != voxels)
+			{
+				again.resize(voxels);
+				for (size_t k = 0; k < voxels; ++k)
+				{
+					const Uint8 colour = step.bodyColours[k * step.bodyColourStep];
+					again[k] = !fallen && body.part[k] == VoxelUnitModel::Item ? colour : recolour[colour];
+				}
+			}
+			step.bodyColours = again.data();
+			step.bodyColourStep = 1;
+		}
 		step.bodyParts = fallen ? nullptr : body.part.data();
 		step.bodyCount = voxels;
 		std::copy(feet, feet + 3, step.bodyFeet);
@@ -847,7 +907,8 @@ void FirstPersonView::recordVoxelUnit(const VoxelUnitModel &body, int walkPhase,
 		splat.halfX = std::min((float)VoxelSplatHalfMax, reachX * splat.nearer);
 		splat.halfY = std::min((float)VoxelSplatHalfMax, reachY * splat.nearer);
 		splat.depth = depth;
-		splat.colour = shadeColor(fallen ? fallen->colour[k] : body.colour(k, direction, level), shade);
+		const Uint8 own = fallen ? fallen->colour[k] : body.colour(k, direction, level);
+		splat.colour = shadeColor(recolour && (fallen || body.part[k] != VoxelUnitModel::Item) ? recolour[own] : own, shade);
 		step.voxelHalfMax = std::max(step.voxelHalfMax, splat.halfY);
 		_voxelSplats.push_back(splat);
 	}

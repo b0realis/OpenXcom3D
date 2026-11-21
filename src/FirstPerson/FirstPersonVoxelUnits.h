@@ -202,6 +202,13 @@ public:
 		const SavedBattleGame *save, const SDL_Color *palette, int &builds, int &walkPhase);
 	/// The body a unit was last drawn with (for its fall, and its corpse lying where it fell), or null.
 	const VoxelUnitModel *lastBody(const BattleUnit *unit) const;
+	/// What a unit's mod makes of each palette colour of its sprite at a frame of the battle's animation (its armor's
+	/// script that recolours the sprite as it is drawn: an energy shield's flash, a hit's blink): `table[colour]`, the
+	/// colour itself where the script leaves it. False, and nothing done, for an armor without such a script.
+	static bool recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256]);
+	/// The frame of the battle's animation a unit's body is made at: one at which its sprite's recolouring is at rest
+	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on.
+	int restFrame(const BattleUnit *unit, const SavedBattleGame *save);
 	/// The way a unit faced when it was last drawn as a body, up.
 	int lastFacing(const BattleUnit *unit) const;
 	/// The body for a unit as it is now, if it's made (none is made here: see modelFor), or null; a unit walking, its
@@ -214,6 +221,7 @@ public:
 	/// Forgets every body, and those being made (a new battle).
 	void clear();
 private:
+	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
 	/// The frames and pictures a body is being made from (defined with the builder).
 	struct Job;
 	/// What a body is made for: the unit, its armour, kneeling, aiming, flying, what it holds, a big unit's turret's turn.
