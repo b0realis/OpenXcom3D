@@ -1494,10 +1494,10 @@ index 000000000..f7f5de937
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..44341f567
+index 000000000..6cc25fd66
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,254 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1693,6 +1693,8 @@ index 000000000..44341f567
 +  #           drawn), or all (as ever: by all eight drawings, a little forgiving)
 +  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
 +  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
++  #   arms: outside (a robe's arms lie outside the body), along (coloured along their length), both; or own (an arm
++  #           is painted by its own drawing alone, not by the body drawn over it: hands on a shirt)
 +  #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
 +  #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
 +  #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
@@ -1721,6 +1723,10 @@ index 000000000..44341f567
 +    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
 +    - names: [BAT, SHADOWBAT]
 +      animation: sprite
++    # The X-Com Files' people of the human race (civilians of every trade, gangers, hunters; XPiratez's too): hands on a
++    # shirt, an arm across a vest. Their arms are painted by the arm's own drawing, not the body's drawn over it
++    - names: [HUMAN]
++      arms: own
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
 +      sculpt: sides
@@ -88375,7 +88381,7 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..de54a3305
+index 000000000..2eed424a8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 @@ -0,0 +1,5406 @@
@@ -93576,10 +93582,10 @@ index 000000000..de54a3305
 +					}
 +				}
 +			}
-+			// (A person's arm is painted by its own drawing alone: where that has no pixel for a cube, the nearest it has,
-+			// not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
++			// (A person's arm, and that of a unit the table names "arms: own", is painted by its own drawing alone: where
++			// that has no pixel for a cube, the nearest it has, not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
 +			// there took the torso's colours: "hands wrapped in shirt fabric", a player, GitHub issue #219.)
-+			if (!colour && routine.standard && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
++			if (!colour && (routine.standard || (routine.arms & 4)) && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
 +			{
 +				const int other = first == Front ? Back : Front;
 +				colour = ownColour(k, first, painting);
@@ -93787,7 +93793,7 @@ index 000000000..de54a3305
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..77cc8ac0a
+index 000000000..8330831b9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
 @@ -0,0 +1,154 @@
@@ -93886,7 +93892,7 @@ index 000000000..77cc8ac0a
 +/// top stand, voxels: a kneeling soldier's height by the game's rules, and 20 (set for the unit being made; 0: as its
 +/// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 +/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
-+/// length (see makeModel).
++/// length, 4 painted by their own drawing alone (see makeModel).
 +/// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
 +/// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
 +/// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see
@@ -103038,7 +103044,7 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..cdf31d968
+index 000000000..33613fd18
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
 @@ -0,0 +1,504 @@
@@ -103167,7 +103173,7 @@ index 000000000..cdf31d968
 +		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 +		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 +		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
-+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
++		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone; 0 as drawn)
 +		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
@@ -103385,7 +103391,7 @@ index 000000000..cdf31d968
 +				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 +				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : sculpt == "sides" ? 2 : 0;
 +				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
-+				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
++				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : arms == "own" ? 4 : 0;
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}

@@ -93,7 +93,7 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// top stand, voxels: a kneeling soldier's height by the game's rules, and 20 (set for the unit being made; 0: as its
 /// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 /// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
-/// length (see makeModel).
+/// length, 4 painted by their own drawing alone (see makeModel).
 /// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
 /// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
 /// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see

@@ -5195,10 +5195,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 					}
 				}
 			}
-			// (A person's arm is painted by its own drawing alone: where that has no pixel for a cube, the nearest it has,
-			// not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
+			// (A person's arm, and that of a unit the table names "arms: own", is painted by its own drawing alone: where
+			// that has no pixel for a cube, the nearest it has, not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
 			// there took the torso's colours: "hands wrapped in shirt fabric", a player, GitHub issue #219.)
-			if (!colour && routine.standard && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
+			if (!colour && (routine.standard || (routine.arms & 4)) && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
 			{
 				const int other = first == Front ? Back : Front;
 				colour = ownColour(k, first, painting);

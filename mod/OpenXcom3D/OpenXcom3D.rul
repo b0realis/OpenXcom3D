@@ -193,6 +193,8 @@ firstPerson:
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
   #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
+  #   arms: outside (a robe's arms lie outside the body), along (coloured along their length), both; or own (an arm
+  #           is painted by its own drawing alone, not by the body drawn over it: hands on a shirt)
   #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
   #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
   #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
@@ -221,6 +223,10 @@ firstPerson:
     # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]
       animation: sprite
+    # The X-Com Files' people of the human race (civilians of every trade, gangers, hunters; XPiratez's too): hands on a
+    # shirt, an arm across a vest. Their arms are painted by the arm's own drawing, not the body's drawn over it
+    - names: [HUMAN]
+      arms: own
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
       sculpt: sides
