@@ -549,6 +549,51 @@ void continueLimbs(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner
 	}
 }
 
+/// A big walker's shape, cut by its four drawings from front, back and sides (see makeModel), is rounded as it stands:
+/// what four outlines leave is square where it is seen from between them, a block on legs. At each height every cell
+/// has the body's stretch through it across and its stretch along; it stays where it lies within the oval those two
+/// span, RoundSlack over. A leg comes out a round post, a trunk an oval, by what the four drawings left alone: no
+/// quarter drawing is asked.
+const float RoundSlack = 1.15f;
+void roundPlan(std::vector<Uint8> &cells)
+{
+	std::vector<float> acrossOff((size_t)GridAcross * GridAlong), alongOff((size_t)GridAcross * GridAlong);
+	for (int up = 0; up < GridUp; ++up)
+	{
+		bool any = false;
+		// each cell's place in its stretch across, -1 to 1 from end to end
+		for (int along = 0; along < GridAlong; ++along)
+			for (int across = 0, start = -1; across <= GridAcross; ++across)
+			{
+				const bool in = across < GridAcross && cells[cellIndex(across, along, up)];
+				if (in && start < 0) start = across;
+				if (in || start < 0) continue;
+				for (int a = start; a < across; ++a) acrossOff[(size_t)a * GridAlong + along] = (2.0f * (a - start) + 1.0f) / (across - start) - 1.0f;
+				start = -1;
+				any = true;
+			}
+		if (!any) continue;
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0, start = -1; along <= GridAlong; ++along)
+			{
+				const bool in = along < GridAlong && cells[cellIndex(across, along, up)];
+				if (in && start < 0) start = along;
+				if (in || start < 0) continue;
+				for (int a = start; a < along; ++a) alongOff[(size_t)across * GridAlong + a] = (2.0f * (a - start) + 1.0f) / (along - start) - 1.0f;
+				start = -1;
+			}
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+			{
+				const int cell = cellIndex(across, along, up);
+				if (!cells[cell]) continue;
+				const float x = acrossOff[(size_t)across * GridAlong + along], y = alongOff[(size_t)across * GridAlong + along];
+				if (x * x + y * y > RoundSlack) cells[cell] = 2; // (marked: taken out below, the stretches stay as they were meanwhile)
+			}
+	}
+	for (Uint8 &cell : cells) if (cell == 2) cell = 0;
+}
+
 /// The pits of a body cut from eight drawings are filled (the owner, of XPiratez's Baron of Hell: its "outline is still
 /// ragged"; and "No thin slits should be present ever!"). Where hand drawn frames differ by a pixel the cut leaves
 /// its skin pocked: single cells out, a cell deep, and grooves a cell wide. An empty cell with PitSides or more of its
@@ -3536,6 +3581,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
 	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
 	const bool tank = bigHull && !turret && parts[1].any;
+	// (A big walker the unit table names "sculpt: frontal", a frog: its shape is its four drawings' from front, back and
+	// sides alone, rounded between them (see roundPlan), and each of its cubes is painted by the drawing it is turned
+	// to, as a humanoid's. Cut by all eight with one forgiven, as big walkers are, it had no legs to tell and no gap
+	// under its belly: the owner, "frog is awful/ we must revisit its generator! (It looks like a green blob)". By
+	// name only: UFO's Sectopod and Reaper agree less with their eight drawings made so (0.51 to 0.45 and 0.47 to
+	// 0.43 of outline in common: fatter seen from the quarters), and stay as they were.)
+	const bool fourSided = routine.big && !bigHull && routine.frontal;
 	SlantOnly = routine.big && !bigHull;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
@@ -3588,6 +3640,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const bool humanoid = !routine.big && !beast && !thin;
 		const int lowCardinals = Cardinals & ~(1 << ((Front + 4) % 8));
 		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : humanoid ? carve(solid, 0, shape, 0, false, Cardinals, lowCardinals, FeetZone)
+			: fourSided ? carve(solid, 0, shape, 0, false, Cardinals)
 			: carve(solid, bigHull ? 0 : 1, shape, thin ? LimbCarveReach : 0);
 		// (An upright creature that the cut leaves headless: its drawings are read level as well. Some are drawn as a
 		// thing standing is looked at, not as the views' slant would show it: a head held forward no lower from the
@@ -3597,6 +3650,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// readings. Not for every upright body: a civilian drawn standing straight keeps its head either way and came
 		// out a tenth fatter.)
 		if (humanoid && upright(solid) && topShown(solid, hull) < HeadKept) hull = carve(solid, 0, shape, 0, true, Cardinals, lowCardinals, FeetZone);
+		if (fourSided) roundPlan(hull);
 		if (turret) levelOff(solid, hull);
 		if (tank) flattenHull(hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -4218,7 +4272,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// don't shade it alike nor lie on one solid: a civilian's white shirt was blotched with its arms' skin and
 		// shadow, its shorts with its hands, its face a plain patch; a Celatid was striped, a Silacoid speckled. The
 		// owner, of the civilian: "something is very wrong with this model and its colors".)
-		const bool hull = turret || beast || tank || (routine.whole && routine.big);
+		const bool hull = turret || beast || tank || (routine.whole && routine.big && !fourSided);
 		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
 		std::vector<int> foremost, rearmost;
 		if (beast && routine.beast)
