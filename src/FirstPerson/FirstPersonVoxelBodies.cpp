@@ -277,7 +277,9 @@ inline bool atRow(int up, int row)
 /// A part's shape from all 8 of its frames: a cell is kept where at most `tolerance` frames put it outside the
 /// part's outline (the visual hull, a little forgiving of hand drawn frames that don't quite agree). Only the cells of
 /// `only` are looked at (the part's slices: the rest isn't kept anyway).
-std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only, int reach = 0)
+/// LevelToo: a frame has a cell where it has it read level as well (its rows heights, wherever the cell stands), not
+/// only along the views' slant: see makeModel, an upright creature drawn on one frame.
+std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vector<Uint8> &only, int reach = 0, bool levelToo = false)
 {
 	std::vector<Uint8> kept(GridCells, 0);
 	// (With a reach: the outlines grown by so many pixels, see LimbCarveReach.)
@@ -314,7 +316,8 @@ std::vector<Uint8> carve(const PartFrames &part, int tolerance, const std::vecto
 				int outside = 0;
 				for (int d = 0; d < 8 && outside <= tolerance; ++d)
 				{
-					if (!inside(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))) ++outside;
+					if (!inside(d, (int)std::floor(column[d]), (int)std::floor(rowFloor[d] - cellUp(up)))
+						&& !(levelToo && inside(d, (int)std::floor(column[d]), (int)std::floor(FloorY - cellUp(up))))) ++outside;
 				}
 				kept[cellIndex(across, along, up)] = outside <= tolerance;
 			}
@@ -348,11 +351,12 @@ bool thinDrawing(const PartFrames &part)
 /// an arm drawn against a shoulder stood a cell off it, all round: a Skeleton's two arms and its toes, a soldier's
 /// arm raised to aim, hung in the air beside the body. And a long body is its side drawing given width (see profile),
 /// in pieces where that has a pixel's gap in a thin tail or a leg's bar stands off the rounded trunk above it.
-/// So, of the pieces (cells touching by a face, an edge or a corner): one under SpeckCells is a speck and goes;
-/// wherever two stand SlitMost cells apart or less, the cells between are filled, all along; a piece still apart
-/// gets a bridge three cells thick to the nearest cell of the rest, if that is JoinMost or nearer. One further off
-/// stays where it is drawn. Cells gained are of the part beside them.
-const int SpeckCells = 8, SlitMost = 2, JoinMost = (int)(3.0f * VOXELSCALE / Cell);
+/// So, of the pieces (cells touching by a face, an edge or a corner): wherever two stand SlitMost cells apart or
+/// less, the cells between are filled, all along; a piece still apart gets a bridge three cells thick to the nearest
+/// cell of the rest, if that is JoinMost or nearer. One further off stays where it is drawn. Cells gained are of the
+/// part beside them. (The smallest pieces, a few cells each, were dropped as specks at first: they were a Skeleton's
+/// toes, drawn a dot each, and its feet's lowest rows fell from 85% covered to 66%. They are joined as the rest are.)
+const int SlitMost = 2, JoinMost = (int)(3.0f * VOXELSCALE / Cell);
 void joinPieces(std::vector<Uint8> &owner)
 {
 	std::vector<int> piece(GridCells, -1);
@@ -378,13 +382,6 @@ void joinPieces(std::vector<Uint8> &owner)
 	if (pieces.size() < 2) return;
 	const int biggest = (int)(std::max_element(pieces.begin(), pieces.end(), [](const std::vector<int> &one, const std::vector<int> &other) { return one.size() < other.size(); }) - pieces.begin());
 	auto place = [](int cell, int at[3]) { at[2] = cell % GridUp; at[1] = (cell / GridUp) % GridAlong; at[0] = cell / (GridUp * GridAlong); };
-	// the specks go
-	for (int label = 0; label < (int)pieces.size(); ++label)
-	{
-		if (label == biggest || (int)pieces[label].size() >= SpeckCells) continue;
-		for (const int cell : pieces[label]) { owner[cell] = 0; piece[cell] = -1; }
-		pieces[label].clear();
-	}
 	// (which pieces are one by now: each one's first of them)
 	std::vector<int> group(pieces.size());
 	for (size_t i = 0; i < group.size(); ++i) group[i] = (int)i;
@@ -508,6 +505,13 @@ void continueLimbs(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner
 			int over = 0;
 			for (int c = first; c <= last; ++c) over += !landing[(row - step) * FrameSize + c].empty();
 			if (over * 2 < last - first + 1) continue;
+			// (Not a sliver along a thing the body has: the stretch is half or more of the drawing's own stretch there. A
+			// hand held before a thigh went on down the thigh's edge to the floor, a stick, where the body's leg stood a
+			// pixel narrower than drawn.)
+			int runFirst = first, runLast = last;
+			while (runFirst > 0 && part.frame[Front][row * FrameSize + runFirst - 1]) --runFirst;
+			while (runLast < FrameSize - 1 && part.frame[Front][row * FrameSize + runLast + 1]) ++runLast;
+			if ((last - first + 1) * 2 < runLast - runFirst + 1) continue;
 			for (int c = first; c <= last; ++c)
 			{
 				const std::vector<int> from = landing[(row - step) * FrameSize + c]; // (a copy: the cells gained land on pixels too)
@@ -528,6 +532,142 @@ void continueLimbs(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner
 			}
 		}
 	}
+}
+
+/// The pits of a body cut from eight drawings are filled (the owner, of XPiratez's Baron of Hell: its "outline is still
+/// ragged"; and "No thin slits should be present ever!"). Where hand drawn frames differ by a pixel the cut leaves
+/// its skin pocked: single cells out, a cell deep, and grooves a cell wide. An empty cell with PitSides or more of its
+/// six sides against the body is one of it, of the part beside it; twice over, so a groove two cells deep goes too.
+const int PitSides = 5;
+void fillPits(std::vector<Uint8> &owner)
+{
+	static const int Beside[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
+	for (int pass = 0; pass < 2; ++pass)
+	{
+		std::vector<std::pair<int, Uint8>> gained;
+		for (int across = 1; across < GridAcross - 1; ++across)
+			for (int along = 1; along < GridAlong - 1; ++along)
+				for (int up = 1; up < GridUp - 1; ++up)
+				{
+					if (owner[cellIndex(across, along, up)] || cellUp(up) < 0.0f) continue;
+					int sides = 0;
+					Uint8 code = 0;
+					for (const int *step : Beside)
+					{
+						const Uint8 beside = owner[cellIndex(across + step[0], along + step[1], up + step[2])];
+						if (beside) { ++sides; code = beside; }
+					}
+					if (sides >= PitSides) gained.push_back({ cellIndex(across, along, up), code });
+				}
+		if (gained.empty()) break;
+		for (const std::pair<int, Uint8> &cell : gained) owner[cell.first] = cell.second;
+	}
+}
+
+/// A foot goes on along the floor as its side drawing has it (the owner, of creatures drawn on one frame, whose "feet
+/// end a little high": "Make better"; a player, GitHub issue #211: units "seem to lack say, toes pushing out from
+/// feet"). A body on one frame is made row by row from its front drawing (see limb), each slice as deep as the side
+/// drawing's row there: but a row is read as a height, and a side drawing has its near foot lower than that, by the
+/// views' slant, and a shoe's length in rows the front has for the ankle. So a civilian's legs ended as posts.
+/// Each place across the body with cells in the lowest FeetZone, a leg's, takes the side drawing that has it near,
+/// the right side's for the body's right. From the pixels its own lowest cells land on there, the drawn pixels joined
+/// to them within FootReach, no higher than the zone, are its foot: each that nothing of the body lands on gets cells
+/// at that place across, as far along the body and as high as it shows there; one drawn up to FootUnder under the
+/// floor lies on it, one further under is another foot's. (With twice the zone and the reach and no such limit a
+/// civilian stood on plates twice as long as its shoes: both feet of the drawing for each leg.)
+const float FeetZone = 2.0f * VOXELSCALE, FootUnder = 1.0f * VOXELSCALE;
+const int FootReach = (int)(2.5f * VOXELSCALE * PixelsAcross);
+void continueFeet(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner)
+{
+	// (Only a body that stands on legs: two stretches or more across it near the floor. One that stands on all its
+	// breadth, a Silacoid, a robe, has no feet to find, and gained a rim all round.)
+	int legs = 0;
+	for (int across = 0, before = 0; across < GridAcross; ++across)
+	{
+		int low = 0;
+		for (int along = 0; along < GridAlong && !low; ++along)
+			for (int up = 0; up < GridUp && cellUp(up) < FeetZone && !low; ++up) low = owner[cellIndex(across, along, up)] != 0;
+		legs += low && !before;
+		before = low;
+	}
+	if (legs < 2) return;
+	const int pixels = FrameSize * FrameSize;
+	// where the body lands on each side drawing (0 the right side's, 1 the left's)
+	static const int Sides[2] = { RightSide, LeftSide };
+	std::vector<Uint8> landed[2];
+	auto pixelOf = [&](int side, int across, int along, int up) -> int
+	{
+		float column, row, nearness;
+		project(cellRight(across), cellAhead(along), cellUp(up), Sides[side], false, column, row, nearness);
+		const int c = (int)std::floor(column), r = (int)std::floor(row);
+		return c < 0 || r < 0 || c >= FrameSize || r >= FrameSize ? -1 : r * FrameSize + c;
+	};
+	for (int side = 0; side < 2; ++side)
+	{
+		landed[side].assign(pixels, 0);
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+				for (int up = 0; up < GridUp; ++up)
+				{
+					if (!owner[cellIndex(across, along, up)]) continue;
+					const int at = pixelOf(side, across, along, up);
+					if (at >= 0) landed[side][at] = 1;
+				}
+	}
+	std::vector<std::pair<int, Uint8>> gained; // (found for every place across first: a foot is its own leg's, not its neighbour's new cells')
+	std::vector<int> reach(pixels), queue;
+	for (int across = 0; across < GridAcross; ++across)
+	{
+		// (the side drawing that has this place across near, and which way along the body its columns run)
+		const int side = cellRight(across) >= 0.0f ? 0 : 1;
+		const float towards = side == 0 ? 1.0f : -1.0f;
+		std::fill(reach.begin(), reach.end(), -1);
+		queue.clear();
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp && cellUp(up) < FeetZone; ++up)
+			{
+				if (!owner[cellIndex(across, along, up)]) continue;
+				const int at = pixelOf(side, across, along, up);
+				if (at < 0 || reach[at] >= 0 || !part.frame[Sides[side]][at]) continue;
+				reach[at] = 0;
+				queue.push_back(at);
+			}
+		if (queue.empty()) continue;
+		const float slant = towards * 0.70710678f * cellRight(across);
+		const int topRow = (int)std::floor(FloorY - FeetZone + slant);
+		for (size_t i = 0; i < queue.size(); ++i)
+		{
+			const int at = queue[i], c = at % FrameSize, r = at / FrameSize;
+			if (reach[at] >= FootReach) continue;
+			static const int Beside[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+			for (const int *step : Beside)
+			{
+				const int nc = c + step[0], nr = r + step[1];
+				if (nc < 0 || nr < topRow || nc >= FrameSize || nr >= FrameSize || reach[nr * FrameSize + nc] >= 0 || !part.frame[Sides[side]][nr * FrameSize + nc]) continue;
+				reach[nr * FrameSize + nc] = reach[at] + 1;
+				queue.push_back(nr * FrameSize + nc);
+			}
+		}
+		for (const int at : queue)
+		{
+			if (landed[side][at]) continue;
+			const int c = at % FrameSize, r = at / FrameSize;
+			const float ahead = towards * (c + 0.5f - FloorX) / PixelsAcross;
+			if (FloorY - (r + 0.5f) + slant < -FootUnder) continue;
+			const float height = std::max(FloorY - (r + 0.5f) + slant, Cell * 0.5f);
+			if (height >= FeetZone) continue;
+			for (int along = 0; along < GridAlong; ++along)
+			{
+				if (std::abs(cellAhead(along) - ahead) > 0.5f / PixelsAcross + Cell * 0.5f) continue;
+				for (int up = 0; up < GridUp; ++up)
+				{
+					if (cellUp(up) < 0.0f || std::abs(cellUp(up) - height) > 0.5f + Cell * 0.5f) continue;
+					if (!owner[cellIndex(across, along, up)]) gained.push_back({ cellIndex(across, along, up), code });
+				}
+			}
+		}
+	}
+	for (const std::pair<int, Uint8> &cell : gained) owner[cell.first] = cell.second;
 }
 
 /// A turret's shape (a big unit that can't move, mounted on a vehicle: see makeModel), made a plain block. Its 8 frames are all
@@ -716,6 +856,47 @@ bool drawnBox(const PartFrames &part, int direction, int &left, int &right, int 
 	return right >= 0;
 }
 
+/// Whether a body drawn on one frame stands upright: its front drawing taller above the floor's row than the body is
+/// broad there (see makeModel: such a body's drawings are read level as well).
+bool upright(const PartFrames &part)
+{
+	int left, right, top, bottom;
+	if (!drawnBox(part, Front, left, right, top, bottom)) return false;
+	return (float)(FloorY - top) > (float)(right - left + 1) / PixelsAcross;
+}
+
+/// How much of the top of a body's front drawing, its highest HeadRows, its cells show, seen level (see makeModel).
+const int HeadRows = 5 * VOXELSCALE;
+const float HeadKept = 0.75f;
+float topShown(const PartFrames &part, const std::vector<Uint8> &cells)
+{
+	int left, right, top, bottom;
+	if (!drawnBox(part, Front, left, right, top, bottom)) return 1.0f;
+	std::vector<Uint8> landed((size_t)FrameSize * FrameSize, 0);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+		{
+			float column, rowFloor, nearness;
+			project(cellRight(across), cellAhead(along), 0.0f, Front, true, column, rowFloor, nearness);
+			const int c = (int)std::floor(column);
+			if (c < 0 || c >= FrameSize) continue;
+			for (int up = 0; up < GridUp; ++up)
+			{
+				const int r = (int)std::floor(rowFloor - cellUp(up));
+				if (r >= top && r < top + HeadRows && r < FrameSize && cells[cellIndex(across, along, up)]) landed[(size_t)r * FrameSize + c] = 1;
+			}
+		}
+	int drawn = 0, shown = 0;
+	for (int row = top; row < std::min(top + HeadRows, FrameSize); ++row)
+		for (int column = left; column <= right; ++column)
+		{
+			if (!part.at(Front, column, row)) continue;
+			++drawn;
+			shown += landed[(size_t)row * FrameSize + column];
+		}
+	return drawn ? (float)shown / drawn : 1.0f;
+}
+
 /// Whether a body drawn on one frame, named a beast by a mod's rules, is a long one (see LongNamed).
 bool longBody(const PartFrames &part)
 {
@@ -806,6 +987,8 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 	std::vector<Uint8> stands(FrameSize, 0);
 	for (int row = belly + 1; row <= std::min(bottom, belly + 1 + VOXELSCALE); ++row)
 		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row)) stands[column] = 1;
+	int standsFirst = FrameSize, standsLast = -1;
+	for (int column = 0; column < FrameSize; ++column) if (stands[column]) { standsFirst = std::min(standsFirst, column); standsLast = column; }
 	// the columns a pair of legs keeps to: what a drawing (the front's, the back's) has in its lowest rows
 	auto legColumns = [&](int direction) {
 		std::vector<Uint8> columns(FrameSize, 0);
@@ -857,15 +1040,16 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 		for (int column = left; column <= right; ++column) runs += part.at(RightSide, column, row) && !part.at(RightSide, column - 1, row);
 		if (runs >= 2) strokesFrom = row;
 	}
+	struct Stroke { int label, count, top, bottom; float middle; };
+	std::vector<Stroke> strokes;
 	if (strokesFrom < FrameSize)
 	{
-		struct Stroke { int label, count, bottom; float middle; };
 		std::vector<Stroke> halves[2];
 		for (int row = strokesFrom; row <= bottom; ++row)
 			for (int column = left; column <= right; ++column)
 			{
 				if (!part.at(RightSide, column, row) || stroke[(size_t)row * FrameSize + column] >= 0) continue;
-				Stroke found = { (int)strokeSide.size(), 0, row, 0.0f };
+				Stroke found = { (int)strokeSide.size(), 0, row, row, 0.0f };
 				std::vector<std::pair<int, int>> stack(1, { column, row });
 				stroke[(size_t)row * FrameSize + column] = found.label;
 				while (!stack.empty())
@@ -886,6 +1070,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 				}
 				found.middle /= found.count;
 				strokeSide.push_back(0);
+				strokes.push_back(found);
 				if (found.count >= 3 * VOXELSCALE * VOXELSCALE) halves[found.middle >= FloorX ? 0 : 1].push_back(found);
 			}
 		for (std::vector<Stroke> &half : halves)
@@ -897,14 +1082,15 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			for (size_t i = 0; i < half.size(); ++i) strokeSide[half[i].label] = i < near ? 1 : -1;
 		}
 	}
-	auto legSide = [&](int column, int row) {
-		if (strokesFrom == FrameSize || column < 0 || column >= FrameSize) return 0;
+	// (the stroke a leg's pixel is of; above the strokes' first row, the one under it)
+	auto strokeAt = [&](int column, int row) {
+		if (strokesFrom == FrameSize || column < 0 || column >= FrameSize) return -1;
 		for (int r = std::max(row, strokesFrom); r <= std::min(bottom, std::max(row, strokesFrom) + VOXELSCALE); ++r)
 		{
-			if (stroke[(size_t)r * FrameSize + column] >= 0) return strokeSide[stroke[(size_t)r * FrameSize + column]];
+			if (stroke[(size_t)r * FrameSize + column] >= 0) return stroke[(size_t)r * FrameSize + column];
 			if (row >= strokesFrom) break;
 		}
-		return 0;
+		return -1;
 	};
 	std::vector<std::vector<std::pair<float, float>>> rowBars[2];
 	std::vector<int> barsRow[2];
@@ -928,6 +1114,55 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 		{
 			for (int lower = row; lower < FrameSize && barsRow[end][row] < 0; ++lower) if (rowRuns[end][lower] >= 2) barsRow[end][row] = lower;
 			for (int upper = row; upper >= 0 && barsRow[end][row] < 0; --upper) if (rowRuns[end][upper] >= 2) barsRow[end][row] = upper;
+		}
+	}
+	// (And each stroke one strut a side. A row of a frontal drawing with legs spread wide has several bars a side, a
+	// leg before and a leg behind it, and a stroke stood on all of them: a Chupacabra showed more struts than it has
+	// legs, and drew half as many pixels again as its sprite. So a stroke keeps to one bar on each side it stands on:
+	// at its top, of its side's bars from the middle out, the first no stroke of its half has taken; further down,
+	// the bar nearest the one it had a row above. Paths[side: 0 right, 1 left][stroke][row]: the bar's middle and
+	// half width, none where its half width is 0.)
+	std::vector<std::vector<std::pair<float, float>>> paths[2];
+	for (int side = 0; side < 2; ++side) paths[side].assign(strokes.size(), std::vector<std::pair<float, float>>());
+	for (int end = 0; end < 2 && !strokes.empty(); ++end)
+	{
+		std::vector<Stroke> half;
+		for (const Stroke &one : strokes) if (one.count >= 3 * VOXELSCALE * VOXELSCALE && (one.middle >= FloorX ? 0 : 1) == end) half.push_back(one);
+		std::sort(half.begin(), half.end(), [](const Stroke &one, const Stroke &other) { return one.top != other.top ? one.top < other.top : one.label < other.label; });
+		int taken[2] = { 0, 0 };
+		for (const Stroke &one : half)
+		{
+			// (the row of the frontal drawing a row of the side one is on, at the stroke's place along the body)
+			const float ahead = (one.middle - FloorX) / PixelsAcross;
+			const int shift = (int)std::lround((end ? -ahead : ahead) * reading.slant);
+			for (int side = 0; side < 2; ++side)
+			{
+				if (strokeSide[one.label] && (strokeSide[one.label] > 0) != (side == 0)) continue;
+				std::vector<std::pair<float, float>> &path = paths[side][one.label];
+				path.assign(FrameSize, { 0.0f, 0.0f });
+				const int slot = taken[side]++;
+				float last = 0.0f;
+				bool begun = false;
+				for (int row = one.top; row <= one.bottom; ++row)
+				{
+					const int endRow = std::clamp(row + shift, 0, FrameSize - 1);
+					if (barsRow[end][endRow] < 0) continue;
+					std::vector<std::pair<float, float>> bars;
+					for (const auto &bar : rowBars[end][barsRow[end][endRow]]) if ((bar.first > 0.0f) == (side == 0)) bars.push_back(bar);
+					if (bars.empty()) bars = rowBars[end][barsRow[end][endRow]];
+					if (bars.empty()) continue;
+					std::sort(bars.begin(), bars.end(), [](const std::pair<float, float> &a, const std::pair<float, float> &b) { return std::abs(a.first) < std::abs(b.first); });
+					size_t chosen = std::min((size_t)slot, bars.size() - 1);
+					if (begun)
+					{
+						chosen = 0;
+						for (size_t i = 1; i < bars.size(); ++i) if (std::abs(bars[i].first - last) < std::abs(bars[chosen].first - last)) chosen = i;
+					}
+					path[row] = bars[chosen];
+					last = bars[chosen].first;
+					begun = true;
+				}
+			}
 		}
 	}
 	// (Each leg a bar where a frontal drawing has it, no thicker than the side drawing has it. The runs of a drawing's
@@ -966,7 +1201,10 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 				}
 			}
 			if (!part.at(RightSide, sideRight, row)) continue;
-			const bool leg = row >= legsFrom;
+			// (the legs' rows: below the belly all of them; of the belly's raised rows, what stands between the first leg
+			// and the last. What the drawing has there behind the hind legs or before the front ones is no belly to
+			// raise: a rat's tail lying low went with it.)
+			const bool leg = row >= legsFrom && (row > belly || (sideRight >= standsFirst && sideRight <= standsLast));
 			// (Round: the drawing's stretch through this pixel, up and down or along the body, whichever is the shorter,
 			// is a round thing's thickness there, and it is as far across as that from its middle. As deep as the
 			// outline is near, all of it was a slab with its edges cut: the owner, of the dog, "needs to be much more
@@ -974,7 +1212,8 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			int runTop = row, runBottom = row, runFirst = sideRight, runLast = sideRight;
 			while (runTop > 0 && part.at(RightSide, sideRight, runTop - 1)) --runTop;
 			// (the trunk's stretch ends at the belly: the legs under it are their own)
-			while (runBottom < FrameSize - 1 && part.at(RightSide, sideRight, runBottom + 1) && (leg || runBottom + 1 < legsFrom)) ++runBottom;
+			while (runBottom < FrameSize - 1 && part.at(RightSide, sideRight, runBottom + 1)
+				&& (leg || runBottom + 1 < legsFrom || (runBottom + 1 <= belly && (sideRight < standsFirst || sideRight > standsLast)))) ++runBottom;
 			while (runFirst > 0 && part.at(RightSide, runFirst - 1, row)) --runFirst;
 			while (runLast < FrameSize - 1 && part.at(RightSide, runLast + 1, row)) ++runLast;
 			const float tall = (runBottom - runTop + 1) * 0.5f, lengthways = (runLast - runFirst + 1) * 0.5f;
@@ -1006,6 +1245,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			const float half = std::min(widest, std::max(ProfileHalfLeast, breadth * std::sqrt(std::max(0.0f, 1.0f - off * off))));
 			// (the belly's raised rows: only the legs are left of them)
 			if (leg && row <= belly && !(sideRight >= 0 && sideRight < FrameSize && stands[sideRight])) continue;
+			const int legStroke = leg ? strokeAt(sideRight, row) : -1;
 			for (int across = 0; across < GridAcross; ++across)
 			{
 				if (pair)
@@ -1018,16 +1258,20 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 				const int legBarsRow = leg && endRow >= 0 && endRow < FrameSize ? barsRow[end][endRow] : -1;
 				if (leg)
 				{
-					const std::vector<std::pair<float, float>> &bars = legBarsRow >= 0 ? rowBars[end][legBarsRow] : end == 0 ? frontBars : hindBars;
-					// (its own side's bars, where the drawing has one there)
-					int side = legBarsRow >= 0 ? legSide(sideRight, row) : 0;
-					bool sided = false;
-					for (const auto &bar : bars) sided = sided || (side && (bar.first > 0.0f) == (side > 0));
-					if (!sided) side = 0;
-					bool onBar = false;
-					for (const auto &bar : bars)
+					// (its stroke's own bars, see paths; a pixel of no stroke stands on every bar of its row)
+					bool onBar = false, pathed = false;
+					for (int side = 0; side < 2 && legStroke >= 0 && legBarsRow >= 0; ++side)
 					{
-						if (side && (bar.first > 0.0f) != (side > 0)) continue;
+						const std::vector<std::pair<float, float>> &path = paths[side][legStroke];
+						if (path.empty()) continue;
+						const std::pair<float, float> &bar = path[std::clamp(row, strokes[legStroke].top, strokes[legStroke].bottom)];
+						if (bar.second <= 0.0f) continue;
+						pathed = true;
+						onBar = onBar || std::abs(cellRight(across) - bar.first) <= std::min(bar.second, half + 0.5f);
+					}
+					for (const auto &bar : legBarsRow >= 0 ? rowBars[end][legBarsRow] : end == 0 ? frontBars : hindBars)
+					{
+						if (pathed) break;
 						onBar = onBar || std::abs(cellRight(across) - bar.first) <= std::min(bar.second, half + 0.5f);
 					}
 					if (!onBar) continue;
@@ -3311,7 +3555,21 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? longShape(solid, beastLegsTop, routine.beast, longReading) : limb(solid, RightSide);
 		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
 		// (a long body has its width from its own side drawing, see profile: the other drawings don't cut it)
-		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : carve(solid, bigHull ? 0 : 1, shape, !routine.big && thinDrawing(solid) ? LimbCarveReach : 0);
+		const bool thin = !routine.big && thinDrawing(solid);
+		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : carve(solid, bigHull ? 0 : 1, shape, thin ? LimbCarveReach : 0);
+		// (An upright creature that the cut leaves headless: its drawings are read level as well. Some are drawn as a
+		// thing standing is looked at, not as the views' slant would show it: a head held forward no lower from the
+		// front than from behind, a horn on the far side no higher than the near one. Cut along the slant alone, what
+		// stands off such a body's middle goes wherever two drawings differ so: XPiratez's Baron of Hell and its Imp,
+		// both drawn leaning, had no head from the front, horns and half an arm gone (the owner, of the Baron: its
+		// "outline is still ragged and its horns faint"). So where under HeadKept of the top of the front drawing is
+		// left, seen level, the cut is made again with both readings. Not for every upright body: a civilian drawn
+		// standing straight keeps its head either way and came out a tenth fatter; nor a low thing drawn from above,
+		// a Silacoid, a third.)
+		if (!beast && !routine.big && !thin && upright(solid) && topShown(solid, hull) < HeadKept)
+		{
+			hull = carve(solid, 1, shape, 0, true);
+		}
 		if (turret) levelOff(solid, hull);
 		if (tank) flattenHull(hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
@@ -3593,12 +3851,15 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 
 	joinPieces(owner);
 
-	// (a body on one frame that is no long one: its limbs go on as its front drawing has them, see continueLimbs;
+	// (a body on one frame that is no long one: its limbs go on as its front drawing has them, see continueLimbs,
+	// its feet along the floor as its side drawings have them, see continueFeet, and its skin's pits are filled;
 	// after the loose cells and the pieces apart went, which took a thin shin and all below it; not a thin thing, a
 	// bat: its wings went on down as curtains)
 	if (routine.whole && !routine.big && !beast && !tank && !turret && !thinDrawing(parts[0]))
 	{
 		continueLimbs(parts[0], PartCodes[0], owner);
+		continueFeet(parts[0], PartCodes[0], owner);
+		fillPits(owner);
 	}
 
 	// The waist: each part's shape narrows to nothing at its ends, and where the torso's lowest rows met the legs' highest
