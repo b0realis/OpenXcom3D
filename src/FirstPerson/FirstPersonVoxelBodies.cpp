@@ -4171,11 +4171,16 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// (So a long body on four legs, see longBody: most of it is its flanks, which the front and back drawings show
 		// nothing of. Painted by those two, a dog's flanks took its chest's colour: one tan barrel, where its side drawings
 		// have a dark flank on light legs.)
-		// (And so any body drawn on one frame, a creature: a frog, a demon. Its drawings show it from all round, and
-		// thrown straight through it the front drawing's colours ran along its sides in streaks: a player, GitHub issue
-		// #211, a Bullfrog's face "as if the front decided to adopt textures from the left". A body drawn in parts, a
-		// human's, stays painted by its front and back.)
-		const bool hull = turret || beast || tank || routine.whole;
+		// (And so a big body drawn on one frame, two tiles by two: a frog, a demon. Its drawings show it from all round,
+		// and thrown straight through it the front drawing's colours ran along its long sides in streaks: a player,
+		// GitHub issue #211, a Bullfrog's face "as if the front decided to adopt textures from the left". A body drawn
+		// in parts, a human's, stays painted by its front and back.)
+		// (Not a body on one frame that is one tile big, a civilian, an Ethereal, a Celatid, an Imp: painted by its front
+		// and back as a human is. For a while they were painted this way too, and a hand drawn body's eight drawings
+		// don't shade it alike nor lie on one solid: a civilian's white shirt was blotched with its arms' skin and
+		// shadow, its shorts with its hands, its face a plain patch; a Celatid was striped, a Silacoid speckled. The
+		// owner, of the civilian: "something is very wrong with this model and its colors".)
+		const bool hull = turret || beast || tank || (routine.whole && routine.big);
 		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
 		std::vector<int> foremost, rearmost;
 		if (beast && routine.beast)
