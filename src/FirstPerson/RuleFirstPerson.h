@@ -124,6 +124,7 @@ public:
 		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
 		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
+		int drawn = -1; // (a body that walks on two legs left as its drawings have it: 1; made the standard humanoid, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -326,7 +327,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms;
+				std::string shape, top, sculpt, animation, arms, humanoid;
 				int seeThrough = 0, torsoDepth = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -341,6 +342,7 @@ public:
 				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
 				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
 				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
+				if (entry.tryRead("humanoid", humanoid)) look.drawn = humanoid == "drawn" ? 1 : 0;
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
 		}
@@ -441,6 +443,7 @@ public:
 			if (entry.second.animated != -1) look.animated = entry.second.animated;
 			if (entry.second.relief != -1) look.relief = entry.second.relief;
 			if (entry.second.arms != -1) look.arms = entry.second.arms;
+			if (entry.second.drawn != -1) look.drawn = entry.second.drawn;
 		}
 		return look;
 	}

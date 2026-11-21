@@ -197,6 +197,7 @@ struct VoxelUnits::Job
 	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
 	bool relief = false; // (its one drawing given volume: see Routine)
 	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
+	bool drawn = false; // (taken out of the standard humanoid, by the unit table: see Routine)
 	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
@@ -695,9 +696,9 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (normal && normal->getKneelHeight() > 0) tankHull = (float)normal->getKneelHeight();
 		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 	}
-	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };
-	hashBytes(hash, pose, 10);
+	const Uint8 pose[11] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.drawn == 1) };
+	hashBytes(hash, pose, 11);
 	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 	hashBytes(hash, tankHeights, 2);
 	_byQuick[quick] = hash;
@@ -729,6 +730,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->frontal = look.frontal == 1;
 		job->relief = relief;
 		job->arms = std::max(look.arms, 0);
+		job->drawn = look.drawn == 1;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->fine = FineBodies;
@@ -940,6 +942,8 @@ void VoxelUnits::build()
 			source.torsoDepth = job->torsoDepth;
 			source.backTop = job->backTop;
 			source.frontal = job->frontal;
+			source.kneeling = job->kneeled;
+			source.drawn = job->drawn;
 			source.relief = job->relief;
 			source.arms = job->arms;
 			source.tankHull = job->tankHull;
@@ -955,6 +959,8 @@ void VoxelUnits::build()
 			routine.torsoDepth = job->torsoDepth;
 			routine.backTop = job->backTop;
 			routine.frontal = job->frontal;
+			routine.kneeling = job->kneeled;
+			routine.drawn = job->drawn;
 			routine.relief = job->relief;
 			routine.arms = job->arms;
 			routine.tankHull = job->tankHull;
@@ -985,6 +991,8 @@ void VoxelUnits::build()
 				source.torsoDepth = job->torsoDepth;
 				source.backTop = job->backTop;
 				source.frontal = job->frontal;
+				source.kneeling = job->kneeled;
+				source.drawn = job->drawn;
 				source.relief = job->relief;
 				source.routine = job->routine->number;
 				shape = makeFineModel(source, job->palette);
@@ -1002,6 +1010,8 @@ void VoxelUnits::build()
 				routine.torsoDepth = job->torsoDepth;
 				routine.backTop = job->backTop;
 				routine.frontal = job->frontal;
+				routine.kneeling = job->kneeled;
+				routine.drawn = job->drawn;
 				routine.relief = job->relief;
 				const std::vector<Uint8> noComposite[8];
 				const HeldItem noItems[2];
@@ -1085,8 +1095,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop);
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d drawn %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.drawn);
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

@@ -94,9 +94,12 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 /// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 /// length (see makeModel).
+/// Kneeling: the pose the body is made in (set for the unit being made); drawn: the unit table takes it out of the
+/// standard humanoid ("humanoid: drawn"; see standardBody): a body that walks on two legs stays as its drawings alone
+/// leave it.
 /// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 /// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; };
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool drawn = false; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

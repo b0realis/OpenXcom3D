@@ -1478,10 +1478,10 @@ index 000000000..87c809c43
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..53c5d4475
+index 000000000..c6bf5491f
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,240 @@
+@@ -0,0 +1,242 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1677,6 +1677,8 @@ index 000000000..53c5d4475
 +  #           drawn), or all (as ever: by all eight drawings, a little forgiving)
 +  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
 +  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
++  #   humanoid: drawn (a unit that walks on two legs keeps the body its drawings alone leave: no standard humanoid's
++  #           neck, egg of a head, round limbs and feet), or standard (as ever)
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
@@ -88209,10 +88211,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..cafd27d9e
+index 000000000..2e47750c1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,4595 @@
+@@ -0,0 +1,5337 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88807,6 +88809,722 @@ index 000000000..cafd27d9e
 +			}
 +	}
 +	for (Uint8 &cell : cells) if (cell == 2) cell = 0;
++}
++
++/// ---- The standard humanoid ----
++/// The owner: "For humanoid body set a general beautiful humanoid that conforms to standards. Legs waist feet neck
++/// head and adapt our models to that!" A body that walks on two legs is first made from its drawings, as every body
++/// is (see makeModel): slices of its drawings' rows, cut by its outlines. That body has its drawings' size and pose,
++/// and their pixels' steps, the notches where two drawings differ, a head that sits on the shoulders as a block, feet
++/// that are plates. standardBody makes it again as a humanoid is built, to that body's own measures:
++///  - every part is taken apart into its sections, a piece at a height, each an oval as wide and as deep as the piece
++///    (a piece that is two joined by a thin bridge, the two legs at the hips, is two), and the sections that follow
++///    each other up a limb are smoothed along it: a limb is a round tube, the trunk a little square;
++///  - the head is an egg: its widest section's oval, round above it to the crown and round below it to the neck (what
++///    stands thin above the crown, ears, horns, a plume, stays as drawn);
++///  - there is a neck: where the body is thinnest between the head and the shoulders (no lower than where the arms
++///    begin), NeckShare of the head thick at most, a voxel long, the shoulders sloping away from it;
++///  - a waist, a little in, low on the trunk;
++///  - an arm with bones (see armEnd, placeElbow) is its bones: a shoulder joined to the trunk, an upper arm, a
++///    forearm tapering to the wrist, a hand;
++///  - each leg goes straight down from its ankle (its thinnest above the foot) to a foot: a sole on the floor from
++///    heel to toe, FootLong of the body's height long and pointing ahead, toes out no more than SplayMost, however
++///    the drawing has the shoe (X-COM's stand with their shoes out sideways).
++/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Not made so: a
++/// body on one frame that shows no two legs (a robe: the Ethereal), one drawn leaning (see makeModel), a kneeling
++/// body's legs, and what the unit table names "humanoid: drawn".
++/// (All in voxels but where said. StandardTrunk, StandardHead, StandardLimb: how far the smoothing along a limb
++/// reaches. SplitDip: a piece is two where, along its length, it is this thin against both its sides. RoundWide: a
++/// section's oval is at most this many times its cells' spread wide (a stray cell doesn't widen it). CapShare: a
++/// limb's free end is rounded off over this much of its thickness. NeckPinch: a neck is at most this much of what is
++/// above and below it, in area; ShoulderJump: without one, the shoulders begin where the body is this many times what
++/// is above it. ChinLong, ShoulderLong: over how much the neck widens to the head and to the
++/// shoulders. HeadMost: a head without arms to tell its end is at most this much of the body's height; HeadLong: an
++/// egg at most this long for its width; HeadDome: its top round over this much of its half width; CrownShare: what
++/// is thinner than this much of the head, for a voxel and more, is no part of the egg; HeadFlat: what is over the neck
++/// and more than this many times as wide as it is high is no head (a frill, a wide hat, a Muton's shoulders). WaistIn: how much in. LegWide:
++/// a leg's ankle is at most this thick, half across; AnkleReach: it is looked for this far above the foot's top.
++/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootMost, FootWide: its length, the
++/// most if drawn longer, and its least half width, of the body's height. LimbRound: a limb at least LimbLong long is
++/// at least this thick one way for the other, where it is no more than LimbThick across, half. TrunkSquare: the power of the trunk's sections' outline, 2 an oval.)
++constexpr float StdTrunk = 0.6f, StdHead = 0.4f, StdLimb = 0.6f, SplitDip = 0.4f, CapShare = 1.0f, RoundWide = 2.2f, NeckPinch = 0.85f, NeckShare = 0.6f,
++	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.75f, FootLong = 0.15f, FootMost = 0.2f, ToeHigh = 0.65f, LegWide = 3.0f,
++	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.032f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
++	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f;
++/// An arm's bones as placed (see makeModel), for standardBody: its joints, and how thick its upper and lower bone are.
++struct StandardArm { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
++/// A piece of a part at one height: its middle and its oval (the squares of its half sizes along its own axes, as a
++/// matrix), in cells. Ragged: it fills less than SectionSolid of its oval: a star, a hook, a thing with arms out at
++/// that height, no section of a limb; it stays as its cells are.
++struct Section { Uint8 part; int up; float right, ahead, xx, xy, yy; std::vector<int> cells, above, below; bool ragged = false; };
++inline float sectionRadius(const Section &one) { return std::sqrt(std::sqrt(std::max(one.xx * one.yy - one.xy * one.xy, 1e-6f))); }
++/// Fills the empty cells within a round bar from a to b, radiusA thick at a and radiusB at b, with a part's code;
++/// with `over`, the torso's cells too.
++void fillBar(std::vector<Uint8> &cells, Uint8 code, const float a[3], const float b[3], float radiusA, float radiusB, bool over = false)
++{
++	const float most = std::max(radiusA, radiusB);
++	auto range = [&](int axis, float from, int count, int &first, int &last) {
++		first = std::max(0, (int)std::floor((std::min(a[axis], b[axis]) - most - from) / Cell));
++		last = std::min(count - 1, (int)std::ceil((std::max(a[axis], b[axis]) + most - from) / Cell));
++	};
++	int across0, across1, along0, along1, up0, up1;
++	range(0, AcrossFrom, GridAcross, across0, across1);
++	range(1, AlongFrom, GridAlong, along0, along1);
++	range(2, UpFrom, GridUp, up0, up1);
++	const float ab[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, length2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
++	for (int across = across0; across <= across1; ++across)
++		for (int along = along0; along <= along1; ++along)
++			for (int up = up0; up <= up1; ++up)
++			{
++				const float point[3] = { cellRight(across) - a[0], cellAhead(along) - a[1], cellUp(up) - a[2] };
++				const float t = length2 > 1e-9f ? std::clamp((point[0] * ab[0] + point[1] * ab[1] + point[2] * ab[2]) / length2, 0.0f, 1.0f) : 0.0f;
++				const float off[3] = { point[0] - t * ab[0], point[1] - t * ab[1], point[2] - t * ab[2] }, radius = radiusA + (radiusB - radiusA) * t;
++				Uint8 &cell = cells[cellIndex(across, along, up)];
++				if ((!cell || (over && cell == VoxelUnitModel::Torso)) && off[0] * off[0] + off[1] * off[1] + off[2] * off[2] <= radius * radius) cell = code;
++			}
++}
++/// Makes a body that walks on two legs again as the standard humanoid (see above). Whole: all of it is drawn on one
++/// frame, and is the torso's part (its legs among it); stands: its legs stand (not kneeling); arms: its arms' bones
++/// (left, right), where it has them; armsOver: they lie over the body where they touch it (the unit table's arms
++/// outside); legsDrawn: its legs' drawings, to paint its feet by.
++void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const StandardArm arms[2], bool armsOver, const PartFrames &legsDrawn)
++{
++	const float V = VOXELSCALE / Cell; // (cells a voxel)
++	std::vector<Section> sections;
++	std::vector<int> at(GridCells, -1);
++	// 1. the sections: each part's pieces at each height, a piece that is two joined by a thin bridge taken apart
++	{
++		std::vector<int> stack;
++		std::vector<std::vector<int>> work;
++		for (int up = 0; up < GridUp; ++up)
++			for (int across = 0; across < GridAcross; ++across)
++				for (int along = 0; along < GridAlong; ++along)
++				{
++					const int first = cellIndex(across, along, up);
++					if (!owner[first] || at[first] != -1) continue;
++					const Uint8 part = owner[first];
++					std::vector<int> blob;
++					at[first] = -2;
++					stack.push_back(first);
++					while (!stack.empty())
++					{
++						const int cell = stack.back();
++						stack.pop_back();
++						blob.push_back(cell);
++						const int b = (cell / GridUp) % GridAlong, a = cell / (GridUp * GridAlong);
++						for (int da = -1; da <= 1; ++da)
++							for (int db = -1; db <= 1; ++db)
++							{
++								if (a + da < 0 || b + db < 0 || a + da >= GridAcross || b + db >= GridAlong) continue;
++								const int other = cellIndex(a + da, b + db, up);
++								if (owner[other] == part && at[other] == -1) { at[other] = -2; stack.push_back(other); }
++							}
++					}
++					work.clear();
++					work.push_back(std::move(blob));
++					for (int depth = 0; !work.empty(); ++depth)
++					{
++						std::vector<int> cells = std::move(work.back());
++						work.pop_back();
++						const int count = (int)cells.size();
++						float ma = 0.0f, mb = 0.0f;
++						for (int cell : cells) { ma += cell / (GridUp * GridAlong); mb += (cell / GridUp) % GridAlong; }
++						ma /= count; mb /= count;
++						float caa = 1.0f / 12.0f, cab = 0.0f, cbb = 1.0f / 12.0f;
++						for (int cell : cells)
++						{
++							const float da = cell / (GridUp * GridAlong) - ma, db = (cell / GridUp) % GridAlong - mb;
++							caa += da * da / count; cab += da * db / count; cbb += db * db / count;
++						}
++						const float angle = 0.5f * std::atan2(2.0f * cab, caa - cbb), ua = std::cos(angle), ub = std::sin(angle);
++						float most = 0.0f, mostOther = 0.0f, least = 1e9f;
++						for (int cell : cells)
++						{
++							const float da = cell / (GridUp * GridAlong) - ma, db = (cell / GridUp) % GridAlong - mb;
++							most = std::max(most, std::abs(da * ua + db * ub));
++							mostOther = std::max(mostOther, std::abs(-da * ub + db * ua));
++							least = std::min(least, da * ua + db * ub);
++						}
++						// (two pieces joined by a thin bridge: taken apart where, along its length, it is thinnest)
++						if (count >= 8 && depth < 6)
++						{
++							const int bins = (int)std::floor(2.0f * most) + 2;
++							std::vector<int> counts(bins, 0);
++							for (int cell : cells)
++							{
++								const float da = cell / (GridUp * GridAlong) - ma, db = (cell / GridUp) % GridAlong - mb;
++								++counts[std::min(bins - 1, std::max(0, (int)std::floor(da * ua + db * ub - least)))];
++							}
++							int cut = -1;
++							float lowest = SplitDip;
++							for (int bin = 1; bin + 1 < bins; ++bin)
++							{
++								const int before = *std::max_element(counts.begin(), counts.begin() + bin), after = *std::max_element(counts.begin() + bin + 1, counts.end());
++								const int sides = std::min(before, after);
++								if (sides < 2) continue;
++								const float share = (float)counts[bin] / sides;
++								if (share < lowest) { lowest = share; cut = bin; }
++							}
++							if (cut >= 0)
++							{
++								std::vector<int> one, other;
++								for (int cell : cells)
++								{
++									const float da = cell / (GridUp * GridAlong) - ma, db = (cell / GridUp) % GridAlong - mb;
++									(da * ua + db * ub - least < cut + 0.5f ? one : other).push_back(cell);
++								}
++								if (one.size() >= 3 && other.size() >= 3)
++								{
++									work.push_back(std::move(one));
++									work.push_back(std::move(other));
++									continue;
++								}
++							}
++						}
++						const float mean = (caa + cbb) * 0.5f, spread = std::sqrt((caa - cbb) * (caa - cbb) * 0.25f + cab * cab);
++						const float half = std::max(0.5f, std::min(most + 0.25f, RoundWide * std::sqrt(mean + spread))),
++							halfOther = std::max(0.5f, std::min(mostOther + 0.25f, RoundWide * std::sqrt(std::max(mean - spread, 0.0f))));
++						Section made;
++						made.part = part;
++						made.up = up;
++						made.right = ma;
++						made.ahead = mb;
++						made.xx = half * half * ua * ua + halfOther * halfOther * ub * ub;
++						made.xy = (half * half - halfOther * halfOther) * ua * ub;
++						made.yy = half * half * ub * ub + halfOther * halfOther * ua * ua;
++						made.ragged = count >= 12 && count < SectionSolid * 3.14159265f * half * halfOther;
++						for (int cell : cells) at[cell] = (int)sections.size();
++						made.cells = std::move(cells);
++						sections.push_back(std::move(made));
++					}
++				}
++	}
++	// 2. a section and the one above it are of one limb where each has only the other
++	for (size_t s = 0; s < sections.size(); ++s)
++	{
++		if (sections[s].up + 1 >= GridUp) continue;
++		for (int cell : sections[s].cells)
++		{
++			const int t = at[cell + 1];
++			if (t < 0 || sections[t].part != sections[s].part) continue;
++			if (std::find(sections[s].above.begin(), sections[s].above.end(), t) == sections[s].above.end()) { sections[s].above.push_back(t); sections[t].below.push_back((int)s); }
++		}
++	}
++	std::vector<std::vector<int>> chains;
++	std::vector<int> chainOf(sections.size(), -1);
++	for (size_t s = 0; s < sections.size(); ++s)
++	{
++		if (sections[s].below.size() == 1 && sections[sections[s].below[0]].above.size() == 1) continue; // (not a limb's lowest)
++		std::vector<int> chain(1, (int)s);
++		while (sections[chain.back()].above.size() == 1 && sections[sections[chain.back()].above[0]].below.size() == 1) chain.push_back(sections[chain.back()].above[0]);
++		for (int k : chain) chainOf[k] = (int)chains.size();
++		chains.push_back(std::move(chain));
++	}
++	// (the middles and the ovals of a run of sections smoothed along it)
++	auto smoothRun = [&](const std::vector<int> &run, int from, int to, float sigma, bool middles, bool ovals) {
++		const int length = to - from;
++		if (length < 2 || sigma <= 0.0f) return;
++		const int reach = (int)std::ceil(2.5f * sigma);
++		std::vector<float> values(length * 5), smooth(length * 5);
++		for (int i = 0; i < length; ++i)
++		{
++			const Section &one = sections[run[from + i]];
++			const float all[5] = { one.right, one.ahead, one.xx, one.xy, one.yy };
++			std::copy(all, all + 5, values.begin() + i * 5);
++		}
++		for (int i = 0; i < length; ++i)
++		{
++			float weights = 0.0f, sum[5] = {};
++			for (int j = std::max(0, i - reach); j <= std::min(length - 1, i + reach); ++j)
++			{
++				const float weight = std::exp(-0.5f * (j - i) * (j - i) / (sigma * sigma));
++				weights += weight;
++				for (int v = 0; v < 5; ++v) sum[v] += weight * values[j * 5 + v];
++			}
++			for (int v = 0; v < 5; ++v) smooth[i * 5 + v] = sum[v] / weights;
++		}
++		for (int i = 0; i < length; ++i)
++		{
++			Section &one = sections[run[from + i]];
++			if (middles) { one.right = smooth[i * 5]; one.ahead = smooth[i * 5 + 1]; }
++			if (ovals) { one.xx = smooth[i * 5 + 2]; one.xy = smooth[i * 5 + 3]; one.yy = smooth[i * 5 + 4]; }
++		}
++	};
++	auto scaleOval = [&](Section &one, float by) { one.xx *= by * by; one.xy *= by * by; one.yy *= by * by; };
++	// (a run's free end rounded off: over as many sections as the end is thick, CapShare of it)
++	auto freeEnd = [&](const Section &end, int step) {
++		if (end.up + step < 0 || end.up + step >= GridUp) return true;
++		int against = 0;
++		for (int cell : end.cells) if (owner[cell + step]) ++against;
++		return against * 4 < (int)end.cells.size();
++	};
++	auto capEnd = [&](const std::vector<int> &run, bool top) {
++		const int length = (int)run.size();
++		const Section &last = sections[top ? run.back() : run.front()];
++		if (!(top ? last.above.empty() : last.below.empty()) || !freeEnd(last, top ? 1 : -1)) return;
++		if (!top && cellUp(last.up) < 2.0f * VOXELSCALE) return; // (standing on the floor)
++		const float mean = (last.xx + last.yy) * 0.5f, spread = std::sqrt((last.xx - last.yy) * (last.xx - last.yy) * 0.25f + last.xy * last.xy);
++		const int cap = std::min(length / 2, (int)std::lround(CapShare * std::sqrt(std::max(mean - spread, 0.25f))));
++		for (int k = 0; k < cap; ++k)
++		{
++			const float off = (cap - k - 0.5f) / cap;
++			scaleOval(sections[top ? run[length - 1 - k] : run[k]], std::sqrt(1.0f - off * off));
++		}
++	};
++	std::vector<char> left(sections.size(), 0); // (a section left out of the body made again)
++	std::vector<char> rounded(sections.size(), 0); // (a section of the head: an oval, where the trunk's are a little square)
++	// 3. the legs: the limbs that stand on the floor
++	const Uint8 legsPart = whole ? (Uint8)VoxelUnitModel::Torso : (Uint8)VoxelUnitModel::Legs;
++	const int footTop = (int)std::ceil((FootHigh * VOXELSCALE - UpFrom) / Cell - 0.5f);
++	struct Leg { int chain, ankle; };
++	std::vector<Leg> legs;
++	std::vector<char> isLeg(chains.size(), 0);
++	if (stands)
++	{
++		for (size_t c = 0; c < chains.size(); ++c)
++		{
++			const std::vector<int> &chain = chains[c];
++			if (sections[chain[0]].part != legsPart || sections[chain[0]].up > footTop + (int)V || sections[chain.back()].up < footTop + 2 * (int)V) continue;
++			// (its ankle: where it is thinnest above the foot; what is drawn of a shoe reaches higher than a foot's top)
++			int ankle = -1;
++			for (int k : chain)
++			{
++				if (sections[k].up < footTop) continue;
++				if (sections[k].up > footTop + (int)(AnkleReach * V)) break;
++				if (ankle < 0 || sectionRadius(sections[k]) < sectionRadius(sections[ankle])) ankle = k;
++			}
++			if (ankle >= 0 && sectionRadius(sections[ankle]) <= LegWide * V) legs.push_back({ (int)c, ankle });
++		}
++	}
++	const bool feet = legs.size() == 2;
++	if (whole && !feet) return; // (a robe, a thing on no legs: no humanoid to tell, left as it is)
++	if (feet) for (const Leg &leg : legs) isLeg[leg.chain] = 1;
++	// 4. the head, the neck and the trunk: the torso's sections from its top down
++	std::vector<int> path;
++	{
++		int top = -1;
++		for (size_t s = 0; s < sections.size(); ++s)
++			if (sections[s].part == VoxelUnitModel::Torso && sections[s].cells.size() >= 4 && (top < 0 || sections[s].up > sections[top].up || (sections[s].up == sections[top].up && sections[s].cells.size() > sections[top].cells.size()))) top = (int)s;
++		for (int s = top; s >= 0; )
++		{
++			if (isLeg[chainOf[s]]) break;
++			path.push_back(s);
++			int next = -1;
++			for (int below : sections[s].below) if (next < 0 || sections[below].cells.size() > sections[next].cells.size()) next = below;
++			s = next;
++		}
++		std::reverse(path.begin(), path.end());
++	}
++	std::vector<char> onPath(sections.size(), 0);
++	for (int k : path) onPath[k] = 1;
++	const int length = (int)path.size();
++	bool headRound = false;
++	int headLow = 0, headHigh = 0; // (the head's egg: from this layer to this)
++	float headThick = 0.0f;
++	int neck = -1;
++	if (length >= (int)(4 * V))
++	{
++		std::vector<float> area(length);
++		for (int i = 0; i < length; ++i) area[i] = sectionRadius(sections[path[i]]) * sectionRadius(sections[path[i]]);
++		float best = NeckPinch;
++		// (no lower than where the arms begin; without arms to tell, a head is at most HeadMost of the body's height)
++		float shoulders = -1e9f;
++		for (int arm = 0; arm < 2; ++arm) if (arms[arm].any) shoulders = std::max(shoulders, arms[arm].shoulder[2]);
++		const int shoulderLayer = (int)std::floor((shoulders - UpFrom) / Cell);
++		int lowest = length - 1 - (int)(HeadMost * (sections[path.back()].up + 1 - (-UpFrom / Cell)));
++		if (shoulders > -1e8f) for (int i = 0; i < length; ++i) if (sections[path[i]].up == shoulderLayer) lowest = i - (int)(0.5f * V);
++		for (int i = length - 1 - (int)(1.5f * V); i >= std::max(1, lowest); --i)
++		{
++			const float above = *std::max_element(area.begin() + i + 1, area.end()), below = *std::max_element(area.begin() + std::max(0, i - (int)(3 * V)), area.begin() + i);
++			const float score = area[i] / std::min(above, below);
++			// (the first pinch from the top, followed down to where it is thinnest: under it may be another, between
++			// the shoulders' armour and the chest)
++			if (score < best)
++			{
++				// (down while it gets no thicker than a quarter over its thinnest; of sections as thin, the lowest)
++				neck = i;
++				for (int j = i - 1; j >= std::max(1, lowest) && area[j] <= 1.25f * area[neck]; --j) if (area[j] <= 1.05f * area[neck]) neck = j;
++				break;
++			}
++			// (no pinch, and here the body is suddenly ShoulderJump times what is above it: a head that goes straight
++			// into the shoulders. Its neck is the head's foot)
++			if (area[i] >= ShoulderJump * above)
++			{
++				neck = std::min(length - 1 - (int)(1.5f * V), i + 1 + (int)std::lround(NeckHalf * V));
++				break;
++			}
++		}
++		// (a head is no wider than all the body under it, where there are no arms to tell the shoulders: such a
++		// "neck" is a waist, and what is above it a chest with its arms)
++		if (neck >= 0 && shoulders < -1e8f && *std::max_element(area.begin() + neck + 1, area.end()) >= *std::max_element(area.begin(), area.begin() + neck)) neck = -1;
++		// (no pinch drawn: just over where the arms begin)
++		if (neck < 0 && shoulders > -1e8f)
++		{
++			const int layer = (int)std::floor((shoulders + 0.5f * VOXELSCALE - UpFrom) / Cell);
++			for (int i = 1; i < length - (int)(1.5f * V); ++i) if (sections[path[i]].up == layer) neck = i;
++		}
++	}
++	// (what is over the neck must be a head: not far wider than it is high, a frill, a wide hat, the hunched
++	// shoulders of a Muton with its head sunk between them; nor ragged. Without a head there is no neck to make)
++	if (neck >= 0)
++	{
++		const int headFrom = std::min(length, neck + (int)std::lround(NeckHalf * V) + 1);
++		float widest = 0.0f;
++		bool ragged = false;
++		for (int i = headFrom; i < length; ++i)
++		{
++			const Section &one = sections[path[i]];
++			widest = std::max(widest, std::sqrt((one.xx + one.yy) * 0.5f + std::sqrt((one.xx - one.yy) * (one.xx - one.yy) * 0.25f + one.xy * one.xy)));
++			ragged = ragged || one.ragged;
++		}
++		if (length - headFrom < (int)(2 * V) || 2.0f * widest > HeadFlat * (length - headFrom) || ragged) neck = -1;
++	}
++	if (length >= 2)
++	{
++		smoothRun(path, 0, length, StdTrunk * V, true, false);
++		const int half = (int)std::lround(NeckHalf * V);
++		if (neck >= 0)
++		{
++			const int headFrom = std::min(length, neck + half + 1), trunkTo = std::max(0, neck - half);
++			smoothRun(path, headFrom, length, StdHead * V, false, true);
++			smoothRun(path, 0, trunkTo, StdTrunk * V, false, true);
++			std::vector<float> radii;
++			for (int i = headFrom; i < length; ++i) radii.push_back(sectionRadius(sections[path[i]]));
++			std::sort(radii.begin(), radii.end());
++			const float head = radii.empty() ? 0.0f : radii[radii.size() / 2];
++			const float thin = std::min(sectionRadius(sections[path[neck]]), NeckShare * head);
++			// (the head: an egg. Its widest section's oval, round above it to the top and round below it to the neck)
++			bool ovoid = false;
++			if (length - headFrom >= (int)(2 * V))
++			{
++				int widest = headFrom;
++				for (int i = headFrom; i < length; ++i) if (sectionRadius(sections[path[i]]) > sectionRadius(sections[path[widest]])) widest = i;
++				Section plan = sections[path[widest]];
++				{
++					float xx = 0.0f, xy = 0.0f, yy = 0.0f;
++					int many = 0;
++					for (int i = std::max(headFrom, widest - (int)(0.75f * V)); i <= std::min(length - 1, widest + (int)(0.75f * V)); ++i, ++many)
++					{
++						xx += sections[path[i]].xx; xy += sections[path[i]].xy; yy += sections[path[i]].yy;
++					}
++					plan.xx = xx / many; plan.xy = xy / many; plan.yy = yy / many;
++					const float middle = (plan.xx + plan.yy) * 0.5f, apart = std::sqrt((plan.xx - plan.yy) * (plan.xx - plan.yy) * 0.25f + plan.xy * plan.xy);
++					const float most = HeadLong * HeadLong * (middle - apart);
++					if (middle + apart > most && apart > 1e-6f)
++					{
++						const float now = (most - (middle - apart)) * 0.5f, by = now / apart, centre = (most + middle - apart) * 0.5f;
++						const float lean = (plan.xx - plan.yy) * 0.5f * by;
++						plan.xx = centre + lean; plan.yy = centre - lean; plan.xy *= by;
++					}
++				}
++				const float mean = (plan.xx + plan.yy) * 0.5f, spread = std::sqrt((plan.xx - plan.yy) * (plan.xx - plan.yy) * 0.25f + plan.xy * plan.xy);
++				const int dome = std::max(1, (int)std::lround(HeadDome * std::sqrt(std::max(mean - spread, 0.25f))));
++				// (its crown: the highest of it at least CrownShare as big as its widest; ears, horns, a plume above stay as drawn)
++				// (thin for a voxel and more, and for a third of the head above its widest: the top of a round head is thin
++				// too, for less)
++				int crown = length - 1;
++				while (crown > widest && sectionRadius(sections[path[crown]]) < CrownShare * sectionRadius(sections[path[widest]])) --crown;
++				if (length - 1 - crown <= std::max((int)V, (crown - widest) / 3)) crown = length - 1;
++				widest = std::max(headFrom, std::min(widest, crown - dome));
++				const float own = sectionRadius(plan), above = crown + 0.5f - widest, below = widest - headFrom + 0.5f, least = std::min(1.0f, thin / own);
++				for (int i = headFrom; i <= crown; ++i)
++				{
++					Section &one = sections[path[i]];
++					const float off = i >= widest ? (i - widest) / above : (widest - i) / below, round = std::sqrt(std::max(0.0f, 1.0f - off * off));
++					const float by = i >= widest ? round : least + (1.0f - least) * round;
++					one.xx = plan.xx * by * by; one.xy = plan.xy * by * by; one.yy = plan.yy * by * by;
++					rounded[path[i]] = 1;
++				}
++				ovoid = true;
++				headThick = own;
++				headLow = sections[path[headFrom]].up;
++				headHigh = sections[path[crown]].up;
++			}
++			for (int i = 0; i < length && head > 0.0f; ++i)
++			{
++				Section &one = sections[path[i]];
++				const int off = std::abs(i - neck) - half;
++				const float own = sectionRadius(one);
++				if (off <= 0)
++				{
++					if (thin < own) { one.xx = one.yy = thin * thin; one.xy = 0.0f; }
++					continue;
++				}
++				if (i > neck && ovoid) continue;
++				const float t = off / ((i > neck ? ChinLong : ShoulderLong) * V);
++				if (t >= 1.0f) continue;
++				const float most = thin + (own - thin) * std::sqrt(1.0f - (1.0f - t) * (1.0f - t));
++				if (most < own) scaleOval(one, most / own);
++			}
++			if (ovoid) headRound = true;
++		}
++		else
++		{
++			smoothRun(path, 0, length, StdTrunk * V, false, true);
++		}
++		// the waist: a little in, between the hips and the chest
++		const int trunkTop = neck >= 0 ? neck - half - (int)(ShoulderLong * V) : length * 2 / 3;
++		if (trunkTop >= (int)(3 * V) && (feet || !whole))
++		{
++			const float middle = (whole ? 0.3f : 0.2f) * trunkTop, reach = 0.3f * trunkTop;
++			for (int i = 0; i < trunkTop; ++i)
++			{
++				const float off = std::min(1.0f, std::abs(i - middle) / reach), bump = std::cos(1.5707963f * off) * std::cos(1.5707963f * off);
++				const float in = 1.0f - WaistIn * bump, inDeep = 1.0f - 0.5f * WaistIn * bump;
++				Section &one = sections[path[i]];
++				one.xx *= in * in; one.xy *= in * inDeep; one.yy *= inDeep * inDeep;
++			}
++		}
++		if (!headRound) capEnd(path, true);
++	}
++	// (a short piece beside the head, under its crown: a tuft of hair, the corner of a hat. The head's egg is the head)
++	if (headRound)
++	{
++		for (size_t c = 0; c < chains.size(); ++c)
++		{
++			const std::vector<int> &chain = chains[c];
++			if (onPath[chain[0]] || sections[chain[0]].part != VoxelUnitModel::Torso || (int)chain.size() >= (int)V) continue;
++			float thick = 0.0f;
++			for (int k : chain) thick = std::max(thick, sectionRadius(sections[k]));
++			if (sections[chain[0]].up > headLow && sections[chain.back()].up <= headHigh && thick <= 0.5f * headThick) for (int k : chain) left[k] = 1;
++		}
++	}
++	// 5. the other limbs, each smoothed along its length; an arm with bones is its bones
++	for (size_t c = 0; c < chains.size(); ++c)
++	{
++		const std::vector<int> &chain = chains[c];
++		const Uint8 part = sections[chain[0]].part;
++		const int arm = part == VoxelUnitModel::LeftArm ? 0 : part == VoxelUnitModel::RightArm ? 1 : -1;
++		if (arm >= 0 && arms[arm].any) { for (int k : chain) left[k] = 1; continue; }
++		if (onPath[chain[0]]) continue;
++		int from = 0;
++		if (isLeg[c]) for (const Leg &leg : legs) if (leg.chain == (int)c) while (from < (int)chain.size() && chain[from] != leg.ankle) ++from;
++		smoothRun(chain, from, (int)chain.size(), StdLimb * V, true, true);
++		// (a leg goes straight down from its ankle to its foot)
++		for (int i = 0; i < from; ++i)
++		{
++			Section &one = sections[chain[i]];
++			const Section &ankle = sections[chain[from]];
++			one.right = ankle.right; one.ahead = ankle.ahead; one.xx = ankle.xx; one.xy = ankle.xy; one.yy = ankle.yy;
++		}
++		// (a limb is round: at least LimbRound as thick one way as the other. A limb: long, and thin where it is cut
++		// across; not a pair of ears or horns joined at their foot, nor an arm held out level, cut along its length:
++		// wide flat pieces that would be made discs)
++		for (int k : chain)
++		{
++			if ((int)chain.size() < (int)(LimbLong * V)) break;
++			if (sections[k].xx + sections[k].yy > LimbThick * V * LimbThick * V) continue;
++			Section &one = sections[k];
++			const float mean = (one.xx + one.yy) * 0.5f, spread = std::sqrt((one.xx - one.yy) * (one.xx - one.yy) * 0.25f + one.xy * one.xy);
++			const float least = LimbRound * LimbRound * (mean + spread);
++			if (mean - spread >= least || spread < 1e-6f) continue;
++			// (its thin axis grown to that: the same axes, the matrix moved towards a circle's)
++			const float grown = (mean + spread + least) * 0.5f, apart = (mean + spread - least) * 0.5f, by = apart / spread;
++			const float half = (one.xx - one.yy) * 0.5f * by, cross = one.xy * by;
++			one.xx = grown + half; one.yy = grown - half; one.xy = cross;
++		}
++		capEnd(chain, true);
++		capEnd(chain, false);
++	}
++	if (feet)
++	{
++		// (what was drawn of the feet goes: all of the legs' part under a foot's top, and beside the legs up to the ankles)
++		const int ankles = std::min(sections[legs[0].ankle].up, sections[legs[1].ankle].up);
++		for (size_t s = 0; s < sections.size(); ++s)
++			if (sections[s].part == legsPart && (sections[s].up < footTop || (sections[s].up < ankles && !isLeg[chainOf[s]] && !onPath[s]))) left[s] = 1;
++	}
++	// 6. the body again: each section an oval (the trunk's a little square)
++	std::vector<Uint8> made(GridCells, 0);
++	auto fillSections = [&](Uint8 part) {
++		for (size_t s = 0; s < sections.size(); ++s)
++		{
++			const Section &one = sections[s];
++			if (one.part != part || left[s]) continue;
++			if (one.ragged && !rounded[s])
++			{
++				for (int cell : one.cells) if (!made[cell]) made[cell] = part;
++				continue;
++			}
++			const float mean = (one.xx + one.yy) * 0.5f, spread = std::sqrt((one.xx - one.yy) * (one.xx - one.yy) * 0.25f + one.xy * one.xy);
++			const float half = std::sqrt(mean + spread), halfOther = std::sqrt(std::max(mean - spread, 0.0f));
++			if (halfOther < 0.3f) continue;
++			const float angle = 0.5f * std::atan2(2.0f * one.xy, one.xx - one.yy), ua = std::cos(angle), ub = std::sin(angle);
++			const float power = onPath[s] && !rounded[s] ? TrunkSquare : 2.0f;
++			const int reach = (int)std::ceil(half) + 1;
++			for (int across = std::max(0, (int)std::floor(one.right) - reach); across <= std::min(GridAcross - 1, (int)std::ceil(one.right) + reach); ++across)
++				for (int along = std::max(0, (int)std::floor(one.ahead) - reach); along <= std::min(GridAlong - 1, (int)std::ceil(one.ahead) + reach); ++along)
++				{
++					const float da = across - one.right, db = along - one.ahead;
++					const float u = std::abs(da * ua + db * ub) / half, v = std::abs(-da * ub + db * ua) / halfOther;
++					if (u > 1.0f || v > 1.0f || std::pow(u, power) + std::pow(v, power) > 1.0f) continue;
++					Uint8 &cell = made[cellIndex(across, along, one.up)];
++					if (!cell) cell = part;
++				}
++		}
++	};
++	fillSections(VoxelUnitModel::Torso);
++	for (int arm = 0; arm < 2; ++arm)
++	{
++		const Uint8 part = arm ? VoxelUnitModel::RightArm : VoxelUnitModel::LeftArm;
++		fillSections(part);
++		if (!arms[arm].any) continue;
++		const float upper = arms[arm].radius[0], lower = arms[arm].radius[1];
++		// (its shoulder joined to the trunk: a bar in to the trunk's middle at that height)
++		{
++			const int layer = (int)std::floor((arms[arm].shoulder[2] - UpFrom) / Cell);
++			for (int k : path)
++			{
++				if (sections[k].up != layer) continue;
++				const float middle[3] = { AcrossFrom + (sections[k].right + 0.5f) * Cell, AlongFrom + (sections[k].ahead + 0.5f) * Cell, arms[arm].shoulder[2] };
++				fillBar(made, part, arms[arm].shoulder, middle, upper, upper, false);
++			}
++		}
++		fillBar(made, part, arms[arm].shoulder, arms[arm].shoulder, upper * 1.15f, upper * 1.15f, armsOver);
++		fillBar(made, part, arms[arm].shoulder, arms[arm].elbow, upper * 1.05f, std::max(upper * 0.9f, lower), armsOver);
++		fillBar(made, part, arms[arm].elbow, arms[arm].hand, std::max(upper * 0.9f, lower), lower * 0.9f, armsOver);
++		fillBar(made, part, arms[arm].hand, arms[arm].hand, lower * 1.1f, lower * 1.1f, armsOver);
++	}
++	fillSections(VoxelUnitModel::Legs);
++	// 7. the feet: each leg's, from its ankle along the floor the way its drawing has it, as long as a foot is
++	std::vector<Uint8> painted;
++	if ((int)Painted.size() == GridCells) painted = Painted;
++	if (feet)
++	{
++		for (int l = 0; l < 2; ++l)
++		{
++			const Section &ankle = sections[legs[l].ankle], &other = sections[legs[1 - l].ankle];
++			// (the leg goes straight down from its ankle to its foot's top, whatever was drawn between)
++			{
++				const float det = ankle.xx * ankle.yy - ankle.xy * ankle.xy;
++				const int reachOval = (int)std::ceil(std::sqrt(std::max(ankle.xx, ankle.yy))) + 1;
++				for (int up = footTop; up < ankle.up && det > 1e-6f; ++up)
++					for (int across = std::max(0, (int)ankle.right - reachOval); across <= std::min(GridAcross - 1, (int)ankle.right + reachOval); ++across)
++						for (int along = std::max(0, (int)ankle.ahead - reachOval); along <= std::min(GridAlong - 1, (int)ankle.ahead + reachOval); ++along)
++						{
++							const float da = across - ankle.right, db = along - ankle.ahead;
++							if (ankle.yy * da * da - 2.0f * ankle.xy * da * db + ankle.xx * db * db > det) continue;
++							Uint8 &cell = made[cellIndex(across, along, up)];
++							if (!cell) cell = legsPart;
++						}
++			}
++			const float tall = length > 0 ? sections[path.back()].up + 1 - (-UpFrom / Cell) : 22.0f * V; // (the body's height, cells)
++			const float thick = sectionRadius(ankle);
++			// (what was drawn of it: the part's cells under the ankle's height that are nearer this ankle than the other)
++			float sumA = 0.0f, sumB = 0.0f;
++			int many = 0;
++			std::vector<std::pair<float, float>> drawn;
++			for (int across = 0; across < GridAcross; ++across)
++				for (int along = 0; along < GridAlong; ++along)
++					for (int up = 0; up < ankle.up; ++up)
++					{
++						if (owner[cellIndex(across, along, up)] != legsPart) continue;
++						const float da = across - ankle.right, db = along - ankle.ahead, oa = across - other.right, ob = along - other.ahead;
++						if (da * da + db * db > oa * oa + ob * ob) continue;
++						sumA += da; sumB += db; ++many;
++						drawn.push_back({ da, db });
++					}
++			float aimA = 0.0f, aimB = 1.0f;
++			if (many > 0 && std::sqrt(sumA * sumA + sumB * sumB) / many >= 0.35f * thick && sumB > 0.0f)
++			{
++				// (toes out at most SplayMost from straight ahead, and never in)
++				const float outward = ankle.right >= other.right ? 1.0f : -1.0f;
++				float turn = std::atan2(sumA * outward, sumB);
++				turn = std::clamp(turn, 0.0f, SplayMost * 0.0174533f);
++				aimA = std::sin(turn) * outward; aimB = std::cos(turn);
++			}
++			const float wide = std::max(1.15f * thick, FootWide * tall), heel = -std::max(1.1f * thick, 0.25f * FootLong * tall), high = footTop - 0.0f;
++			float toe = heel + FootLong * tall;
++			for (const auto &cell : drawn) toe = std::max(toe, cell.first * aimA + cell.second * aimB);
++			toe = std::min(toe, heel + FootMost * tall);
++			const int reach = (int)std::ceil(toe + wide) + 1;
++			for (int across = std::max(0, (int)ankle.right - reach); across <= std::min(GridAcross - 1, (int)ankle.right + reach); ++across)
++				for (int along = std::max(0, (int)ankle.ahead - reach); along <= std::min(GridAlong - 1, (int)ankle.ahead + reach); ++along)
++				{
++					const float da = across - ankle.right, db = along - ankle.ahead;
++					const float u = da * aimA + db * aimB, v = -da * aimB + db * aimA;
++					// (its sole: a bar with round ends from heel to toe)
++					const float on = std::clamp(u, heel + wide, toe - wide), offU = u - on;
++					if (offU * offU + v * v > wide * wide) continue;
++					// (its top: the ankle's height over the heel, sloping to the toe's)
++					const float slope = std::clamp(u / toe, 0.0f, 1.0f), top = high * (1.0f - slope * (1.0f - ToeHigh));
++					for (int up = 0; up < footTop; ++up)
++					{
++						if (cellUp(up) < 0.0f) continue;
++						const float layer = (cellUp(up) / Cell) / std::max(top - (-UpFrom / Cell), 1.0f);
++						if (layer > 1.0f) continue;
++						const float inside = (offU * offU + v * v) / (wide * wide);
++						if (inside > 1.0f - 0.35f * layer * layer) continue; // (its upper edges rounded)
++						const int cell = cellIndex(across, along, up);
++						if (made[cell]) continue;
++						made[cell] = legsPart;
++						// (painted by its own drawing's pixel along the views' slant: read level, a shoe's toe took the shin's colour)
++						if (!painted.empty())
++						{
++							for (int d : { Front, (Front + 4) % 8 })
++							{
++								float column, row, nearness;
++								project(cellRight(across), cellAhead(along), cellUp(up), d, false, column, row, nearness);
++								const Uint8 colour = legsDrawn.at(d, (int)std::floor(column), (int)std::floor(row));
++								if (colour) { painted[cell] = colour; break; }
++							}
++						}
++					}
++				}
++		}
++	}
++	// (what stands apart from the body now goes: a tuft, the tip of a shoe that was)
++	{
++		std::vector<int> piece(GridCells, -1), sizes, stack;
++		for (int start = 0; start < GridCells; ++start)
++		{
++			if (!made[start] || piece[start] >= 0) continue;
++			const int label = (int)sizes.size();
++			sizes.push_back(0);
++			piece[start] = label;
++			stack.push_back(start);
++			while (!stack.empty())
++			{
++				const int cell = stack.back();
++				stack.pop_back();
++				++sizes[label];
++				const int up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
++				for (int a = std::max(0, across - 1); a <= std::min(GridAcross - 1, across + 1); ++a)
++					for (int b = std::max(0, along - 1); b <= std::min(GridAlong - 1, along + 1); ++b)
++						for (int c = std::max(0, up - 1); c <= std::min(GridUp - 1, up + 1); ++c)
++						{
++							const int other = cellIndex(a, b, c);
++							if (made[other] && piece[other] < 0) { piece[other] = label; stack.push_back(other); }
++						}
++			}
++		}
++		if (sizes.size() > 1)
++		{
++			const int biggest = (int)(std::max_element(sizes.begin(), sizes.end()) - sizes.begin());
++			for (int cell = 0; cell < GridCells; ++cell) if (made[cell] && piece[cell] != biggest) made[cell] = 0;
++		}
++	}
++	// (a cell that wasn't there before, beside one painted by a pixel of its own: by that pixel too)
++	if (!painted.empty())
++	{
++		for (int across = 2; across < GridAcross - 2; ++across)
++			for (int along = 2; along < GridAlong - 2; ++along)
++				for (int up = 2; up < GridUp - 2; ++up)
++				{
++					const int cell = cellIndex(across, along, up);
++					if (!made[cell] || owner[cell] || painted[cell]) continue;
++					int nearest = 99;
++					for (int da = -2; da <= 2; ++da)
++						for (int db = -2; db <= 2; ++db)
++							for (int dc = -2; dc <= 2; ++dc)
++							{
++								const int beside = cellIndex(across + da, along + db, up + dc);
++								const int far = da * da + db * db + dc * dc;
++								if (Painted[beside] && owner[beside] && far < nearest) { nearest = far; painted[cell] = Painted[beside]; }
++							}
++				}
++		Painted.swap(painted);
++	}
++	owner.swap(made);
 +}
 +
 +/// The pits of a body cut from eight drawings are filled (the owner, of XPiratez's Baron of Hell: its "outline is still
@@ -91829,6 +92547,7 @@ index 000000000..cafd27d9e
 +
 +	// The parts' shapes, each claiming its cells in this order (the torso first).
 +	std::vector<Uint8> owner(GridCells, 0);
++	bool leaning = false; // (a creature on one frame whose drawings are no standing body's seen along the slant: see below)
 +	if (routine.whole)
 +	{
 +		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own); a
@@ -91864,7 +92583,11 @@ index 000000000..cafd27d9e
 +		// where under HeadKept of the top of the front drawing is left, seen level, the cut is made again with both
 +		// readings. Not for every upright body: a civilian drawn standing straight keeps its head either way and came
 +		// out a tenth fatter.)
-+		if (humanoid && upright(solid) && topShown(solid, hull) < HeadKept) hull = carve(solid, 0, shape, 0, true, Cardinals, lowCardinals, FeetZone);
++		if (humanoid && upright(solid) && topShown(solid, hull) < HeadKept)
++		{
++			hull = carve(solid, 0, shape, 0, true, Cardinals, lowCardinals, FeetZone);
++			leaning = true;
++		}
 +		if (fourSided) roundPlan(hull);
 +		if (turret) levelOff(solid, hull);
 +		if (tank) flattenHull(hull);
@@ -91983,7 +92706,7 @@ index 000000000..cafd27d9e
 +	}
 +	std::vector<Uint8> skeletons[BodyParts];
 +	// (each arm's bones as placed: shoulder, elbow, hand; see the arms' colours below)
-+	struct ArmBones { bool any = false; float shoulder[3], elbow[3], hand[3]; };
++	struct ArmBones { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
 +	ArmBones bones[BodyParts];
 +	{
 +		struct Arm { int part; bool right, holds, found; float shoulder[3], hand[3]; };
@@ -92059,6 +92782,7 @@ index 000000000..cafd27d9e
 +			std::copy(shoulder, shoulder + 3, bones[arm.part].shoulder);
 +			std::copy(elbow, elbow + 3, bones[arm.part].elbow);
 +			std::copy(hand, hand + 3, bones[arm.part].hand);
++			std::copy(radius, radius + 2, bones[arm.part].radius);
 +		}
 +	}
 +	for (int p = 1; p < BodyParts; ++p)
@@ -92206,6 +92930,26 @@ index 000000000..cafd27d9e
 +						if (!cell && owner[cellIndex(across, along, torsoRow)] == VoxelUnitModel::Torso) cell = up <= legsHigh ? VoxelUnitModel::Legs : VoxelUnitModel::Torso;
 +					}
 +		}
++	}
++
++	// The standard humanoid (see standardBody): a body that walks on two legs, made from its drawings so far, is made
++	// again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one drawn leaning (its drawings
++	// are no standing body's: what the cut left of it is doubtful enough), nor a thin thing, nor what the unit table
++	// takes out.
++	if (routine.humanoid && routine.legsSwing && !routine.drawn && !leaning && !routine.big && !beast && !tank && !turret && !(routine.whole && thinDrawing(parts[0])))
++	{
++		StandardArm standardArms[2];
++		for (int arm = 0; arm < 2; ++arm)
++		{
++			const ArmBones &bone = bones[arm + 1];
++			if (!bone.any) continue;
++			standardArms[arm].any = true;
++			std::copy(bone.shoulder, bone.shoulder + 3, standardArms[arm].shoulder);
++			std::copy(bone.elbow, bone.elbow + 3, standardArms[arm].elbow);
++			std::copy(bone.hand, bone.hand + 3, standardArms[arm].hand);
++			std::copy(bone.radius, bone.radius + 2, standardArms[arm].radius);
++		}
++		standardBody(owner, routine.whole, !routine.kneeling, standardArms, (routine.arms & 1) != 0, parts[routine.whole ? 0 : 3]);
 +	}
 +
 +	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
@@ -92810,10 +93554,10 @@ index 000000000..cafd27d9e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..a19d0fb8d
+index 000000000..40886e1e8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,152 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -92910,9 +93654,12 @@ index 000000000..a19d0fb8d
 +/// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 +/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 +/// length (see makeModel).
++/// Kneeling: the pose the body is made in (set for the unit being made); drawn: the unit table takes it out of the
++/// standard humanoid ("humanoid: drawn"; see standardBody): a body that walks on two legs stays as its drawings alone
++/// leave it.
 +/// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 +/// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; };
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool drawn = false; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -92965,10 +93712,10 @@ index 000000000..a19d0fb8d
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..82d9c2a19
+index 000000000..d6722ea60
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,108 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -93065,6 +93812,8 @@ index 000000000..82d9c2a19
 +	made.torsoDepth = source.torsoDepth;
 +	made.backTop = source.backTop;
 +	made.frontal = source.frontal;
++	made.kneeling = source.kneeling;
++	made.drawn = source.drawn;
 +	made.relief = source.relief;
 +	made.arms = source.arms;
 +	made.tankHull = source.tankHull;
@@ -93077,10 +93826,10 @@ index 000000000..82d9c2a19
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..327362b9d
+index 000000000..6e0eb1d72
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,48 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -93118,6 +93867,8 @@ index 000000000..327362b9d
 +	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
 +	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
++	bool kneeling = false; // (the pose it is made in: see Routine)
++	bool drawn = false; // (taken out of the standard humanoid, by the mod's rules: see Routine)
 +	bool relief = false; // (its one drawing given volume: see Routine)
 +	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
@@ -93454,10 +94205,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..704ff93d7
+index 000000000..c8bbe9a49
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1129 @@
+@@ -0,0 +1,1139 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -93657,6 +94408,7 @@ index 000000000..704ff93d7
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
 +	bool relief = false; // (its one drawing given volume: see Routine)
 +	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
++	bool drawn = false; // (taken out of the standard humanoid, by the unit table: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
@@ -94155,9 +94907,9 @@ index 000000000..704ff93d7
 +		if (normal && normal->getKneelHeight() > 0) tankHull = (float)normal->getKneelHeight();
 +		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 +	}
-+	const Uint8 pose[10] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0) };
-+	hashBytes(hash, pose, 10);
++	const Uint8 pose[11] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
++		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.drawn == 1) };
++	hashBytes(hash, pose, 11);
 +	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 +	hashBytes(hash, tankHeights, 2);
 +	_byQuick[quick] = hash;
@@ -94189,6 +94941,7 @@ index 000000000..704ff93d7
 +		job->frontal = look.frontal == 1;
 +		job->relief = relief;
 +		job->arms = std::max(look.arms, 0);
++		job->drawn = look.drawn == 1;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->fine = FineBodies;
@@ -94400,6 +95153,8 @@ index 000000000..704ff93d7
 +			source.torsoDepth = job->torsoDepth;
 +			source.backTop = job->backTop;
 +			source.frontal = job->frontal;
++			source.kneeling = job->kneeled;
++			source.drawn = job->drawn;
 +			source.relief = job->relief;
 +			source.arms = job->arms;
 +			source.tankHull = job->tankHull;
@@ -94415,6 +95170,8 @@ index 000000000..704ff93d7
 +			routine.torsoDepth = job->torsoDepth;
 +			routine.backTop = job->backTop;
 +			routine.frontal = job->frontal;
++			routine.kneeling = job->kneeled;
++			routine.drawn = job->drawn;
 +			routine.relief = job->relief;
 +			routine.arms = job->arms;
 +			routine.tankHull = job->tankHull;
@@ -94445,6 +95202,8 @@ index 000000000..704ff93d7
 +				source.torsoDepth = job->torsoDepth;
 +				source.backTop = job->backTop;
 +				source.frontal = job->frontal;
++				source.kneeling = job->kneeled;
++				source.drawn = job->drawn;
 +				source.relief = job->relief;
 +				source.routine = job->routine->number;
 +				shape = makeFineModel(source, job->palette);
@@ -94462,6 +95221,8 @@ index 000000000..704ff93d7
 +				routine.torsoDepth = job->torsoDepth;
 +				routine.backTop = job->backTop;
 +				routine.frontal = job->frontal;
++				routine.kneeling = job->kneeled;
++				routine.drawn = job->drawn;
 +				routine.relief = job->relief;
 +				const std::vector<Uint8> noComposite[8];
 +				const HeldItem noItems[2];
@@ -94545,8 +95306,8 @@ index 000000000..704ff93d7
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop);
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d drawn %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.drawn);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -101990,10 +102751,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..62f4a6ac0
+index 000000000..d89b94011
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,501 @@
+@@ -0,0 +1,504 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -102120,6 +102881,7 @@ index 000000000..62f4a6ac0
 +		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 +		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
 +		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
++		int drawn = -1; // (a body that walks on two legs left as its drawings have it: 1; made the standard humanoid, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -102322,7 +103084,7 @@ index 000000000..62f4a6ac0
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms;
++				std::string shape, top, sculpt, animation, arms, humanoid;
 +				int seeThrough = 0, torsoDepth = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -102337,6 +103099,7 @@ index 000000000..62f4a6ac0
 +				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
 +				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
 +				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
++				if (entry.tryRead("humanoid", humanoid)) look.drawn = humanoid == "drawn" ? 1 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -102437,6 +103200,7 @@ index 000000000..62f4a6ac0
 +			if (entry.second.animated != -1) look.animated = entry.second.animated;
 +			if (entry.second.relief != -1) look.relief = entry.second.relief;
 +			if (entry.second.arms != -1) look.arms = entry.second.arms;
++			if (entry.second.drawn != -1) look.drawn = entry.second.drawn;
 +		}
 +		return look;
 +	}

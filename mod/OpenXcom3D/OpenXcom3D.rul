@@ -193,6 +193,8 @@ firstPerson:
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
   #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
+  #   humanoid: drawn (a unit that walks on two legs keeps the body its drawings alone leave: no standard humanoid's
+  #           neck, egg of a head, round limbs and feet), or standard (as ever)
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # ghosts (XPiratez, The X-Com Files): there, but seen through

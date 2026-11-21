@@ -35,6 +35,8 @@ struct FineBodySource
 	float torsoDepth = 0.0f; // (the torso's slices at most this deep for their width, by the mod's rules: see Routine)
 	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
+	bool kneeling = false; // (the pose it is made in: see Routine)
+	bool drawn = false; // (taken out of the standard humanoid, by the mod's rules: see Routine)
 	bool relief = false; // (its one drawing given volume: see Routine)
 	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
