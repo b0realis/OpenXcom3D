@@ -88375,10 +88375,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..25fca787b
+index 000000000..691ff48e0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5352 @@
+@@ -0,0 +1,5385 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -89015,12 +89015,15 @@ index 000000000..25fca787b
 +/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootWide: its length and its
 +/// least half width, of the body's height. HeadFull: how full the egg is (2 an egg, more squarer: a head keeps its
 +/// hair's breadth; a plain egg left a woman's face a bald ball, the owner: "bald because face colour is taken to the
-+/// hair"). LimbRound: a limb at least LimbLong long is
++/// hair"). FaceTurn: a head's cubes turned to the front within this (the cosine: 53 degrees) are its face, painted by
++/// the front drawing; HairReach: how far, in pixels, the back drawing is searched for the hair's colour where the
++/// head is fuller than drawn (see makeModel). LimbRound: a limb at least LimbLong long is
 +/// at least this thick one way for the other, where it is no more than LimbThick across, half. TrunkSquare: the power of the trunk's sections' outline, 2 an oval.)
 +constexpr float StdTrunk = 0.6f, StdHead = 0.4f, StdLimb = 0.6f, SplitDip = 0.4f, CapShare = 1.0f, RoundWide = 2.2f, NeckPinch = 0.85f, NeckShare = 0.6f,
 +	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.5f, FootLong = 0.13f, ToeHigh = 0.65f, LegWide = 3.0f,
 +	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.028f, HeadFull = 2.6f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
-+	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f;
++	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f, FaceTurn = 0.6f;
++constexpr int HairReach = 4 * VOXELSCALE;
 +/// An arm's bones as placed (see makeModel), for standardBody: its joints, and how thick its upper and lower bone are.
 +struct StandardArm { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
 +/// A piece of a part at one height: its middle and its oval (the squares of its half sizes along its own axes, as a
@@ -89056,9 +89059,11 @@ index 000000000..25fca787b
 +/// Makes a body that walks on two legs again as the standard humanoid (see above). Whole: all of it is drawn on one
 +/// frame, and is the torso's part (its legs among it); stands: its legs stand (not kneeling); arms: its arms' bones
 +/// (left, right), where it has them; armsOver: they lie over the body where they touch it (the unit table's arms
-+/// outside); legsDrawn: its legs' drawings, to paint its feet by.
-+void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const StandardArm arms[2], bool armsOver, const PartFrames &legsDrawn)
++/// outside); legsDrawn: its legs' drawings, to paint its feet by; headBottom: gets the height its head begins at,
++/// over the neck (voxels; very high for a body without a head found), to paint its face and hair by (see makeModel).
++void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const StandardArm arms[2], bool armsOver, const PartFrames &legsDrawn, float &headBottom)
 +{
++	headBottom = 1e9f;
 +	const float V = VOXELSCALE / Cell; // (cells a voxel)
 +	std::vector<Section> sections;
 +	std::vector<int> at(GridCells, -1);
@@ -89356,6 +89361,7 @@ index 000000000..25fca787b
 +		if (neck >= 0)
 +		{
 +			const int headFrom = std::min(length, neck + half + 1), trunkTo = std::max(0, neck - half);
++			if (headFrom < length) headBottom = cellUp(sections[path[headFrom]].up) - 0.5f * Cell;
 +			smoothRun(path, headFrom, length, StdHead * V, false, true);
 +			smoothRun(path, 0, trunkTo, StdTrunk * V, false, true);
 +			std::vector<float> radii;
@@ -92716,6 +92722,7 @@ index 000000000..25fca787b
 +	// The parts' shapes, each claiming its cells in this order (the torso first).
 +	std::vector<Uint8> owner(GridCells, 0);
 +	bool leaning = false; // (a creature on one frame whose drawings are no standing body's seen along the slant: see below)
++	float headBottom = 1e9f; // (a person's head begins here: see standardBody and the colours below)
 +	if (routine.whole)
 +	{
 +		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own); a
@@ -93124,7 +93131,7 @@ index 000000000..25fca787b
 +			std::copy(bone.hand, bone.hand + 3, standardArms[arm].hand);
 +			std::copy(bone.radius, bone.radius + 2, standardArms[arm].radius);
 +		}
-+		standardBody(owner, routine.whole, !routine.kneeling, standardArms, (routine.arms & 1) != 0, parts[routine.whole ? 0 : 3]);
++		standardBody(owner, routine.whole, !routine.kneeling, standardArms, (routine.arms & 1) != 0, parts[routine.whole ? 0 : 3], headBottom);
 +	}
 +
 +	// The voxels: each a filled cell of the grid, a little cube; drawn side by side they pack without a gap. Kept are the
@@ -93375,6 +93382,21 @@ index 000000000..25fca787b
 +			return colour;
 +		};
 +		// (the body's skin seen from the front and from the back: the nearest of its voxels on each pixel)
++		// (the nearest pixel a drawing has to where a cube stands, read level, within HairReach pixels: see the head below)
++		auto drawnNear = [&](size_t k, int d) -> Uint8 {
++			float column, row, nearness;
++			project(model->right[k], model->ahead[k], model->up[k], d, true, column, row, nearness);
++			const int c = (int)std::floor(column), r = (int)std::floor(row), part = (int)(std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes);
++			if (part >= BodyParts || !parts[part].any) return 0;
++			for (int spread = 1; spread <= HairReach; ++spread)
++				for (int dr = -spread; dr <= spread; ++dr)
++					for (int dc = -spread; dc <= spread; ++dc)
++					{
++						if (std::max(std::abs(dr), std::abs(dc)) != spread) continue;
++						if (const Uint8 colour = parts[part].at(d, c + dc, r + dr)) return colour;
++					}
++			return 0;
++		};
 +		std::vector<float> frontSkin((size_t)FrameSize * FrameSize + 1, -1e9f), backSkin((size_t)FrameSize * FrameSize + 1, -1e9f);
 +		auto pixelAt = [&](size_t k, int d, float &nearness) -> size_t {
 +			float column, row;
@@ -93461,6 +93483,13 @@ index 000000000..25fca787b
 +			// drawing's pixels there, the forehead's: skin up the hair to the crown (a player, GitHub issue #181: "unit
 +			// seems to be given bald spot"). From behind a head is hair all over.)
 +			const bool facesUp = out[2] > planeLength(out[0], out[1]) * 1.5f;
++			// (A person's head, see standardBody: only its face is the front drawing's, the cubes turned to the front
++			// within FaceTurn; all the rest of the head is the back drawing's, hair or helmet, its top too. Painted as
++			// the rest of a body is, the half of the head nearer the front took the front drawing: the face's skin ran
++			// back to the ears and up over an egg fuller than the drawn head. The owner, of the female civilian: "bald",
++			// "keep only face from frontal. The rest of the head is hair!")
++			const bool onHead = routine.standard && model->part[k] == VoxelUnitModel::Torso && model->up[k] >= headBottom;
++			// (the top of a person's head: the back drawing's too, along the slant, as that drawing shows the crown)
 +			const int painting = facesUp && !routine.backTop ? 1 : 0;
 +			// (each direction's camera: towards its nearness, see project)
 +			float fit[8];
@@ -93471,7 +93500,8 @@ index 000000000..25fca787b
 +			// outward side where it's as near both)
 +			float nearFront, nearBack;
 +			const float underFront = frontSkin[pixelAt(k, Front, nearFront)] - nearFront, underBack = backSkin[pixelAt(k, Back, nearBack)] - nearBack;
-+			const int first = facesUp && routine.backTop ? Back
++			const bool face = onHead && !facesUp && fit[Front] >= FaceTurn * 1.41421356f * planeLength(out[0], out[1]);
++			const int first = onHead ? (face ? Front : Back) : facesUp && routine.backTop ? Back
 +				: std::abs(underFront - underBack) < 1.0f * VOXELSCALE ? (fit[Front] >= fit[Back] ? Front : Back) : underFront < underBack ? Front : Back;
 +			Uint8 colour = 0;
 +			// (A long body is its right side's drawing given width, see profile: each cube has the colour of the pixel of
@@ -93537,6 +93567,9 @@ index 000000000..25fca787b
 +				}
 +			}
 +			if (!colour) colour = drawnColour(k, first, painting);
++			// (hair past the back drawing's outline, where the head's egg is fuller than drawn: the nearest pixel that
++			// drawing has, not the front drawing's skin)
++			if (!colour && onHead && !face) colour = drawnNear(k, Back);
 +			if (!colour) colour = drawnColour(k, first == Front ? Back : Front, painting);
 +			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], painting);
 +			for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1 - painting);
