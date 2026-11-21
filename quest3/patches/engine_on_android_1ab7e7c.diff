@@ -1516,10 +1516,10 @@ index 000000000..87c809c43
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..c6bf5491f
+index 000000000..44341f567
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,242 @@
+@@ -0,0 +1,248 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1710,15 +1710,21 @@ index 000000000..c6bf5491f
 +  #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
 +  #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
 +  #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
-+  #           and the waist, the legs apart, as drawn; a big walking creature, two tiles by two: its shape is its
-+  #           drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
++  #           and the waist, the legs apart, as drawn), sides (a big walking creature, two tiles by two: its shape is
++  #           its drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
 +  #           drawn), or all (as ever: by all eight drawings, a little forgiving)
 +  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
 +  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
-+  #   humanoid: drawn (a unit that walks on two legs keeps the body its drawings alone leave: no standard humanoid's
-+  #           neck, egg of a head, round limbs and feet), or standard (as ever)
++  #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
++  #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
++  #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
++  #           leave it)
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
++    # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
++    # games' civilians. Whole names: STR_SECTOID_SOLDIER is no person
++    - names: [STR_SOLDIER, MALE_CIVILIAN, FEMALE_CIVILIAN, SAILOR_CIVILIAN, DOCKER_CIVILIAN]
++      humanoid: standard
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
 +    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
 +      seeThrough: 50
@@ -1739,7 +1745,7 @@ index 000000000..c6bf5491f
 +      animation: sprite
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
-+      sculpt: frontal
++      sculpt: sides
 +    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
 +    # arms posed on their guns (arms outside the body, coloured along their length)
 +    - names: [DAGON]
@@ -88288,10 +88294,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..2e47750c1
+index 000000000..25fca787b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5337 @@
+@@ -0,0 +1,5352 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88890,7 +88896,10 @@ index 000000000..2e47750c1
 +
 +/// ---- The standard humanoid ----
 +/// The owner: "For humanoid body set a general beautiful humanoid that conforms to standards. Legs waist feet neck
-+/// head and adapt our models to that!" A body that walks on two legs is first made from its drawings, as every body
++/// head and adapt our models to that!", and, of who it is for: "For humanoids i ment only people!", "Leave old units
++/// as they were before!", "Make fixes on per unit basis always". So only a unit the table names a person
++/// ("humanoid: standard": X-COM's soldiers, the civilians) is made so; every other body, a Sectoid's, a Muton's, a
++/// zombie's, stays as its drawings alone leave it. A person's body is first made from its drawings, as every body
 +/// is (see makeModel): slices of its drawings' rows, cut by its outlines. That body has its drawings' size and pose,
 +/// and their pixels' steps, the notches where two drawings differ, a head that sits on the shoulders as a block, feet
 +/// that are plates. standardBody makes it again as a humanoid is built, to that body's own measures:
@@ -88906,10 +88915,11 @@ index 000000000..2e47750c1
 +///    forearm tapering to the wrist, a hand;
 +///  - each leg goes straight down from its ankle (its thinnest above the foot) to a foot: a sole on the floor from
 +///    heel to toe, FootLong of the body's height long and pointing ahead, toes out no more than SplayMost, however
-+///    the drawing has the shoe (X-COM's stand with their shoes out sideways).
-+/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Not made so: a
-+/// body on one frame that shows no two legs (a robe: the Ethereal), one drawn leaning (see makeModel), a kneeling
-+/// body's legs, and what the unit table names "humanoid: drawn".
++///    long and whichever way the drawing has the shoe (the games' civilians stand with their shoes out sideways; as
++///    long as drawn, a foot was a fifth of the body: the owner, "Civilian has large feet correct!").
++/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Of the named,
++/// not made so: a body on one frame that shows no two legs, one drawn leaning (see makeModel), a kneeling body's
++/// legs.
 +/// (All in voxels but where said. StandardTrunk, StandardHead, StandardLimb: how far the smoothing along a limb
 +/// reaches. SplitDip: a piece is two where, along its length, it is this thin against both its sides. RoundWide: a
 +/// section's oval is at most this many times its cells' spread wide (a stray cell doesn't widen it). CapShare: a
@@ -88921,12 +88931,14 @@ index 000000000..2e47750c1
 +/// is thinner than this much of the head, for a voxel and more, is no part of the egg; HeadFlat: what is over the neck
 +/// and more than this many times as wide as it is high is no head (a frill, a wide hat, a Muton's shoulders). WaistIn: how much in. LegWide:
 +/// a leg's ankle is at most this thick, half across; AnkleReach: it is looked for this far above the foot's top.
-+/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootMost, FootWide: its length, the
-+/// most if drawn longer, and its least half width, of the body's height. LimbRound: a limb at least LimbLong long is
++/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootWide: its length and its
++/// least half width, of the body's height. HeadFull: how full the egg is (2 an egg, more squarer: a head keeps its
++/// hair's breadth; a plain egg left a woman's face a bald ball, the owner: "bald because face colour is taken to the
++/// hair"). LimbRound: a limb at least LimbLong long is
 +/// at least this thick one way for the other, where it is no more than LimbThick across, half. TrunkSquare: the power of the trunk's sections' outline, 2 an oval.)
 +constexpr float StdTrunk = 0.6f, StdHead = 0.4f, StdLimb = 0.6f, SplitDip = 0.4f, CapShare = 1.0f, RoundWide = 2.2f, NeckPinch = 0.85f, NeckShare = 0.6f,
-+	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.75f, FootLong = 0.15f, FootMost = 0.2f, ToeHigh = 0.65f, LegWide = 3.0f,
-+	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.032f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
++	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.5f, FootLong = 0.13f, ToeHigh = 0.65f, LegWide = 3.0f,
++	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.028f, HeadFull = 2.6f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
 +	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f;
 +/// An arm's bones as placed (see makeModel), for standardBody: its joints, and how thick its upper and lower bone are.
 +struct StandardArm { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
@@ -89307,7 +89319,7 @@ index 000000000..2e47750c1
 +				for (int i = headFrom; i <= crown; ++i)
 +				{
 +					Section &one = sections[path[i]];
-+					const float off = i >= widest ? (i - widest) / above : (widest - i) / below, round = std::sqrt(std::max(0.0f, 1.0f - off * off));
++					const float off = i >= widest ? (i - widest) / above : (widest - i) / below, round = std::pow(std::max(0.0f, 1.0f - std::pow(off, HeadFull)), 1.0f / HeadFull);
 +					const float by = i >= widest ? round : least + (1.0f - least) * round;
 +					one.xx = plan.xx * by * by; one.xy = plan.xy * by * by; one.yy = plan.yy * by * by;
 +					rounded[path[i]] = 1;
@@ -89510,9 +89522,7 @@ index 000000000..2e47750c1
 +				aimA = std::sin(turn) * outward; aimB = std::cos(turn);
 +			}
 +			const float wide = std::max(1.15f * thick, FootWide * tall), heel = -std::max(1.1f * thick, 0.25f * FootLong * tall), high = footTop - 0.0f;
-+			float toe = heel + FootLong * tall;
-+			for (const auto &cell : drawn) toe = std::max(toe, cell.first * aimA + cell.second * aimB);
-+			toe = std::min(toe, heel + FootMost * tall);
++			const float toe = heel + FootLong * tall;
 +			const int reach = (int)std::ceil(toe + wide) + 1;
 +			for (int across = std::max(0, (int)ankle.right - reach); across <= std::min(GridAcross - 1, (int)ankle.right + reach); ++across)
 +				for (int along = std::max(0, (int)ankle.ahead - reach); along <= std::min(GridAlong - 1, (int)ankle.ahead + reach); ++along)
@@ -92591,13 +92601,13 @@ index 000000000..2e47750c1
 +	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
 +	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
 +	const bool tank = bigHull && !turret && parts[1].any;
-+	// (A big walker the unit table names "sculpt: frontal", a frog: its shape is its four drawings' from front, back and
++	// (A big walker the unit table names "sculpt: sides", a frog: its shape is its four drawings' from front, back and
 +	// sides alone, rounded between them (see roundPlan), and each of its cubes is painted by the drawing it is turned
 +	// to, as a humanoid's. Cut by all eight with one forgiven, as big walkers are, it had no legs to tell and no gap
 +	// under its belly: the owner, "frog is awful/ we must revisit its generator! (It looks like a green blob)". By
 +	// name only: UFO's Sectopod and Reaper agree less with their eight drawings made so (0.51 to 0.45 and 0.47 to
 +	// 0.43 of outline in common: fatter seen from the quarters), and stay as they were.)
-+	const bool fourSided = routine.big && !bigHull && routine.frontal;
++	const bool fourSided = routine.big && !bigHull && routine.sides;
 +	SlantOnly = routine.big && !bigHull;
 +	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 +	// and profile.)
@@ -92648,7 +92658,10 @@ index 000000000..2e47750c1
 +		// not for shape!!". So a body on one frame that is one tile big, no long one and no thin one, is its slices,
 +		// made from its front and right side (see limb), cut by the four drawings from its front, back and sides alone,
 +		// strictly: what a quarter drawing has or hasn't changes nothing of its shape.)
-+		const bool humanoid = !routine.big && !beast && !thin;
++		// (Only for a person, a unit the table names "humanoid: standard": the owner, "For humanoids i ment only
++		// people!", "Leave old units as they were before!", "Make fixes on per unit basis always". Every other body on
++		// one frame is cut by all eight of its drawings, one forgiven, as it always was.)
++		const bool humanoid = routine.standard && !routine.big && !beast && !thin;
 +		const int lowCardinals = Cardinals & ~(1 << ((Front + 4) % 8));
 +		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : humanoid ? carve(solid, 0, shape, 0, false, Cardinals, lowCardinals, FeetZone)
 +			: fourSided ? carve(solid, 0, shape, 0, false, Cardinals)
@@ -92664,6 +92677,10 @@ index 000000000..2e47750c1
 +		{
 +			hull = carve(solid, 0, shape, 0, true, Cardinals, lowCardinals, FeetZone);
 +			leaning = true;
++		}
++		else if (!routine.standard && !beast && !routine.big && !thin && upright(solid) && topShown(solid, hull) < HeadKept)
++		{
++			hull = carve(solid, 1, shape, 0, true);
 +		}
 +		if (fourSided) roundPlan(hull);
 +		if (turret) levelOff(solid, hull);
@@ -92745,7 +92762,7 @@ index 000000000..2e47750c1
 +	{
 +		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
 +		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
-+		const std::vector<Uint8> hull = carve(parts[0], 0, torso, 0, false, Cardinals);
++		const std::vector<Uint8> hull = routine.standard ? carve(parts[0], 0, torso, 0, false, Cardinals) : carve(parts[0], 1, torso);
 +		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 +	}
 +	// The items in hand, where their frames show them, and the arms' skeletons (see ArmFrames): each from the top of its
@@ -92754,7 +92771,7 @@ index 000000000..2e47750c1
 +	// (A body on one frame that is one tile big holds nothing: its drawing has no hands on an item, so the item hung in
 +	// the air before it, at a civilian's shoulder with its arms down. The owner: "floating pistol: In some sprites means
 +	// that pistol should be removed altogether!")
-+	const bool handless = routine.whole && !routine.big;
++	const bool handless = routine.standard && routine.whole && !routine.big;
 +	const bool placed[2] = { !handless && placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
 +		!handless && placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
 +	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
@@ -93009,11 +93026,11 @@ index 000000000..2e47750c1
 +		}
 +	}
 +
-+	// The standard humanoid (see standardBody): a body that walks on two legs, made from its drawings so far, is made
-+	// again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one drawn leaning (its drawings
-+	// are no standing body's: what the cut left of it is doubtful enough), nor a thin thing, nor what the unit table
-+	// takes out.
-+	if (routine.humanoid && routine.legsSwing && !routine.drawn && !leaning && !routine.big && !beast && !tank && !turret && !(routine.whole && thinDrawing(parts[0])))
++	// The standard humanoid (see standardBody): a person, a unit the table names so, that walks on two legs, made from
++	// its drawings so far, is made again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one
++	// drawn leaning (its drawings are no standing body's: what the cut left of it is doubtful enough), nor a thin
++	// thing.
++	if (routine.standard && routine.humanoid && routine.legsSwing && !leaning && !routine.big && !beast && !tank && !turret && !(routine.whole && thinDrawing(parts[0])))
 +	{
 +		StandardArm standardArms[2];
 +		for (int arm = 0; arm < 2; ++arm)
@@ -93334,7 +93351,11 @@ index 000000000..2e47750c1
 +		// all eight, thrown straight through onto it, where that drawing sees it. So from its side it shows its side
 +		// drawing, as from its front its front one: painted by front and back alone its flanks were those two's edges
 +		// run through it in streaks; the owner, "From the side it looks awful", "Diagonal only for colouring".)
-+		const bool facing = !hull;
++		const bool facing = !hull && fourSided;
++		// (A person, a unit the table names "humanoid: standard", is painted by its front and back, as every body
++		// drawn in parts is. Each cube by whichever of the eight drawings it was turned to most, as for a while,
++		// speckled a chest with its sides' pixels and gave a soldier's face its hair: the owner, "something is wrong
++		// now with voxel models if you compare to experimental 1 release".)
 +		for (int d = 0; (hull || facing) && d < 8; ++d)
 +		{
 +			seenSkin[d].assign((size_t)FrameSize * FrameSize + 1, -1e9f);
@@ -93414,7 +93435,7 @@ index 000000000..2e47750c1
 +				for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1);
 +			}
 +			// (a cell made for a pixel it doesn't stand behind, a toe, a shoe: that pixel's colour)
-+			if (facing && (int)Painted.size() == GridCells) colour = Painted[cell];
++			if ((facing || routine.standard) && (int)Painted.size() == GridCells) colour = Painted[cell];
 +			if (facing && !colour && !facesUp)
 +			{
 +				// (the front, back and side drawings first, the one it is turned to most; the quarter drawings where none
@@ -93631,10 +93652,10 @@ index 000000000..2e47750c1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..40886e1e8
+index 000000000..77cc8ac0a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,154 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -93731,12 +93752,14 @@ index 000000000..40886e1e8
 +/// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 +/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 +/// length (see makeModel).
-+/// Kneeling: the pose the body is made in (set for the unit being made); drawn: the unit table takes it out of the
-+/// standard humanoid ("humanoid: drawn"; see standardBody): a body that walks on two legs stays as its drawings alone
-+/// leave it.
++/// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
++/// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
++/// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see
++/// standardBody). Only a named unit is: every other body stays as its drawings alone leave it. Sides: the unit table
++/// names it "sculpt: sides": a big walker cut by its four drawings from front, back and sides (see makeModel).
 +/// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 +/// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool drawn = false; };
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -93789,10 +93812,10 @@ index 000000000..40886e1e8
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..d6722ea60
+index 000000000..39d8101f4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,109 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -93890,7 +93913,8 @@ index 000000000..d6722ea60
 +	made.backTop = source.backTop;
 +	made.frontal = source.frontal;
 +	made.kneeling = source.kneeling;
-+	made.drawn = source.drawn;
++	made.standard = source.standard;
++	made.sides = source.sides;
 +	made.relief = source.relief;
 +	made.arms = source.arms;
 +	made.tankHull = source.tankHull;
@@ -93903,10 +93927,10 @@ index 000000000..d6722ea60
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..6e0eb1d72
+index 000000000..409f9ada5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -93945,7 +93969,8 @@ index 000000000..6e0eb1d72
 +	bool backTop = false; // (what faces up painted by the back drawing, by the mod's rules: see Routine)
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the mod's rules: see Routine)
 +	bool kneeling = false; // (the pose it is made in: see Routine)
-+	bool drawn = false; // (taken out of the standard humanoid, by the mod's rules: see Routine)
++	bool standard = false; // (a person, made the standard humanoid, by the mod's rules: see Routine)
++	bool sides = false; // (a big walker cut by its four drawings from front, back and sides, by the mod's rules: see Routine)
 +	bool relief = false; // (its one drawing given volume: see Routine)
 +	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
@@ -94282,10 +94307,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..c8bbe9a49
+index 000000000..bc7f030b0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1139 @@
+@@ -0,0 +1,1145 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94485,7 +94510,8 @@ index 000000000..c8bbe9a49
 +	bool frontal = false; // (kept to its front and back drawings' outlines, by the unit table: see Routine)
 +	bool relief = false; // (its one drawing given volume: see Routine)
 +	int arms = 0; // (its arms outside the body, coloured along their length, by the unit table: see Routine)
-+	bool drawn = false; // (taken out of the standard humanoid, by the unit table: see Routine)
++	bool standard = false; // (a person, made the standard humanoid, by the unit table: see Routine)
++	bool sides = false; // (a big walker cut by its four drawings from front, back and sides, by the unit table: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
@@ -94985,7 +95011,7 @@ index 000000000..c8bbe9a49
 +		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 +	}
 +	const Uint8 pose[11] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)(look.frontal == 1), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.drawn == 1) };
++		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)std::max(look.frontal, 0), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.standard == 1) };
 +	hashBytes(hash, pose, 11);
 +	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 +	hashBytes(hash, tankHeights, 2);
@@ -95018,7 +95044,8 @@ index 000000000..c8bbe9a49
 +		job->frontal = look.frontal == 1;
 +		job->relief = relief;
 +		job->arms = std::max(look.arms, 0);
-+		job->drawn = look.drawn == 1;
++		job->standard = look.standard == 1;
++		job->sides = look.frontal == 2;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->fine = FineBodies;
@@ -95231,7 +95258,8 @@ index 000000000..c8bbe9a49
 +			source.backTop = job->backTop;
 +			source.frontal = job->frontal;
 +			source.kneeling = job->kneeled;
-+			source.drawn = job->drawn;
++			source.standard = job->standard;
++			source.sides = job->sides;
 +			source.relief = job->relief;
 +			source.arms = job->arms;
 +			source.tankHull = job->tankHull;
@@ -95248,7 +95276,8 @@ index 000000000..c8bbe9a49
 +			routine.backTop = job->backTop;
 +			routine.frontal = job->frontal;
 +			routine.kneeling = job->kneeled;
-+			routine.drawn = job->drawn;
++			routine.standard = job->standard;
++			routine.sides = job->sides;
 +			routine.relief = job->relief;
 +			routine.arms = job->arms;
 +			routine.tankHull = job->tankHull;
@@ -95280,7 +95309,8 @@ index 000000000..c8bbe9a49
 +				source.backTop = job->backTop;
 +				source.frontal = job->frontal;
 +				source.kneeling = job->kneeled;
-+				source.drawn = job->drawn;
++				source.standard = job->standard;
++				source.sides = job->sides;
 +				source.relief = job->relief;
 +				source.routine = job->routine->number;
 +				shape = makeFineModel(source, job->palette);
@@ -95299,7 +95329,8 @@ index 000000000..c8bbe9a49
 +				routine.backTop = job->backTop;
 +				routine.frontal = job->frontal;
 +				routine.kneeling = job->kneeled;
-+				routine.drawn = job->drawn;
++				routine.standard = job->standard;
++				routine.sides = job->sides;
 +				routine.relief = job->relief;
 +				const std::vector<Uint8> noComposite[8];
 +				const HeldItem noItems[2];
@@ -95383,8 +95414,8 @@ index 000000000..c8bbe9a49
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d drawn %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.drawn);
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides);
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -102828,7 +102859,7 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..d89b94011
+index 000000000..cdf31d968
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
 @@ -0,0 +1,504 @@
@@ -102954,11 +102985,11 @@ index 000000000..d89b94011
 +		int shows = -1;
 +		int torsoDepth = -1;
 +		int backTop = -1;
-+		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; as ever: 0)
++		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 +		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 +		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
 +		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length; 0 as drawn)
-+		int drawn = -1; // (a body that walks on two legs left as its drawings have it: 1; made the standard humanoid, as ever: 0)
++		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -103173,10 +103204,10 @@ index 000000000..d89b94011
 +				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 +				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 +				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
-+				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : 0;
++				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : sculpt == "sides" ? 2 : 0;
 +				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
 +				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : 0;
-+				if (entry.tryRead("humanoid", humanoid)) look.drawn = humanoid == "drawn" ? 1 : 0;
++				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -103277,7 +103308,7 @@ index 000000000..d89b94011
 +			if (entry.second.animated != -1) look.animated = entry.second.animated;
 +			if (entry.second.relief != -1) look.relief = entry.second.relief;
 +			if (entry.second.arms != -1) look.arms = entry.second.arms;
-+			if (entry.second.drawn != -1) look.drawn = entry.second.drawn;
++			if (entry.second.standard != -1) look.standard = entry.second.standard;
 +		}
 +		return look;
 +	}

@@ -596,7 +596,10 @@ void roundPlan(std::vector<Uint8> &cells)
 
 /// ---- The standard humanoid ----
 /// The owner: "For humanoid body set a general beautiful humanoid that conforms to standards. Legs waist feet neck
-/// head and adapt our models to that!" A body that walks on two legs is first made from its drawings, as every body
+/// head and adapt our models to that!", and, of who it is for: "For humanoids i ment only people!", "Leave old units
+/// as they were before!", "Make fixes on per unit basis always". So only a unit the table names a person
+/// ("humanoid: standard": X-COM's soldiers, the civilians) is made so; every other body, a Sectoid's, a Muton's, a
+/// zombie's, stays as its drawings alone leave it. A person's body is first made from its drawings, as every body
 /// is (see makeModel): slices of its drawings' rows, cut by its outlines. That body has its drawings' size and pose,
 /// and their pixels' steps, the notches where two drawings differ, a head that sits on the shoulders as a block, feet
 /// that are plates. standardBody makes it again as a humanoid is built, to that body's own measures:
@@ -612,10 +615,11 @@ void roundPlan(std::vector<Uint8> &cells)
 ///    forearm tapering to the wrist, a hand;
 ///  - each leg goes straight down from its ankle (its thinnest above the foot) to a foot: a sole on the floor from
 ///    heel to toe, FootLong of the body's height long and pointing ahead, toes out no more than SplayMost, however
-///    the drawing has the shoe (X-COM's stand with their shoes out sideways).
-/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Not made so: a
-/// body on one frame that shows no two legs (a robe: the Ethereal), one drawn leaning (see makeModel), a kneeling
-/// body's legs, and what the unit table names "humanoid: drawn".
+///    long and whichever way the drawing has the shoe (the games' civilians stand with their shoes out sideways; as
+///    long as drawn, a foot was a fifth of the body: the owner, "Civilian has large feet correct!").
+/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Of the named,
+/// not made so: a body on one frame that shows no two legs, one drawn leaning (see makeModel), a kneeling body's
+/// legs.
 /// (All in voxels but where said. StandardTrunk, StandardHead, StandardLimb: how far the smoothing along a limb
 /// reaches. SplitDip: a piece is two where, along its length, it is this thin against both its sides. RoundWide: a
 /// section's oval is at most this many times its cells' spread wide (a stray cell doesn't widen it). CapShare: a
@@ -627,12 +631,14 @@ void roundPlan(std::vector<Uint8> &cells)
 /// is thinner than this much of the head, for a voxel and more, is no part of the egg; HeadFlat: what is over the neck
 /// and more than this many times as wide as it is high is no head (a frill, a wide hat, a Muton's shoulders). WaistIn: how much in. LegWide:
 /// a leg's ankle is at most this thick, half across; AnkleReach: it is looked for this far above the foot's top.
-/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootMost, FootWide: its length, the
-/// most if drawn longer, and its least half width, of the body's height. LimbRound: a limb at least LimbLong long is
+/// FootHigh: a foot's top over the ankle; ToeHigh: its toe's, of that; FootLong, FootWide: its length and its
+/// least half width, of the body's height. HeadFull: how full the egg is (2 an egg, more squarer: a head keeps its
+/// hair's breadth; a plain egg left a woman's face a bald ball, the owner: "bald because face colour is taken to the
+/// hair"). LimbRound: a limb at least LimbLong long is
 /// at least this thick one way for the other, where it is no more than LimbThick across, half. TrunkSquare: the power of the trunk's sections' outline, 2 an oval.)
 constexpr float StdTrunk = 0.6f, StdHead = 0.4f, StdLimb = 0.6f, SplitDip = 0.4f, CapShare = 1.0f, RoundWide = 2.2f, NeckPinch = 0.85f, NeckShare = 0.6f,
-	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.75f, FootLong = 0.15f, FootMost = 0.2f, ToeHigh = 0.65f, LegWide = 3.0f,
-	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.032f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
+	NeckHalf = 0.5f, ChinLong = 1.0f, ShoulderLong = 1.25f, WaistIn = 0.10f, FootHigh = 1.5f, FootLong = 0.13f, ToeHigh = 0.65f, LegWide = 3.0f,
+	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.028f, HeadFull = 2.6f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
 	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f;
 /// An arm's bones as placed (see makeModel), for standardBody: its joints, and how thick its upper and lower bone are.
 struct StandardArm { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
@@ -1013,7 +1019,7 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 				for (int i = headFrom; i <= crown; ++i)
 				{
 					Section &one = sections[path[i]];
-					const float off = i >= widest ? (i - widest) / above : (widest - i) / below, round = std::sqrt(std::max(0.0f, 1.0f - off * off));
+					const float off = i >= widest ? (i - widest) / above : (widest - i) / below, round = std::pow(std::max(0.0f, 1.0f - std::pow(off, HeadFull)), 1.0f / HeadFull);
 					const float by = i >= widest ? round : least + (1.0f - least) * round;
 					one.xx = plan.xx * by * by; one.xy = plan.xy * by * by; one.yy = plan.yy * by * by;
 					rounded[path[i]] = 1;
@@ -1216,9 +1222,7 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 				aimA = std::sin(turn) * outward; aimB = std::cos(turn);
 			}
 			const float wide = std::max(1.15f * thick, FootWide * tall), heel = -std::max(1.1f * thick, 0.25f * FootLong * tall), high = footTop - 0.0f;
-			float toe = heel + FootLong * tall;
-			for (const auto &cell : drawn) toe = std::max(toe, cell.first * aimA + cell.second * aimB);
-			toe = std::min(toe, heel + FootMost * tall);
+			const float toe = heel + FootLong * tall;
 			const int reach = (int)std::ceil(toe + wide) + 1;
 			for (int across = std::max(0, (int)ankle.right - reach); across <= std::min(GridAcross - 1, (int)ankle.right + reach); ++across)
 				for (int along = std::max(0, (int)ankle.ahead - reach); along <= std::min(GridAlong - 1, (int)ankle.ahead + reach); ++along)
@@ -4297,13 +4301,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
 	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
 	const bool tank = bigHull && !turret && parts[1].any;
-	// (A big walker the unit table names "sculpt: frontal", a frog: its shape is its four drawings' from front, back and
+	// (A big walker the unit table names "sculpt: sides", a frog: its shape is its four drawings' from front, back and
 	// sides alone, rounded between them (see roundPlan), and each of its cubes is painted by the drawing it is turned
 	// to, as a humanoid's. Cut by all eight with one forgiven, as big walkers are, it had no legs to tell and no gap
 	// under its belly: the owner, "frog is awful/ we must revisit its generator! (It looks like a green blob)". By
 	// name only: UFO's Sectopod and Reaper agree less with their eight drawings made so (0.51 to 0.45 and 0.47 to
 	// 0.43 of outline in common: fatter seen from the quarters), and stay as they were.)
-	const bool fourSided = routine.big && !bigHull && routine.frontal;
+	const bool fourSided = routine.big && !bigHull && routine.sides;
 	SlantOnly = routine.big && !bigHull;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
@@ -4354,7 +4358,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// not for shape!!". So a body on one frame that is one tile big, no long one and no thin one, is its slices,
 		// made from its front and right side (see limb), cut by the four drawings from its front, back and sides alone,
 		// strictly: what a quarter drawing has or hasn't changes nothing of its shape.)
-		const bool humanoid = !routine.big && !beast && !thin;
+		// (Only for a person, a unit the table names "humanoid: standard": the owner, "For humanoids i ment only
+		// people!", "Leave old units as they were before!", "Make fixes on per unit basis always". Every other body on
+		// one frame is cut by all eight of its drawings, one forgiven, as it always was.)
+		const bool humanoid = routine.standard && !routine.big && !beast && !thin;
 		const int lowCardinals = Cardinals & ~(1 << ((Front + 4) % 8));
 		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : humanoid ? carve(solid, 0, shape, 0, false, Cardinals, lowCardinals, FeetZone)
 			: fourSided ? carve(solid, 0, shape, 0, false, Cardinals)
@@ -4370,6 +4377,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		{
 			hull = carve(solid, 0, shape, 0, true, Cardinals, lowCardinals, FeetZone);
 			leaning = true;
+		}
+		else if (!routine.standard && !beast && !routine.big && !thin && upright(solid) && topShown(solid, hull) < HeadKept)
+		{
+			hull = carve(solid, 1, shape, 0, true);
 		}
 		if (fourSided) roundPlan(hull);
 		if (turret) levelOff(solid, hull);
@@ -4451,7 +4462,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	{
 		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
 		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
-		const std::vector<Uint8> hull = carve(parts[0], 0, torso, 0, false, Cardinals);
+		const std::vector<Uint8> hull = routine.standard ? carve(parts[0], 0, torso, 0, false, Cardinals) : carve(parts[0], 1, torso);
 		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 	}
 	// The items in hand, where their frames show them, and the arms' skeletons (see ArmFrames): each from the top of its
@@ -4460,7 +4471,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (A body on one frame that is one tile big holds nothing: its drawing has no hands on an item, so the item hung in
 	// the air before it, at a civilian's shoulder with its arms down. The owner: "floating pistol: In some sprites means
 	// that pistol should be removed altogether!")
-	const bool handless = routine.whole && !routine.big;
+	const bool handless = routine.standard && routine.whole && !routine.big;
 	const bool placed[2] = { !handless && placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
 		!handless && placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
 	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
@@ -4715,11 +4726,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 	}
 
-	// The standard humanoid (see standardBody): a body that walks on two legs, made from its drawings so far, is made
-	// again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one drawn leaning (its drawings
-	// are no standing body's: what the cut left of it is doubtful enough), nor a thin thing, nor what the unit table
-	// takes out.
-	if (routine.humanoid && routine.legsSwing && !routine.drawn && !leaning && !routine.big && !beast && !tank && !turret && !(routine.whole && thinDrawing(parts[0])))
+	// The standard humanoid (see standardBody): a person, a unit the table names so, that walks on two legs, made from
+	// its drawings so far, is made again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one
+	// drawn leaning (its drawings are no standing body's: what the cut left of it is doubtful enough), nor a thin
+	// thing.
+	if (routine.standard && routine.humanoid && routine.legsSwing && !leaning && !routine.big && !beast && !tank && !turret && !(routine.whole && thinDrawing(parts[0])))
 	{
 		StandardArm standardArms[2];
 		for (int arm = 0; arm < 2; ++arm)
@@ -5040,7 +5051,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// all eight, thrown straight through onto it, where that drawing sees it. So from its side it shows its side
 		// drawing, as from its front its front one: painted by front and back alone its flanks were those two's edges
 		// run through it in streaks; the owner, "From the side it looks awful", "Diagonal only for colouring".)
-		const bool facing = !hull;
+		const bool facing = !hull && fourSided;
+		// (A person, a unit the table names "humanoid: standard", is painted by its front and back, as every body
+		// drawn in parts is. Each cube by whichever of the eight drawings it was turned to most, as for a while,
+		// speckled a chest with its sides' pixels and gave a soldier's face its hair: the owner, "something is wrong
+		// now with voxel models if you compare to experimental 1 release".)
 		for (int d = 0; (hull || facing) && d < 8; ++d)
 		{
 			seenSkin[d].assign((size_t)FrameSize * FrameSize + 1, -1e9f);
@@ -5120,7 +5135,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 				for (int i = 0; i < 8 && !colour; ++i) colour = drawnColour(k, order[i], 1);
 			}
 			// (a cell made for a pixel it doesn't stand behind, a toe, a shoe: that pixel's colour)
-			if (facing && (int)Painted.size() == GridCells) colour = Painted[cell];
+			if ((facing || routine.standard) && (int)Painted.size() == GridCells) colour = Painted[cell];
 			if (facing && !colour && !facesUp)
 			{
 				// (the front, back and side drawings first, the one it is turned to most; the quarter drawings where none

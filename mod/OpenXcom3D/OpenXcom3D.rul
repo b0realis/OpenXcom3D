@@ -188,15 +188,21 @@ firstPerson:
   #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
   #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
   #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
-  #           and the waist, the legs apart, as drawn; a big walking creature, two tiles by two: its shape is its
-  #           drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
+  #           and the waist, the legs apart, as drawn), sides (a big walking creature, two tiles by two: its shape is
+  #           its drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
   #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
-  #   humanoid: drawn (a unit that walks on two legs keeps the body its drawings alone leave: no standard humanoid's
-  #           neck, egg of a head, round limbs and feet), or standard (as ever)
+  #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
+  #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
+  #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
+  #           leave it)
   # A later entry (or a later mod's) overrides what it sets.
   units:
+    # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
+    # games' civilians. Whole names: STR_SECTOID_SOLDIER is no person
+    - names: [STR_SOLDIER, MALE_CIVILIAN, FEMALE_CIVILIAN, SAILOR_CIVILIAN, DOCKER_CIVILIAN]
+      humanoid: standard
     # ghosts (XPiratez, The X-Com Files): there, but seen through
     - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
       seeThrough: 50
@@ -217,7 +223,7 @@ firstPerson:
       animation: sprite
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
-      sculpt: frontal
+      sculpt: sides
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
     # arms posed on their guns (arms outside the body, coloured along their length)
     - names: [DAGON]
