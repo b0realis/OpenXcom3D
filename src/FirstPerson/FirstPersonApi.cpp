@@ -448,11 +448,24 @@ void settleOptions()
 		Options::keyFpsNextFireMode = Options::keyFpsNextMode;
 		Options::keyFpsNextMode = SDLK_f;
 	}
-	// The second key for the isometric / 3D switch is V by default, which the auto shot had: a profile that still has
-	// the auto shot on it (any profile from before) keeps the auto shot there, and has no second key until one is chosen.
+	// The second key for the isometric / 3D switch is V by default, which the auto shot had; the auto shot has no key
+	// by default. So too on a profile from before (the owner: "The V key should be bound to 3d view by default and
+	// auto key unbound"; such a profile kept the auto shot on V for a while, and had no second key for the switch).
+	// Once (the option "fpsKeyDefaults" keeps that it was done): a profile with the auto shot on V has no key for the
+	// auto shot, and V is the switch's second key where it has none. After that the two keys are the player's own.
+	if (Options::fpsKeyDefaults < 1)
+	{
+		if (Options::keyFpsModeAuto == SDLK_v)
+		{
+			Options::keyFpsModeAuto = SDLK_UNKNOWN;
+			if (Options::keyBattleFirstPerson2 == SDLK_UNKNOWN) Options::keyBattleFirstPerson2 = SDLK_v;
+		}
+		Options::fpsKeyDefaults = 1;
+	}
+	// (both on one key, by the player's hand: it is the switch's, in the 3D view too)
 	if (Options::keyBattleFirstPerson2 != SDLK_UNKNOWN && Options::keyBattleFirstPerson2 == Options::keyFpsModeAuto)
 	{
-		Options::keyBattleFirstPerson2 = SDLK_UNKNOWN;
+		Options::keyFpsModeAuto = SDLK_UNKNOWN;
 	}
 	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
 }
@@ -1058,6 +1071,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPreset", &fpsPreset, 1, "STR_FPS_PRESET", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomPreset", &fpsCustomPreset, "", "", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsPresetTables", &fpsPresetTables, 0, "", category)); // (which tables of presets the profile has seen: see settlePresets; unlisted)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsKeyDefaults", &fpsKeyDefaults, 0, "", category)); // (the keys' defaults a profile from before was given, once: see settleOptions; unlisted)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsGraphicsDetail", &fpsGraphicsDetail, 1, "STR_FPS_GRAPHICS_DETAIL", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCustomGraphics", &fpsCustomGraphics, "", "", category));
 	// The game's own options set to a recommended lot, when the player clicks the row (see applyGameOptions): whether that was done.
@@ -1449,7 +1463,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Switching views, freeing the cursor from mouse look, and showing the classic HUD.
 	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson", &keyBattleFirstPerson, SDLK_F8, "STR_FPS_KEY_TOGGLE_VIEW", category));
 	// (A second key for it, under the left hand: GitHub issue #167. The auto shot, which had V, has no key of its own
-	// by default now: the wheel and the next fire mode key reach it.)
+	// by default now: the wheel and the next fire mode key reach it. On a profile from before too: see settleOptions.)
 	options.push_back(keyOption(OPTION_OTHER, "keyBattleFirstPerson2", &keyBattleFirstPerson2, SDLK_v, "STR_FPS_KEY_TOGGLE_VIEW_2", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsMouseMode", &keyFpsMouseMode, SDLK_c, "STR_FPS_KEY_MOUSE_MODE", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsClassicHud", &keyFpsClassicHud, SDLK_h, "STR_FPS_KEY_CLASSIC_HUD", category));
