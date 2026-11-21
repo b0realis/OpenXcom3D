@@ -5442,15 +5442,18 @@ static const int ArenaEmptySpot = 7;
  * map for a player to walk among, and written as a save (see arenaSave).
  * Called as a frame begins, before the camera's axes are made.
  */
+int WatchedAlone = -1; // (the developer's camera, below: the id of the only unit drawn, -1 for all of them as ever)
+
 void FirstPersonView::arenaStep()
 {
 	// (A developer's camera on a unit: while OPENXCOM3D_WATCH_UNIT names a file holding "id degrees tiles", the view
 	// looks at that unit from so many tiles away, so many degrees round from its front: for a look at a voxel body in
-	// the game itself, from any side. The file is read again every half second. The battle's debug mode goes on.)
+	// the game itself, from any side. The file is read again every half second. The battle's debug mode goes on. A
+	// fourth number, 1, leaves the other units undrawn: a unit standing in a crowd is seen whole, see WatchedAlone.)
 	static const char *const watch = getenv("OPENXCOM3D_WATCH_UNIT");
 	if (watch && _save && !_sharedModelsOwner && getWidth() >= 320)
 	{
-		static int id = -1;
+		static int id = -1, alone = 0;
 		static float degrees = 0.0f, tiles = 3.0f;
 		static Uint32 read = 0;
 		if (!_save->getDebugMode()) _save->setDebugMode(); // (every unit shown, seen by the player or not)
@@ -5459,8 +5462,10 @@ void FirstPersonView::arenaStep()
 			read = SDL_GetTicks();
 			if (FILE *asked = fopen(watch, "r"))
 			{
-				if (fscanf(asked, "%d %f %f", &id, &degrees, &tiles) != 3) id = -1;
+				alone = 0;
+				if (fscanf(asked, "%d %f %f %d", &id, &degrees, &tiles, &alone) < 3) id = -1;
 				fclose(asked);
+				WatchedAlone = alone ? id : -1;
 			}
 		}
 		for (BattleUnit *unit : *_save->getUnits())
