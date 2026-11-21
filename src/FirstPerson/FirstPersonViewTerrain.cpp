@@ -5466,9 +5466,9 @@ void FirstPersonView::arenaStep()
 			if (FILE *asked = fopen(watch, "r"))
 			{
 				alone = 0;
-				const int read = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
-				if (read < 3) id = -1;
-				pitched = read >= 5;
+				const int fields = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
+				if (fields < 3) id = -1;
+				pitched = fields >= 5;
 				fclose(asked);
 				WatchedAlone = alone == 2 ? -2 : alone ? id : -1;
 			}

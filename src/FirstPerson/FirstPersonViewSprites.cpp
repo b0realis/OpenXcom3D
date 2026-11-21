@@ -1757,8 +1757,7 @@ void FirstPersonView::drawUnits()
 			{
 				const double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
 				standing[2] += lift;
-				auto glide = _unitGlides.find(unit);
-				if (glide != _unitGlides.end()) glide->second.lift = lift;
+				glide.lift = lift;
 			}
 			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
 			{

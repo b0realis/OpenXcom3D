@@ -4256,9 +4256,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			{
 				const int column = (int)std::floor(FloorX + model->ahead[k] / longReading.length * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
 				for (int lower = 0; lower <= ProfileBelow && !colour; ++lower) colour = parts[0].at(RightSide, column, row + lower);
-				for (int reach = 1; reach <= 2 * VOXELSCALE && !colour; ++reach)
-					for (int dy = -reach; dy <= reach && !colour; ++dy)
-						for (int dx = -reach; dx <= reach && !colour; ++dx) colour = parts[0].at(RightSide, column + dx, row + dy);
+				for (int spread = 1; spread <= 2 * VOXELSCALE && !colour; ++spread)
+					for (int dy = -spread; dy <= spread && !colour; ++dy)
+						for (int dx = -spread; dx <= spread && !colour; ++dx) colour = parts[0].at(RightSide, column + dx, row + dy);
 			}
 			if (hull && !colour)
 			{

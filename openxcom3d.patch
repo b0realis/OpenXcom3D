@@ -75194,10 +75194,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..7e553c542
+index 000000000..4ad6902ca
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4336 @@
+@@ -0,0 +1,4335 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -76957,8 +76957,7 @@ index 000000000..7e553c542
 +			{
 +				const double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
 +				standing[2] += lift;
-+				auto glide = _unitGlides.find(unit);
-+				if (glide != _unitGlides.end()) glide->second.lift = lift;
++				glide.lift = lift;
 +			}
 +			if (unit->getArmor()->getDrawingRoutine() == 9 && fall <= 0.0)
 +			{
@@ -80527,7 +80526,7 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..8d316a903
+index 000000000..a3373e325
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
 @@ -0,0 +1,5754 @@
@@ -85999,9 +85998,9 @@ index 000000000..8d316a903
 +			if (FILE *asked = fopen(watch, "r"))
 +			{
 +				alone = 0;
-+				const int read = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
-+				if (read < 3) id = -1;
-+				pitched = read >= 5;
++				const int fields = fscanf(asked, "%d %f %f %d %f", &id, &degrees, &tiles, &alone, &pitchDegrees);
++				if (fields < 3) id = -1;
++				pitched = fields >= 5;
 +				fclose(asked);
 +				WatchedAlone = alone == 2 ? -2 : alone ? id : -1;
 +			}
@@ -88205,7 +88204,7 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..4a9ffb650
+index 000000000..f9809cbc0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 @@ -0,0 +1,4472 @@
@@ -92467,9 +92466,9 @@ index 000000000..4a9ffb650
 +			{
 +				const int column = (int)std::floor(FloorX + model->ahead[k] / longReading.length * PixelsAcross), row = (int)std::floor(FloorY - model->up[k]);
 +				for (int lower = 0; lower <= ProfileBelow && !colour; ++lower) colour = parts[0].at(RightSide, column, row + lower);
-+				for (int reach = 1; reach <= 2 * VOXELSCALE && !colour; ++reach)
-+					for (int dy = -reach; dy <= reach && !colour; ++dy)
-+						for (int dx = -reach; dx <= reach && !colour; ++dx) colour = parts[0].at(RightSide, column + dx, row + dy);
++				for (int spread = 1; spread <= 2 * VOXELSCALE && !colour; ++spread)
++					for (int dy = -spread; dy <= spread && !colour; ++dy)
++						for (int dx = -spread; dx <= spread && !colour; ++dx) colour = parts[0].at(RightSide, column + dx, row + dy);
 +			}
 +			if (hull && !colour)
 +			{
