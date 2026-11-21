@@ -74,6 +74,7 @@ namespace OpenXcom
 class Armor;
 class BattleUnit;
 class RuleItem;
+class Mod;
 class SavedBattleGame;
 class SurfaceSet;
 class UnitSprite;
@@ -85,6 +86,9 @@ constexpr int AnimFrames = 8;
 /// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
 /// the map, where every other pixel of it is left out.
 constexpr float VoxelDitherFaint = 0.5f;
+/// A melee weapon sharing its hand drawing with longer ones (see VoxelUnits::handShare) is this much of the drawing's
+/// length at the least.
+constexpr float HandShareLeast = 0.35f;
 
 /// A unit's body made from its own sprites: its surface voxels and their colours, standing (or
 /// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
@@ -222,6 +226,8 @@ public:
 	void clear();
 private:
 	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
+	std::map<int, float> _handLongest; // by hand drawing: the longest inventory picture among the melee weapons that use it (see handShare)
+	float handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites);
 	/// The frames and pictures a body is being made from (defined with the builder).
 	struct Job;
 	/// What a body is made for: the unit, its armour, kneeling, aiming, flying, what it holds, a big unit's turret's turn.

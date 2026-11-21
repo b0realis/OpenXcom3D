@@ -70,6 +70,7 @@ std::unique_ptr<VoxelUnitModel> makeFineModel(const FineBodySource &source, cons
 		items[hand].height = source.itemHeight[hand];
 		items[hand].twoHanded = source.itemTwoHanded[hand];
 		items[hand].melee = source.itemMelee[hand];
+		items[hand].share = source.itemShare[hand];
 	}
 	std::vector<std::vector<Uint8>> deaths;
 	for (const auto &death : source.deaths) deaths.push_back(enlarged(death));

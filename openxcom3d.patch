@@ -72256,10 +72256,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..145f5e65c
+index 000000000..6c5b2925c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,730 @@
+@@ -0,0 +1,731 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72497,9 +72497,10 @@ index 000000000..145f5e65c
 +/// line passes within this far of its middle on the ground, voxels (a heap; a big unit's wreck), and is drawn at this
 +/// share of the ghost opacity.
 +const double VoxelCorpseReach = 9.0, VoxelWreckReach = 18.0, VoxelCorpseFaint = 0.6;
-+/// And only where the aim's line passes low over it: within VoxelCorpseOver voxels of its top (a body lying is taken
-+/// as VoxelCorpseHeight high, a wreck VoxelWreckHeight), or ends on a unit standing behind it.
-+const double VoxelCorpseHeight = 6.0, VoxelWreckHeight = 14.0, VoxelCorpseOver = 6.0;
++/// And only where it is in the way: the aim ends on a unit standing behind it; or the aim's line goes through the body
++/// itself, under its own top where it leaves the body's reach, and ends VoxelCorpsePast or more beyond that (a tile:
++/// looking at the body, or over it at what lies behind, it is solid).
++const double VoxelCorpsePast = 16.0;
 +/// A Celatid's voxel body hovers as its picture's frames do: up and down by this much (voxels), once in this long (ms),
 +/// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
 +const double CelatidBob = 1.2, CelatidSwell = 0.04;
@@ -75337,10 +75338,10 @@ index 000000000..229bd966c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..847ffeef6
+index 000000000..f1efa44a1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4396 @@
+@@ -0,0 +1,4408 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -78116,8 +78117,8 @@ index 000000000..847ffeef6
 +		// (By where it lies and where the aim goes alone, not by whether its pixels are under the crosshair: drawn
 +		// see-through it leaves holes there, the crosshair found no body in them the next frame, and it was solid again:
 +		// the owner, a downed Cyberdisc "flashes transparent when I am near but turns solid again".)
-+		// (And only where it is in the way: the aim's line passes low over it, within VoxelCorpseOver of its top, or
-+		// ends on a unit standing behind it, whose legs it hides. Looking straight ahead over the bodies at one's feet,
++		// (And only where it is in the way: the aim ends on a unit standing behind it, whose legs it hides, or goes
++		// through the body to a place beyond it (see below). Looking straight ahead over the bodies at one's feet,
 +		// at a wall across the room, they stay solid: a player, GitHub issue #190, "looking straight ahead over them,
 +		// the units become invisible despite not looking at the voxel MODEL".)
 +		double bodyOpacity = 1.0;
@@ -78130,11 +78131,23 @@ index 000000000..847ffeef6
 +			const double beside = length > 0.0 ? std::abs(toX * wayY - toY * wayX) / length : 1e9;
 +			if (along > 0.0 && beside <= reach && length > along + reach)
 +			{
-+				const double lineHeight = _eye[2] + (_pointerAim.z + 0.5 - _eye[2]) * along / length;
-+				const double top = step.sprite.world[2] + (wreck ? VoxelWreckHeight : VoxelCorpseHeight);
++				// (Before a unit standing behind it, whose legs it hides. Else only where the body itself is between the
++				// eye and the place aimed at: the aim's line goes through it, under the top it really has where it leaves
++				// the body's reach, and ends a tile or more past it. A wreck was taken as 14 voxels high whatever it was,
++				// and any aim a little downwards anywhere near one made it a ghost, the crosshair on the wreck itself
++				// too: a Reaper down after a blast, seen through with its far side showing, "makes a unit ghostly", a
++				// player, GitHub issue #222.)
++				const double farHeight = _eye[2] + (_pointerAim.z + 0.5 - _eye[2]) * std::min(length, along + reach) / length;
++				double top = step.sprite.world[2];
++				if (const VoxelUnitModel::FallShape *shape = (wreck ? wreck : lying)->fallAt(1.0))
++				{
++					float highest = 0.0f;
++					for (float up : shape->up) highest = std::max(highest, up);
++					top += highest * itemScale * (wreck ? wreck : lying)->unit;
++				}
 +				const Tile *ends = _save->getTile(_pointerAim.toTile());
 +				const BattleUnit *behind = ends ? ends->getUnit() : nullptr;
-+				if (lineHeight <= top + VoxelCorpseOver || (behind && !behind->isOut())) bodyOpacity = _faintPile.opacity;
++				if ((behind && !behind->isOut()) || (farHeight <= top && length > along + reach + VoxelCorpsePast)) bodyOpacity = _faintPile.opacity;
 +			}
 +		}
 +		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
@@ -88486,10 +88499,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..b2b29063c
+index 000000000..b5d2be25e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5451 @@
+@@ -0,0 +1,5465 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -92988,6 +93001,20 @@ index 000000000..b2b29063c
 +	const bool handless = routine.standard && routine.whole && !routine.big;
 +	const bool placed[2] = { !handless && placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
 +		!handless && placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
++	// (A melee weapon that shares its hand drawing with longer ones is as much shorter than the drawing as its inventory
++	// picture is shorter than the longest of theirs (HeldItem::share): its length from the hand that holds it, which
++	// stays where the drawing has it. XPiratez draws its shiv, one inventory square, in the hand with its machete's
++	// drawing: as long as the drawing, "the shiv ... I didn't even recognize it (the 1x1 knife, it looked like a
++	// sword", a player, GitHub issue #223.)
++	for (int hand = 0; hand < 2; ++hand)
++	{
++		if (!placed[hand] || items[hand].share >= 1.0f || places[hand].plate) continue;
++		float grip[3], gripNow[3];
++		gripOf(places[hand], items[hand].twoHanded, true, grip);
++		places[hand].length = std::max(1.0f, places[hand].length * items[hand].share);
++		gripOf(places[hand], items[hand].twoHanded, true, gripNow);
++		for (int i = 0; i < 3; ++i) places[hand].middle[i] += grip[i] - gripNow[i];
++	}
 +	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
 +	// it (the hand frames only say where it is on the pictures; a deep body, a Muton's or a robe, reached out round
 +	// it) is moved ahead, half a voxel at a time, till it is not, ItemOutMost at most. The arms reach for it where it
@@ -93943,10 +93970,10 @@ index 000000000..b2b29063c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..b4bc497da
+index 000000000..9b64b2a79
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,162 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94089,6 +94116,9 @@ index 000000000..b4bc497da
 +	int width = 0, height = 0;
 +	bool twoHanded = false;
 +	bool melee = false;
++	/// How long it is for its hand drawing (see VoxelUnits::handShare): 1, or less for a melee weapon that shares its
++	/// hand drawing with longer ones (a mod's knife drawn in the hand as its machete is).
++	float share = 1.0f;
 +};
 +
 +/// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
@@ -94108,10 +94138,10 @@ index 000000000..b4bc497da
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..4fcfe5e02
+index 000000000..615fc91a8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,111 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -94184,6 +94214,7 @@ index 000000000..4fcfe5e02
 +		items[hand].height = source.itemHeight[hand];
 +		items[hand].twoHanded = source.itemTwoHanded[hand];
 +		items[hand].melee = source.itemMelee[hand];
++		items[hand].share = source.itemShare[hand];
 +	}
 +	std::vector<std::vector<Uint8>> deaths;
 +	for (const auto &death : source.deaths) deaths.push_back(enlarged(death));
@@ -94224,10 +94255,10 @@ index 000000000..4fcfe5e02
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..bf2c23649
+index 000000000..f853e4370
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,51 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -94254,6 +94285,7 @@ index 000000000..bf2c23649
 +	int itemWidth[2] = {}, itemHeight[2] = {};
 +	bool itemTwoHanded[2] = {};
 +	bool itemMelee[2] = {};
++	float itemShare[2] = { 1.0f, 1.0f }; // (how long each is for its hand drawing: see HeldItem::share)
 +	std::vector<std::vector<Uint8>> deaths;
 +	std::vector<Uint8> corpse, lyingPicture;
 +	int lyingWidth = 0, lyingHeight = 0;
@@ -94605,10 +94637,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..589010880
+index 000000000..834daf38c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1187 @@
+@@ -0,0 +1,1233 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -95262,6 +95294,7 @@ index 000000000..589010880
 +		items[hand].melee = item->getRules()->getBattleType() == BT_MELEE;
 +		const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
 +		if (!frame) continue;
++		if (items[hand].melee) items[hand].share = handShare(item->getRules(), save->getMod(), inventorySprites);
 +		Surface picture(frame->getWidth(), frame->getHeight());
 +		ScriptWorkerBlit worker;
 +		BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
@@ -95283,8 +95316,8 @@ index 000000000..589010880
 +	for (const HeldItem &held : items)
 +	{
 +		hashBytes(hash, held.picture.data(), held.picture.size());
-+		const Uint8 flags[4] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee };
-+		hashBytes(hash, flags, 4);
++		const Uint8 flags[5] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee, (Uint8)std::lround(held.share * 100.0f) };
++		hashBytes(hash, flags, 5);
 +	}
 +	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 +	hashBytes(hash, corpse.data(), corpse.size());
@@ -95400,6 +95433,50 @@ index 000000000..589010880
 + * @param unit The unit.
 + * @return The body, or null if it was never drawn as one.
 + */
++/**
++ * How long a melee weapon is for its hand drawing: the mods draw several in the hand with one drawing (XPiratez its
++ * shiv and its machete), and a body's item is made as long as that drawing has it (see VoxelBodies::placeItem). So an
++ * inventory picture's own length counts: the picture's (its drawn box, corner to corner) over the longest among the
++ * mod's melee weapons with the same hand drawing. 1 for a weapon whose hand drawing is its own, as the games' all are.
++ * Found once for each hand drawing and kept.
++ * @param rule The weapon's rules.
++ * @param mod The mod.
++ * @param inventorySprites The inventory pictures (BIGOBS.PCK).
++ * @return Its share of the hand drawing's length: over 0, 1 at most.
++ */
++float VoxelUnits::handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites)
++{
++	auto reach = [&](const RuleItem *item) -> float {
++		const Surface *frame = item->getBigSprite() >= 0 ? const_cast<SurfaceSet*>(inventorySprites)->getFrame(item->getBigSprite()) : nullptr;
++		if (!frame) return 0.0f;
++		int left = frame->getWidth(), right = -1, top = frame->getHeight(), bottom = -1;
++		for (int y = 0; y < frame->getHeight(); ++y)
++			for (int x = 0; x < frame->getWidth(); ++x)
++			{
++				if (!frame->getPixel(x, y)) continue;
++				left = std::min(left, x); right = std::max(right, x);
++				top = std::min(top, y); bottom = std::max(bottom, y);
++			}
++		// (not hypot on floats: the release's old C library has none)
++		const float wide = (float)(right - left + 1), high = (float)(bottom - top + 1);
++		return right < 0 ? 0.0f : std::sqrt(wide * wide + high * high);
++	};
++	if (rule->getHandSprite() < 0) return 1.0f;
++	auto known = _handLongest.find(rule->getHandSprite());
++	if (known == _handLongest.end())
++	{
++		float longest = 0.0f;
++		for (const std::string &name : mod->getItemsList())
++		{
++			const RuleItem *other = mod->getItem(name);
++			if (other && other->getBattleType() == BT_MELEE && other->getHandSprite() == rule->getHandSprite()) longest = std::max(longest, reach(other));
++		}
++		known = _handLongest.emplace(rule->getHandSprite(), longest).first;
++	}
++	const float own = reach(rule);
++	return own > 0.0f && known->second > own ? std::max(HandShareLeast, own / known->second) : 1.0f;
++}
++
 +bool VoxelUnits::recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256])
 +{
 +	if (!unit->getArmor()->getScript<ModScript::RecolorUnitSprite>()) return false;
@@ -95574,6 +95651,7 @@ index 000000000..589010880
 +				source.itemHeight[hand] = job->items[hand].height;
 +				source.itemTwoHanded[hand] = job->items[hand].twoHanded;
 +				source.itemMelee[hand] = job->items[hand].melee;
++				source.itemShare[hand] = job->items[hand].share;
 +			}
 +			source.deaths = job->deaths;
 +			source.corpse = job->corpse;
@@ -95754,8 +95832,8 @@ index 000000000..589010880
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits);
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f));
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -95798,10 +95876,10 @@ index 000000000..589010880
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..4b920ff7b
+index 000000000..4deeb28c9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,268 @@
+@@ -0,0 +1,274 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -95878,6 +95956,7 @@ index 000000000..4b920ff7b
 +class Armor;
 +class BattleUnit;
 +class RuleItem;
++class Mod;
 +class SavedBattleGame;
 +class SurfaceSet;
 +class UnitSprite;
@@ -95889,6 +95968,9 @@ index 000000000..4b920ff7b
 +/// How much shows of the body of a unit the game draws as a dither (see VoxelUnitModel::opacity): see-through as on
 +/// the map, where every other pixel of it is left out.
 +constexpr float VoxelDitherFaint = 0.5f;
++/// A melee weapon sharing its hand drawing with longer ones (see VoxelUnits::handShare) is this much of the drawing's
++/// length at the least.
++constexpr float HandShareLeast = 0.35f;
 +
 +/// A unit's body made from its own sprites: its surface voxels and their colours, standing (or
 +/// kneeling, aiming) as the unit was when it was made, and the walk's 8 poses.
@@ -96026,6 +96108,8 @@ index 000000000..4b920ff7b
 +	void clear();
 +private:
 +	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
++	std::map<int, float> _handLongest; // by hand drawing: the longest inventory picture among the melee weapons that use it (see handShare)
++	float handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites);
 +	/// The frames and pictures a body is being made from (defined with the builder).
 +	struct Job;
 +	/// What a body is made for: the unit, its armour, kneeling, aiming, flying, what it holds, a big unit's turret's turn.

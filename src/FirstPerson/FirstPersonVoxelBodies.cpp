@@ -4496,6 +4496,20 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	const bool handless = routine.standard && routine.whole && !routine.big;
 	const bool placed[2] = { !handless && placeItem(parts[RightItem], items[0].twoHanded, aiming, items[0].melee, places[0]),
 		!handless && placeItem(parts[LeftItem], items[1].twoHanded, aiming, items[1].melee, places[1]) };
+	// (A melee weapon that shares its hand drawing with longer ones is as much shorter than the drawing as its inventory
+	// picture is shorter than the longest of theirs (HeldItem::share): its length from the hand that holds it, which
+	// stays where the drawing has it. XPiratez draws its shiv, one inventory square, in the hand with its machete's
+	// drawing: as long as the drawing, "the shiv ... I didn't even recognize it (the 1x1 knife, it looked like a
+	// sword", a player, GitHub issue #223.)
+	for (int hand = 0; hand < 2; ++hand)
+	{
+		if (!placed[hand] || items[hand].share >= 1.0f || places[hand].plate) continue;
+		float grip[3], gripNow[3];
+		gripOf(places[hand], items[hand].twoHanded, true, grip);
+		places[hand].length = std::max(1.0f, places[hand].length * items[hand].share);
+		gripOf(places[hand], items[hand].twoHanded, true, gripNow);
+		for (int i = 0; i < 3; ++i) places[hand].middle[i] += grip[i] - gripNow[i];
+	}
 	// What it holds is held in front of it: an item whose own length lies inside the body for more than ItemInBody of
 	// it (the hand frames only say where it is on the pictures; a deep body, a Muton's or a robe, reached out round
 	// it) is moved ahead, half a voxel at a time, till it is not, ItemOutMost at most. The arms reach for it where it

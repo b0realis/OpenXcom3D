@@ -651,6 +651,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		items[hand].melee = item->getRules()->getBattleType() == BT_MELEE;
 		const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
 		if (!frame) continue;
+		if (items[hand].melee) items[hand].share = handShare(item->getRules(), save->getMod(), inventorySprites);
 		Surface picture(frame->getWidth(), frame->getHeight());
 		ScriptWorkerBlit worker;
 		BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
@@ -672,8 +673,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	for (const HeldItem &held : items)
 	{
 		hashBytes(hash, held.picture.data(), held.picture.size());
-		const Uint8 flags[4] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee };
-		hashBytes(hash, flags, 4);
+		const Uint8 flags[5] = { (Uint8)held.width, (Uint8)held.height, (Uint8)held.twoHanded, (Uint8)held.melee, (Uint8)std::lround(held.share * 100.0f) };
+		hashBytes(hash, flags, 5);
 	}
 	for (const auto &death : deaths) hashBytes(hash, death.data(), death.size());
 	hashBytes(hash, corpse.data(), corpse.size());
@@ -789,6 +790,50 @@ int VoxelUnits::lastFacing(const BattleUnit *unit) const
  * @param unit The unit.
  * @return The body, or null if it was never drawn as one.
  */
+/**
+ * How long a melee weapon is for its hand drawing: the mods draw several in the hand with one drawing (XPiratez its
+ * shiv and its machete), and a body's item is made as long as that drawing has it (see VoxelBodies::placeItem). So an
+ * inventory picture's own length counts: the picture's (its drawn box, corner to corner) over the longest among the
+ * mod's melee weapons with the same hand drawing. 1 for a weapon whose hand drawing is its own, as the games' all are.
+ * Found once for each hand drawing and kept.
+ * @param rule The weapon's rules.
+ * @param mod The mod.
+ * @param inventorySprites The inventory pictures (BIGOBS.PCK).
+ * @return Its share of the hand drawing's length: over 0, 1 at most.
+ */
+float VoxelUnits::handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites)
+{
+	auto reach = [&](const RuleItem *item) -> float {
+		const Surface *frame = item->getBigSprite() >= 0 ? const_cast<SurfaceSet*>(inventorySprites)->getFrame(item->getBigSprite()) : nullptr;
+		if (!frame) return 0.0f;
+		int left = frame->getWidth(), right = -1, top = frame->getHeight(), bottom = -1;
+		for (int y = 0; y < frame->getHeight(); ++y)
+			for (int x = 0; x < frame->getWidth(); ++x)
+			{
+				if (!frame->getPixel(x, y)) continue;
+				left = std::min(left, x); right = std::max(right, x);
+				top = std::min(top, y); bottom = std::max(bottom, y);
+			}
+		// (not hypot on floats: the release's old C library has none)
+		const float wide = (float)(right - left + 1), high = (float)(bottom - top + 1);
+		return right < 0 ? 0.0f : std::sqrt(wide * wide + high * high);
+	};
+	if (rule->getHandSprite() < 0) return 1.0f;
+	auto known = _handLongest.find(rule->getHandSprite());
+	if (known == _handLongest.end())
+	{
+		float longest = 0.0f;
+		for (const std::string &name : mod->getItemsList())
+		{
+			const RuleItem *other = mod->getItem(name);
+			if (other && other->getBattleType() == BT_MELEE && other->getHandSprite() == rule->getHandSprite()) longest = std::max(longest, reach(other));
+		}
+		known = _handLongest.emplace(rule->getHandSprite(), longest).first;
+	}
+	const float own = reach(rule);
+	return own > 0.0f && known->second > own ? std::max(HandShareLeast, own / known->second) : 1.0f;
+}
+
 bool VoxelUnits::recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256])
 {
 	if (!unit->getArmor()->getScript<ModScript::RecolorUnitSprite>()) return false;
@@ -963,6 +1008,7 @@ void VoxelUnits::build()
 				source.itemHeight[hand] = job->items[hand].height;
 				source.itemTwoHanded[hand] = job->items[hand].twoHanded;
 				source.itemMelee[hand] = job->items[hand].melee;
+				source.itemShare[hand] = job->items[hand].share;
 			}
 			source.deaths = job->deaths;
 			source.corpse = job->corpse;
@@ -1143,8 +1189,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits);
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f));
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

@@ -24,6 +24,7 @@ struct FineBodySource
 	int itemWidth[2] = {}, itemHeight[2] = {};
 	bool itemTwoHanded[2] = {};
 	bool itemMelee[2] = {};
+	float itemShare[2] = { 1.0f, 1.0f }; // (how long each is for its hand drawing: see HeldItem::share)
 	std::vector<std::vector<Uint8>> deaths;
 	std::vector<Uint8> corpse, lyingPicture;
 	int lyingWidth = 0, lyingHeight = 0;

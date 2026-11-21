@@ -2773,8 +2773,8 @@ void FirstPersonView::drawFloorItems()
 		// (By where it lies and where the aim goes alone, not by whether its pixels are under the crosshair: drawn
 		// see-through it leaves holes there, the crosshair found no body in them the next frame, and it was solid again:
 		// the owner, a downed Cyberdisc "flashes transparent when I am near but turns solid again".)
-		// (And only where it is in the way: the aim's line passes low over it, within VoxelCorpseOver of its top, or
-		// ends on a unit standing behind it, whose legs it hides. Looking straight ahead over the bodies at one's feet,
+		// (And only where it is in the way: the aim ends on a unit standing behind it, whose legs it hides, or goes
+		// through the body to a place beyond it (see below). Looking straight ahead over the bodies at one's feet,
 		// at a wall across the room, they stay solid: a player, GitHub issue #190, "looking straight ahead over them,
 		// the units become invisible despite not looking at the voxel MODEL".)
 		double bodyOpacity = 1.0;
@@ -2787,11 +2787,23 @@ void FirstPersonView::drawFloorItems()
 			const double beside = length > 0.0 ? std::abs(toX * wayY - toY * wayX) / length : 1e9;
 			if (along > 0.0 && beside <= reach && length > along + reach)
 			{
-				const double lineHeight = _eye[2] + (_pointerAim.z + 0.5 - _eye[2]) * along / length;
-				const double top = step.sprite.world[2] + (wreck ? VoxelWreckHeight : VoxelCorpseHeight);
+				// (Before a unit standing behind it, whose legs it hides. Else only where the body itself is between the
+				// eye and the place aimed at: the aim's line goes through it, under the top it really has where it leaves
+				// the body's reach, and ends a tile or more past it. A wreck was taken as 14 voxels high whatever it was,
+				// and any aim a little downwards anywhere near one made it a ghost, the crosshair on the wreck itself
+				// too: a Reaper down after a blast, seen through with its far side showing, "makes a unit ghostly", a
+				// player, GitHub issue #222.)
+				const double farHeight = _eye[2] + (_pointerAim.z + 0.5 - _eye[2]) * std::min(length, along + reach) / length;
+				double top = step.sprite.world[2];
+				if (const VoxelUnitModel::FallShape *shape = (wreck ? wreck : lying)->fallAt(1.0))
+				{
+					float highest = 0.0f;
+					for (float up : shape->up) highest = std::max(highest, up);
+					top += highest * itemScale * (wreck ? wreck : lying)->unit;
+				}
 				const Tile *ends = _save->getTile(_pointerAim.toTile());
 				const BattleUnit *behind = ends ? ends->getUnit() : nullptr;
-				if (lineHeight <= top + VoxelCorpseOver || (behind && !behind->isOut())) bodyOpacity = _faintPile.opacity;
+				if ((behind && !behind->isOut()) || (farHeight <= top && length > along + reach + VoxelCorpsePast)) bodyOpacity = _faintPile.opacity;
 			}
 		}
 		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;

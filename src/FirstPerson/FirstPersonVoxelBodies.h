@@ -140,6 +140,9 @@ struct HeldItem
 	int width = 0, height = 0;
 	bool twoHanded = false;
 	bool melee = false;
+	/// How long it is for its hand drawing (see VoxelUnits::handShare): 1, or less for a melee weapon that shares its
+	/// hand drawing with longer ones (a mod's knife drawn in the hand as its machete is).
+	float share = 1.0f;
 };
 
 /// Makes a unit's body from its parts' frames (and, for a unit drawn in parts, the parts laid over each other as the game
