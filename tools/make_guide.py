@@ -260,7 +260,7 @@ SETTINGS = [
         ('Coloured lights', 'NO', 'YES / NO', 'With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour.', 'YES: firefights at night look the part.'),
         ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it.', 'YES for TFTD\'s surface missions.'),
         ('Light shafts', 'NO', 'YES / NO', 'With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea.', 'YES for night missions and TFTD.'),
-        ('Surface relief', 'Off', 'Off / Subtle / Strong', 'Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings: lights bring out bricks, panels, bales and paving.', 'Subtle everywhere; Strong for night missions, where lamps and the flashlight bring it out.'),
+        ('Surface relief', 'Off', 'Off / Subtle / Strong', 'Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings: lights bring out bricks, panels, bales and paving. Switching it takes some time: the card makes its programs again.', 'Subtle everywhere; Strong for night missions, where lamps and the flashlight bring it out.'),
         ('VR eyes kept on the card', 'YES', 'YES / NO', 'VR on a headset, with Renderer GPU. Each eye stays on the graphics chip and goes to the headset from there. NO: read back and sent up again. Not in the 1.12 download yet.', 'YES; NO if the headset shows the eyes wrong.'),
     ]),
 ]

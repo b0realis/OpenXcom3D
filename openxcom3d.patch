@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..04292d522
+index 000000000..94bcf11d5
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,683 @@
@@ -314,7 +314,7 @@ index 000000000..04292d522
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world; the CPU takes over where it can't. {ALT}The first switch takes a while."
 +  STR_FPS_PREPARING_3D: "PREPARING 3D..."
 +  STR_FPS_PREPARING_3D_NOTE: "The graphics card gets ready: a moment, longer the first time."
 +  STR_FPS_RENDERER_CPU: "CPU"
@@ -345,7 +345,7 @@ index 000000000..04292d522
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
-+  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out."
++  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -813,7 +813,7 @@ index 000000000..04292d522
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c3338601d
+index 000000000..31eca3b1f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,683 @@
@@ -1003,7 +1003,7 @@ index 000000000..c3338601d
 +  STR_FPS_DISCREET_EDGE: "Discreet map edge"
 +  STR_FPS_DISCREET_EDGE_DESC: "The map's edge as small red dots on the floor, instead of the yellow tape."
 +  STR_FPS_RENDERER: "Renderer"
-+  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world (Linux, Windows, macOS); the CPU takes over where it can't. {ALT}The first switch to GPU can freeze the game for a while: the card prepares its programs once."
++  STR_FPS_RENDERER_DESC: "CPU: runs anywhere. GPU: the graphics card draws the 3D world; the CPU takes over where it can't. {ALT}The first switch takes a while."
 +  STR_FPS_PREPARING_3D: "PREPARING 3D..."
 +  STR_FPS_PREPARING_3D_NOTE: "The graphics card gets ready: a moment, longer the first time."
 +  STR_FPS_RENDERER_CPU: "CPU"
@@ -1034,7 +1034,7 @@ index 000000000..c3338601d
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
-+  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out."
++  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -102504,10 +102504,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..dde829830
+index 000000000..5476845ad
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1167 @@
+@@ -0,0 +1,1171 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -102819,6 +102819,10 @@ index 000000000..dde829830
 +void OptionsFirstPersonState::init()
 +{
 +	OptionsBaseState::init();
++	// A description's warning (its part after {ALT}: "Takes some time!") in a colour of its own in a battle too: the
++	// battle's colours give the description's two parts one colour, and a warning read as the rest of the sentence
++	// (the owner, of Surface relief: "add a warning different colour"). The headings' gold.
++	if (_origin == OPT_BATTLESCAPE) _txtTooltip->setSecondaryColor(_colorSel);
 +	updateList();
 +}
 +

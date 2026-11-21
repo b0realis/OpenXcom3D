@@ -309,6 +309,10 @@ OptionsFirstPersonState::~OptionsFirstPersonState()
 void OptionsFirstPersonState::init()
 {
 	OptionsBaseState::init();
+	// A description's warning (its part after {ALT}: "Takes some time!") in a colour of its own in a battle too: the
+	// battle's colours give the description's two parts one colour, and a warning read as the rest of the sentence
+	// (the owner, of Surface relief: "add a warning different colour"). The headings' gold.
+	if (_origin == OPT_BATTLESCAPE) _txtTooltip->setSecondaryColor(_colorSel);
 	updateList();
 }
 
