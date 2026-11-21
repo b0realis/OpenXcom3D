@@ -88510,10 +88510,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..b5d2be25e
+index 000000000..c43068361
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5465 @@
+@@ -0,0 +1,5638 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -89134,9 +89134,13 @@ index 000000000..b5d2be25e
 +///    heel to toe, FootLong of the body's height long and pointing ahead, toes out no more than SplayMost, however
 +///    long and whichever way the drawing has the shoe (the games' civilians stand with their shoes out sideways; as
 +///    long as drawn, a foot was a fifth of the body: the owner, "Civilian has large feet correct!").
++///  - a kneeling body's legs (of a body drawn in parts) are those of a body down on one knee: hips, a thigh ahead to a
++///    raised knee and a shin down to a foot flat on the floor, the other thigh down to a knee on the floor and its
++///    shin back to a foot on its toes; which side is which, how far ahead, how high and how far back, by what the
++///    drawings left of the legs (the owner, of kneeling bodies: "Make kneeling beautiful"; a kneeling pair of legs
++///    cut from eight small drawings was a lump under a disc of hips).
 +/// Sizes, places and the pose stay the drawings'; the colours are painted on after, as on any body. Of the named,
-+/// not made so: a body on one frame that shows no two legs, one drawn leaning (see makeModel), a kneeling body's
-+/// legs.
++/// not made so: a body on one frame that shows no two legs, one drawn leaning (see makeModel).
 +/// (All in voxels but where said. StandardTrunk, StandardHead, StandardLimb: how far the smoothing along a limb
 +/// reaches. SplitDip: a piece is two where, along its length, it is this thin against both its sides. RoundWide: a
 +/// section's oval is at most this many times its cells' spread wide (a stray cell doesn't widen it). CapShare: a
@@ -89160,6 +89164,15 @@ index 000000000..b5d2be25e
 +	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.028f, HeadFull = 2.6f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
 +	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f, FaceTurn = 0.6f;
 +constexpr int HairReach = 4 * VOXELSCALE;
++/// A kneeling body's legs (see standardBody, the kneeling legs). ThighShare: a thigh's thickness, half, of the trunk's
++/// half breadth at its foot, within ThighLeast and ThighMost voxels and no more than ThighTall of the body's height; KneeShare, ShinLeast, ShinMost: its knee's of
++/// that, and its shin's, at the ankle; KneelLow: the legs' drawing under this many voxels is the feet and the shin
++/// on the ground; KneeUpLeast: the raised knee stands at least this much of the legs' height; ShinLean: its shin
++/// leans back from it at most this much of the knee's height, and ahead a third of that; RearFoot: the foot behind
++/// stands on its toes this steep (degrees); FootKneeling: a kneeling body is this much lower than it stands (its
++/// feet are as long as when it stands); KneeOut: a knee stands at most this many voxels further out than its hip.
++constexpr float ThighShare = 0.62f, ThighLeast = 1.3f, ThighMost = 2.4f, KneeShare = 0.9f, ShinLeast = 0.55f, ShinMost = 1.0f, ThighTall = 0.075f, KneelLow = 2.0f, KneeUpLeast = 0.55f,
++	ShinLean = 0.45f, RearFoot = 35.0f, FootKneeling = 1.2f, KneeOut = 1.5f;
 +/// An arm's bones as placed (see makeModel), for standardBody: its joints, and how thick its upper and lower bone are.
 +struct StandardArm { bool any = false; float shoulder[3], elbow[3], hand[3], radius[2]; };
 +/// A piece of a part at one height: its middle and its oval (the squares of its half sizes along its own axes, as a
@@ -89601,6 +89614,108 @@ index 000000000..b5d2be25e
 +			if (sections[chain[0]].up > headLow && sections[chain.back()].up <= headHigh && thick <= 0.5f * headThick) for (int k : chain) left[k] = 1;
 +		}
 +	}
++	// 4b. a kneeling body's legs: the bones of a body down on one knee, placed by what its drawings left of the legs
++	// (cut from eight small drawings a kneeling pair of legs is one lump: no knee, no shin to make round). The hips at
++	// the trunk's foot; the side whose legs reach less far back on the floor has its knee up: its thigh ahead to the
++	// knee, as far ahead and as high as the lump is there, its shin down to a foot flat on the floor, as far ahead as
++	// the lump is on the floor; the other side's thigh down to its knee on the floor, its shin back along the floor to
++	// a foot on its toes, as far back as the lump reaches. (All in the model's units; hip, knee, ankle: left, right.)
++	struct { bool any = false; int raised = 0; float hip[2][3], knee[2][3], ankle[2][3], toe[3], thigh = 0.0f, kneeThick = 0.0f, shin = 0.0f, foot = 0.0f; } kneel;
++	if (!stands && !whole && length >= (int)(2 * V))
++	{
++		const float M = (float)VOXELSCALE;
++		float middle = 0.0f, ahead = 0.0f, half = 0.0f;
++		const int low = std::min(length, (int)(2 * V));
++		for (int i = 0; i < low; ++i)
++		{
++			const Section &one = sections[path[i]];
++			middle += (AcrossFrom + (one.right + 0.5f) * Cell) / low;
++			ahead += (AlongFrom + (one.ahead + 0.5f) * Cell) / low;
++			half = std::max(half, std::sqrt(std::max(one.xx, 0.0f)) * Cell);
++		}
++		std::vector<int> perLayer(GridUp, 0);
++		for (int cell = 0; cell < GridCells; ++cell) if (owner[cell] == legsPart) ++perLayer[cell % GridUp];
++		int topLayer = -1;
++		for (int up = GridUp - 1; up >= 0 && topLayer < 0; --up) if (perLayer[up] >= 4) topLayer = up;
++		const float legsTop = topLayer >= 0 ? cellUp(topLayer) + 0.5f * Cell : 0.0f;
++		if (legsTop >= 4.0f * M && half > 0.0f)
++		{
++			float backLow[2] = { 1e9f, 1e9f }, foreLow[2] = { -1e9f, -1e9f }, foreUp[2] = { -1e9f, -1e9f }, outFore[2] = {}, outBack[2] = {};
++			int cellsOf[2] = {};
++			std::vector<int> areaOf[2] = { std::vector<int>(GridUp, 0), std::vector<int>(GridUp, 0) };
++			for (int across = 0; across < GridAcross; ++across)
++				for (int along = 0; along < GridAlong; ++along)
++					for (int up = 0; up <= topLayer; ++up)
++					{
++						if (owner[cellIndex(across, along, up)] != legsPart) continue;
++						const float r = cellRight(across) - middle, a = cellAhead(along) - ahead, u = cellUp(up);
++						if (u < 0.0f) continue;
++						const int h = r < 0.0f ? 0 : 1;
++						++areaOf[h][up];
++						if (std::abs(r) < 0.25f * M) continue; // (the middle: either side's)
++						++cellsOf[h];
++						if (u < KneelLow * M)
++						{
++							backLow[h] = std::min(backLow[h], a); foreLow[h] = std::max(foreLow[h], a);
++							float &out = a >= 0.0f ? outFore[h] : outBack[h];
++							if (a >= 0.0f || a <= -1.0f * M) out = std::max(out, std::abs(r));
++						}
++						if (u >= 0.5f * legsTop) foreUp[h] = std::max(foreUp[h], a);
++					}
++			if (cellsOf[0] >= 8 && cellsOf[1] >= 8 && backLow[0] < 1e8f && backLow[1] < 1e8f && foreUp[0] > -1e8f && foreUp[1] > -1e8f)
++			{
++				const int U = backLow[0] > backLow[1] + 0.5f * M ? 0 : backLow[1] > backLow[0] + 0.5f * M ? 1 : foreUp[0] >= foreUp[1] ? 0 : 1, D = 1 - U;
++				const float side[2] = { -1.0f, 1.0f };
++				kneel.any = true;
++				kneel.raised = U;
++				const float kneelingTall = (sections[path.back()].up + 1 - (-UpFrom / Cell)) * Cell, bodyTall = FootKneeling * kneelingTall;
++				kneel.thigh = std::clamp(std::min(ThighShare * half, ThighTall * kneelingTall), ThighLeast * M, ThighMost * M);
++				kneel.kneeThick = KneeShare * kneel.thigh;
++				// (the shin's thickness: the raised side's lump where it is thinnest between its foot and its knee)
++				float thinnest = 1e9f;
++				for (int up = footTop + (int)(0.5f * V); up <= topLayer && cellUp(up) <= 0.5f * legsTop; ++up) if (areaOf[U][up] > 0) thinnest = std::min(thinnest, std::sqrt(areaOf[U][up] * Cell * Cell / 3.14159265f));
++				kneel.shin = std::clamp(thinnest, ShinLeast * kneel.thigh, ShinMost * kneel.thigh);
++				const float hipHalf = std::max(0.5f * kneel.thigh + 0.25f * M, half - kneel.thigh), hipUp = legsTop - 1.05f * kneel.thigh;
++				for (int h = 0; h < 2; ++h) { kneel.hip[h][0] = middle + side[h] * hipHalf; kneel.hip[h][1] = ahead; kneel.hip[h][2] = hipUp; }
++				// (the raised knee: where the lump is furthest ahead in its upper half, and as high as it is there)
++				float kneeUp = 0.0f, kneeOut = 0.0f;
++				int many = 0;
++				for (int across = 0; across < GridAcross; ++across)
++					for (int along = 0; along < GridAlong; ++along)
++						for (int up = 0; up <= topLayer; ++up)
++						{
++							if (owner[cellIndex(across, along, up)] != legsPart) continue;
++							const float r = cellRight(across) - middle, a = cellAhead(along) - ahead, u = cellUp(up);
++							if (r * side[U] < 0.25f * M || u < 0.4f * legsTop || a < foreUp[U] - 1.0f * M) continue;
++							kneeUp += u; kneeOut = std::max(kneeOut, r * side[U]); ++many;
++						}
++				kneeUp = many ? kneeUp / many : hipUp;
++				const float kneeOutU = std::clamp(kneeOut - kneel.kneeThick, hipHalf, hipHalf + KneeOut * M);
++				kneel.knee[U][0] = middle + side[U] * kneeOutU;
++				kneel.knee[U][1] = ahead + std::max(1.5f * kneel.thigh, foreUp[U] - kneel.kneeThick);
++				kneel.knee[U][2] = std::clamp(kneeUp, KneeUpLeast * legsTop, legsTop - kneel.kneeThick);
++				// (its foot: flat on the floor, its toe as far ahead as the lump is on the floor; the shin near upright)
++				kneel.foot = FootLong * bodyTall;
++				const float heel = std::max(1.1f * kneel.shin, 0.25f * kneel.foot), kneeHigh = kneel.knee[U][2];
++				// (as far out as the lump is on the floor ahead: the foot stands under the knee or a little outside it)
++				kneel.ankle[U][0] = middle + side[U] * std::clamp(outFore[U] - std::max(1.15f * kneel.shin, FootWide * bodyTall), kneeOutU - 0.5f * M, kneeOutU + 1.0f * M);
++				kneel.ankle[U][1] = std::clamp(ahead + foreLow[U] - (kneel.foot - heel), kneel.knee[U][1] - ShinLean * kneeHigh, kneel.knee[U][1] + ShinLean / 3.0f * kneeHigh);
++				kneel.ankle[U][2] = cellUp(footTop);
++				// (the other knee: on the floor, as far ahead as the lump is there, no further than a thigh leaning half its height)
++				const float kneeOutD = std::clamp(outFore[D] - kneel.kneeThick, hipHalf, hipHalf + KneeOut * M);
++				kneel.knee[D][0] = middle + side[D] * kneeOutD;
++				kneel.knee[D][2] = kneel.kneeThick;
++				kneel.knee[D][1] = ahead + std::clamp(foreLow[D] - kneel.kneeThick, 0.0f, 0.5f * (hipUp - kneel.kneeThick));
++				// (its foot: on its toes, as far back as the lump reaches on the floor, a thigh's length behind at least)
++				const float steep = RearFoot * 0.0174533f, toeThick = 0.75f * kneel.shin;
++				const float back = std::min(backLow[D], -(0.6f * (hipUp - kneel.kneeThick)));
++				kneel.toe[0] = middle + side[D] * std::clamp(outBack[D] - toeThick, kneeOutD - 1.0f * M, kneeOutD + 1.0f * M); kneel.toe[1] = ahead + back + toeThick; kneel.toe[2] = toeThick;
++				kneel.ankle[D][1] = kneel.toe[1] + std::cos(steep) * 0.8f * kneel.foot;
++				kneel.ankle[D][0] = kneel.toe[0] + (kneel.knee[D][0] - kneel.toe[0]) * std::clamp((kneel.ankle[D][1] - kneel.toe[1]) / std::max(kneel.knee[D][1] - kneel.toe[1], 1e-3f), 0.0f, 1.0f);
++				kneel.ankle[D][2] = kneel.toe[2] + std::sin(steep) * 0.8f * kneel.foot;
++			}
++		}
++	}
 +	// 5. the other limbs, each smoothed along its length; an arm with bones is its bones
 +	for (size_t c = 0; c < chains.size(); ++c)
 +	{
@@ -89608,6 +89723,7 @@ index 000000000..b5d2be25e
 +		const Uint8 part = sections[chain[0]].part;
 +		const int arm = part == VoxelUnitModel::LeftArm ? 0 : part == VoxelUnitModel::RightArm ? 1 : -1;
 +		if (arm >= 0 && arms[arm].any) { for (int k : chain) left[k] = 1; continue; }
++		if (kneel.any && part == legsPart) { for (int k : chain) left[k] = 1; continue; }
 +		if (onPath[chain[0]]) continue;
 +		int from = 0;
 +		if (isLeg[c]) for (const Leg &leg : legs) if (leg.chain == (int)c) while (from < (int)chain.size() && chain[from] != leg.ankle) ++from;
@@ -89700,6 +89816,45 @@ index 000000000..b5d2be25e
 +	// 7. the feet: each leg's, from its ankle along the floor the way its drawing has it, as long as a foot is
 +	std::vector<Uint8> painted;
 +	if ((int)Painted.size() == GridCells) painted = Painted;
++	// (a foot on the floor under an ankle at footRight, footAhead (cells), thick there, its toe towards aimA, aimB)
++	auto layFoot = [&](float footRight, float footAhead, float thick, float aimA, float aimB, float tall) {
++		const float wide = std::max(1.15f * thick, FootWide * tall), heel = -std::max(1.1f * thick, 0.25f * FootLong * tall), high = footTop - 0.0f;
++		const float toe = heel + FootLong * tall;
++		const int reach = (int)std::ceil(toe + wide) + 1;
++		for (int across = std::max(0, (int)footRight - reach); across <= std::min(GridAcross - 1, (int)footRight + reach); ++across)
++			for (int along = std::max(0, (int)footAhead - reach); along <= std::min(GridAlong - 1, (int)footAhead + reach); ++along)
++			{
++				const float da = across - footRight, db = along - footAhead;
++				const float u = da * aimA + db * aimB, v = -da * aimB + db * aimA;
++				// (its sole: a bar with round ends from heel to toe)
++				const float on = std::clamp(u, heel + wide, toe - wide), offU = u - on;
++				if (offU * offU + v * v > wide * wide) continue;
++				// (its top: the ankle's height over the heel, sloping to the toe's)
++				const float slope = std::clamp(u / toe, 0.0f, 1.0f), top = high * (1.0f - slope * (1.0f - ToeHigh));
++				for (int up = 0; up < footTop; ++up)
++				{
++					if (cellUp(up) < 0.0f) continue;
++					const float layer = (cellUp(up) / Cell) / std::max(top - (-UpFrom / Cell), 1.0f);
++					if (layer > 1.0f) continue;
++					const float inside = (offU * offU + v * v) / (wide * wide);
++					if (inside > 1.0f - 0.35f * layer * layer) continue; // (its upper edges rounded)
++					const int cell = cellIndex(across, along, up);
++					if (made[cell]) continue;
++					made[cell] = legsPart;
++					// (painted by its own drawing's pixel along the views' slant: read level, a shoe's toe took the shin's colour)
++					if (!painted.empty())
++					{
++						for (int d : { Front, (Front + 4) % 8 })
++						{
++							float column, row, nearness;
++							project(cellRight(across), cellAhead(along), cellUp(up), d, false, column, row, nearness);
++							const Uint8 colour = legsDrawn.at(d, (int)std::floor(column), (int)std::floor(row));
++							if (colour) { painted[cell] = colour; break; }
++						}
++					}
++				}
++			}
++	};
 +	if (feet)
 +	{
 +		for (int l = 0; l < 2; ++l)
@@ -89744,43 +89899,57 @@ index 000000000..b5d2be25e
 +				turn = std::clamp(turn, 0.0f, SplayMost * 0.0174533f);
 +				aimA = std::sin(turn) * outward; aimB = std::cos(turn);
 +			}
-+			const float wide = std::max(1.15f * thick, FootWide * tall), heel = -std::max(1.1f * thick, 0.25f * FootLong * tall), high = footTop - 0.0f;
-+			const float toe = heel + FootLong * tall;
-+			const int reach = (int)std::ceil(toe + wide) + 1;
-+			for (int across = std::max(0, (int)ankle.right - reach); across <= std::min(GridAcross - 1, (int)ankle.right + reach); ++across)
-+				for (int along = std::max(0, (int)ankle.ahead - reach); along <= std::min(GridAlong - 1, (int)ankle.ahead + reach); ++along)
-+				{
-+					const float da = across - ankle.right, db = along - ankle.ahead;
-+					const float u = da * aimA + db * aimB, v = -da * aimB + db * aimA;
-+					// (its sole: a bar with round ends from heel to toe)
-+					const float on = std::clamp(u, heel + wide, toe - wide), offU = u - on;
-+					if (offU * offU + v * v > wide * wide) continue;
-+					// (its top: the ankle's height over the heel, sloping to the toe's)
-+					const float slope = std::clamp(u / toe, 0.0f, 1.0f), top = high * (1.0f - slope * (1.0f - ToeHigh));
-+					for (int up = 0; up < footTop; ++up)
++			layFoot(ankle.right, ankle.ahead, thick, aimA, aimB, tall);
++		}
++	}
++	// 7b. a kneeling body's legs, from their bones: the hips, a thigh and a shin a side, round, the knees a little
++	// thicker; the foot ahead as a standing body's, the foot behind on its toes
++	if (kneel.any)
++	{
++		const int U = kneel.raised, D = 1 - U;
++		const float thigh = kneel.thigh, knee = kneel.kneeThick, shin = kneel.shin;
++		fillBar(made, legsPart, kneel.hip[0], kneel.hip[1], 1.05f * thigh, 1.05f * thigh);
++		// (joined to the trunk's foot, whatever is drawn between)
++		{
++			const Section &foot = sections[path[0]];
++			const float from[3] = { 0.5f * (kneel.hip[0][0] + kneel.hip[1][0]), kneel.hip[0][1], kneel.hip[0][2] };
++			const float to[3] = { AcrossFrom + (foot.right + 0.5f) * Cell, AlongFrom + (foot.ahead + 0.5f) * Cell, cellUp(foot.up) };
++			if (to[2] > from[2]) fillBar(made, legsPart, from, to, thigh, thigh);
++		}
++		for (int h = 0; h < 2; ++h)
++		{
++			fillBar(made, legsPart, kneel.hip[h], kneel.knee[h], thigh, knee);
++			fillBar(made, legsPart, kneel.knee[h], kneel.knee[h], 1.05f * knee, 1.05f * knee);
++			fillBar(made, legsPart, kneel.knee[h], kneel.ankle[h], 0.95f * knee, shin);
++		}
++		// (the foot behind: painted as the foot ahead is, by its own drawing's pixel along the views' slant, the back
++		// drawing's first: thrown straight through, a boot behind the body took the trousers' colour)
++		{
++			const Uint8 mark = 0xFE;
++			fillBar(made, mark, kneel.ankle[D], kneel.toe, shin, 0.75f * shin);
++			const int reach = (int)std::ceil(shin / Cell) + 1;
++			auto cellOf = [&](float value, float from) { return (int)std::floor((value - from) / Cell); };
++			for (int across = std::max(0, cellOf(std::min(kneel.ankle[D][0], kneel.toe[0]), AcrossFrom) - reach); across <= std::min(GridAcross - 1, cellOf(std::max(kneel.ankle[D][0], kneel.toe[0]), AcrossFrom) + reach); ++across)
++				for (int along = std::max(0, cellOf(std::min(kneel.ankle[D][1], kneel.toe[1]), AlongFrom) - reach); along <= std::min(GridAlong - 1, cellOf(std::max(kneel.ankle[D][1], kneel.toe[1]), AlongFrom) + reach); ++along)
++					for (int up = std::max(0, cellOf(std::min(kneel.ankle[D][2], kneel.toe[2]), UpFrom) - reach); up <= std::min(GridUp - 1, cellOf(std::max(kneel.ankle[D][2], kneel.toe[2]), UpFrom) + reach); ++up)
 +					{
-+						if (cellUp(up) < 0.0f) continue;
-+						const float layer = (cellUp(up) / Cell) / std::max(top - (-UpFrom / Cell), 1.0f);
-+						if (layer > 1.0f) continue;
-+						const float inside = (offU * offU + v * v) / (wide * wide);
-+						if (inside > 1.0f - 0.35f * layer * layer) continue; // (its upper edges rounded)
 +						const int cell = cellIndex(across, along, up);
-+						if (made[cell]) continue;
++						if (made[cell] != mark) continue;
 +						made[cell] = legsPart;
-+						// (painted by its own drawing's pixel along the views' slant: read level, a shoe's toe took the shin's colour)
-+						if (!painted.empty())
++						for (int d : { (Front + 4) % 8, Front })
 +						{
-+							for (int d : { Front, (Front + 4) % 8 })
-+							{
-+								float column, row, nearness;
-+								project(cellRight(across), cellAhead(along), cellUp(up), d, false, column, row, nearness);
-+								const Uint8 colour = legsDrawn.at(d, (int)std::floor(column), (int)std::floor(row));
-+								if (colour) { painted[cell] = colour; break; }
-+							}
++							if (painted.empty()) break;
++							float column, row, nearness;
++							project(cellRight(across), cellAhead(along), cellUp(up), d, false, column, row, nearness);
++							const Uint8 colour = legsDrawn.at(d, (int)std::floor(column), (int)std::floor(row));
++							if (colour) { painted[cell] = colour; break; }
 +						}
 +					}
-+				}
 +		}
++		// (the foot ahead: turned out as its leg is from the hip, SplayMost at most)
++		const float outward = U ? 1.0f : -1.0f;
++		const float turn = std::clamp(std::atan2((kneel.ankle[U][0] - kneel.hip[U][0]) * outward, std::max(kneel.ankle[U][1] - kneel.hip[U][1], 1e-3f)), 0.0f, SplayMost * 0.0174533f);
++		layFoot((kneel.ankle[U][0] - AcrossFrom) / Cell - 0.5f, (kneel.ankle[U][1] - AlongFrom) / Cell - 0.5f, shin / Cell, std::sin(turn) * outward, std::cos(turn), kneel.foot / FootLong / Cell);
 +	}
 +	// (what stands apart from the body now goes: a tuft, the tip of a shoe that was)
 +	{
@@ -93773,7 +93942,11 @@ index 000000000..b5d2be25e
 +			// (A person's arm, and that of a unit the table names "arms: own", is painted by its own drawing alone: where
 +			// that has no pixel for a cube, the nearest it has, not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
 +			// there took the torso's colours: "hands wrapped in shirt fabric", a player, GitHub issue #219.)
-+			if (!colour && (routine.standard || (routine.arms & 4)) && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
++			const bool ownArm = (routine.standard || (routine.arms & 4)) && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm);
++			// (and so a kneeling person's legs, made from their bones: a knee held up before the body is no part of the
++			// torso or of the arm drawn over it there)
++			const bool ownLeg = routine.standard && routine.kneeling && !routine.whole && model->part[k] == VoxelUnitModel::Legs;
++			if (!colour && (ownArm || ownLeg))
 +			{
 +				const int other = first == Front ? Back : Front;
 +				colour = ownColour(k, first, painting);
