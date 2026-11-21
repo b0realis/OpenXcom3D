@@ -216,8 +216,14 @@ firstPerson:
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
   #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
-  #   arms: outside (a robe's arms lie outside the body), along (coloured along their length), both; or own (an arm
-  #           is painted by its own drawing alone, not by the body drawn over it: hands on a shirt)
+  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length),
+  #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
+  #           on a shirt), posed (an arm is where its bones are, shoulder to the hand on what it holds; what its
+  #           drawings add away from them, a second forearm, is left out)
+  #   head: face (only what of the head is turned to the front is painted by the front drawing; its sides, back and
+  #           top by the back drawing: hair, a helmet), or drawn (as ever)
+  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show), or
+  #           drawn (as ever: as broad as its frontal drawings)
   #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
   #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
   #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
@@ -246,10 +252,19 @@ firstPerson:
     # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]
       animation: sprite
-    # The X-Com Files' people of the human race (civilians of every trade, gangers, hunters; XPiratez's too): hands on a
-    # shirt, an arm across a vest. Their arms are painted by the arm's own drawing, not the body's drawn over it
+    # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
+    # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
+    # is where its bones are (a pistol held out, and no second forearm left at the hip); the head is a face on hair or
+    # a helmet (no skin on the crown)
     - names: [HUMAN]
-      arms: own
+      arms: own posed
+      head: face
+    # Deep Ones (TFTD's and The X-Com Files'): arms on their bones, as above
+    - names: [DEEPONE, DEEP_ONE.PCK]
+      arms: posed
+    # The X-Com Files' Gilldog: drawn from the front crouching, its legs out beside its trunk
+    - names: [GILLDOG]
+      trunk: round
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
       sculpt: sides

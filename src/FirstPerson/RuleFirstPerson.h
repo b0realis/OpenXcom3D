@@ -124,8 +124,10 @@ public:
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
-		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone; 0 as drawn)
+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones; 0 as drawn)
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
+		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
+		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -353,7 +355,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head;
 				int seeThrough = 0, torsoDepth = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -367,7 +369,20 @@ public:
 				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : sculpt == "sides" ? 2 : 0;
 				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
-				if (entry.tryRead("arms", arms)) look.arms = arms == "outside" ? 1 : arms == "along" ? 2 : arms == "both" ? 3 : arms == "own" ? 4 : 0;
+				if (entry.tryRead("arms", arms))
+				{
+					// (one word or several: "own posed")
+					look.arms = 0;
+					for (size_t at = 0; at < arms.size();)
+					{
+						const size_t end = std::min(arms.find_first_of(" ,", at), arms.size());
+						const std::string word = arms.substr(at, end - at);
+						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : 0;
+						at = end + 1;
+					}
+				}
+				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
+				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
@@ -470,6 +485,8 @@ public:
 			if (entry.second.relief != -1) look.relief = entry.second.relief;
 			if (entry.second.arms != -1) look.arms = entry.second.arms;
 			if (entry.second.standard != -1) look.standard = entry.second.standard;
+			if (entry.second.roundTrunk != -1) look.roundTrunk = entry.second.roundTrunk;
+			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
 		}
 		return look;
 	}

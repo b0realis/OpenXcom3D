@@ -93,7 +93,12 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// top stand, voxels: a kneeling soldier's height by the game's rules, and 20 (set for the unit being made; 0: as its
 /// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 /// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
-/// length, 4 painted by their own drawing alone (see makeModel).
+/// length, 4 painted by their own drawing alone, 8 posed: an arm is where its bones are, and what its drawings add
+/// away from them is left out (see makeModel).
+/// Traits: more the unit table says of a named unit, a bit each: 1 its trunk is round ("trunk: round": a long body as
+/// broad as it is tall, whatever its frontal drawings show; see profile), 2 its head is its face and its hair ("head:
+/// face": only what is turned to the front is the front drawing's, the rest of the head the back drawing's; see
+/// makeModel).
 /// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
 /// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
 /// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see
@@ -101,7 +106,7 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// names it "sculpt: sides": a big walker cut by its four drawings from front, back and sides (see makeModel).
 /// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 /// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; };
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; int traits = 0; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

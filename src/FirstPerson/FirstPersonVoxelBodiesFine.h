@@ -38,6 +38,7 @@ struct FineBodySource
 	bool kneeling = false; // (the pose it is made in: see Routine)
 	bool standard = false; // (a person, made the standard humanoid, by the mod's rules: see Routine)
 	bool sides = false; // (a big walker cut by its four drawings from front, back and sides, by the mod's rules: see Routine)
+	int traits = 0; // (a round trunk, a head of face and hair, by the mod's rules: see Routine)
 	bool relief = false; // (its one drawing given volume: see Routine)
 	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)

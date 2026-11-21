@@ -93,6 +93,7 @@ thread_local bool BigUnit = false; // (two tiles by two: see tileFloorRows)
 /// the rest, which are painted where they stand (see makeModel). Cleared for each body.
 thread_local std::vector<Uint8> Painted;
 thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
+thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
 
 /// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 void useGrid(int size)
@@ -1361,6 +1362,9 @@ void fillPits(std::vector<Uint8> &owner)
 /// at that place across, as far along the body and as high as it shows there; one drawn up to FootUnder under the
 /// floor lies on it, one further under is another foot's. (With twice the zone and the reach and no such limit a
 /// civilian stood on plates twice as long as its shoes: both feet of the drawing for each leg.)
+/// Posed arms (see makeModel): what an arm's drawings make of it stays within this of its bones' skin: PosedShoulder
+/// at the shoulder, less along the arm, PosedHand at the hand.
+const float PosedShoulder = 2.0f * VOXELSCALE, PosedHand = 0.25f * VOXELSCALE;
 const float FeetZone = 2.0f * VOXELSCALE, FootUnder = 1.0f * VOXELSCALE;
 const int FootReach = (int)(2.5f * VOXELSCALE * PixelsAcross);
 void continueFeet(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner)
@@ -2021,14 +2025,21 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			const int end = cellAhead(along) >= 0.0f ? 0 : 1;
 			const int endRow = reading.row(end, drawnAhead, cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
 			bool pair = false;
+			// (Not a body the unit table names "trunk: round": it stays as broad as it is tall. The X-Com Files' Gilldog is
+			// drawn from the front crouching, its legs out beside it at its trunk's height: as broad as that drawing
+			// its trunk and head were one barrel across the whole tile; a player, GitHub issue #221, "a very STRANGE
+			// head ... it should probably assume a round shape, as thats more likely than whatever that is".)
 			if (reading.drawn[end] && !leg)
 			{
 				if ((lying ? tall : breadth) >= ProfileThick)
 				{
 					float drawnBreadth = 0.0f;
+					if (RoundTrunk) drawnBreadth = -1.0f;
+					else
 					if (lying) for (int r = runTop; r <= runBottom; ++r) drawnBreadth = std::max(drawnBreadth, breadthAt(end, endRow + r - row));
 					else drawnBreadth = breadthAt(end, endRow);
 					if (drawnBreadth > 0.0f) breadth = drawnBreadth;
+					else if (RoundTrunk && !lying) breadth = std::min(breadth, tall); // (a part standing: no broader than it is tall there)
 				}
 				else pair = end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2;
 			}
@@ -4318,6 +4329,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// 0.43 of outline in common: fatter seen from the quarters), and stay as they were.)
 	const bool fourSided = routine.big && !bigHull && routine.sides;
 	SlantOnly = routine.big && !bigHull;
+	RoundTrunk = (routine.traits & 1) != 0;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
@@ -4603,7 +4615,31 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// arm a third and a Skeleton its feet.)
 		const std::vector<Uint8> hull = carve(parts[p], 2, shape, LimbCarveReach);
 		const bool skeleton = !skeletons[p].empty();
-		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i]) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
+		// (Posed arms, the unit table's "arms: posed" for the units it names: an arm that has bones is where its bones
+		// are, shoulder to elbow to the hand on what it holds; of what its drawings make of it, only what lies close to
+		// the bones stays (see PosedShoulder). An item is placed by how it is held, pointing ahead, and the hand goes to it;
+		// the arm as drawn, bent at the waist or hanging, stayed beside that one: "units in particular poses have
+		// 'multiple' arms? I presume this is because the older, flawed arm code is still running, and leaves
+		// leftovers", a player, GitHub issue #221.)
+		const bool posed = (routine.arms & 8) && skeleton && bones[p].any;
+		auto byBones = [&](int cell) {
+			const float at[3] = { cellRight(cell / (GridUp * GridAlong)), cellAhead((cell / GridUp) % GridAlong), cellUp(cell % GridUp) };
+			float nearest = 1e9f, where = 0.0f; // (how far from the bones' skin, and where along the arm: 0 the shoulder, 1 the hand)
+			const float *ends[3] = { bones[p].shoulder, bones[p].elbow, bones[p].hand };
+			for (int bone = 0; bone < 2; ++bone)
+			{
+				const float *a = ends[bone], *b = ends[bone + 1];
+				const float ab[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, ap[3] = { at[0] - a[0], at[1] - a[1], at[2] - a[2] };
+				const float length2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+				const float t = length2 > 1e-9f ? std::clamp((ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / length2, 0.0f, 1.0f) : 0.0f;
+				const float off[3] = { ap[0] - t * ab[0], ap[1] - t * ab[1], ap[2] - t * ab[2] };
+				const float far = std::sqrt(off[0] * off[0] + off[1] * off[1] + off[2] * off[2]) - bones[p].radius[bone];
+				if (far < nearest) { nearest = far; where = (bone + t) * 0.5f; }
+			}
+			// (more of the drawing at the shoulder, a pad, a sleeve's top; next to none at the hand)
+			return nearest <= PosedShoulder + (PosedHand - PosedShoulder) * where;
+		};
+		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i] && (!posed || byBones(i))) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
 		// (arms outside the body, see above: the bones lie over the body where they touch it)
 		if ((routine.arms & 1) && skeleton && (PartCodes[p] == VoxelUnitModel::LeftArm || PartCodes[p] == VoxelUnitModel::RightArm))
 			for (int i = 0; i < GridCells; ++i) if (skeletons[p][i] && owner[i] == VoxelUnitModel::Torso) owner[i] = PartCodes[p];
@@ -4736,6 +4772,15 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 	}
 
+	// (A head of face and hair, the unit table's "head: face" for the units it names, where no standard humanoid found
+	// the head: of a body drawn in parts, the head is the torso above where its arms begin.)
+	if ((routine.traits & 2) && headBottom > 1e8f && !routine.whole && !routine.big)
+	{
+		int shoulders = FrameSize;
+		for (int p : { 1, 2 })
+			for (int row = 0; parts[p].any && row < shoulders; ++row) if (!runs(parts[p], Front, row).empty()) shoulders = row;
+		if (shoulders < FrameSize) headBottom = (float)(FloorY - shoulders);
+	}
 	// The standard humanoid (see standardBody): a person, a unit the table names so, that walks on two legs, made from
 	// its drawings so far, is made again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one
 	// drawn leaning (its drawings are no standing body's: what the cut left of it is doubtful enough), nor a thin
@@ -5117,7 +5162,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			// the rest of a body is, the half of the head nearer the front took the front drawing: the face's skin ran
 			// back to the ears and up over an egg fuller than the drawn head. The owner, of the female civilian: "bald",
 			// "keep only face from frontal. The rest of the head is hair!")
-			const bool onHead = routine.standard && model->part[k] == VoxelUnitModel::Torso && model->up[k] >= headBottom;
+			const bool onHead = (routine.standard || (routine.traits & 2)) && model->part[k] == VoxelUnitModel::Torso && model->up[k] >= headBottom;
 			// (the top of a person's head: the back drawing's too, along the slant, as that drawing shows the crown)
 			const int painting = facesUp && !routine.backTop ? 1 : 0;
 			// (each direction's camera: towards its nearness, see project)

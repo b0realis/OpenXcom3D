@@ -97,6 +97,7 @@ std::unique_ptr<VoxelUnitModel> makeFineModel(const FineBodySource &source, cons
 	made.kneeling = source.kneeling;
 	made.standard = source.standard;
 	made.sides = source.sides;
+	made.traits = source.traits;
 	made.relief = source.relief;
 	made.arms = source.arms;
 	made.tankHull = source.tankHull;
