@@ -43,6 +43,7 @@ struct FineBodySource
 	bool relief = false; // (its one drawing given volume: see Routine)
 	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
+	float flatTop = 1.0f, flatUnder = 1.0f; // (pressed flatter above and under its widest level, by the mod's rules: see Routine)
 };
 
 /// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).

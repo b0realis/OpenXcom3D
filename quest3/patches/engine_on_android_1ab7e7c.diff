@@ -1532,10 +1532,10 @@ index 000000000..17ed3b787
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..44cb14b88
+index 000000000..6d2a8a15d
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,292 @@
+@@ -0,0 +1,302 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1766,6 +1766,9 @@ index 000000000..44cb14b88
 +  #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
 +  #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
 +  #           leave it)
++  #   flat: how much of what stands above its widest level the body keeps, in hundredths, rounded off (35: the cone
++  #           the eight drawings leave on a saucer, all made from the same height above it, becomes a low dome);
++  #           flatUnder: the same for what hangs under its widest level; 100: as ever
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
 +    # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
@@ -1806,6 +1809,13 @@ index 000000000..44cb14b88
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
 +      sculpt: sides
++    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it); TFTD's
++    # Hallucinoid, a jellyfish's bell
++    - names: [CYBERDISC]
++      flat: 35
++      flatUnder: 50
++    - names: [HALLUCINOID]
++      flat: 70
 +    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
 +    # arms posed on their guns (arms outside the body, coloured along their length)
 +    - names: [DAGON]
@@ -62357,7 +62367,7 @@ index 000000000..66c35a97a
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..e032240c7
+index 000000000..eb85a5c78
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,916 @@
@@ -62762,7 +62772,7 @@ index 000000000..e032240c7
 + * Sets the horizontal field of view, kept between 5 (zoomed in) and 120 degrees. The view
 + * stores the tangent of half of it, which is what the ray directions are built from; and how
 + * many times the zoom narrowed it, for what keeps its size on the screen as if unzoomed (the
-+ * bullet holes' cap up close, see drawDecals).
++ * bullet holes' cap right against them, see drawDecals).
 + * @param degrees The horizontal field of view, in degrees.
 + * @param zoom How many times the zoom narrows it (1: not zoomed).
 + */
@@ -72344,10 +72354,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..6c5b2925c
+index 000000000..65b30cdb5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,731 @@
+@@ -0,0 +1,732 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72789,11 +72799,12 @@ index 000000000..6c5b2925c
 +const double GroundPlaneReach = 6.0, GroundPlaneReachCorpse = 12.0, SlopeItemDepthBiasMax = 6.0;
 +const int GroundPlaneProbe = 12, GroundPlaneLiftMax = 4;
 +/// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
-+/// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
-+/// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
-+/// own darkness, 4), so it shows on busy textures such as the desert's sand.
++/// size (a bullet hole is size 1, a scorch 3); drawn at most this much of the view's height from
++/// its middle, right against it (so one mark never fills the view); a bullet hole's core this
++/// many shades darker (its edge by the mark's own darkness, 4), so it shows on busy textures such
++/// as the desert's sand.
 +const double MarkRadius = 0.3;
-+const int MarkMaxPixels = 6;
++const double MarkMostOfView = 0.25;
 +const int BulletHoleCoreShades = 7;
 +/// Unexplored terrain turns misty with distance (see shadeHit): blended towards the haze from
 +/// UnexploredMistFrom to UnexploredMistTo times the game's sight range (10 to 30 tiles at its
@@ -73081,10 +73092,10 @@ index 000000000..6c5b2925c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..229bd966c
+index 000000000..c2ce32f58
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2339 @@
+@@ -0,0 +1,2344 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73586,8 +73597,8 @@ index 000000000..229bd966c
 + * Leaves a mark where a shot hit: a bullet hole, or a bigger scorch from energy weapons and
 + * incendiaries. Only the 400 newest marks are kept.
 + * @param pos Where the shot hit, in voxels.
-+ * @param size How big the mark is (1 for a bullet hole, 3 for a scorch); on the screen it
-+ * shrinks with distance.
++ * @param size How big the mark is (1 for a bullet hole, 3 for a scorch: 0.6 and 1.8 voxels
++ * across in the world, from any distance).
 + * @param darkness How many shades it darkens the surface.
 + */
 +void FirstPersonView::addDecal(const float pos[3], int size, int darkness)
@@ -73650,7 +73661,7 @@ index 000000000..229bd966c
 +		if (_gpuRecording)
 +		{
 +			// (The card darkens the pixels: a mark smaller than half a pixel only the one it falls on, see below.)
-+			const double recordedRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
++			const double recordedRadius = std::min(radius, MarkMostOfView * height * pixelSpan * _zoom);
 +			gpuRecordDecal(screenX, screenY, depth, markRight, markUp, radius, pixelSpan, recordedRadius, radius < pixelSpan * 0.5 ? 0 : (int)std::ceil(recordedRadius / pixelSpan),
 +				coreShades, decal.depth);
 +			if (_gpuRecordOnly) continue;
@@ -73670,11 +73681,16 @@ index 000000000..229bd966c
 +			continue; // smaller than half a pixel: that one pixel is all of it
 +		}
 +		// The rest: every pixel within its radius, with a ragged edge once it's bigger than a
-+		// pixel; right up close no more than MarkMaxPixels across from its middle on the screen
-+		// (the radius drawn shrinks to what that many pixels span there, so it stays round), as
-+		// counted without the zoom: zoomed in, a mark grows with everything round it (a player's
-+		// report, GitHub issue #41: zoomed in, the holes looked smaller).
-+		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
++		// pixel. A mark is as big in the world from any distance: a hole 0.6 voxels across, a
++		// scorch 1.8. (It was drawn no more than 6 pixels from its middle, however close: the
++		// same dot on the screen from one tile away as from three, a pinhole on a wall right
++		// before the eye, and the smaller the finer the 3D view's resolution: a player, GitHub
++		// issue #230, of a heavy plasma's scorch: "the hole appears big ... with distance, and
++		// like a pinhole up close".) Only right against it no more than MarkMostOfView of the
++		// view's height from its middle (the radius drawn shrinks to what that spans there, so it
++		// stays round), as counted without the zoom: zoomed in, a mark grows with everything
++		// round it (GitHub issue #41: zoomed in, the holes looked smaller).
++		const double drawnRadius = std::min(radius, MarkMostOfView * height * pixelSpan * _zoom);
 +		const int reach = (int)std::ceil(drawnRadius / pixelSpan);
 +		for (int y = centreY - reach; y <= centreY + reach; ++y)
 +		{
@@ -88587,10 +88603,10 @@ index 000000000..cec85b14c
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..c43068361
+index 000000000..ac198b360
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5638 @@
+@@ -0,0 +1,5689 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -90386,6 +90402,55 @@ index 000000000..c43068361
 +	for (int across = 0; across < GridAcross; ++across)
 +		for (int along = 0; along < GridAlong; ++along)
 +			for (int up = 0; up < GridUp; ++up) if (up > deck || up < belly) cells[cellIndex(across, along, up)] = 0;
++}
++
++/// A body pressed flatter (the unit table's "flat:" and "flatUnder:", for the units it names; a player, GitHub issue
++/// #226, of the Cyberdisc and TFTD's Hallucinoid: "discs to be more 'disk' shaped", "tops being slightly flatter"). A
++/// body whose drawings are all made from the same height above it carries, as the cut leaves it (see carve), a cone
++/// on its top and one under it, each as high as a third of its width: a saucer came out a spinning top. What stands
++/// above its widest level is pressed to `top` of its height, what hangs under it to `under` (1: as it is), and
++/// rounded off: a level takes the place of one further out, further the nearer the tip (a cone pressed to half or
++/// less becomes a dome; pressed less, its point is blunted). Only ever down towards the widest level, never out: all
++/// of it stays within what the drawings show. The widest level: where the body has the most cells, and the levels
++/// beside it within WidestBand of that (a disc's rim).
++constexpr float WidestBand = 0.97f;
++void pressFlat(std::vector<Uint8> &cells, float top, float under)
++{
++	std::vector<int> area(GridUp, 0);
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up) area[up] += cells[cellIndex(across, along, up)] != 0;
++	const int widest = (int)(std::max_element(area.begin(), area.end()) - area.begin());
++	if (area[widest] == 0) return;
++	int high = widest, low = widest, topmost = widest, lowest = widest;
++	while (high + 1 < GridUp && area[high + 1] >= area[widest] * WidestBand) ++high;
++	while (low > 0 && area[low - 1] >= area[widest] * WidestBand) --low;
++	for (int up = 0; up < GridUp; ++up) if (area[up] > 0) { topmost = std::max(topmost, up); lowest = std::min(lowest, up); }
++	const bool painted = (int)Painted.size() == GridCells;
++	// (the level that takes the place of the one `offset` out from the widest, of `tall` levels pressed to `share`)
++	auto source = [](int offset, int tall, float share) {
++		const float pressed = (offset - 0.5f) / tall, round = std::min(1.0f, 1.0f / share - 1.0f);
++		const float from = round > 1e-3f ? ((1.0f + round) - std::sqrt(std::max(0.0f, (1.0f + round) * (1.0f + round) - 4.0f * round * pressed / share))) / (2.0f * round) : pressed / share;
++		return std::clamp((int)std::lround(from * tall + 0.5f), offset, tall);
++	};
++	auto press = [&](int from, int tall, int step, float share) {
++		if (share >= 0.995f || tall < 2) return;
++		const int kept = std::max(1, (int)std::lround(tall * share));
++		for (int offset = 1; offset <= tall; ++offset)
++		{
++			const int taken = offset <= kept ? source(offset, tall, share) : 0;
++			if (taken == offset) continue;
++			for (int across = 0; across < GridAcross; ++across)
++				for (int along = 0; along < GridAlong; ++along)
++				{
++					const int cell = cellIndex(across, along, from + step * offset);
++					cells[cell] = taken ? cells[cellIndex(across, along, from + step * taken)] : 0;
++					if (painted) Painted[cell] = taken ? Painted[cellIndex(across, along, from + step * taken)] : 0;
++				}
++		}
++	};
++	press(high, topmost - high, 1, top);
++	press(low, low - lowest, -1, under);
 +}
 +
 +/// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one a mod's rules name a beast (the unit table,
@@ -93557,6 +93622,8 @@ index 000000000..c43068361
 +			for (int row = 0; parts[p].any && row < shoulders; ++row) if (!runs(parts[p], Front, row).empty()) shoulders = row;
 +		if (shoulders < FrameSize) headBottom = (float)(FloorY - shoulders);
 +	}
++	// (pressed flatter, the unit table's "flat:" for the units it names: see pressFlat)
++	if (routine.flatTop < 1.0f || routine.flatUnder < 1.0f) pressFlat(owner, routine.flatTop, routine.flatUnder);
 +	// The standard humanoid (see standardBody): a person, a unit the table names so, that walks on two legs, made from
 +	// its drawings so far, is made again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one
 +	// drawn leaning (its drawings are no standing body's: what the cut left of it is doubtful enough), nor a thin
@@ -94231,10 +94298,10 @@ index 000000000..c43068361
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..9b64b2a79
+index 000000000..20ddabafe
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,164 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94343,7 +94410,9 @@ index 000000000..9b64b2a79
 +/// names it "sculpt: sides": a big walker cut by its four drawings from front, back and sides (see makeModel).
 +/// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 +/// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; int traits = 0; };
++/// FlatTop, flatUnder: the unit table names it "flat:" or "flatUnder:": what of the body stands above its widest
++/// level, and what hangs under it, is pressed to that share of its height and rounded off (see pressFlat); 1: as ever.
++struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; int traits = 0; float flatTop = 1.0f, flatUnder = 1.0f; };
 +/// The routine's way of drawing, or null for one not given a voxel body.
 +const Routine *routineFor(int number);
 +
@@ -94399,10 +94468,10 @@ index 000000000..9b64b2a79
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
 new file mode 100644
-index 000000000..615fc91a8
+index 000000000..920ee9c99
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.cpp
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,113 @@
 +/*
 + * FirstPersonVoxelBodiesFine.cpp: the voxel bodies' builder a second time, twice as fine (see
 + * FirstPersonVoxelBodiesFine.h): the same source, FirstPersonVoxelBodies.cpp, with VOXELSCALE 2 and under a name of its
@@ -94508,6 +94577,8 @@ index 000000000..615fc91a8
 +	made.arms = source.arms;
 +	made.tankHull = source.tankHull;
 +	made.tankTop = source.tankTop;
++	made.flatTop = source.flatTop;
++	made.flatUnder = source.flatUnder;
 +	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 +	if (model) model->unit = 1.0f / VOXELSCALE;
 +	return model;
@@ -94516,10 +94587,10 @@ index 000000000..615fc91a8
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelBodiesFine.h b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
 new file mode 100644
-index 000000000..f853e4370
+index 000000000..b9d9fffaf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodiesFine.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,52 @@
 +#pragma once
 +/*
 + * FirstPersonVoxelBodiesFine.h: the voxel bodies made twice as fine (see FineBodies): the builder of
@@ -94565,6 +94636,7 @@ index 000000000..f853e4370
 +	bool relief = false; // (its one drawing given volume: see Routine)
 +	int arms = 0; // (its arms outside the body, coloured along their length, by the mod's rules: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
++	float flatTop = 1.0f, flatUnder = 1.0f; // (pressed flatter above and under its widest level, by the mod's rules: see Routine)
 +};
 +
 +/// Makes a body twice as fine from a unit's frames; null if it has no torso (or its routine has no bodies).
@@ -94898,10 +94970,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..834daf38c
+index 000000000..807b588b7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1233 @@
+@@ -0,0 +1,1274 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -95105,6 +95177,7 @@ index 000000000..834daf38c
 +	bool sides = false; // (a big walker cut by its four drawings from front, back and sides, by the unit table: see Routine)
 +	int traits = 0; // (a round trunk, a head of face and hair, by the unit table: see Routine)
 +	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
++	float flatTop = 1.0f, flatUnder = 1.0f; // (pressed flatter above and under its widest level, by the unit table: see Routine)
 +	bool fine = false; // (made twice as fine: see FineBodies)
 +	const Routine *routine = nullptr;
 +	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -95142,8 +95215,27 @@ index 000000000..834daf38c
 +}
 +
 +/**
-+ * The key a unit's body is kept under: the unit, its armour, kneeling, aiming, flying, what it holds, and a big unit's
-+ * turret's turn from its hull.
++ * Whether the game draws a unit otherwise while it aims: the routines of the bodies in parts (arms up on what they
++ * hold), the one-frame bodies of routine 4 and its kin, and the Silacoid's (its own frame). The others (every unit two
++ * tiles by two, the Chryssalid, the Celatid, the units drawn the same from every side) are drawn the same aiming or
++ * not, and have one body for both: with aiming in their key each had a second body made at its first shot, alike in
++ * every cube, and showed as its flat picture all the while that took (a player, GitHub issue #228: "2x2 units /
++ * muckstars (units with no rotations) flash sprite in voxel mode when reaction firing").
++ * @param routine The armour's drawing routine.
++ * @return True if aiming shows.
++ */
++static bool aimingShows(int routine)
++{
++	switch (routine)
++	{
++	case 0: case 1: case 4: case 6: case 8: case 10: case 13: case 14: case 15: case 17: case 18: return true;
++	default: return false;
++	}
++}
++
++/**
++ * The key a unit's body is kept under: the unit, its armour, kneeling, aiming (where that shows, see aimingShows),
++ * flying, what it holds, and a big unit's turret's turn from its hull.
 + * @param unit The unit.
 + * @param standing As the unit would stand (the body the walk swings): not kneeling, aiming or flying.
 + * @return The key.
@@ -95156,14 +95248,17 @@ index 000000000..834daf38c
 +	// (only a unit with a turret: the game moves every big unit's turret direction a step behind its own as it turns,
 +	// and a Cyberdisc turning or setting off had no body for that step: it showed as its picture)
 +	const int turret = unit->getArmor()->getSize() > 1 && unit->getTurretType() != -1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
-+	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING,
++	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING && aimingShows(unit->getArmor()->getDrawingRoutine()),
 +		!standing && unit->isFloating(), held(unit->getRightHandWeapon()), held(unit->getLeftHandWeapon()), turret);
 +}
 +
 +/**
 + * The body for a unit as it is now, made from its sprites the first time it's seen so (a unit drawn just like one
 + * seen before shares its body). A walking unit takes the body it stands in (and the walk's phase), if it was ever
-+ * seen standing; else there's none yet (it's drawn as its sprite meanwhile).
++ * seen standing; else there's none yet (it's drawn as its sprite meanwhile). While the body for how a unit is now
++ * is still to be made or being made (it kneels, raises its weapon to aim, takes another in hand for the first time),
++ * it keeps the body it was last drawn with: it showed as its flat picture for those frames, a flash at a soldier's
++ * first shot (GitHub issue #228). One never drawn as a body is its sprite meanwhile.
 + * @param unit The unit.
 + * @param unitSprite The 3D view's unit drawer (left turned to the unit's own direction when a body is made; the parts
 + *        it doesn't give the body, such as fire, are drawn on its surface, to be cleared).
@@ -95194,12 +95289,12 @@ index 000000000..834daf38c
 +	if (waiting != _waiting.end())
 +	{
 +		auto made = _byFrames.find(waiting->second);
-+		if (made == _byFrames.end()) return nullptr; // (still being made)
++		if (made == _byFrames.end()) return lastBody(unit); // (still being made)
 +		_models[key] = made->second;
 +		_waiting.erase(waiting);
 +		return remember(unit, made->second);
 +	}
-+	if (builds <= 0 || !palette) return nullptr;
++	if (builds <= 0 || !palette) return lastBody(unit);
 +	// (Every unit whose frames are gathered counts, whether its body is then made or shared with one alike: gathering
 +	// them takes the game's own thread a millisecond or more. A hundred units alike, all gathered in one frame because
 +	// only the first was "made", held the game up for a third of a second at a battle's start, and again whenever
@@ -95290,7 +95385,7 @@ index 000000000..834daf38c
 +	{
 +		const Uint64 said[4] = { (Uint64)(size_t)unit->getArmor(), (Uint64)std::hash<std::string>()(unit->getType()), (Uint64)(size_t)std::get<5>(key), (Uint64)(size_t)std::get<6>(key) };
 +		hashBytes(quick, (const Uint8*)said, sizeof(said));
-+		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)(unit->getStatus() == STATUS_AIMING), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
++		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)std::get<3>(key), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
 +		hashBytes(quick, stands, sizeof(stands));
 +	}
 +	auto quickKnown = _byQuick.find(quick);
@@ -95306,7 +95401,7 @@ index 000000000..834daf38c
 +			return remember(unit, alike->second);
 +		}
 +		_waiting[key] = quickKnown->second; // (being made)
-+		return nullptr;
++		return lastBody(unit);
 +	}
 +	for (int d = 0; d < 8; ++d)
 +	{
@@ -95570,7 +95665,7 @@ index 000000000..834daf38c
 +	// A unit drawn just like one before (the same frames, pictures and pose) shares its body.
 +	// (aiming only tells how what it holds is held: a unit showing nothing in its hands, drawn the same aiming or
 +	// not, has one body for both, not a second made at its first shot)
-+	const bool aiming = unit->getStatus() == STATUS_AIMING && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
++	const bool aiming = std::get<3>(key) && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
 +	Uint64 hash = 14695981039346656037ULL;
 +	for (const PartFrames &part : parts)
 +		for (const auto &frame : part.frame) hashBytes(hash, frame.data(), frame.size());
@@ -95611,6 +95706,13 @@ index 000000000..834daf38c
 +	hashBytes(hash, pose, 12);
 +	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 +	hashBytes(hash, tankHeights, 2);
++	// (pressed flatter, by the unit table: only said of a unit hashed in, so every other body's hash is as it was)
++	const int flatTop = look.flatTop > 0 ? look.flatTop : 100, flatUnder = look.flatUnder > 0 ? look.flatUnder : 100;
++	if (flatTop != 100 || flatUnder != 100)
++	{
++		const Uint8 flats[2] = { (Uint8)flatTop, (Uint8)flatUnder };
++		hashBytes(hash, flats, 2);
++	}
 +	_byQuick[quick] = hash;
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
@@ -95618,7 +95720,8 @@ index 000000000..834daf38c
 +		_models[key] = alike->second;
 +		return remember(unit, alike->second);
 +	}
-+	// Else the builder makes it (unless it's making one alike already), and the unit is drawn as its sprite meanwhile.
++	// Else the builder makes it (unless it's making one alike already), and the unit is drawn meanwhile as the body
++	// it was last drawn with (see modelFor), or as its sprite if it never had one.
 +	_waiting[key] = hash;
 +	if (_making.insert(hash).second)
 +	{
@@ -95645,6 +95748,8 @@ index 000000000..834daf38c
 +		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0);
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
++		job->flatTop = flatTop / 100.0f;
++		job->flatUnder = flatUnder / 100.0f;
 +		job->fine = FineBodies;
 +		job->routine = routine;
 +		std::copy(palette, palette + 256, job->palette);
@@ -95659,7 +95764,7 @@ index 000000000..834daf38c
 +		if (_builders.size() < std::min(_jobs.size() + _building, builderThreads())) _builders.emplace_back(&VoxelUnits::build, this);
 +		_wake.notify_one();
 +	}
-+	return nullptr;
++	return lastBody(unit);
 +}
 +
 +/**
@@ -95940,6 +96045,8 @@ index 000000000..834daf38c
 +			source.arms = job->arms;
 +			source.tankHull = job->tankHull;
 +			source.tankTop = job->tankTop;
++			source.flatTop = job->flatTop;
++			source.flatUnder = job->flatUnder;
 +			source.routine = job->routine->number;
 +			model = makeFineModel(source, job->palette);
 +		}
@@ -95959,6 +96066,8 @@ index 000000000..834daf38c
 +			routine.arms = job->arms;
 +			routine.tankHull = job->tankHull;
 +			routine.tankTop = job->tankTop;
++			routine.flatTop = job->flatTop;
++			routine.flatUnder = job->flatUnder;
 +			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 +		}
 +		if (model)
@@ -95990,6 +96099,8 @@ index 000000000..834daf38c
 +				source.sides = job->sides;
 +				source.traits = job->traits;
 +				source.relief = job->relief;
++				source.flatTop = job->flatTop;
++				source.flatUnder = job->flatUnder;
 +				source.routine = job->routine->number;
 +				shape = makeFineModel(source, job->palette);
 +			}
@@ -96011,6 +96122,8 @@ index 000000000..834daf38c
 +				routine.sides = job->sides;
 +				routine.traits = job->traits;
 +				routine.relief = job->relief;
++				routine.flatTop = job->flatTop;
++				routine.flatUnder = job->flatUnder;
 +				const std::vector<Uint8> noComposite[8];
 +				const HeldItem noItems[2];
 +				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
@@ -96093,8 +96206,8 @@ index 000000000..834daf38c
 +
 +	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 +	{
-+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
-+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f));
++		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d flat %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
++			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f), (int)std::lround(job.flatTop * 100.0f), (int)std::lround(job.flatUnder * 100.0f));
 +		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 +		std::fclose(file);
 +	}
@@ -103552,10 +103665,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..60eff85fe
+index 000000000..b124a13de
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,553 @@
+@@ -0,0 +1,558 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -103686,6 +103799,7 @@ index 000000000..60eff85fe
 +		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 +		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 +		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
++		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -103914,7 +104028,7 @@ index 000000000..60eff85fe
 +			{
 +				std::vector<std::string> names;
 +				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head;
-+				int seeThrough = 0, torsoDepth = 0;
++				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100;
 +				UnitLook look;
 +				entry.tryRead("names", names);
 +				if (entry.tryRead("shape", shape))
@@ -103942,6 +104056,8 @@ index 000000000..60eff85fe
 +				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 +				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
++				if (entry.tryRead("flat", flat)) look.flatTop = std::clamp(flat, 10, 100);
++				if (entry.tryRead("flatUnder", flatUnder)) look.flatUnder = std::clamp(flatUnder, 10, 100);
 +				if (!names.empty()) _unitLooks.push_back({ names, look });
 +			}
 +		}
@@ -104045,6 +104161,8 @@ index 000000000..60eff85fe
 +			if (entry.second.standard != -1) look.standard = entry.second.standard;
 +			if (entry.second.roundTrunk != -1) look.roundTrunk = entry.second.roundTrunk;
 +			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
++			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
++			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 +		}
 +		return look;
 +	}

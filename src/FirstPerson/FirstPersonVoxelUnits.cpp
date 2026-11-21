@@ -201,6 +201,7 @@ struct VoxelUnits::Job
 	bool sides = false; // (a big walker cut by its four drawings from front, back and sides, by the unit table: see Routine)
 	int traits = 0; // (a round trunk, a head of face and hair, by the unit table: see Routine)
 	float tankHull = 0.0f, tankTop = 0.0f; // (a tank's deck and top, voxels: see Routine)
+	float flatTop = 1.0f, flatUnder = 1.0f; // (pressed flatter above and under its widest level, by the unit table: see Routine)
 	bool fine = false; // (made twice as fine: see FineBodies)
 	const Routine *routine = nullptr;
 	int unitId = 0, status = 0; // (the unit's, for dump's file names)
@@ -238,8 +239,27 @@ bool VoxelUnits::suitsDown(const BattleUnit *unit)
 }
 
 /**
- * The key a unit's body is kept under: the unit, its armour, kneeling, aiming, flying, what it holds, and a big unit's
- * turret's turn from its hull.
+ * Whether the game draws a unit otherwise while it aims: the routines of the bodies in parts (arms up on what they
+ * hold), the one-frame bodies of routine 4 and its kin, and the Silacoid's (its own frame). The others (every unit two
+ * tiles by two, the Chryssalid, the Celatid, the units drawn the same from every side) are drawn the same aiming or
+ * not, and have one body for both: with aiming in their key each had a second body made at its first shot, alike in
+ * every cube, and showed as its flat picture all the while that took (a player, GitHub issue #228: "2x2 units /
+ * muckstars (units with no rotations) flash sprite in voxel mode when reaction firing").
+ * @param routine The armour's drawing routine.
+ * @return True if aiming shows.
+ */
+static bool aimingShows(int routine)
+{
+	switch (routine)
+	{
+	case 0: case 1: case 4: case 6: case 8: case 10: case 13: case 14: case 15: case 17: case 18: return true;
+	default: return false;
+	}
+}
+
+/**
+ * The key a unit's body is kept under: the unit, its armour, kneeling, aiming (where that shows, see aimingShows),
+ * flying, what it holds, and a big unit's turret's turn from its hull.
  * @param unit The unit.
  * @param standing As the unit would stand (the body the walk swings): not kneeling, aiming or flying.
  * @return The key.
@@ -252,14 +272,17 @@ VoxelUnits::Key VoxelUnits::keyFor(const BattleUnit *unit, bool standing)
 	// (only a unit with a turret: the game moves every big unit's turret direction a step behind its own as it turns,
 	// and a Cyberdisc turning or setting off had no body for that step: it showed as its picture)
 	const int turret = unit->getArmor()->getSize() > 1 && unit->getTurretType() != -1 ? ((unit->getTurretDirection() - unit->getDirection()) % 8 + 8) % 8 : 0;
-	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING,
+	return Key(unit->getId(), unit->getArmor(), !standing && unit->isKneeled(), !standing && unit->getStatus() == STATUS_AIMING && aimingShows(unit->getArmor()->getDrawingRoutine()),
 		!standing && unit->isFloating(), held(unit->getRightHandWeapon()), held(unit->getLeftHandWeapon()), turret);
 }
 
 /**
  * The body for a unit as it is now, made from its sprites the first time it's seen so (a unit drawn just like one
  * seen before shares its body). A walking unit takes the body it stands in (and the walk's phase), if it was ever
- * seen standing; else there's none yet (it's drawn as its sprite meanwhile).
+ * seen standing; else there's none yet (it's drawn as its sprite meanwhile). While the body for how a unit is now
+ * is still to be made or being made (it kneels, raises its weapon to aim, takes another in hand for the first time),
+ * it keeps the body it was last drawn with: it showed as its flat picture for those frames, a flash at a soldier's
+ * first shot (GitHub issue #228). One never drawn as a body is its sprite meanwhile.
  * @param unit The unit.
  * @param unitSprite The 3D view's unit drawer (left turned to the unit's own direction when a body is made; the parts
  *        it doesn't give the body, such as fire, are drawn on its surface, to be cleared).
@@ -290,12 +313,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	if (waiting != _waiting.end())
 	{
 		auto made = _byFrames.find(waiting->second);
-		if (made == _byFrames.end()) return nullptr; // (still being made)
+		if (made == _byFrames.end()) return lastBody(unit); // (still being made)
 		_models[key] = made->second;
 		_waiting.erase(waiting);
 		return remember(unit, made->second);
 	}
-	if (builds <= 0 || !palette) return nullptr;
+	if (builds <= 0 || !palette) return lastBody(unit);
 	// (Every unit whose frames are gathered counts, whether its body is then made or shared with one alike: gathering
 	// them takes the game's own thread a millisecond or more. A hundred units alike, all gathered in one frame because
 	// only the first was "made", held the game up for a third of a second at a battle's start, and again whenever
@@ -386,7 +409,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	{
 		const Uint64 said[4] = { (Uint64)(size_t)unit->getArmor(), (Uint64)std::hash<std::string>()(unit->getType()), (Uint64)(size_t)std::get<5>(key), (Uint64)(size_t)std::get<6>(key) };
 		hashBytes(quick, (const Uint8*)said, sizeof(said));
-		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)(unit->getStatus() == STATUS_AIMING), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
+		const Uint8 stands[6] = { (Uint8)unit->isKneeled(), (Uint8)std::get<3>(key), (Uint8)unit->isFloating(), (Uint8)std::get<7>(key), (Uint8)FineBodies, (Uint8)unit->isOut() };
 		hashBytes(quick, stands, sizeof(stands));
 	}
 	auto quickKnown = _byQuick.find(quick);
@@ -402,7 +425,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 			return remember(unit, alike->second);
 		}
 		_waiting[key] = quickKnown->second; // (being made)
-		return nullptr;
+		return lastBody(unit);
 	}
 	for (int d = 0; d < 8; ++d)
 	{
@@ -666,7 +689,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// A unit drawn just like one before (the same frames, pictures and pose) shares its body.
 	// (aiming only tells how what it holds is held: a unit showing nothing in its hands, drawn the same aiming or
 	// not, has one body for both, not a second made at its first shot)
-	const bool aiming = unit->getStatus() == STATUS_AIMING && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
+	const bool aiming = std::get<3>(key) && (!items[0].picture.empty() || !items[1].picture.empty() || !routine->whole);
 	Uint64 hash = 14695981039346656037ULL;
 	for (const PartFrames &part : parts)
 		for (const auto &frame : part.frame) hashBytes(hash, frame.data(), frame.size());
@@ -707,6 +730,13 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	hashBytes(hash, pose, 12);
 	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 	hashBytes(hash, tankHeights, 2);
+	// (pressed flatter, by the unit table: only said of a unit hashed in, so every other body's hash is as it was)
+	const int flatTop = look.flatTop > 0 ? look.flatTop : 100, flatUnder = look.flatUnder > 0 ? look.flatUnder : 100;
+	if (flatTop != 100 || flatUnder != 100)
+	{
+		const Uint8 flats[2] = { (Uint8)flatTop, (Uint8)flatUnder };
+		hashBytes(hash, flats, 2);
+	}
 	_byQuick[quick] = hash;
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
@@ -714,7 +744,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		_models[key] = alike->second;
 		return remember(unit, alike->second);
 	}
-	// Else the builder makes it (unless it's making one alike already), and the unit is drawn as its sprite meanwhile.
+	// Else the builder makes it (unless it's making one alike already), and the unit is drawn meanwhile as the body
+	// it was last drawn with (see modelFor), or as its sprite if it never had one.
 	_waiting[key] = hash;
 	if (_making.insert(hash).second)
 	{
@@ -741,6 +772,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0);
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
+		job->flatTop = flatTop / 100.0f;
+		job->flatUnder = flatUnder / 100.0f;
 		job->fine = FineBodies;
 		job->routine = routine;
 		std::copy(palette, palette + 256, job->palette);
@@ -755,7 +788,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (_builders.size() < std::min(_jobs.size() + _building, builderThreads())) _builders.emplace_back(&VoxelUnits::build, this);
 		_wake.notify_one();
 	}
-	return nullptr;
+	return lastBody(unit);
 }
 
 /**
@@ -1036,6 +1069,8 @@ void VoxelUnits::build()
 			source.arms = job->arms;
 			source.tankHull = job->tankHull;
 			source.tankTop = job->tankTop;
+			source.flatTop = job->flatTop;
+			source.flatUnder = job->flatUnder;
 			source.routine = job->routine->number;
 			model = makeFineModel(source, job->palette);
 		}
@@ -1055,6 +1090,8 @@ void VoxelUnits::build()
 			routine.arms = job->arms;
 			routine.tankHull = job->tankHull;
 			routine.tankTop = job->tankTop;
+			routine.flatTop = job->flatTop;
+			routine.flatUnder = job->flatUnder;
 			model = makeModel(parts, job->composite, job->items, job->deaths, job->corpse, job->lying, job->walks, job->aiming, routine, job->palette);
 		}
 		if (model)
@@ -1086,6 +1123,8 @@ void VoxelUnits::build()
 				source.sides = job->sides;
 				source.traits = job->traits;
 				source.relief = job->relief;
+				source.flatTop = job->flatTop;
+				source.flatUnder = job->flatUnder;
 				source.routine = job->routine->number;
 				shape = makeFineModel(source, job->palette);
 			}
@@ -1107,6 +1146,8 @@ void VoxelUnits::build()
 				routine.sides = job->sides;
 				routine.traits = job->traits;
 				routine.relief = job->relief;
+				routine.flatTop = job->flatTop;
+				routine.flatUnder = job->flatUnder;
 				const std::vector<Uint8> noComposite[8];
 				const HeldItem noItems[2];
 				shape = makeModel(framed, noComposite, noItems, {}, {}, HeldItem(), WalkFrames(), false, routine, job->palette);
@@ -1189,8 +1230,8 @@ void VoxelUnits::dump(const Job &job, const VoxelUnitModel *model, const char *f
 
 	if (FILE *file = std::fopen((base + ".job").c_str(), "w"))
 	{
-		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
-			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f));
+		std::fprintf(file, "routine %d whole %d big %d aiming %d twoHanded %d %d deaths %d corpse %d beast %d torso %d top %d frontal %d relief %d melee %d %d arms %d tank %d %d standard %d sides %d traits %d share %d %d flat %d %d\n", job.routine->number, job.routine->whole, job.routine->big,
+			job.aiming, job.items[0].twoHanded, job.items[1].twoHanded, (int)job.deaths.size(), (int)!job.corpse.empty(), (int)job.beast, (int)std::lround(job.torsoDepth * 100.0f), (int)job.backTop, (int)job.frontal, (int)job.relief, (int)job.items[0].melee, (int)job.items[1].melee, job.arms, (int)job.tankHull, (int)job.tankTop, (int)job.standard, (int)job.sides, job.traits, (int)std::lround(job.items[0].share * 100.0f), (int)std::lround(job.items[1].share * 100.0f), (int)std::lround(job.flatTop * 100.0f), (int)std::lround(job.flatUnder * 100.0f));
 		for (int i = 0; i < 256; ++i) std::fprintf(file, "%d %d %d\n", job.palette[i].r, job.palette[i].g, job.palette[i].b);
 		std::fclose(file);
 	}

@@ -128,6 +128,7 @@ public:
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
+		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -356,7 +357,7 @@ public:
 			{
 				std::vector<std::string> names;
 				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head;
-				int seeThrough = 0, torsoDepth = 0;
+				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100;
 				UnitLook look;
 				entry.tryRead("names", names);
 				if (entry.tryRead("shape", shape))
@@ -384,6 +385,8 @@ public:
 				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
+				if (entry.tryRead("flat", flat)) look.flatTop = std::clamp(flat, 10, 100);
+				if (entry.tryRead("flatUnder", flatUnder)) look.flatUnder = std::clamp(flatUnder, 10, 100);
 				if (!names.empty()) _unitLooks.push_back({ names, look });
 			}
 		}
@@ -487,6 +490,8 @@ public:
 			if (entry.second.standard != -1) look.standard = entry.second.standard;
 			if (entry.second.roundTrunk != -1) look.roundTrunk = entry.second.roundTrunk;
 			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
+			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
+			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 		}
 		return look;
 	}

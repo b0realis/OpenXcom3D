@@ -106,7 +106,9 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// names it "sculpt: sides": a big walker cut by its four drawings from front, back and sides (see makeModel).
 /// Relief: the unit is drawn the same from every side, and lopsided (set for the unit being made, see
 /// VoxelUnits::modelFor): its one drawing given volume is its body (see reliefModel).
-struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; int traits = 0; };
+/// FlatTop, flatUnder: the unit table names it "flat:" or "flatUnder:": what of the body stands above its widest
+/// level, and what hangs under it, is pressed to that share of its height and rounded off (see pressFlat); 1: as ever.
+struct Routine { int number; bool whole, humanoid, legsSwing, armsSwing; int bob[8]; bool big = false; bool still = false; bool beast = false; float torsoDepth = 0.0f; bool backTop = false; bool frontal = false; bool relief = false; int arms = 0; float tankHull = 0.0f, tankTop = 0.0f; bool kneeling = false; bool standard = false; bool sides = false; int traits = 0; float flatTop = 1.0f, flatUnder = 1.0f; };
 /// The routine's way of drawing, or null for one not given a voxel body.
 const Routine *routineFor(int number);
 

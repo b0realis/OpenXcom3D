@@ -499,8 +499,8 @@ void FirstPersonView::drawChainFireballs()
  * Leaves a mark where a shot hit: a bullet hole, or a bigger scorch from energy weapons and
  * incendiaries. Only the 400 newest marks are kept.
  * @param pos Where the shot hit, in voxels.
- * @param size How big the mark is (1 for a bullet hole, 3 for a scorch); on the screen it
- * shrinks with distance.
+ * @param size How big the mark is (1 for a bullet hole, 3 for a scorch: 0.6 and 1.8 voxels
+ * across in the world, from any distance).
  * @param darkness How many shades it darkens the surface.
  */
 void FirstPersonView::addDecal(const float pos[3], int size, int darkness)
@@ -563,7 +563,7 @@ void FirstPersonView::drawDecals()
 		if (_gpuRecording)
 		{
 			// (The card darkens the pixels: a mark smaller than half a pixel only the one it falls on, see below.)
-			const double recordedRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
+			const double recordedRadius = std::min(radius, MarkMostOfView * height * pixelSpan * _zoom);
 			gpuRecordDecal(screenX, screenY, depth, markRight, markUp, radius, pixelSpan, recordedRadius, radius < pixelSpan * 0.5 ? 0 : (int)std::ceil(recordedRadius / pixelSpan),
 				coreShades, decal.depth);
 			if (_gpuRecordOnly) continue;
@@ -583,11 +583,16 @@ void FirstPersonView::drawDecals()
 			continue; // smaller than half a pixel: that one pixel is all of it
 		}
 		// The rest: every pixel within its radius, with a ragged edge once it's bigger than a
-		// pixel; right up close no more than MarkMaxPixels across from its middle on the screen
-		// (the radius drawn shrinks to what that many pixels span there, so it stays round), as
-		// counted without the zoom: zoomed in, a mark grows with everything round it (a player's
-		// report, GitHub issue #41: zoomed in, the holes looked smaller).
-		const double drawnRadius = std::min(radius, MarkMaxPixels * pixelSpan * _zoom);
+		// pixel. A mark is as big in the world from any distance: a hole 0.6 voxels across, a
+		// scorch 1.8. (It was drawn no more than 6 pixels from its middle, however close: the
+		// same dot on the screen from one tile away as from three, a pinhole on a wall right
+		// before the eye, and the smaller the finer the 3D view's resolution: a player, GitHub
+		// issue #230, of a heavy plasma's scorch: "the hole appears big ... with distance, and
+		// like a pinhole up close".) Only right against it no more than MarkMostOfView of the
+		// view's height from its middle (the radius drawn shrinks to what that spans there, so it
+		// stays round), as counted without the zoom: zoomed in, a mark grows with everything
+		// round it (GitHub issue #41: zoomed in, the holes looked smaller).
+		const double drawnRadius = std::min(radius, MarkMostOfView * height * pixelSpan * _zoom);
 		const int reach = (int)std::ceil(drawnRadius / pixelSpan);
 		for (int y = centreY - reach; y <= centreY + reach; ++y)
 		{

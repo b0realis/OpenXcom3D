@@ -439,11 +439,12 @@ const double LyingSlopeMax = 1.5;
 const double GroundPlaneReach = 6.0, GroundPlaneReachCorpse = 12.0, SlopeItemDepthBiasMax = 6.0;
 const int GroundPlaneProbe = 12, GroundPlaneLiftMax = 4;
 /// Bullet holes and scorch marks (see drawDecals): a mark's radius, in voxels, per step of its
-/// size (a bullet hole is size 1, a scorch 3); at most this many pixels from its middle on the
-/// screen, however close; a bullet hole's core this many shades darker (its edge by the mark's
-/// own darkness, 4), so it shows on busy textures such as the desert's sand.
+/// size (a bullet hole is size 1, a scorch 3); drawn at most this much of the view's height from
+/// its middle, right against it (so one mark never fills the view); a bullet hole's core this
+/// many shades darker (its edge by the mark's own darkness, 4), so it shows on busy textures such
+/// as the desert's sand.
 const double MarkRadius = 0.3;
-const int MarkMaxPixels = 6;
+const double MarkMostOfView = 0.25;
 const int BulletHoleCoreShades = 7;
 /// Unexplored terrain turns misty with distance (see shadeHit): blended towards the haze from
 /// UnexploredMistFrom to UnexploredMistTo times the game's sight range (10 to 30 tiles at its

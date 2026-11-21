@@ -399,7 +399,7 @@ double FirstPersonView::getPitchDegrees() const
  * Sets the horizontal field of view, kept between 5 (zoomed in) and 120 degrees. The view
  * stores the tangent of half of it, which is what the ray directions are built from; and how
  * many times the zoom narrowed it, for what keeps its size on the screen as if unzoomed (the
- * bullet holes' cap up close, see drawDecals).
+ * bullet holes' cap right against them, see drawDecals).
  * @param degrees The horizontal field of view, in degrees.
  * @param zoom How many times the zoom narrows it (1: not zoomed).
  */

@@ -1795,6 +1795,55 @@ void flattenHull(std::vector<Uint8> &cells)
 			for (int up = 0; up < GridUp; ++up) if (up > deck || up < belly) cells[cellIndex(across, along, up)] = 0;
 }
 
+/// A body pressed flatter (the unit table's "flat:" and "flatUnder:", for the units it names; a player, GitHub issue
+/// #226, of the Cyberdisc and TFTD's Hallucinoid: "discs to be more 'disk' shaped", "tops being slightly flatter"). A
+/// body whose drawings are all made from the same height above it carries, as the cut leaves it (see carve), a cone
+/// on its top and one under it, each as high as a third of its width: a saucer came out a spinning top. What stands
+/// above its widest level is pressed to `top` of its height, what hangs under it to `under` (1: as it is), and
+/// rounded off: a level takes the place of one further out, further the nearer the tip (a cone pressed to half or
+/// less becomes a dome; pressed less, its point is blunted). Only ever down towards the widest level, never out: all
+/// of it stays within what the drawings show. The widest level: where the body has the most cells, and the levels
+/// beside it within WidestBand of that (a disc's rim).
+constexpr float WidestBand = 0.97f;
+void pressFlat(std::vector<Uint8> &cells, float top, float under)
+{
+	std::vector<int> area(GridUp, 0);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up) area[up] += cells[cellIndex(across, along, up)] != 0;
+	const int widest = (int)(std::max_element(area.begin(), area.end()) - area.begin());
+	if (area[widest] == 0) return;
+	int high = widest, low = widest, topmost = widest, lowest = widest;
+	while (high + 1 < GridUp && area[high + 1] >= area[widest] * WidestBand) ++high;
+	while (low > 0 && area[low - 1] >= area[widest] * WidestBand) --low;
+	for (int up = 0; up < GridUp; ++up) if (area[up] > 0) { topmost = std::max(topmost, up); lowest = std::min(lowest, up); }
+	const bool painted = (int)Painted.size() == GridCells;
+	// (the level that takes the place of the one `offset` out from the widest, of `tall` levels pressed to `share`)
+	auto source = [](int offset, int tall, float share) {
+		const float pressed = (offset - 0.5f) / tall, round = std::min(1.0f, 1.0f / share - 1.0f);
+		const float from = round > 1e-3f ? ((1.0f + round) - std::sqrt(std::max(0.0f, (1.0f + round) * (1.0f + round) - 4.0f * round * pressed / share))) / (2.0f * round) : pressed / share;
+		return std::clamp((int)std::lround(from * tall + 0.5f), offset, tall);
+	};
+	auto press = [&](int from, int tall, int step, float share) {
+		if (share >= 0.995f || tall < 2) return;
+		const int kept = std::max(1, (int)std::lround(tall * share));
+		for (int offset = 1; offset <= tall; ++offset)
+		{
+			const int taken = offset <= kept ? source(offset, tall, share) : 0;
+			if (taken == offset) continue;
+			for (int across = 0; across < GridAcross; ++across)
+				for (int along = 0; along < GridAlong; ++along)
+				{
+					const int cell = cellIndex(across, along, from + step * offset);
+					cells[cell] = taken ? cells[cellIndex(across, along, from + step * taken)] : 0;
+					if (painted) Painted[cell] = taken ? Painted[cellIndex(across, along, from + step * taken)] : 0;
+				}
+		}
+	};
+	press(high, topmost - high, 1, top);
+	press(low, low - lowest, -1, under);
+}
+
 /// A long body (a beast on four legs: a dog, a cat, a rat, a pig) is one a mod's rules name a beast (the unit table,
 /// see Routine), and no other: a unit that isn't named there is made as ever (the owner: a fix for one kind of unit
 /// mustn't "break other voxel units that are good allready like sectoid, snakeman, mutton"). A named one whose side
@@ -4964,6 +5013,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			for (int row = 0; parts[p].any && row < shoulders; ++row) if (!runs(parts[p], Front, row).empty()) shoulders = row;
 		if (shoulders < FrameSize) headBottom = (float)(FloorY - shoulders);
 	}
+	// (pressed flatter, the unit table's "flat:" for the units it names: see pressFlat)
+	if (routine.flatTop < 1.0f || routine.flatUnder < 1.0f) pressFlat(owner, routine.flatTop, routine.flatUnder);
 	// The standard humanoid (see standardBody): a person, a unit the table names so, that walks on two legs, made from
 	// its drawings so far, is made again as a humanoid is built: its trunk, a neck, a head, round limbs, feet. Not one
 	// drawn leaning (its drawings are no standing body's: what the cut left of it is doubtful enough), nor a thin

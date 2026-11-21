@@ -103,6 +103,8 @@ std::unique_ptr<VoxelUnitModel> makeFineModel(const FineBodySource &source, cons
 	made.arms = source.arms;
 	made.tankHull = source.tankHull;
 	made.tankTop = source.tankTop;
+	made.flatTop = source.flatTop;
+	made.flatUnder = source.flatUnder;
 	std::unique_ptr<VoxelUnitModel> model = makeModel(parts, composite, items, deaths, corpse, lying, walks, source.aiming, made, palette);
 	if (model) model->unit = 1.0f / VOXELSCALE;
 	return model;

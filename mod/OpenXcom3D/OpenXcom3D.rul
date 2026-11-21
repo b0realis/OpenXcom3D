@@ -228,6 +228,9 @@ firstPerson:
   #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
   #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
   #           leave it)
+  #   flat: how much of what stands above its widest level the body keeps, in hundredths, rounded off (35: the cone
+  #           the eight drawings leave on a saucer, all made from the same height above it, becomes a low dome);
+  #           flatUnder: the same for what hangs under its widest level; 100: as ever
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
@@ -268,6 +271,13 @@ firstPerson:
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
       sculpt: sides
+    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it); TFTD's
+    # Hallucinoid, a jellyfish's bell
+    - names: [CYBERDISC]
+      flat: 35
+      flatUnder: 50
+    - names: [HALLUCINOID]
+      flat: 70
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
     # arms posed on their guns (arms outside the body, coloured along their length)
     - names: [DAGON]
