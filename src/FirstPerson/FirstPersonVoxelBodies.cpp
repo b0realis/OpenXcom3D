@@ -3743,7 +3743,7 @@ Uint16 viewsAt(const std::vector<int> onTop[8], float right, float ahead, float 
 }
 
 /// What a shot meets (see VoxelUnitModel::hits): the body's solid cells (owner: its filled half voxel cells, the inside
-/// too), the items in its hands and the pieces added for views, in whole voxels; each the views it shows in (a cell's,
+/// too) and the pieces added for views, not the items in its hands, in whole voxels; each the views it shows in (a cell's,
 /// as its middle falls inside each view's solid drawing, see matchViews; a voxel's, as it shows). Nothing floats here
 /// either: in each view, only the cells joined (within Joined cells, as dropFloating joins them) to a voxel that still
 /// shows there are met; a speck hidden from the drawing isn't hit.
@@ -3825,7 +3825,10 @@ void makeHits(VoxelUnitModel &model, const std::vector<Uint8> &owner, const std:
 		const int up = cell % GridUp, along = (cell / GridUp) % GridAlong, across = cell / (GridUp * GridAlong);
 		at(cellRight(across), cellAhead(along), cellUp(up)) |= met[cell];
 	}
-	for (size_t k = 0; k < model.part.size(); ++k) at(model.right[k], model.ahead[k], model.up[k]) |= model.views[k];
+	// (Not what it holds: a shot at the barrel of a gun goes on through it, to the body or past it. A held item was
+	// part of what a shot meets, and "Kinda odd to hit a man shotguns barrel and he bleeds out": a player, GitHub
+	// issue #198; the owner: "Yesyes".)
+	for (size_t k = 0; k < model.part.size(); ++k) if (model.part[k] != VoxelUnitModel::Item) at(model.right[k], model.ahead[k], model.up[k]) |= model.views[k];
 }
 
 /// The body matched to its drawings view by view (the owner's choice: "view-matched"). A hand drawn unit's 8 frames don't
@@ -5001,6 +5004,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			return colour;
 		};
 		// (the body's skin seen from the front and from the back: the nearest of its voxels on each pixel)
+		// (a cube's pixel of its own part's drawing, and nothing else's: see a person's arm below)
+		auto ownColour = [&](size_t k, int d, int painting) -> Uint8 {
+			float column, row, nearness;
+			project(model->right[k], model->ahead[k], model->up[k], d, painting == 0, column, row, nearness);
+			const int part = (int)(std::find(PartCodes, PartCodes + BodyParts, model->part[k]) - PartCodes);
+			return part < BodyParts && parts[part].any ? parts[part].at(d, (int)std::floor(column), (int)std::floor(row)) : 0;
+		};
 		// (the nearest pixel a drawing has to where a cube stands, read level, within HairReach pixels: see the head below)
 		auto drawnNear = [&](size_t k, int d) -> Uint8 {
 			float column, row, nearness;
@@ -5184,6 +5194,17 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 						colour = drawnColour(k, d, 0);
 					}
 				}
+			}
+			// (A person's arm is painted by its own drawing alone: where that has no pixel for a cube, the nearest it has,
+			// not whatever part is drawn on top there. An arm's bones reach a little past its drawing, and the cubes
+			// there took the torso's colours: "hands wrapped in shirt fabric", a player, GitHub issue #219.)
+			if (!colour && routine.standard && (model->part[k] == VoxelUnitModel::LeftArm || model->part[k] == VoxelUnitModel::RightArm))
+			{
+				const int other = first == Front ? Back : Front;
+				colour = ownColour(k, first, painting);
+				if (!colour) colour = drawnNear(k, first);
+				if (!colour) colour = ownColour(k, other, painting);
+				if (!colour) colour = drawnNear(k, other);
 			}
 			if (!colour) colour = drawnColour(k, first, painting);
 			// (hair past the back drawing's outline, where the head's egg is fuller than drawn: the nearest pixel that
