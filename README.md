@@ -43,7 +43,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 ## New in 1.15
 
-- **Voxel units** (experimental, off by default; the switch is on the first page of the 3D VIEW settings): soldiers, aliens, civilians and tanks as 3D bodies of small cubes made from their own sprites, in both games and in mods: they turn smoothly, walk, kneel, fall and lie where they fell, and what you see is what a shot hits. A table in the mod's rules shapes kinds of units by name (people, animals, spiders, ghosts, tanks with hollow barrels).
+- **Voxel units (experimental)**, off by default; the switch is on the first page of the 3D VIEW settings: soldiers, aliens, civilians and tanks as 3D bodies of small cubes made from their own sprites, in both games and in mods: they turn smoothly, walk, kneel, fall and lie where they fell, and what you see is what a shot hits. A table in the mod's rules shapes kinds of units by name (people, animals, spiders, ghosts, tanks with hollow barrels). **Tell us what looks wrong:** [open an issue](https://github.com/b0realis/OpenXcom3D/issues) with a screenshot and, if you can, the save.
 - **The 3D VIEW settings redesigned:** a first page of eight rows, Controls, and Advanced by section; **Gameplay** in six presets (FAITHFUL, Extended+, TACTICUS, XMbl, FullQoL, FPS), **Graphics detail** Low, Medium or High, and **Recommended game options** on a click.
 - **Tactical map:** the map opened from the 3D view fills the screen, with soldiers' numbers, the enemies' classes and a view cone on every dot.
 - **On the graphics card:** *Surface relief* (walls and hulls catch the light by what is drawn on them), reflections on window glass and still water, and no freeze on a battle's first 3D frame.
