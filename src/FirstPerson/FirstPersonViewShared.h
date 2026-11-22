@@ -157,6 +157,14 @@ const float UfoInsideTint = 1.8f, UfoInsideTintNight = 1.5f;
 /// angle, for Subtle and for Strong. At Strong, walls drawn as smooth ramps of shades (inside a
 /// UFO, a base) come out rippled; at Subtle they keep their look.
 const float ReliefSubtle = 0.5f, ReliefStrong = 1.0f;
+/// Setting "Metallic surfaces" (the card's rays, see ShadeSource): a UFO's parts are metal. The sun glints on them, as
+/// tight as MetalShine (the exponent of the highlight) and MetalSun shades bright at its middle; seen along its face a
+/// hull shows the sky's light, up to MetalRim shades; and whatever lamp lights it (the flashlight, a flare, a shot)
+/// gleams where the face is turned to the eye, MetalLamp of that light again. A highlight makes a colour up to
+/// MetalBrightest shades brighter than its drawing has it, in its own colour group, and no more than MetalRoom of the
+/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Mirror" the hull shows what
+/// its face mirrors, tinted by its own colour, MetalMirror of it at most (seen along the face; a third of that head on).
+const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.8f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
 /// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 /// many can burn at once.
 const float FlareLife = 60.0f, FlareReach = 150.0f;
@@ -456,6 +464,13 @@ const int GroundPlaneProbe = 12, GroundPlaneLiftMax = 4;
 /// many shades darker (its edge by the mark's own darkness, 4), so it shows on busy textures such
 /// as the desert's sand.
 const double MarkRadius = 0.3;
+/// A shade on the ground (see drawGroundShade: a unit's shadow, scorched earth) darkens only what lies on the ground
+/// right there: within GroundShadeHeight voxels of its height, and never less than GroundShadeDepth along the view.
+/// (It was GroundShadeDepth along the view alone. Looked at from low and far, the same floor half a voxel under the
+/// shade's plane is many voxels further off along the ray, the more the further away: a scorch stopped at a straight
+/// line a few tiles ahead, "the dark explosion patches on the ground are cut off at a certain distance", and a unit's
+/// shadow was gone beyond seven tiles.)
+const double GroundShadeDepth = 3.0, GroundShadeHeight = 2.0;
 const double MarkMostOfView = 0.25;
 const int BulletHoleCoreShades = 7;
 /// Unexplored terrain turns misty with distance (see shadeHit): blended towards the haze from

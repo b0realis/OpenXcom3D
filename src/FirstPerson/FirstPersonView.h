@@ -1758,6 +1758,8 @@ private:
 		bool overEverything = false, bool mark = false);
 	/// Leaves a bullet hole or scorch mark.
 	void addDecal(const float pos[3], int size, int darkness);
+	/// The screen rectangle round a shade on the ground.
+	bool groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const;
 	/// Draws the bullet holes, scorch marks and blackened ground.
 	void drawDecals();
 	/// Spawns chunks and dust from a destroyed tile part.

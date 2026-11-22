@@ -129,6 +129,12 @@ firstPerson:
     - { dataSet: IDT_FARM_WATER, groups: [7] }
     - { dataSet: MOUNTMUD, groups: [7] }
     - { dataSet: NUKE_WATER_2, groups: [3] }
+    # the same water under other names (tools/testing/still_water_scan.py: floors whose picture is, pixel for pixel, a
+    # floor's above): the polar ice's open water (X-COM's own POLAR, which the big mods carry too; the snow swamp's and
+    # the beach's water are its pictures), XPiratez's lava swamp, the sea's own bits
+    - { dataSet: POLAR, groups: [8], records: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80] }
+    - { dataSet: LAVA_SWAMP, groups: [8] }
+    - { dataSet: SEABITS, groups: [8] }
   # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
   # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
   # A list replaces the earlier one.

@@ -473,6 +473,9 @@ const float LampReach = 120.0;     // how far a lamp lights (voxels)
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
+#ifdef METAL
+uniform int uMetal;          // setting "Metallic surfaces": 1 a UFO's parts glint, 2 and mirror faintly (with the reflections)
+#endif
 #ifdef RELIEF
 // Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
 // the tables: ReliefRow), a voxel's four neighbours on its face give the slope there, and the slope tilts the face
@@ -1706,6 +1709,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	float shade = lightAt(surfacePoint, ufoGlow) + faceShading + distanceShade(hit.t) + waveShade;
 	if (uUfoLightsOn == 0) ufoGlow = 0.0;
 	float sunShadow = 0.0;
+	float lampLight = 0.0; // (the shades the lamps near the place brighten it by)
 	if (hit.emissive)
 	{
 		int pulseKind = int(partInfo.z >> 24);
@@ -1746,11 +1750,13 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			sunShadow = 3.0 * daylight * blocked;
 			shade += sunShadow;
 		}
-		shade -= pointLight(surfacePoint, normal, true);
+		lampLight = pointLight(surfacePoint, normal, true);
+		shade -= lampLight;
 	}
 	else
 	{
-		shade -= pointLight(surfacePoint, normal, false);
+		lampLight = pointLight(surfacePoint, normal, false);
+		shade -= lampLight;
 	}
 #ifdef RELIEF
 	// The faces' own light on the tilted face, by the cosine law their shading is made with; less of it in the sun's shadow.
@@ -1799,6 +1805,33 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		creaseShade = CreaseShades * crease(rayOrigin + rayDirection * hit.t + normal * 0.5, normal) * (1.0 - smoothStep(CreaseFadeFrom, CreaseFadeTo, hit.t));
 		shade += creaseShade;
 	}
+#ifdef METAL
+	// Setting "Metallic surfaces": a UFO's parts are metal (see MetalShine in FirstPersonViewShared.h). The sun glints
+	// on a face turned halfway between it and the eye (on the face as "Surface relief" tilts it, if that is on: the
+	// glint slides over panels and seams); a face looked along shows the sky's light; and the light of lamps, the
+	// flashlight and flares gleams on a face turned to the eye.
+	bool metal = uMetal != 0 && onUfo && !hit.emissive && !unseen && !hit.ghost && !onSea;
+	vec3 metalNormal = normal;
+	float metalFacing = 1.0; // (how squarely the face is turned to the eye)
+	if (metal)
+	{
+#ifdef RELIEF
+		metalNormal = normalize(normal + reliefTilt);
+#endif
+		vec3 toEye = -normalize(rayDirection);
+		metalFacing = max(0.0, dot(metalNormal, toEye));
+		float sheen = 0.0;
+		float day = uUnderwater != 0 || uOvercast != 0 || uSky == SkyVoid ? 0.0 : 1.0 - uNight;
+		if (!indoors && day > 0.3 && dot(metalNormal, uSunDir) > 0.0)
+		{
+			sheen += MetalSun * pow(max(0.0, dot(metalNormal, normalize(uSunDir + toEye))), MetalShine) * day * (1.0 - sunShadow / (3.0 * day));
+		}
+		float lookedAlong = 1.0 - metalFacing;
+		sheen += MetalRim * lookedAlong * lookedAlong * lookedAlong * (indoors ? 0.3 : 1.0) * (1.0 - 0.7 * uNight);
+		sheen += MetalLamp * (lampLight + flare * 10.0) * pow(metalFacing, 6.0);
+		shade -= sheen;
+	}
+#endif
 	// Whole palette shades, the fraction dithered; black only where the place is really dark.
 	int wholeShades = int(max(0.0, shade + dither(pixelX, pixelY)));
 	float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow - creaseShade;
@@ -1817,6 +1850,14 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	{
 		color = fadedToBlack(baseColor | 15u, blackShare, dither(pixelX + 1, pixelY + 2));
 	}
+#ifdef METAL
+	// (a highlight on metal: brighter than its drawing has it, in its own colour group; the fraction dithered)
+	if (metal && shade < 0.0)
+	{
+		int brighter = int(min(min(MetalBrightest, float(color & 15u) * MetalRoom), -shade) + dither(pixelX + 2, pixelY + 3));
+		color = (color & 0xF0u) | uint(max((color & 0xF0u) == 0u ? 1 : 0, int(color & 15u) - brighter));
+	}
+#endif
 	if (flare * 1.5 > 0.04 + dither(pixelX + 1, pixelY + 3))
 	{
 		color = table(FlareRow, color); // the flare's light is red
@@ -1842,6 +1883,16 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #ifdef MIRROR_FLAGS
 	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 #endif
+#ifdef METAL
+	// ("Mirror": the metal shows what its face mirrors, with the reflections)
+	bool metalMirrors = metal && uMetal >= 2 && uReflections != 0 && !onPond;
+#ifdef REFLECTIONS
+	mirrors = mirrors || metalMirrors;
+#endif
+#ifdef MIRROR_FLAGS
+	if (metalMirrors) mirrorWanted = true;
+#endif
+#endif
 #ifdef COLORED_LIGHTS
 	bool colorLit = uColorLightCount > 0;
 #else
@@ -1863,6 +1914,16 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
 			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
 			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
+#ifdef METAL
+			if (metal && shade < 0.0)
+			{
+				float up = min(min(MetalBrightest, float(baseColor & 15u) * MetalRoom), -shade);
+				int least = (baseColor & 0xF0u) == 0u ? 1 : 0;
+				uint lowBright = (baseColor & 0xF0u) | uint(max(least, int(baseColor & 15u) - int(up)));
+				uint highBright = (baseColor & 0xF0u) | uint(max(least, int(baseColor & 15u) - int(up) - 1));
+				rgb = mix(paletteRgb(lowBright), paletteRgb(highBright), up - floor(up));
+			}
+#endif
 			if (fadeColor != 0u && fadeColor != baseColor)
 			{
 				// (an animated part between two frames: the other frame's colour in the same light, mixed in)
@@ -1888,7 +1949,18 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		{
 			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
 			float share;
-			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
+			vec3 mirrored;
+#ifdef METAL
+			if (metalMirrors)
+			{
+				// (off the metal's own face; more of it the more the face is looked along, as metal does)
+				mirrored = reflect(normalize(rayDirection), metalNormal);
+				float lookedAlong = 1.0 - metalFacing;
+				share = MetalMirror * (0.33 + 0.67 * lookedAlong * lookedAlong);
+			}
+			else
+#endif
+			mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 			Hit met;
 			int metTile, metAxis;
 			float metDistance;
@@ -1904,6 +1976,14 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			{
 				seen = skyRgbTowards(mirrored, pixelX, pixelY);
 			}
+#ifdef METAL
+			if (metalMirrors)
+			{
+				// (metal colours what it mirrors: by its own colour group's brightest)
+				vec3 own = paletteRgb((baseColor & 0xF0u) | uint((baseColor & 0xF0u) == 0u ? 1 : 0));
+				seen *= own / max(1.0, max(own.r, max(own.g, own.b)));
+			}
+#endif
 			rgb = mix(rgb, seen, share);
 		}
 #endif
@@ -2827,7 +2907,8 @@ void main()
 				if (fromCentre > t2.w) continue;
 				closeness = 1.0 - fromCentre / t2.w;
 			}
-			if (abs(depth - along) > 3.0) continue;
+			// (only on the floor right there: within GroundShadeHeight of the ground's height; t2.z is the ground's height from the eye, scaled)
+			if (abs(depth - along) > max(GroundShadeDepth, GroundShadeHeight * along / max(1.0, -t2.z / ZScale))) continue;
 			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
 		}
 		else if (kind == EffectDecal)

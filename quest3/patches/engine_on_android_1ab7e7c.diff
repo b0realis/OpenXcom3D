@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..81caf22fe
+index 000000000..1a2910d23
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,694 @@
+@@ -0,0 +1,699 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -384,6 +384,11 @@ index 000000000..81caf22fe
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
++  STR_FPS_METALLIC: "Metallic surfaces"
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal. Sheen: it glints in the sun and under lamps. Mirror: with Reflections, it also mirrors faintly."
++  STR_FPS_METALLIC_OFF: "Off"
++  STR_FPS_METALLIC_SHEEN: "Sheen"
++  STR_FPS_METALLIC_MIRROR: "Mirror"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -862,10 +867,10 @@ index 000000000..81caf22fe
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1bb72b637
+index 000000000..1f2d96bbc
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,694 @@
+@@ -0,0 +1,699 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1084,6 +1089,11 @@ index 000000000..1bb72b637
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
++  STR_FPS_METALLIC: "Metallic surfaces"
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal. Sheen: it glints in the sun and under lamps. Mirror: with Reflections, it also mirrors faintly."
++  STR_FPS_METALLIC_OFF: "Off"
++  STR_FPS_METALLIC_SHEEN: "Sheen"
++  STR_FPS_METALLIC_MIRROR: "Mirror"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -1562,10 +1572,10 @@ index 000000000..1bb72b637
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..f21d314d3
+index 000000000..02c6875c0
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,398 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1697,6 +1707,12 @@ index 000000000..f21d314d3
 +    - { dataSet: IDT_FARM_WATER, groups: [7] }
 +    - { dataSet: MOUNTMUD, groups: [7] }
 +    - { dataSet: NUKE_WATER_2, groups: [3] }
++    # the same water under other names (tools/testing/still_water_scan.py: floors whose picture is, pixel for pixel, a
++    # floor's above): the polar ice's open water (X-COM's own POLAR, which the big mods carry too; the snow swamp's and
++    # the beach's water are its pictures), XPiratez's lava swamp, the sea's own bits
++    - { dataSet: POLAR, groups: [8], records: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80] }
++    - { dataSet: LAVA_SWAMP, groups: [8] }
++    - { dataSet: SEABITS, groups: [8] }
 +  # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
 +  # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
 +  # A list replaces the earlier one.
@@ -23192,7 +23208,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..3dc04bd0e 100644
+index 0467dd243..0b15de306 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -23210,7 +23226,7 @@ index 0467dd243..3dc04bd0e 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
-+OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
++OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDL_Keycode keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsEmergencyClimb, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -24239,10 +24255,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..226ee72d3
+index 000000000..912b62270
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2026 @@
+@@ -0,0 +1,2029 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25569,6 +25585,9 @@ index 000000000..226ee72d3
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
 +	// On the graphics card: walls, floors and hulls show a little relief read from their own drawings (0 off, 1 subtle, 2 strong). Off by default.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSurfaceRelief", &fpsSurfaceRelief, 0, "STR_FPS_SURFACE_RELIEF", category));
++	// On the graphics card: a UFO's hull is metal (0 off; 1 sheen: it glints in the sun and under lamps; 2 mirror: and
++	// faintly mirrors what is round it, with "Reflections"). Off by default.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsMetallic", &fpsMetallic, 0, "STR_FPS_METALLIC", category));
 +	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
 +	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));
@@ -28362,10 +28381,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..85e18c005
+index 000000000..376fbc399
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3841 @@
+@@ -0,0 +1,3853 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28854,6 +28873,13 @@ index 000000000..85e18c005
 +	number("MoonEarthCos", MoonEarthCos);
 +	number("MoonEarthSin", MoonEarthSin);
 +	number("CloudDeckMottle", CloudDeckMottle);
++	number("MetalShine", MetalShine);
++	number("MetalSun", MetalSun);
++	number("MetalRim", MetalRim);
++	number("MetalLamp", MetalLamp);
++	number("MetalBrightest", MetalBrightest);
++	number("MetalRoom", MetalRoom);
++	number("MetalMirror", MetalMirror);
 +	number("DarkOverflowFrom", DarkOverflowFrom);
 +	number("DarkOverflowTo", DarkOverflowTo);
 +	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
@@ -29239,7 +29265,7 @@ index 000000000..85e18c005
 +	};
 +	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 +	Program programs[2];
-+	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief
++	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief | 128 metal
 +	Program *programFor(const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0);
 +	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 +	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
@@ -29562,7 +29588,7 @@ index 000000000..85e18c005
 +{
 +	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
 +		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "")
-+		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
++		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + ((extras & 128) ? "#define METAL\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 +	const std::string vertexSource = shaderHead() + VertexSource;
 +	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 +	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -29630,7 +29656,7 @@ index 000000000..85e18c005
 +			found = extraPrograms.emplace(extras, Program()).first;
 +			if (!build(found->second, false, extras))
 +			{
-+				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections, light shafts or surface relief on this card";
++				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections, light shafts, surface relief or metal on this card";
 +				found->second.id = 0;
 +			}
 +		}
@@ -29639,7 +29665,8 @@ index 000000000..85e18c005
 +	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
 +	// only for the frames that have a light.)
 +	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
-+	const int relief = frame.relief > 0.0f ? 16 : 0; // (setting "Surface relief": in the palette's picture too)
++	// (settings "Surface relief" and "Metallic surfaces": in the palette's picture too)
++	const int relief = (frame.relief > 0.0f ? 16 : 0) | (frame.metal > 0 ? 128 : 0);
 +	if (!frame.palette)
 +	{
 +		return built(relief);
@@ -30078,6 +30105,7 @@ index 000000000..85e18c005
 +	Gl::Uniform3f(location("uShadingDir"), colors.shadingDir[0], colors.shadingDir[1], colors.shadingDir[2]);
 +	Gl::Uniform1f(location("uShadingTurn"), colors.shadingTurn);
 +	Gl::Uniform1f(location("uRelief"), frame.relief);
++	Gl::Uniform1i(location("uMetal"), frame.metal);
 +	Gl::Uniform3f(location("uMoonDir"), colors.moonDir[0], colors.moonDir[1], colors.moonDir[2]);
 +	Gl::Uniform1fv(location("uWaveSteps"), 18, frame.waveSteps);
 +	Gl::Uniform4fv(location("uLamps"), 16, &frame.lamps[0][0]);
@@ -30623,6 +30651,8 @@ index 000000000..85e18c005
 +	auto whole = [&](const char *name, int value) { constants += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
 +	number("ZScale", ZScale);
 +	number("FlareShadowWidening", FlareShadowWidening);
++	number("GroundShadeDepth", GroundShadeDepth);
++	number("GroundShadeHeight", GroundShadeHeight);
 +	whole("UnitVeilMax", UnitVeilMax);
 +	whole("SmokeNightBrightest", SmokeNightBrightest);
 +	whole("SmokeNightDarkest", SmokeNightDarkest);
@@ -31940,6 +31970,7 @@ index 000000000..85e18c005
 +		SDL_Color anyPalette[1] = {};
 +		wanted.palette = anyPalette;
 +		wanted.relief = (extras & 16) ? 1.0f : 0.0f; // (setting "Surface relief": in every frame's program, or in none)
++		wanted.metal = (extras & 128) ? 1 : 0;       // (setting "Metallic surfaces": likewise)
 +		for (int mask = 0; mask <= 11; ++mask)
 +		{
 +			if ((mask & 4) || (mask & extras) != mask) continue; // (only what the settings can ask for)
@@ -31953,7 +31984,7 @@ index 000000000..85e18c005
 +				state.programFor(wanted, false, false, 1);
 +				state.programFor(wanted, false, false, 2);
 +			}
-+			if ((mask || (extras & 16)) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
++			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
 +			if (extras & 4) state.programFor(wanted, false, true);
 +		}
 +	});
@@ -32209,10 +32240,10 @@ index 000000000..85e18c005
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..e07cc29ee
+index 000000000..b5263bf88
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,326 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32320,6 +32351,7 @@ index 000000000..e07cc29ee
 +		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 +		float relief;                             // setting "Surface relief": how far a step of one shade's brightness in a face's drawing tilts it (0: off)
++		int metal;                                // setting "Metallic surfaces": 0 off, 1 a UFO's parts glint, 2 and mirror faintly (with the reflections)
 +		float lamps[16][4];                       // the lamps nearby: position, strength
 +		int lampCount;
 +		int flashlight;                           // 0 off, 1 the shoulder flashlight, 2 the dynamic one
@@ -32495,7 +32527,7 @@ index 000000000..e07cc29ee
 +	~FirstPersonGpu();
 +	/// The graphics card's name.
 +	const std::string &name() const;
-+	/// Builds ahead the programs that have the coloured lights (1), the reflections (2), the light shafts (8) and the surface relief (16) in
++	/// Builds ahead the programs that have the coloured lights (1), the reflections (2), the light shafts (8), the surface relief (16) and the metal (128) in
 +	/// them, and those for a pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one
 +	/// waits while the driver builds it.
 +	void prebuild(int extras);
@@ -32752,10 +32784,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..f444305e5
+index 000000000..e29f7d625
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3245 @@
+@@ -0,0 +1,3326 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33231,6 +33263,9 @@ index 000000000..f444305e5
 +const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
 +const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 +const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
++#ifdef METAL
++uniform int uMetal;          // setting "Metallic surfaces": 1 a UFO's parts glint, 2 and mirror faintly (with the reflections)
++#endif
 +#ifdef RELIEF
 +// Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
 +// the tables: ReliefRow), a voxel's four neighbours on its face give the slope there, and the slope tilts the face
@@ -34464,6 +34499,7 @@ index 000000000..f444305e5
 +	float shade = lightAt(surfacePoint, ufoGlow) + faceShading + distanceShade(hit.t) + waveShade;
 +	if (uUfoLightsOn == 0) ufoGlow = 0.0;
 +	float sunShadow = 0.0;
++	float lampLight = 0.0; // (the shades the lamps near the place brighten it by)
 +	if (hit.emissive)
 +	{
 +		int pulseKind = int(partInfo.z >> 24);
@@ -34504,11 +34540,13 @@ index 000000000..f444305e5
 +			sunShadow = 3.0 * daylight * blocked;
 +			shade += sunShadow;
 +		}
-+		shade -= pointLight(surfacePoint, normal, true);
++		lampLight = pointLight(surfacePoint, normal, true);
++		shade -= lampLight;
 +	}
 +	else
 +	{
-+		shade -= pointLight(surfacePoint, normal, false);
++		lampLight = pointLight(surfacePoint, normal, false);
++		shade -= lampLight;
 +	}
 +#ifdef RELIEF
 +	// The faces' own light on the tilted face, by the cosine law their shading is made with; less of it in the sun's shadow.
@@ -34557,6 +34595,33 @@ index 000000000..f444305e5
 +		creaseShade = CreaseShades * crease(rayOrigin + rayDirection * hit.t + normal * 0.5, normal) * (1.0 - smoothStep(CreaseFadeFrom, CreaseFadeTo, hit.t));
 +		shade += creaseShade;
 +	}
++#ifdef METAL
++	// Setting "Metallic surfaces": a UFO's parts are metal (see MetalShine in FirstPersonViewShared.h). The sun glints
++	// on a face turned halfway between it and the eye (on the face as "Surface relief" tilts it, if that is on: the
++	// glint slides over panels and seams); a face looked along shows the sky's light; and the light of lamps, the
++	// flashlight and flares gleams on a face turned to the eye.
++	bool metal = uMetal != 0 && onUfo && !hit.emissive && !unseen && !hit.ghost && !onSea;
++	vec3 metalNormal = normal;
++	float metalFacing = 1.0; // (how squarely the face is turned to the eye)
++	if (metal)
++	{
++#ifdef RELIEF
++		metalNormal = normalize(normal + reliefTilt);
++#endif
++		vec3 toEye = -normalize(rayDirection);
++		metalFacing = max(0.0, dot(metalNormal, toEye));
++		float sheen = 0.0;
++		float day = uUnderwater != 0 || uOvercast != 0 || uSky == SkyVoid ? 0.0 : 1.0 - uNight;
++		if (!indoors && day > 0.3 && dot(metalNormal, uSunDir) > 0.0)
++		{
++			sheen += MetalSun * pow(max(0.0, dot(metalNormal, normalize(uSunDir + toEye))), MetalShine) * day * (1.0 - sunShadow / (3.0 * day));
++		}
++		float lookedAlong = 1.0 - metalFacing;
++		sheen += MetalRim * lookedAlong * lookedAlong * lookedAlong * (indoors ? 0.3 : 1.0) * (1.0 - 0.7 * uNight);
++		sheen += MetalLamp * (lampLight + flare * 10.0) * pow(metalFacing, 6.0);
++		shade -= sheen;
++	}
++#endif
 +	// Whole palette shades, the fraction dithered; black only where the place is really dark.
 +	int wholeShades = int(max(0.0, shade + dither(pixelX, pixelY)));
 +	float placeShade = shade - faceShading - distanceShade(hit.t) - waveShade - sunShadow - creaseShade;
@@ -34575,6 +34640,14 @@ index 000000000..f444305e5
 +	{
 +		color = fadedToBlack(baseColor | 15u, blackShare, dither(pixelX + 1, pixelY + 2));
 +	}
++#ifdef METAL
++	// (a highlight on metal: brighter than its drawing has it, in its own colour group; the fraction dithered)
++	if (metal && shade < 0.0)
++	{
++		int brighter = int(min(min(MetalBrightest, float(color & 15u) * MetalRoom), -shade) + dither(pixelX + 2, pixelY + 3));
++		color = (color & 0xF0u) | uint(max((color & 0xF0u) == 0u ? 1 : 0, int(color & 15u) - brighter));
++	}
++#endif
 +	if (flare * 1.5 > 0.04 + dither(pixelX + 1, pixelY + 3))
 +	{
 +		color = table(FlareRow, color); // the flare's light is red
@@ -34600,6 +34673,16 @@ index 000000000..f444305e5
 +#ifdef MIRROR_FLAGS
 +	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 +#endif
++#ifdef METAL
++	// ("Mirror": the metal shows what its face mirrors, with the reflections)
++	bool metalMirrors = metal && uMetal >= 2 && uReflections != 0 && !onPond;
++#ifdef REFLECTIONS
++	mirrors = mirrors || metalMirrors;
++#endif
++#ifdef MIRROR_FLAGS
++	if (metalMirrors) mirrorWanted = true;
++#endif
++#endif
 +#ifdef COLORED_LIGHTS
 +	bool colorLit = uColorLightCount > 0;
 +#else
@@ -34621,6 +34704,16 @@ index 000000000..f444305e5
 +			uint lowLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low, cap)));
 +			uint highLit = (baseColor & 0xF0u) | uint(min(darkest, int(baseColor & 15u) + min(low + 1, cap)));
 +			rgb = mix(paletteRgb(lowLit), paletteRgb(highLit), share);
++#ifdef METAL
++			if (metal && shade < 0.0)
++			{
++				float up = min(min(MetalBrightest, float(baseColor & 15u) * MetalRoom), -shade);
++				int least = (baseColor & 0xF0u) == 0u ? 1 : 0;
++				uint lowBright = (baseColor & 0xF0u) | uint(max(least, int(baseColor & 15u) - int(up)));
++				uint highBright = (baseColor & 0xF0u) | uint(max(least, int(baseColor & 15u) - int(up) - 1));
++				rgb = mix(paletteRgb(lowBright), paletteRgb(highBright), up - floor(up));
++			}
++#endif
 +			if (fadeColor != 0u && fadeColor != baseColor)
 +			{
 +				// (an animated part between two frames: the other frame's colour in the same light, mixed in)
@@ -34646,7 +34739,18 @@ index 000000000..f444305e5
 +		{
 +			// (Setting "Reflections": one ray off the sea's face; what it meets in the game's light there, or the sky.)
 +			float share;
-+			vec3 mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
++			vec3 mirrored;
++#ifdef METAL
++			if (metalMirrors)
++			{
++				// (off the metal's own face; more of it the more the face is looked along, as metal does)
++				mirrored = reflect(normalize(rayDirection), metalNormal);
++				float lookedAlong = 1.0 - metalFacing;
++				share = MetalMirror * (0.33 + 0.67 * lookedAlong * lookedAlong);
++			}
++			else
++#endif
++			mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 +			Hit met;
 +			int metTile, metAxis;
 +			float metDistance;
@@ -34662,6 +34766,14 @@ index 000000000..f444305e5
 +			{
 +				seen = skyRgbTowards(mirrored, pixelX, pixelY);
 +			}
++#ifdef METAL
++			if (metalMirrors)
++			{
++				// (metal colours what it mirrors: by its own colour group's brightest)
++				vec3 own = paletteRgb((baseColor & 0xF0u) | uint((baseColor & 0xF0u) == 0u ? 1 : 0));
++				seen *= own / max(1.0, max(own.r, max(own.g, own.b)));
++			}
++#endif
 +			rgb = mix(rgb, seen, share);
 +		}
 +#endif
@@ -35585,7 +35697,8 @@ index 000000000..f444305e5
 +				if (fromCentre > t2.w) continue;
 +				closeness = 1.0 - fromCentre / t2.w;
 +			}
-+			if (abs(depth - along) > 3.0) continue;
++			// (only on the floor right there: within GroundShadeHeight of the ground's height; t2.z is the ground's height from the eye, scaled)
++			if (abs(depth - along) > max(GroundShadeDepth, GroundShadeHeight * along / max(1.0, -t2.z / ZScale))) continue;
 +			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
 +		}
 +		else if (kind == EffectDecal)
@@ -63882,10 +63995,10 @@ index 000000000..aa66e4f77
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..a5206d0e4
+index 000000000..81a119d33
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1940 @@
+@@ -0,0 +1,1942 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -65646,6 +65759,8 @@ index 000000000..a5206d0e4
 +		bool overEverything = false, bool mark = false);
 +	/// Leaves a bullet hole or scorch mark.
 +	void addDecal(const float pos[3], int size, int darkness);
++	/// The screen rectangle round a shade on the ground.
++	bool groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const;
 +	/// Draws the bullet holes, scorch marks and blackened ground.
 +	void drawDecals();
 +	/// Spawns chunks and dust from a destroyed tile part.
@@ -67719,10 +67834,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..09ab1d0be
+index 000000000..85eeebdd0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,819 @@
+@@ -0,0 +1,820 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -67818,7 +67933,7 @@ index 000000000..09ab1d0be
 +			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
 +			// (The programs for "Coloured lights", "Reflections", "Light shafts" and "Surface relief", if those are on, before the card is called ready.)
 +			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
-+				| (Options::fpsSupersampling > 0 ? 4 : 0) | (Options::fpsSurfaceRelief > 0 ? 16 : 0));
++				| (Options::fpsSupersampling > 0 ? 4 : 0) | (Options::fpsSurfaceRelief > 0 ? 16 : 0) | (Options::fpsMetallic > 0 ? 128 : 0));
 +			shared.ready = shared.gpu.get();
 +			shared.opened = true;
 +		});
@@ -67927,9 +68042,10 @@ index 000000000..09ab1d0be
 +	frame.allLightShadows = Options::fpsAllLightShadows;
 +	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 +	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
++	frame.metal = view._ufos.empty() ? 0 : std::clamp(Options::fpsMetallic, 0, 2); // (only where there is a UFO)
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass); // (only where there is a sea, window glass or still water)
++	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror)
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
@@ -68544,10 +68660,10 @@ index 000000000..09ab1d0be
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..3c811157f
+index 000000000..d3a0b7e60
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1077 @@
+@@ -0,0 +1,1066 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68971,18 +69087,7 @@ index 000000000..3c811157f
 +	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
 +	const int width = getWidth(), height = getHeight();
 +	int left = width, top = height, right = -1, bottom = -1;
-+	for (int corner = 0; corner < 4; ++corner)
-+	{
-+		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
-+			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
-+		double screenX, screenY, cornerDepth;
-+		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
-+		{
-+			return;
-+		}
-+		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
-+		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
-+	}
++	if (!groundShadeBox(centre, reach, endX, endY, left, top, right, bottom)) return;
 +	left = std::max(0, left); top = std::max(0, top); right = std::min(width - 1, right); bottom = std::min(height - 1, bottom);
 +	if (left > right || top > bottom)
 +	{
@@ -72992,10 +73097,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..485ea815c
+index 000000000..8ebc7619b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,746 @@
+@@ -0,0 +1,761 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73155,6 +73260,14 @@ index 000000000..485ea815c
 +/// angle, for Subtle and for Strong. At Strong, walls drawn as smooth ramps of shades (inside a
 +/// UFO, a base) come out rippled; at Subtle they keep their look.
 +const float ReliefSubtle = 0.5f, ReliefStrong = 1.0f;
++/// Setting "Metallic surfaces" (the card's rays, see ShadeSource): a UFO's parts are metal. The sun glints on them, as
++/// tight as MetalShine (the exponent of the highlight) and MetalSun shades bright at its middle; seen along its face a
++/// hull shows the sky's light, up to MetalRim shades; and whatever lamp lights it (the flashlight, a flare, a shot)
++/// gleams where the face is turned to the eye, MetalLamp of that light again. A highlight makes a colour up to
++/// MetalBrightest shades brighter than its drawing has it, in its own colour group, and no more than MetalRoom of the
++/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Mirror" the hull shows what
++/// its face mirrors, tinted by its own colour, MetalMirror of it at most (seen along the face; a third of that head on).
++const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.8f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
 +/// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 +/// many can burn at once.
 +const float FlareLife = 60.0f, FlareReach = 150.0f;
@@ -73454,6 +73567,13 @@ index 000000000..485ea815c
 +/// many shades darker (its edge by the mark's own darkness, 4), so it shows on busy textures such
 +/// as the desert's sand.
 +const double MarkRadius = 0.3;
++/// A shade on the ground (see drawGroundShade: a unit's shadow, scorched earth) darkens only what lies on the ground
++/// right there: within GroundShadeHeight voxels of its height, and never less than GroundShadeDepth along the view.
++/// (It was GroundShadeDepth along the view alone. Looked at from low and far, the same floor half a voxel under the
++/// shade's plane is many voxels further off along the ray, the more the further away: a scorch stopped at a straight
++/// line a few tiles ahead, "the dark explosion patches on the ground are cut off at a certain distance", and a unit's
++/// shadow was gone beyond seven tiles.)
++const double GroundShadeDepth = 3.0, GroundShadeHeight = 2.0;
 +const double MarkMostOfView = 0.25;
 +const int BulletHoleCoreShades = 7;
 +/// Unexplored terrain turns misty with distance (see shadeHit): blended towards the haze from
@@ -76084,10 +76204,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..90a83dcb8
+index 000000000..457bd4649
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4507 @@
+@@ -0,0 +1,4533 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -78522,6 +78642,41 @@ index 000000000..90a83dcb8
 +}
 +
 +/**
++ * The screen rectangle round a shade on the ground (see drawGroundShade): the four corners of the box round its disc,
++ * or round a stretched patch from its start to its end at its widest, projected. With a corner behind the eye (the
++ * eye stands on the shade, or beside a big one) the box is the whole view below nothing: each pixel is asked. (Such a
++ * shade was not drawn at all: a scorch gone the moment one stood on its rim.)
++ * @param centre The shade's centre on the ground, in voxels (a stretched patch's start).
++ * @param reach How far it reaches from there to each side, in voxels.
++ * @param endX, endY A stretched patch's end (a disc: its centre).
++ * @param left, top, right, bottom In: an empty box (the view's width and height, -1, -1). Out: the box, not yet cut to the view.
++ * @return False if all of it is behind the eye.
++ */
++bool FirstPersonView::groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const
++{
++	int behind = 0;
++	for (int corner = 0; corner < 4; ++corner)
++	{
++		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
++			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
++		double screenX, screenY, cornerDepth;
++		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
++		{
++			++behind;
++			continue;
++		}
++		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
++		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
++	}
++	if (behind == 4) return false;
++	if (behind > 0)
++	{
++		left = 0; top = 0; right = getWidth() - 1; bottom = getHeight() - 1;
++	}
++	return true;
++}
++
++/**
 + * Darkens the ground in a soft disc (unit shadows, scorched earth), or in a patch stretched away
 + * from a light (a unit's shadow from a flare, see recordFlareShadow): pixels whose floor lies
 + * within it lose up to `steps` shades, thinning out (dithered) towards the edge (and a stretched
@@ -78552,18 +78707,7 @@ index 000000000..90a83dcb8
 +	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
 +	const int width = getWidth(), height = getHeight();
 +	int left = width, top = height, right = -1, bottom = -1;
-+	for (int corner = 0; corner < 4; ++corner)
-+	{
-+		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
-+			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
-+		double screenX, screenY, cornerDepth;
-+		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
-+		{
-+			return;
-+		}
-+		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
-+		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
-+	}
++	if (!groundShadeBox(centre, reach, endX, endY, left, top, right, bottom)) return;
 +	left = std::max(0, left); top = std::max(std::max(0, bandTop), top); right = std::min(width - 1, right); bottom = std::min(std::min(height, bandBottom) - 1, bottom);
 +	// Each pixel's ray meets the ground plane half a voxel above the centre: if that is within
 +	// the disc and it is the floor the pixel shows, darken the pixel.
@@ -78603,7 +78747,9 @@ index 000000000..90a83dcb8
 +			// Its depth along the view axis, in true proportions like the depth buffer's.
 +			const double viewDepth = distanceAlongRay * (rayDirection[0] * _forward[0] + rayDirection[1] * _forward[1]
 +				+ rayDirection[2] * ZScale * _forward[2]); // true depth
-+			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > 3.0) continue; // only on the floor right there
++			// (only on the floor right there: within GroundShadeHeight of the ground's height, see there)
++			const double slack = std::max(GroundShadeDepth, GroundShadeHeight * viewDepth / std::max(1.0, _eye[2] - groundZ));
++			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > slack) continue;
 +			// Darker towards the middle: more of the pixels get the shade (dithered), each
 +			// darkened within its colour group.
 +			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])
@@ -89439,10 +89585,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..8cf55004b
+index 000000000..8875cec4d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6470 @@
+@@ -0,0 +1,6499 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94525,25 +94671,53 @@ index 000000000..8cf55004b
 +/// stand: they are nearer the eye).
 +constexpr int LegThin = 2 * VOXELSCALE;
 +constexpr float LegRadius = 0.38f * VOXELSCALE, LegFeet = 0.7f;
++/// (the legs of this body's drawings are thin by this many pixels: LegThin, or more where its legs are drawn thicker,
++/// see legThin)
++static thread_local int LegThinNow = LegThin;
 +PartFrames thickPart(const PartFrames &part)
 +{
++	const int thin = LegThinNow;
 +	PartFrames thick;
 +	thick.any = part.any;
 +	for (int d = 0; d < 8; ++d)
 +	{
 +		thick.frame[d].assign((size_t)FrameSize * FrameSize, 0);
-+		for (int row = 0; row + LegThin <= FrameSize; ++row)
-+			for (int column = 0; column + LegThin <= FrameSize; ++column)
++		for (int row = 0; row + thin <= FrameSize; ++row)
++			for (int column = 0; column + thin <= FrameSize; ++column)
 +			{
 +				bool full = true;
-+				for (int dy = 0; dy < LegThin && full; ++dy)
-+					for (int dx = 0; dx < LegThin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
++				for (int dy = 0; dy < thin && full; ++dy)
++					for (int dx = 0; dx < thin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
 +				if (!full) continue;
-+				for (int dy = 0; dy < LegThin; ++dy)
-+					for (int dx = 0; dx < LegThin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
++				for (int dy = 0; dy < thin; ++dy)
++					for (int dx = 0; dx < thin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
 +			}
 +	}
 +	return thick;
++}
++
++/// How thick a legged creature's legs are drawn (see thickPart; the unit table's "legs: N"): LegThin, where the front
++/// drawing then has thin pixels beside its thick part, as ever. Where it has none, its legs are drawn thicker than
++/// that and stood as part of the body: the next thickness up, a pixel at a time to twice LegThin, at which the front
++/// drawing has legs beside a body that is still there. The X-Com Files' coloured giant spiders are its plain one
++/// drawn anew with legs two pixels thick: "spiders, which are pallet swaps, do not retain legs", a player, GitHub
++/// issue #247; they were a lump on a stalk.
++static int legThin(const PartFrames &part)
++{
++	for (int thin = LegThin; thin <= 2 * LegThin; thin += VOXELSCALE)
++	{
++		LegThinNow = thin;
++		const PartFrames thick = thickPart(part);
++		int left = FrameSize, right = -1;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++				if (thick.frame[Front][row * FrameSize + column]) { left = std::min(left, column); right = std::max(right, column); }
++		if (right < 0) break; // (no body left at this thickness, nor at any more)
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++				if ((column < left || column > right) && part.frame[Front][row * FrameSize + column]) return thin;
++	}
++	return LegThin;
 +}
 +
 +/// The legs of a creature on thin legs (see thickPart): `perSide` of them on each side of the body made so far, spread
@@ -94612,9 +94786,9 @@ index 000000000..8cf55004b
 +			{
 +				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
 +				const float out = std::abs(column + 0.5f - reading.middle);
-+				if (row < kneeRow + LegThin) { outSum += out; ++outCount; }
++				if (row < kneeRow + LegThinNow) { outSum += out; ++outCount; }
 +				if (out >= LegFeet * reading.reach[column < left ? 0 : 1]) footRow = std::max(footRow, row);
-+				if (column >= left - LegThin && column <= right + LegThin) { hipSum += row + 0.5f; ++hipCount; }
++				if (column >= left - LegThinNow && column <= right + LegThinNow) { hipSum += row + 0.5f; ++hipCount; }
 +			}
 +		reading.kneeRow = (float)kneeRow;
 +		reading.kneeOut = outSum / std::max(outCount, 1);
@@ -94723,6 +94897,7 @@ index 000000000..8cf55004b
 +	// (A creature on thin legs spread round it, the unit table's "legs: N": how many a side; see spreadLegs. No long
 +	// body, whatever else the table calls it.)
 +	const int legsASide = routine.whole && !turret && !tank ? (routine.traits >> 4) & 7 : 0;
++	LegThinNow = legsASide ? legThin(parts[0]) : LegThin;
 +	const bool beast = routine.whole && !routine.big && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
 +	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 +	float beastLegsTop = 0.0f;
@@ -104276,10 +104451,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..05658c4b9
+index 000000000..9290201da
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1181 @@
+@@ -0,0 +1,1192 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -104525,7 +104700,7 @@ index 000000000..05658c4b9
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsVrCardEyes", "FPS", "fpsCounter" } },
++			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 +	};
 +	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 +	std::vector<Section> sorted;
@@ -104706,6 +104881,12 @@ index 000000000..05658c4b9
 +		{
 +			static const char *const reliefNames[] = { "STR_FPS_SURFACE_RELIEF_OFF", "STR_FPS_SURFACE_RELIEF_SUBTLE", "STR_FPS_SURFACE_RELIEF_STRONG" };
 +			return std::string(tr(reliefNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// Metallic surfaces: a choice of three, shown by name.
++		if (option.id() == "fpsMetallic")
++		{
++			static const char *const metalNames[] = { "STR_FPS_METALLIC_OFF", "STR_FPS_METALLIC_SHEEN", "STR_FPS_METALLIC_MIRROR" };
++			return std::string(tr(metalNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
 +		// The renderer is a choice of two, shown by name.
 +		if (option.id() == "fpsRenderer")
@@ -105082,6 +105263,11 @@ index 000000000..05658c4b9
 +		}
 +		// Surface relief (off, subtle, strong): round and round.
 +		else if (value == &Options::fpsSurfaceRelief)
++		{
++			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
++		}
++		// Metallic surfaces (off, sheen, mirror): round and round.
++		else if (value == &Options::fpsMetallic)
 +		{
 +			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 +		}

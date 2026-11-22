@@ -243,7 +243,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsVrCardEyes", "FPS", "fpsCounter" } },
+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 	};
 	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 	std::vector<Section> sorted;
@@ -424,6 +424,12 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			static const char *const reliefNames[] = { "STR_FPS_SURFACE_RELIEF_OFF", "STR_FPS_SURFACE_RELIEF_SUBTLE", "STR_FPS_SURFACE_RELIEF_STRONG" };
 			return std::string(tr(reliefNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		// Metallic surfaces: a choice of three, shown by name.
+		if (option.id() == "fpsMetallic")
+		{
+			static const char *const metalNames[] = { "STR_FPS_METALLIC_OFF", "STR_FPS_METALLIC_SHEEN", "STR_FPS_METALLIC_MIRROR" };
+			return std::string(tr(metalNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
 		// The renderer is a choice of two, shown by name.
 		if (option.id() == "fpsRenderer")
@@ -800,6 +806,11 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		// Surface relief (off, subtle, strong): round and round.
 		else if (value == &Options::fpsSurfaceRelief)
+		{
+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// Metallic surfaces (off, sheen, mirror): round and round.
+		else if (value == &Options::fpsMetallic)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}

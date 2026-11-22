@@ -421,18 +421,7 @@ void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius
 	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
 	const int width = getWidth(), height = getHeight();
 	int left = width, top = height, right = -1, bottom = -1;
-	for (int corner = 0; corner < 4; ++corner)
-	{
-		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
-			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
-		double screenX, screenY, cornerDepth;
-		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
-		{
-			return;
-		}
-		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
-		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
-	}
+	if (!groundShadeBox(centre, reach, endX, endY, left, top, right, bottom)) return;
 	left = std::max(0, left); top = std::max(0, top); right = std::min(width - 1, right); bottom = std::min(height - 1, bottom);
 	if (left > right || top > bottom)
 	{

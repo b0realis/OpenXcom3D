@@ -1324,6 +1324,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
 	// On the graphics card: walls, floors and hulls show a little relief read from their own drawings (0 off, 1 subtle, 2 strong). Off by default.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSurfaceRelief", &fpsSurfaceRelief, 0, "STR_FPS_SURFACE_RELIEF", category));
+	// On the graphics card: a UFO's hull is metal (0 off; 1 sheen: it glints in the sun and under lamps; 2 mirror: and
+	// faintly mirrors what is round it, with "Reflections"). Off by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsMetallic", &fpsMetallic, 0, "STR_FPS_METALLIC", category));
 	// VR with "Renderer": GPU, on a headset: the eyes' pictures stay on the graphics card and go to the headset's display
 	// from there (nothing read back, nothing uploaded again). NO: read back and uploaded, as the CPU's eyes are.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVrCardEyes", &fpsVrCardEyes, true, "STR_FPS_VR_CARD_EYES", category));

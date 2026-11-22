@@ -105,6 +105,7 @@ public:
 		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
 		float relief;                             // setting "Surface relief": how far a step of one shade's brightness in a face's drawing tilts it (0: off)
+		int metal;                                // setting "Metallic surfaces": 0 off, 1 a UFO's parts glint, 2 and mirror faintly (with the reflections)
 		float lamps[16][4];                       // the lamps nearby: position, strength
 		int lampCount;
 		int flashlight;                           // 0 off, 1 the shoulder flashlight, 2 the dynamic one
@@ -280,7 +281,7 @@ public:
 	~FirstPersonGpu();
 	/// The graphics card's name.
 	const std::string &name() const;
-	/// Builds ahead the programs that have the coloured lights (1), the reflections (2), the light shafts (8) and the surface relief (16) in
+	/// Builds ahead the programs that have the coloured lights (1), the reflections (2), the light shafts (8), the surface relief (16) and the metal (128) in
 	/// them, and those for a pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one
 	/// waits while the driver builds it.
 	void prebuild(int extras);

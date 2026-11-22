@@ -266,6 +266,7 @@ SETTINGS = [
         ('Reflections', 'NO', 'YES / NO', 'With True colour. The sea mirrors the sky, the clouds and what stands in it.', 'YES for TFTD\'s surface missions.'),
         ('Light shafts', 'NO', 'YES / NO', 'With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea.', 'YES for night missions and TFTD.'),
         ('Surface relief', 'Off', 'Off / Subtle / Strong', 'Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings: lights bring out bricks, panels, bales and paving. Switching it takes some time: the card makes its programs again.', 'Subtle everywhere; Strong for night missions, where lamps and the flashlight bring it out.'),
+        ('Metallic surfaces', 'Off', 'Off / Sheen / Mirror', 'Renderer GPU only. A UFO\'s hull is metal. Sheen: it glints in the sun and under your flashlight, in its own colours. Mirror: with Reflections it also mirrors faintly what stands before it.', 'Mirror casts one more ray for each pixel of a hull: it costs some performance near a UFO.'),
         ('VR eyes kept on the card', 'YES', 'YES / NO', 'VR on a headset, with Renderer GPU. Each eye stays on the graphics chip and goes to the headset from there. NO: read back and sent up again. Not in the 1.12 download yet.', 'YES; NO if the headset shows the eyes wrong.'),
     ]),
 ]

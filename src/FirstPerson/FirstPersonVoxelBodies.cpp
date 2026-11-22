@@ -5080,25 +5080,53 @@ static void sitLow(VoxelUnitModel &model, std::vector<Uint8> &owner)
 /// stand: they are nearer the eye).
 constexpr int LegThin = 2 * VOXELSCALE;
 constexpr float LegRadius = 0.38f * VOXELSCALE, LegFeet = 0.7f;
+/// (the legs of this body's drawings are thin by this many pixels: LegThin, or more where its legs are drawn thicker,
+/// see legThin)
+static thread_local int LegThinNow = LegThin;
 PartFrames thickPart(const PartFrames &part)
 {
+	const int thin = LegThinNow;
 	PartFrames thick;
 	thick.any = part.any;
 	for (int d = 0; d < 8; ++d)
 	{
 		thick.frame[d].assign((size_t)FrameSize * FrameSize, 0);
-		for (int row = 0; row + LegThin <= FrameSize; ++row)
-			for (int column = 0; column + LegThin <= FrameSize; ++column)
+		for (int row = 0; row + thin <= FrameSize; ++row)
+			for (int column = 0; column + thin <= FrameSize; ++column)
 			{
 				bool full = true;
-				for (int dy = 0; dy < LegThin && full; ++dy)
-					for (int dx = 0; dx < LegThin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
+				for (int dy = 0; dy < thin && full; ++dy)
+					for (int dx = 0; dx < thin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
 				if (!full) continue;
-				for (int dy = 0; dy < LegThin; ++dy)
-					for (int dx = 0; dx < LegThin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
+				for (int dy = 0; dy < thin; ++dy)
+					for (int dx = 0; dx < thin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
 			}
 	}
 	return thick;
+}
+
+/// How thick a legged creature's legs are drawn (see thickPart; the unit table's "legs: N"): LegThin, where the front
+/// drawing then has thin pixels beside its thick part, as ever. Where it has none, its legs are drawn thicker than
+/// that and stood as part of the body: the next thickness up, a pixel at a time to twice LegThin, at which the front
+/// drawing has legs beside a body that is still there. The X-Com Files' coloured giant spiders are its plain one
+/// drawn anew with legs two pixels thick: "spiders, which are pallet swaps, do not retain legs", a player, GitHub
+/// issue #247; they were a lump on a stalk.
+static int legThin(const PartFrames &part)
+{
+	for (int thin = LegThin; thin <= 2 * LegThin; thin += VOXELSCALE)
+	{
+		LegThinNow = thin;
+		const PartFrames thick = thickPart(part);
+		int left = FrameSize, right = -1;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+				if (thick.frame[Front][row * FrameSize + column]) { left = std::min(left, column); right = std::max(right, column); }
+		if (right < 0) break; // (no body left at this thickness, nor at any more)
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+				if ((column < left || column > right) && part.frame[Front][row * FrameSize + column]) return thin;
+	}
+	return LegThin;
 }
 
 /// The legs of a creature on thin legs (see thickPart): `perSide` of them on each side of the body made so far, spread
@@ -5167,9 +5195,9 @@ void spreadLegs(const PartFrames &part, const PartFrames &thick, int perSide, Ui
 			{
 				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
 				const float out = std::abs(column + 0.5f - reading.middle);
-				if (row < kneeRow + LegThin) { outSum += out; ++outCount; }
+				if (row < kneeRow + LegThinNow) { outSum += out; ++outCount; }
 				if (out >= LegFeet * reading.reach[column < left ? 0 : 1]) footRow = std::max(footRow, row);
-				if (column >= left - LegThin && column <= right + LegThin) { hipSum += row + 0.5f; ++hipCount; }
+				if (column >= left - LegThinNow && column <= right + LegThinNow) { hipSum += row + 0.5f; ++hipCount; }
 			}
 		reading.kneeRow = (float)kneeRow;
 		reading.kneeOut = outSum / std::max(outCount, 1);
@@ -5278,6 +5306,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (A creature on thin legs spread round it, the unit table's "legs: N": how many a side; see spreadLegs. No long
 	// body, whatever else the table calls it.)
 	const int legsASide = routine.whole && !turret && !tank ? (routine.traits >> 4) & 7 : 0;
+	LegThinNow = legsASide ? legThin(parts[0]) : LegThin;
 	const bool beast = routine.whole && !routine.big && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
 	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 	float beastLegsTop = 0.0f;

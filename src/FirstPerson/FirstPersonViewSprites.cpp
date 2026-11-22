@@ -2432,6 +2432,41 @@ void FirstPersonView::recordFlareShadow(const BattleUnit *unit, const double fee
 }
 
 /**
+ * The screen rectangle round a shade on the ground (see drawGroundShade): the four corners of the box round its disc,
+ * or round a stretched patch from its start to its end at its widest, projected. With a corner behind the eye (the
+ * eye stands on the shade, or beside a big one) the box is the whole view below nothing: each pixel is asked. (Such a
+ * shade was not drawn at all: a scorch gone the moment one stood on its rim.)
+ * @param centre The shade's centre on the ground, in voxels (a stretched patch's start).
+ * @param reach How far it reaches from there to each side, in voxels.
+ * @param endX, endY A stretched patch's end (a disc: its centre).
+ * @param left, top, right, bottom In: an empty box (the view's width and height, -1, -1). Out: the box, not yet cut to the view.
+ * @return False if all of it is behind the eye.
+ */
+bool FirstPersonView::groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const
+{
+	int behind = 0;
+	for (int corner = 0; corner < 4; ++corner)
+	{
+		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
+			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
+		double screenX, screenY, cornerDepth;
+		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
+		{
+			++behind;
+			continue;
+		}
+		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
+		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
+	}
+	if (behind == 4) return false;
+	if (behind > 0)
+	{
+		left = 0; top = 0; right = getWidth() - 1; bottom = getHeight() - 1;
+	}
+	return true;
+}
+
+/**
  * Darkens the ground in a soft disc (unit shadows, scorched earth), or in a patch stretched away
  * from a light (a unit's shadow from a flare, see recordFlareShadow): pixels whose floor lies
  * within it lose up to `steps` shades, thinning out (dithered) towards the edge (and a stretched
@@ -2462,18 +2497,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 	const double endX = stretched ? centre[0] + away[0] * length : centre[0], endY = stretched ? centre[1] + away[1] * length : centre[1];
 	const int width = getWidth(), height = getHeight();
 	int left = width, top = height, right = -1, bottom = -1;
-	for (int corner = 0; corner < 4; ++corner)
-	{
-		const double cornerPoint[3] = { (corner & 1) ? std::max(centre[0], endX) + reach : std::min(centre[0], endX) - reach,
-			(corner & 2) ? std::max(centre[1], endY) + reach : std::min(centre[1], endY) - reach, centre[2] + 0.5 };
-		double screenX, screenY, cornerDepth;
-		if (!projectToScreen(cornerPoint, screenX, screenY, cornerDepth))
-		{
-			return;
-		}
-		left = std::min(left, (int)screenX); right = std::max(right, (int)screenX + 1);
-		top = std::min(top, (int)screenY); bottom = std::max(bottom, (int)screenY + 1);
-	}
+	if (!groundShadeBox(centre, reach, endX, endY, left, top, right, bottom)) return;
 	left = std::max(0, left); top = std::max(std::max(0, bandTop), top); right = std::min(width - 1, right); bottom = std::min(std::min(height, bandBottom) - 1, bottom);
 	// Each pixel's ray meets the ground plane half a voxel above the centre: if that is within
 	// the disc and it is the floor the pixel shows, darken the pixel.
@@ -2513,7 +2537,9 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 			// Its depth along the view axis, in true proportions like the depth buffer's.
 			const double viewDepth = distanceAlongRay * (rayDirection[0] * _forward[0] + rayDirection[1] * _forward[1]
 				+ rayDirection[2] * ZScale * _forward[2]); // true depth
-			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > 3.0) continue; // only on the floor right there
+			// (only on the floor right there: within GroundShadeHeight of the ground's height, see there)
+			const double slack = std::max(GroundShadeDepth, GroundShadeHeight * viewDepth / std::max(1.0, _eye[2] - groundZ));
+			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > slack) continue;
 			// Darker towards the middle: more of the pixels get the shade (dithered), each
 			// darkened within its colour group.
 			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])

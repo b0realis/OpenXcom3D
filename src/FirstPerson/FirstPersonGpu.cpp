@@ -486,6 +486,13 @@ std::string shaderConstants()
 	number("MoonEarthCos", MoonEarthCos);
 	number("MoonEarthSin", MoonEarthSin);
 	number("CloudDeckMottle", CloudDeckMottle);
+	number("MetalShine", MetalShine);
+	number("MetalSun", MetalSun);
+	number("MetalRim", MetalRim);
+	number("MetalLamp", MetalLamp);
+	number("MetalBrightest", MetalBrightest);
+	number("MetalRoom", MetalRoom);
+	number("MetalMirror", MetalMirror);
 	number("DarkOverflowFrom", DarkOverflowFrom);
 	number("DarkOverflowTo", DarkOverflowTo);
 	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
@@ -871,7 +878,7 @@ struct FirstPersonGpu::State
 	};
 	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 	Program programs[2];
-	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief
+	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief | 128 metal
 	Program *programFor(const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0);
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
@@ -1194,7 +1201,7 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
 	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
 		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "")
-		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + ((extras & 128) ? "#define METAL\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const std::string vertexSource = shaderHead() + VertexSource;
 	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1262,7 +1269,7 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 			found = extraPrograms.emplace(extras, Program()).first;
 			if (!build(found->second, false, extras))
 			{
-				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections, light shafts or surface relief on this card";
+				Log(LOG_WARNING) << "OpenXcom3D GPU: no coloured lights, reflections, light shafts, surface relief or metal on this card";
 				found->second.id = 0;
 			}
 		}
@@ -1271,7 +1278,8 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
 	// (With "Coloured lights" on, the program with them is built now, not when the first shot flies; it is used
 	// only for the frames that have a light.)
 	// (For a pixel's second and further rays, the program that casts them only where the first rays show an edge.)
-	const int relief = frame.relief > 0.0f ? 16 : 0; // (setting "Surface relief": in the palette's picture too)
+	// (settings "Surface relief" and "Metallic surfaces": in the palette's picture too)
+	const int relief = (frame.relief > 0.0f ? 16 : 0) | (frame.metal > 0 ? 128 : 0);
 	if (!frame.palette)
 	{
 		return built(relief);
@@ -1710,6 +1718,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform3f(location("uShadingDir"), colors.shadingDir[0], colors.shadingDir[1], colors.shadingDir[2]);
 	Gl::Uniform1f(location("uShadingTurn"), colors.shadingTurn);
 	Gl::Uniform1f(location("uRelief"), frame.relief);
+	Gl::Uniform1i(location("uMetal"), frame.metal);
 	Gl::Uniform3f(location("uMoonDir"), colors.moonDir[0], colors.moonDir[1], colors.moonDir[2]);
 	Gl::Uniform1fv(location("uWaveSteps"), 18, frame.waveSteps);
 	Gl::Uniform4fv(location("uLamps"), 16, &frame.lamps[0][0]);
@@ -2255,6 +2264,8 @@ bool FirstPersonGpu::State::buildEffects()
 	auto whole = [&](const char *name, int value) { constants += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
 	number("ZScale", ZScale);
 	number("FlareShadowWidening", FlareShadowWidening);
+	number("GroundShadeDepth", GroundShadeDepth);
+	number("GroundShadeHeight", GroundShadeHeight);
 	whole("UnitVeilMax", UnitVeilMax);
 	whole("SmokeNightBrightest", SmokeNightBrightest);
 	whole("SmokeNightDarkest", SmokeNightDarkest);
@@ -3572,6 +3583,7 @@ void FirstPersonGpu::prebuild(int extras)
 		SDL_Color anyPalette[1] = {};
 		wanted.palette = anyPalette;
 		wanted.relief = (extras & 16) ? 1.0f : 0.0f; // (setting "Surface relief": in every frame's program, or in none)
+		wanted.metal = (extras & 128) ? 1 : 0;       // (setting "Metallic surfaces": likewise)
 		for (int mask = 0; mask <= 11; ++mask)
 		{
 			if ((mask & 4) || (mask & extras) != mask) continue; // (only what the settings can ask for)
@@ -3585,7 +3597,7 @@ void FirstPersonGpu::prebuild(int extras)
 				state.programFor(wanted, false, false, 1);
 				state.programFor(wanted, false, false, 2);
 			}
-			if ((mask || (extras & 16)) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
+			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
 			if (extras & 4) state.programFor(wanted, false, true);
 		}
 	});
