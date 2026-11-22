@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..544daf6fa
+index 000000000..021994dd9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,687 @@
+@@ -0,0 +1,690 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -596,6 +596,9 @@ index 000000000..544daf6fa
 +  STR_FPS_VAULT_DESC: "A jump while walking into a fence, table or crate up to 15 voxels high takes the soldier over it, for 30 TU."
 +  STR_FPS_KEY_JUMP: "Jump"
 +  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
++  STR_FPS_KEY_EMERGENCY_CLIMB: "Emergency climb"
++  STR_FPS_KEY_EMERGENCY_CLIMB_DESC: "50 TU: out of a pit, up a ledge or over a fence straight ahead, where a unit is stuck. No key at first."
++  STR_FPS_NOTHING_TO_CLIMB: "NOTHING TO CLIMB HERE"
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -817,10 +820,10 @@ index 000000000..544daf6fa
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..10c25dbc9
+index 000000000..625aa76da
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,687 @@
+@@ -0,0 +1,690 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1289,6 +1292,9 @@ index 000000000..10c25dbc9
 +  STR_FPS_VAULT_DESC: "A jump while walking into a fence, table or crate up to 15 voxels high takes the soldier over it, for 30 TU."
 +  STR_FPS_KEY_JUMP: "Jump"
 +  STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
++  STR_FPS_KEY_EMERGENCY_CLIMB: "Emergency climb"
++  STR_FPS_KEY_EMERGENCY_CLIMB_DESC: "50 TU: out of a pit, up a ledge or over a fence straight ahead, where a unit is stuck. No key at first."
++  STR_FPS_NOTHING_TO_CLIMB: "NOTHING TO CLIMB HERE"
 +  STR_FPS_KEY_NIGHT_VISION: "Night vision on/off"
 +  STR_FPS_KEY_NIGHT_VISION_DESC: "Night vision on/off."
 +  STR_FPS_KEY_ZOOM: "Zoom (hold)"
@@ -23019,7 +23025,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..1dffdd1d8 100644
+index a08796ced..6bbcec374 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23040,7 +23046,7 @@ index a08796ced..1dffdd1d8 100644
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
-+OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
++OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsEmergencyClimb, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
 diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
 index ae9083dcb..d05fc2a32 100644
 --- a/src/Engine/Screen.cpp
@@ -24087,10 +24093,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..6c9901861
+index 000000000..e9d170321
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2014 @@
+@@ -0,0 +1,2017 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25630,6 +25636,9 @@ index 000000000..6c9901861
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 +	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
++	// The emergency climb (the owner: "a bindable key ... 50 TUs ... sometimes units can get stuck in level depressions
++	// with no way out"): out of a pit, up a ledge, over a fence (see FirstPersonMode::emergencyClimb). No key at first.
++	options.push_back(keyOption(OPTION_OTHER, "keyFpsEmergencyClimb", &keyFpsEmergencyClimb, SDLK_UNKNOWN, "STR_FPS_KEY_EMERGENCY_CLIMB", category));
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 +	// Zoom, held (U: free in the game and the add-on).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));
@@ -37474,10 +37483,10 @@ index 000000000..1974311f2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..0304eb90b
+index 000000000..d722a22cb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3621 @@
+@@ -0,0 +1,3622 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -40354,6 +40363,7 @@ index 000000000..0304eb90b
 +	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 +	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
 +	if (key == Options::keyFpsJump) { if (pressed && _zoom <= 1.05) jump(_save->getSelectedUnit()); return true; } // (zoomed in, it looks closer still: see updateZoom)
++	if (key != SDLK_UNKNOWN && key == Options::keyFpsEmergencyClimb) { if (pressed) emergencyClimb(_save->getSelectedUnit()); return true; }
 +	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 +	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 +	// in 3D too.
@@ -41101,10 +41111,10 @@ index 000000000..0304eb90b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..81e8d690b
+index 000000000..f7fbad892
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1588 @@
+@@ -0,0 +1,1592 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -41797,6 +41807,10 @@ index 000000000..81e8d690b
 +	void jump(BattleUnit *unit);
 +	/// Vaults over a low obstacle straight ahead, if there is one.
 +	bool tryVault(BattleUnit *unit, int stepX, int stepY);
++	/// The emergency climb (its key): out of a pit, up a ledge or over a fence straight ahead.
++	void emergencyClimb(BattleUnit *unit);
++	/// Is this tile part something a soldier can climb over (see emergencyClimb)?
++	bool isClimbable(const Tile *tile, int part, bool openSky) const;
 +	/// Is this tile part low enough to jump over?
 +	bool isLowObstacle(const Tile *tile, int part) const;
 +	/// Moves the camera over the obstacle during a vault.
@@ -46497,10 +46511,10 @@ index 000000000..8271481f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..09f67d285
+index 000000000..c77409707
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2601 @@
+@@ -0,0 +1,2775 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47911,6 +47925,180 @@ index 000000000..09f67d285
 +}
 +
 +/**
++ * Is this tile part something a soldier can climb over with the emergency climb? A wall or an object that is no door
++ * and stands no higher than ClimbMaxHeight voxels (a fence, a railing, a low wall, a crate, a hedge); or, under the
++ * open sky, one of any height that lets sight through by the game's own rules (a tall wire fence). A wall up to the
++ * ceiling is neither, nor is a house's window: it lets sight through, but stands under a floor.
++ * @param tile The tile.
++ * @param part Its part (a TilePart).
++ * @param openSky Nothing is overhead on either side of it.
++ * @return True if the part is there and can be climbed over.
++ */
++bool FirstPersonMode::isClimbable(const Tile *tile, int part, bool openSky) const
++{
++	const MapData *mapData = tile ? tile->getMapData((TilePart)part) : nullptr;
++	if (!mapData || mapData->isDoor() || mapData->isUFODoor())
++	{
++		return false;
++	}
++	if (openSky && mapData->getBlock(DT_NONE) == 0)
++	{
++		return true; // (sight passes it, and nothing is over it)
++	}
++	int height = 0;
++	for (int layer = 0; layer < 12; ++layer)
++	{
++		if (mapData->getLoftID(layer)) height = (layer + 1) * 2;
++	}
++	return height <= ClimbMaxHeight;
++}
++
++/**
++ * The emergency climb (its key, none at first; the owner: "a bindable key - emergency climb (50 TUs - a unit can climb
++ * out of a pit ... if floor/tile is available next where the unit climbs out - sometimes units can get stuck in level
++ * depressions with no way out; ... can also climb over a fence if free space tile is available on other side"). For the
++ * maps where the rules leave a unit no way out: a sunken railway track, a ditch, a yard fenced all round. Only where
++ * the plain step that way is refused, straight along the grid the way the view looks, for a unit one tile big, for
++ * ClimbTimeUnits (and what the game reserves for a shot is kept; free in the debug "doom mode"):
++ * - up a ledge: onto the next tile on the same level, with nothing between but the height the game won't step up;
++ * - over a fence: a wall between here and the next tile, or something standing on the next tile (then onto the tile
++ *   beyond it), that can be climbed (see isClimbable: up to ClimbMaxHeight voxels, or a taller one that sight passes,
++ *   under the open sky);
++ * - out of a pit: onto the next tile a level up, when it has a floor and nothing is over the unit's own head.
++ * The tile climbed onto must have a floor and be free: no unit, nothing on it that stops walking. An object drawn as
++ * a wall along a tile's side counts as a wall between the tiles. The unit is set there (no walk: the rules have none
++ * for it), on its feet, faces the way it climbed, and what follows a step follows the climb (proximity grenades,
++ * sight, light, reaction fire); the camera glides over in a high arc.
++ * @param unit The soldier looked through.
++ */
++void FirstPersonMode::emergencyClimb(BattleUnit *unit)
++{
++	if (_jumpStart || _stepPending || _vaulting || !unit || unit->isOut() || unit->getStatus() != STATUS_STANDING || unit->getArmor()->getSize() != 1
++		|| !canAct() || !_state->playableUnitSelected() || noclipOn(unit) || _save->isPreview())
++	{
++		return;
++	}
++	// The way the view looks, snapped to the nearer grid axis (as a vault goes).
++	const double yaw = moveYawDegrees() * Pi / 180.0; // radians (VR: the soldier's way)
++	const double pushX = std::cos(yaw), pushY = std::sin(yaw);
++	const int stepX = std::abs(pushX) >= std::abs(pushY) ? (pushX > 0.0 ? 1 : -1) : 0;
++	const int stepY = std::abs(pushX) >= std::abs(pushY) ? 0 : (pushY > 0.0 ? 1 : -1);
++	const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
++	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
++	if (stepAllowed(unit, stepX, stepY))
++	{
++		_state->warning("STR_FPS_NOTHING_TO_CLIMB"); // (the way is open: walk)
++		return;
++	}
++
++	const Position from(_trackedTile.x, _trackedTile.y, unit->getPosition().z), step(stepX, stepY, 0), next = from + step;
++	const TilePart wallPart = stepX != 0 ? O_WESTWALL : O_NORTHWALL;
++	// (a tile owns its west and north walls: going east or south the wall between two tiles is the farther one's)
++	auto wallBetween = [&](const Position &nearer, const Position &farther) { return _save->getTile(stepX + stepY > 0 ? farther : nearer); };
++	auto blocking = [](const Tile *tile, TilePart part) {
++		return tile && tile->getMapData(part) && tile->getTUCost(part, MT_WALK) >= Pathfinding::INVALID_MOVE_COST;
++	};
++	// (a tile to stand on: a floor, no unit, nothing on it that stops walking)
++	auto standable = [&](const Tile *tile) { return tile && !tile->getUnit() && !tile->hasNoFloor(_save) && !blocking(tile, O_OBJECT); };
++	// (nothing overhead at a place: no floor on the level above it, or no level above)
++	auto openAbove = [&](const Position &at) {
++		const Tile *over = _save->getTile(at + Position(0, 0, 1));
++		return !over || (over->hasNoFloor(_save) && !over->getMapData(O_OBJECT));
++	};
++	// (an object drawn as a wall along a tile's side, the game's "big wall", that stands across the way: on the side
++	// the unit leaves by, or the opposite side of the tile it comes onto; the diagonal kinds cross every way)
++	auto sideWall = [&](const Tile *tile, bool leaving) {
++		const MapData *object = tile ? tile->getMapData(O_OBJECT) : nullptr;
++		const int kind = object ? object->getBigWall() : 0;
++		const bool towardsEastOrSouth = (stepX + stepY > 0) == leaving; // (the tile's east or south side is crossed)
++		if (kind == Pathfinding::BIGWALLNESW || kind == Pathfinding::BIGWALLNWSE) return true;
++		if (towardsEastOrSouth) return kind == Pathfinding::BIGWALLEASTANDSOUTH || kind == (stepX != 0 ? Pathfinding::BIGWALLEAST : Pathfinding::BIGWALLSOUTH);
++		return kind == Pathfinding::BIGWALLWESTANDNORTH || kind == (stepX != 0 ? Pathfinding::BIGWALLWEST : Pathfinding::BIGWALLNORTH);
++	};
++	// (what stands between two tiles and a climb gets past: no wall that stops walking, or one that can be climbed;
++	// the same for a side wall of either tile)
++	auto passable = [&](const Position &nearer, const Position &farther) {
++		const Tile *wallTile = wallBetween(nearer, farther), *nearTile = _save->getTile(nearer), *farTile = _save->getTile(farther);
++		const bool sky = openAbove(nearer) && openAbove(farther);
++		return wallTile && (!blocking(wallTile, wallPart) || isClimbable(wallTile, wallPart, sky))
++			&& (!sideWall(nearTile, true) || isClimbable(nearTile, O_OBJECT, sky)) && (!sideWall(farTile, false) || isClimbable(farTile, O_OBJECT, sky));
++	};
++
++	const Tile *nextTile = _save->getTile(next);
++	Position target(-1, -1, -1);
++	if (nextTile && passable(from, next))
++	{
++		if (standable(nextTile))
++		{
++			target = next; // (up a ledge, or over a fence between the two tiles)
++		}
++		else if (!nextTile->getUnit() && !nextTile->hasNoFloor(_save) && isClimbable(nextTile, O_OBJECT, openAbove(next))
++			&& standable(_save->getTile(next + step)) && passable(next, next + step))
++		{
++			target = next + step; // (over something standing on the next tile)
++		}
++	}
++	if (target.z < 0)
++	{
++		// Out of a pit: the next tile a level up, nothing over the unit's own head, no wall up there between the two.
++		const Position above = from + Position(0, 0, 1), up = next + Position(0, 0, 1);
++		const Tile *aboveTile = _save->getTile(above);
++		if (aboveTile && aboveTile->hasNoFloor(_save) && !aboveTile->getMapData(O_OBJECT) && standable(_save->getTile(up))
++			&& !blocking(wallBetween(above, up), wallPart) && !sideWall(_save->getTile(up), false))
++		{
++			target = up;
++		}
++	}
++	if (target.z < 0)
++	{
++		_state->warning("STR_FPS_NOTHING_TO_CLIMB");
++		return;
++	}
++	if (!doomModeOn())
++	{
++		if (unit->getTimeUnits() < ClimbTimeUnits || !reserveAllows(unit, ClimbTimeUnits, 0))
++		{
++			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
++			return;
++		}
++		unit->spendTimeUnits(ClimbTimeUnits);
++	}
++
++	// There: the unit set on the tile, on its feet, facing the way it climbed; then what the game does after a step:
++	// a proximity grenade it comes near goes off, light and sight, and whoever sees it may fire (reaction fire).
++	Tile *destination = _save->getTile(target);
++	if (unit->isKneeled()) unit->kneel(false);
++	unit->setDirection(direction);
++	unit->setPosition(target);
++	unit->setTile(destination, _save);
++	TileEngine *tileEngine = _save->getTileEngine();
++	const int mines = _save->getBattleGame()->checkForProximityGrenades(unit);
++	tileEngine->calculateLighting(mines ? LL_ITEMS : LL_UNITS, target, 2);
++	tileEngine->calculateFOV(target, 2, false); // who can see the soldier there now
++	tileEngine->calculateFOV(unit);
++	BattleAction climbed;
++	climbed.type = BA_WALK;
++	climbed.actor = unit;
++	climbed.target = target;
++	tileEngine->checkReactionFire(unit, climbed);
++	_state->updateSoldierInfo(false);
++
++	// The camera: from the eye to the middle of the tile climbed onto, in a high arc (its height follows the unit's).
++	_trackedTile = Position(target.x, target.y, from.z);
++	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
++	_vaulting = true;
++	_vaultCharge = 0;
++	_vaultUnit = nullptr;
++	_vaultFrom[0] = _eyeX;
++	_vaultFrom[1] = _eyeY;
++	_vaultTo[0] = target.x * 16.0 + 8.0;
++	_vaultTo[1] = target.y * 16.0 + 8.0;
++	_jumpStart = SDL_GetTicks();
++	_jumpTime = ClimbTime;
++	_jumpHeight = VaultHeight;
++}
++
++/**
 + * While a vault is on, moves the camera in a straight line from where the vault started to the
 + * middle of the landing tile, in time with the jump's arc (currentJumpHeight lifts it meanwhile),
 + * and keeps the walking momentum at zero. The vault is over once the arc is done and the game
@@ -49104,10 +49292,10 @@ index 000000000..09f67d285
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShared.h b/src/FirstPerson/FirstPersonModeShared.h
 new file mode 100644
-index 000000000..e3f8be5a3
+index 000000000..2f67937fa
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShared.h
-@@ -0,0 +1,569 @@
+@@ -0,0 +1,574 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -49514,6 +49702,11 @@ index 000000000..e3f8be5a3
 +const int VaultTimeUnits = 30;
 +/// What a plain hop on the spot costs, in time units (the owner, GitHub issue #124).
 +const int HopTimeUnits = 1;
++/// The emergency climb (see FirstPersonMode::emergencyClimb): what it costs in time units (the owner: "50 TUs"), the
++/// highest thing climbed over, in voxels (five sixths of a level: a wall to the ceiling is no fence; under the open
++/// sky, taller if sight passes it), and how long the camera takes over it (milliseconds).
++const int ClimbTimeUnits = 50, ClimbMaxHeight = 20;
++const Uint32 ClimbTime = 900;
 +
 +// ---- Fighting ----
 +
@@ -81152,10 +81345,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..dcc191fd3
+index 000000000..dcc67c07d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,5906 @@
+@@ -0,0 +1,5927 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84247,6 +84440,23 @@ index 000000000..dcc191fd3
 +		if (flat && any && thinTo >= 0 && thinTo < WallPlaneThick) wallPlane = north ? 1 : 0;
 +	}
 +
++	// What is left of a door struck down, where a unit can walk through it: a wall or an object that is some door's
++	// destroyed version in its set and costs time units to cross, not all of them. Its art is rubble on the floor;
++	// the shape some sets give it is the door's own slab, half as high or more, and its voxels behind no art took
++	// the nearest colour or the part's plain one: a wall where the door had been, that units walked through
++	// (players: "the wall texture was there while they walked through"). Of such a part only the voxels its art
++	// draws are made.
++	bool doorRemains = false;
++	if (!cutout && !solidShape && mapData->getObjectType() != O_FLOOR && !mapData->isDoor() && !mapData->isUFODoor()
++		&& mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST && record >= 0)
++	{
++		for (size_t other = 0; other < dataSet->getSize() && !doorRemains; ++other)
++		{
++			const MapData *door = dataSet->getObject(other);
++			doorRemains = door && door != mapData && (door->isDoor() || door->isUFODoor()) && door->getDieMCD() == record;
++		}
++	}
++
 +	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 +	// north (y), west to east (x).
 +	const int yOffset = mapData->getYOffset();
@@ -84298,6 +84508,10 @@ index 000000000..dcc191fd3
 +				if (solidShape && !waterFloor && !sprite->getPixel(spriteX, spriteY))
 +				{
 +					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
++				}
++				if (doorRemains && !sprite->getPixel(spriteX, spriteY))
++				{
++					continue; // a struck-down door's remains are what their art draws (see doorRemains)
 +				}
 +				if (!color)
 +				{

@@ -1408,6 +1408,180 @@ bool FirstPersonMode::tryVault(BattleUnit *unit, int stepX, int stepY)
 }
 
 /**
+ * Is this tile part something a soldier can climb over with the emergency climb? A wall or an object that is no door
+ * and stands no higher than ClimbMaxHeight voxels (a fence, a railing, a low wall, a crate, a hedge); or, under the
+ * open sky, one of any height that lets sight through by the game's own rules (a tall wire fence). A wall up to the
+ * ceiling is neither, nor is a house's window: it lets sight through, but stands under a floor.
+ * @param tile The tile.
+ * @param part Its part (a TilePart).
+ * @param openSky Nothing is overhead on either side of it.
+ * @return True if the part is there and can be climbed over.
+ */
+bool FirstPersonMode::isClimbable(const Tile *tile, int part, bool openSky) const
+{
+	const MapData *mapData = tile ? tile->getMapData((TilePart)part) : nullptr;
+	if (!mapData || mapData->isDoor() || mapData->isUFODoor())
+	{
+		return false;
+	}
+	if (openSky && mapData->getBlock(DT_NONE) == 0)
+	{
+		return true; // (sight passes it, and nothing is over it)
+	}
+	int height = 0;
+	for (int layer = 0; layer < 12; ++layer)
+	{
+		if (mapData->getLoftID(layer)) height = (layer + 1) * 2;
+	}
+	return height <= ClimbMaxHeight;
+}
+
+/**
+ * The emergency climb (its key, none at first; the owner: "a bindable key - emergency climb (50 TUs - a unit can climb
+ * out of a pit ... if floor/tile is available next where the unit climbs out - sometimes units can get stuck in level
+ * depressions with no way out; ... can also climb over a fence if free space tile is available on other side"). For the
+ * maps where the rules leave a unit no way out: a sunken railway track, a ditch, a yard fenced all round. Only where
+ * the plain step that way is refused, straight along the grid the way the view looks, for a unit one tile big, for
+ * ClimbTimeUnits (and what the game reserves for a shot is kept; free in the debug "doom mode"):
+ * - up a ledge: onto the next tile on the same level, with nothing between but the height the game won't step up;
+ * - over a fence: a wall between here and the next tile, or something standing on the next tile (then onto the tile
+ *   beyond it), that can be climbed (see isClimbable: up to ClimbMaxHeight voxels, or a taller one that sight passes,
+ *   under the open sky);
+ * - out of a pit: onto the next tile a level up, when it has a floor and nothing is over the unit's own head.
+ * The tile climbed onto must have a floor and be free: no unit, nothing on it that stops walking. An object drawn as
+ * a wall along a tile's side counts as a wall between the tiles. The unit is set there (no walk: the rules have none
+ * for it), on its feet, faces the way it climbed, and what follows a step follows the climb (proximity grenades,
+ * sight, light, reaction fire); the camera glides over in a high arc.
+ * @param unit The soldier looked through.
+ */
+void FirstPersonMode::emergencyClimb(BattleUnit *unit)
+{
+	if (_jumpStart || _stepPending || _vaulting || !unit || unit->isOut() || unit->getStatus() != STATUS_STANDING || unit->getArmor()->getSize() != 1
+		|| !canAct() || !_state->playableUnitSelected() || noclipOn(unit) || _save->isPreview())
+	{
+		return;
+	}
+	// The way the view looks, snapped to the nearer grid axis (as a vault goes).
+	const double yaw = moveYawDegrees() * Pi / 180.0; // radians (VR: the soldier's way)
+	const double pushX = std::cos(yaw), pushY = std::sin(yaw);
+	const int stepX = std::abs(pushX) >= std::abs(pushY) ? (pushX > 0.0 ? 1 : -1) : 0;
+	const int stepY = std::abs(pushX) >= std::abs(pushY) ? 0 : (pushY > 0.0 ? 1 : -1);
+	const int direction = Pathfinding::vectorToDirection(Position(stepX, stepY, 0));
+	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
+	if (stepAllowed(unit, stepX, stepY))
+	{
+		_state->warning("STR_FPS_NOTHING_TO_CLIMB"); // (the way is open: walk)
+		return;
+	}
+
+	const Position from(_trackedTile.x, _trackedTile.y, unit->getPosition().z), step(stepX, stepY, 0), next = from + step;
+	const TilePart wallPart = stepX != 0 ? O_WESTWALL : O_NORTHWALL;
+	// (a tile owns its west and north walls: going east or south the wall between two tiles is the farther one's)
+	auto wallBetween = [&](const Position &nearer, const Position &farther) { return _save->getTile(stepX + stepY > 0 ? farther : nearer); };
+	auto blocking = [](const Tile *tile, TilePart part) {
+		return tile && tile->getMapData(part) && tile->getTUCost(part, MT_WALK) >= Pathfinding::INVALID_MOVE_COST;
+	};
+	// (a tile to stand on: a floor, no unit, nothing on it that stops walking)
+	auto standable = [&](const Tile *tile) { return tile && !tile->getUnit() && !tile->hasNoFloor(_save) && !blocking(tile, O_OBJECT); };
+	// (nothing overhead at a place: no floor on the level above it, or no level above)
+	auto openAbove = [&](const Position &at) {
+		const Tile *over = _save->getTile(at + Position(0, 0, 1));
+		return !over || (over->hasNoFloor(_save) && !over->getMapData(O_OBJECT));
+	};
+	// (an object drawn as a wall along a tile's side, the game's "big wall", that stands across the way: on the side
+	// the unit leaves by, or the opposite side of the tile it comes onto; the diagonal kinds cross every way)
+	auto sideWall = [&](const Tile *tile, bool leaving) {
+		const MapData *object = tile ? tile->getMapData(O_OBJECT) : nullptr;
+		const int kind = object ? object->getBigWall() : 0;
+		const bool towardsEastOrSouth = (stepX + stepY > 0) == leaving; // (the tile's east or south side is crossed)
+		if (kind == Pathfinding::BIGWALLNESW || kind == Pathfinding::BIGWALLNWSE) return true;
+		if (towardsEastOrSouth) return kind == Pathfinding::BIGWALLEASTANDSOUTH || kind == (stepX != 0 ? Pathfinding::BIGWALLEAST : Pathfinding::BIGWALLSOUTH);
+		return kind == Pathfinding::BIGWALLWESTANDNORTH || kind == (stepX != 0 ? Pathfinding::BIGWALLWEST : Pathfinding::BIGWALLNORTH);
+	};
+	// (what stands between two tiles and a climb gets past: no wall that stops walking, or one that can be climbed;
+	// the same for a side wall of either tile)
+	auto passable = [&](const Position &nearer, const Position &farther) {
+		const Tile *wallTile = wallBetween(nearer, farther), *nearTile = _save->getTile(nearer), *farTile = _save->getTile(farther);
+		const bool sky = openAbove(nearer) && openAbove(farther);
+		return wallTile && (!blocking(wallTile, wallPart) || isClimbable(wallTile, wallPart, sky))
+			&& (!sideWall(nearTile, true) || isClimbable(nearTile, O_OBJECT, sky)) && (!sideWall(farTile, false) || isClimbable(farTile, O_OBJECT, sky));
+	};
+
+	const Tile *nextTile = _save->getTile(next);
+	Position target(-1, -1, -1);
+	if (nextTile && passable(from, next))
+	{
+		if (standable(nextTile))
+		{
+			target = next; // (up a ledge, or over a fence between the two tiles)
+		}
+		else if (!nextTile->getUnit() && !nextTile->hasNoFloor(_save) && isClimbable(nextTile, O_OBJECT, openAbove(next))
+			&& standable(_save->getTile(next + step)) && passable(next, next + step))
+		{
+			target = next + step; // (over something standing on the next tile)
+		}
+	}
+	if (target.z < 0)
+	{
+		// Out of a pit: the next tile a level up, nothing over the unit's own head, no wall up there between the two.
+		const Position above = from + Position(0, 0, 1), up = next + Position(0, 0, 1);
+		const Tile *aboveTile = _save->getTile(above);
+		if (aboveTile && aboveTile->hasNoFloor(_save) && !aboveTile->getMapData(O_OBJECT) && standable(_save->getTile(up))
+			&& !blocking(wallBetween(above, up), wallPart) && !sideWall(_save->getTile(up), false))
+		{
+			target = up;
+		}
+	}
+	if (target.z < 0)
+	{
+		_state->warning("STR_FPS_NOTHING_TO_CLIMB");
+		return;
+	}
+	if (!doomModeOn())
+	{
+		if (unit->getTimeUnits() < ClimbTimeUnits || !reserveAllows(unit, ClimbTimeUnits, 0))
+		{
+			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
+			return;
+		}
+		unit->spendTimeUnits(ClimbTimeUnits);
+	}
+
+	// There: the unit set on the tile, on its feet, facing the way it climbed; then what the game does after a step:
+	// a proximity grenade it comes near goes off, light and sight, and whoever sees it may fire (reaction fire).
+	Tile *destination = _save->getTile(target);
+	if (unit->isKneeled()) unit->kneel(false);
+	unit->setDirection(direction);
+	unit->setPosition(target);
+	unit->setTile(destination, _save);
+	TileEngine *tileEngine = _save->getTileEngine();
+	const int mines = _save->getBattleGame()->checkForProximityGrenades(unit);
+	tileEngine->calculateLighting(mines ? LL_ITEMS : LL_UNITS, target, 2);
+	tileEngine->calculateFOV(target, 2, false); // who can see the soldier there now
+	tileEngine->calculateFOV(unit);
+	BattleAction climbed;
+	climbed.type = BA_WALK;
+	climbed.actor = unit;
+	climbed.target = target;
+	tileEngine->checkReactionFire(unit, climbed);
+	_state->updateSoldierInfo(false);
+
+	// The camera: from the eye to the middle of the tile climbed onto, in a high arc (its height follows the unit's).
+	_trackedTile = Position(target.x, target.y, from.z);
+	std::fill(std::begin(_stepAllowedCache), std::end(_stepAllowedCache), -1);
+	_vaulting = true;
+	_vaultCharge = 0;
+	_vaultUnit = nullptr;
+	_vaultFrom[0] = _eyeX;
+	_vaultFrom[1] = _eyeY;
+	_vaultTo[0] = target.x * 16.0 + 8.0;
+	_vaultTo[1] = target.y * 16.0 + 8.0;
+	_jumpStart = SDL_GetTicks();
+	_jumpTime = ClimbTime;
+	_jumpHeight = VaultHeight;
+}
+
+/**
  * While a vault is on, moves the camera in a straight line from where the vault started to the
  * middle of the landing tile, in time with the jump's arc (currentJumpHeight lifts it meanwhile),
  * and keeps the walking momentum at zero. The vault is over once the arc is done and the game

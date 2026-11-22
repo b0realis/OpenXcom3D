@@ -404,6 +404,11 @@ const int VaultMaxHeight = 15;
 const int VaultTimeUnits = 30;
 /// What a plain hop on the spot costs, in time units (the owner, GitHub issue #124).
 const int HopTimeUnits = 1;
+/// The emergency climb (see FirstPersonMode::emergencyClimb): what it costs in time units (the owner: "50 TUs"), the
+/// highest thing climbed over, in voxels (five sixths of a level: a wall to the ceiling is no fence; under the open
+/// sky, taller if sight passes it), and how long the camera takes over it (milliseconds).
+const int ClimbTimeUnits = 50, ClimbMaxHeight = 20;
+const Uint32 ClimbTime = 900;
 
 // ---- Fighting ----
 

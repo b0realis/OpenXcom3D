@@ -3089,6 +3089,23 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		if (flat && any && thinTo >= 0 && thinTo < WallPlaneThick) wallPlane = north ? 1 : 0;
 	}
 
+	// What is left of a door struck down, where a unit can walk through it: a wall or an object that is some door's
+	// destroyed version in its set and costs time units to cross, not all of them. Its art is rubble on the floor;
+	// the shape some sets give it is the door's own slab, half as high or more, and its voxels behind no art took
+	// the nearest colour or the part's plain one: a wall where the door had been, that units walked through
+	// (players: "the wall texture was there while they walked through"). Of such a part only the voxels its art
+	// draws are made.
+	bool doorRemains = false;
+	if (!cutout && !solidShape && mapData->getObjectType() != O_FLOOR && !mapData->isDoor() && !mapData->isUFODoor()
+		&& mapData->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST && record >= 0)
+	{
+		for (size_t other = 0; other < dataSet->getSize() && !doorRemains; ++other)
+		{
+			const MapData *door = dataSet->getObject(other);
+			doorRemains = door && door != mapData && (door->isDoor() || door->isUFODoor()) && door->getDieMCD() == record;
+		}
+	}
+
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
 	const int yOffset = mapData->getYOffset();
@@ -3140,6 +3157,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				if (solidShape && !waterFloor && !sprite->getPixel(spriteX, spriteY))
 				{
 					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
+				}
+				if (doorRemains && !sprite->getPixel(spriteX, spriteY))
+				{
+					continue; // a struck-down door's remains are what their art draws (see doorRemains)
 				}
 				if (!color)
 				{

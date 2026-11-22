@@ -690,6 +690,10 @@ private:
 	void jump(BattleUnit *unit);
 	/// Vaults over a low obstacle straight ahead, if there is one.
 	bool tryVault(BattleUnit *unit, int stepX, int stepY);
+	/// The emergency climb (its key): out of a pit, up a ledge or over a fence straight ahead.
+	void emergencyClimb(BattleUnit *unit);
+	/// Is this tile part something a soldier can climb over (see emergencyClimb)?
+	bool isClimbable(const Tile *tile, int part, bool openSky) const;
 	/// Is this tile part low enough to jump over?
 	bool isLowObstacle(const Tile *tile, int part) const;
 	/// Moves the camera over the obstacle during a vault.

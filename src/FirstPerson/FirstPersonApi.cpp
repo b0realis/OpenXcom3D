@@ -1537,6 +1537,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
 	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
+	// The emergency climb (the owner: "a bindable key ... 50 TUs ... sometimes units can get stuck in level depressions
+	// with no way out"): out of a pit, up a ledge, over a fence (see FirstPersonMode::emergencyClimb). No key at first.
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsEmergencyClimb", &keyFpsEmergencyClimb, SDLK_UNKNOWN, "STR_FPS_KEY_EMERGENCY_CLIMB", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsNightVision", &keyFpsNightVision, SDLK_n, "STR_FPS_KEY_NIGHT_VISION", category));
 	// Zoom, held (U: free in the game and the add-on).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsZoom", &keyFpsZoom, SDLK_u, "STR_FPS_KEY_ZOOM", category));

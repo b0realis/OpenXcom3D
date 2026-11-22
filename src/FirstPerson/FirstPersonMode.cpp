@@ -2874,6 +2874,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (key == Options::keyFpsSprint) { if (pressed) toggleSprint(); return true; }
 	if (key == Options::keyFpsEnPassant) { if (pressed) toggleEnPassant(); return true; }
 	if (key == Options::keyFpsJump) { if (pressed && _zoom <= 1.05) jump(_save->getSelectedUnit()); return true; } // (zoomed in, it looks closer still: see updateZoom)
+	if (key != SDLK_UNKNOWN && key == Options::keyFpsEmergencyClimb) { if (pressed) emergencyClimb(_save->getSelectedUnit()); return true; }
 	// Night vision: the gear of the soldier the view looks through (in the aliens' turn the
 	// game's selected unit is the alien acting); the game's own key (Scroll Lock) checks for it
 	// in 3D too.
