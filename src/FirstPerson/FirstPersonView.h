@@ -355,7 +355,8 @@ public:
 	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
 	static bool gpuOpening();
 	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
-	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
+	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one,
+	/// unless something was drawn over it (see drawnOver).
 	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
 	/// lies over each pixel (0: none): there the air's light belongs on the smoke drawn; else null.
 	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors, const Uint8 *&smokeVeil) const
@@ -366,6 +367,11 @@ public:
 		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
 		return true;
 	}
+	/// Whether a unit's, a body's or an item's picture or a mark was drawn over a pixel's ray this frame, smoke over it or
+	/// not: the ray's full colour and the light in its air are then not that pixel's, whatever its palette colour. (A body the
+	/// colour of the ground behind it took the ground's light, through night vision its green, in patches; a unit in lit
+	/// smoke the light of the wall behind it, and stood there as a ghost. A player, GitHub issues #242 and #243.)
+	bool drawnOver(size_t pixel) const { return _ownColours[pixel] != 0 || _unitVeil[pixel] != 255; }
 	/// This frame as the graphics card put it together (see gpuPresent), if it did: a 0xFFRRGGBB number a pixel. The view's own
 	/// surface then holds only what the CPU drew last (0 elsewhere).
 	bool cardPicture(const Uint32 *&pixels) const
@@ -1069,6 +1075,7 @@ private:
 	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
 	bool _dynamicFlashlight = false; // it's the dynamic flashlight (the one the game uses; off: a wide beam from the shoulder): from under the eye, a tight spot on the crosshair
 	float _flashlightPos[3] = {};   // where it is this frame
+	int _aimLight = 0;              // setting "Flashlight": Far light, with the flashlight on: 1 its light stands at _flashlightPos, where the crosshair's line meets the world; 2 the line meets nothing (no light); 0 the beam
 	float _muzzleFlashPos[3] = {};  // where the last shot flashed, lighting its surroundings for a moment
 	Uint32 _muzzleFlashTick = 0;    // when it flashed
 	float _muzzleFlashLight = 0.0f; // the flash's strength this frame
@@ -1217,10 +1224,18 @@ private:
 	bool _pointerAimed = false;                         // and whether there is one
 	const BattleUnit *_aimedUnit = nullptr;             // the unit pointed at (see setAimedUnit)
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
-	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
+	struct BlendedSprite                                // a sprite's frame dissolved into its next one (see drawSpriteBlend)
+	{
+		const Surface *from = nullptr, *to = nullptr;   // the two frames
+		double blend = 0.0;                             // how far from one to the other
+		bool mixed = false;                             // with their colours mixed
+		std::unique_ptr<Surface> picture, edge;         // the solid pixels; the pixels only one of two mixed frames has, which fade
+		std::vector<Uint8> opacity;                     // ... and how opaque each of those is
+		bool fading = false;                            // any such
+	};
+	std::vector<BlendedSprite> _blended;                // this frame's, made once each: the first _blendedCount (the others' pictures are used again)
+	size_t _blendedCount = 0;
 	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
-	Surface *_blendEdge = nullptr;                      // ... the pixels only one of two mixed frames has, which fade (see drawSpriteBlend)
-	std::vector<Uint8> _blendOpacity;                   // ... and how opaque each is
 	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 
@@ -1246,6 +1261,8 @@ private:
 	static constexpr double NoFloorCut = -1e9;
 	/// A standing sprite isn't cut off under any ceiling (see SpriteDraw::ceilingCut, ceilingAbove).
 	static constexpr double NoCeilingCut = 1e9;
+	/// ... nor under one that would leave less than this much of its height (see ceilingOver).
+	static constexpr double CeilingCutLeast = 0.65;
 	/// One sprite to draw standing in the world (see drawSprite).
 	struct SpriteDraw
 	{
@@ -1265,6 +1282,7 @@ private:
 		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 		double ceilingCut = NoCeilingCut; // no part of a standing sprite at or above this height, in voxels: the floor over a unit's head (see ceilingAbove)
+		bool steady = false;              // its pixels stay as they are and where they are through the frame (a picture the view keeps, see drawSpriteBlend): the card looks them up by their address, not by their bytes
 	};
 	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -1403,6 +1421,8 @@ private:
 	double floorUnderside(const double world[3]) const;
 	/// The floor over the head of something standing at a point, if the level above has one there (else NoCeilingCut).
 	double ceilingAbove(const double world[3]) const;
+	/// The ceiling a unit standing at a point is cut off at: ceilingAbove, or none where that would leave too little of it.
+	double ceilingOver(const double world[3], const BattleUnit *unit) const;
 	/// Whether a voxel is filled by the view's terrain (off the map: no).
 	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
 	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.

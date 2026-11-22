@@ -91,7 +91,8 @@ firstPerson:
     # XPiratez: Mars (Cydonia, Labyrinthus Noctis), the Moon (Moonberia), the orbital stations,
     # the space freighter, the sea floor, the Shadowlands (the Diablo catacombs, the City of the
     # Dead, the Nightosphere, the Styx, the VR simulations); X-Com Files: Cydonia, the Moon (its
-    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal
+    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal; the 40k mod: its
+    # ships in deep space
     - sky: mars
       enviroEffects: [STR_ENVIRO_MARS, STR_ENVIRO_CYDONIA, STR_ENVIRO_CYDONIA_SURFACE, STR_ENVIRO_CYDONIA_2, STR_ENVIRO_CYDONIA_3, STR_ENVIRO_LABYRINTHUS_NOCTIS, STR_CYDONIA]
     - sky: moon
@@ -99,7 +100,7 @@ firstPerson:
     - sky: orbit
       enviroEffects: [STR_ENVIRO_SPACE]
     - sky: space
-      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER]
+      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER, STR_DEEPSPACE_ENVIRO]
     - sky: sea
       enviroEffects: [STR_ENVIRO_SEA, STR_UNDERWATER_GEAR, STR_UNDERWATER_GEAR_HARD, STR_UNDERWATER_GEAR_SEVERE, STR_UNDERWATER_GEAR_EXTREME]
     - sky: void
@@ -219,11 +220,22 @@ firstPerson:
   #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length),
   #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
   #           on a shirt), posed (an arm is where its bones are, shoulder to the hand on what it holds; what its
-  #           drawings add away from them, a second forearm, is left out)
+  #           drawings add away from them, a second forearm, is left out), elbow (with posed: an arm that holds its
+  #           item up, its drawing ending well below its hand, has its elbow there: the upper arm down, the forearm up
+  #           to the item)
   #   head: face (only what of the head is turned to the front is painted by the front drawing; its sides, back and
   #           top by the back drawing: hair, a helmet), or drawn (as ever)
   #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show), or
   #           drawn (as ever: as broad as its frontal drawings)
+  #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
+  #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
+  #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
+  #           artist had room, and the eight drawings together leave none of them: the body is made from the thick
+  #           part of its drawings, and the legs are made anew, as far out, as high at the knee and as thick as the
+  #           front and side drawings show them; 0: as ever. A unit drawn on one frame only
+  #   paint: hull (a body drawn on one frame is painted as a vehicle's hull is, each cube by the drawing that looks
+  #           onto it most squarely: a small saucer's rim keeps what is drawn low on its front and back), or figure
+  #           (as ever: by its front and back drawings, as a standing figure)
   #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
   #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
   #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
@@ -240,10 +252,14 @@ firstPerson:
     # ghosts (XPiratez, The X-Com Files): there, but seen through
     - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
       seeThrough: 50
-    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too)
+    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too);
+    # dead, an animal lies as long as it was long, not as it stood tall
     - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
               BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE, BAN_6.PCK]
       shape: beast
+    # the spiders (XPiratez's and The X-Com Files' giant spiders and their queens): a body on eight thin legs
+    - names: [SPIDER, "*SPIDER"]
+      legs: 8
     # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
     # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
     # on the crown, painted along the slant)
@@ -251,16 +267,24 @@ firstPerson:
       torsoDepth: 80
       top: back
       sculpt: frontal
+    # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
+    # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
+    # drawings
+    - names: [GNOME]
+      sculpt: all
+    # XPiratez's cat girls (sheets XNEKO_n): their tails are drawn in their legs' frames
+    - names: [XNEKO]
+      tail: drawn
     # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
     # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]
       animation: sprite
     # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
     # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
-    # is where its bones are (a pistol held out, and no second forearm left at the hip); the head is a face on hair or
-    # a helmet (no skin on the crown)
+    # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
+    # that holds a gun up at the chest; the head is a face on hair or a helmet (no skin on the crown)
     - names: [HUMAN]
-      arms: own posed
+      arms: own posed elbow
       head: face
     # Deep Ones (TFTD's and The X-Com Files'): arms on their bones, as above
     - names: [DEEPONE, DEEP_ONE.PCK]
@@ -271,11 +295,16 @@ firstPerson:
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
       sculpt: sides
-    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it); TFTD's
-    # Hallucinoid, a jellyfish's bell
+    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it: a low dome
+    # each, still a bulge); TFTD's Hallucinoid, a jellyfish's bell; XPiratez's Academy drone, a small saucer with a
+    # visor in its rim (painted as a hull: the visor on its front, not under it)
     - names: [CYBERDISC]
-      flat: 35
+      flat: 50
+      flatUnder: 60
+    - names: [ADRONE]
+      flat: 60
       flatUnder: 50
+      paint: hull
     - names: [HALLUCINOID]
       flat: 70
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on

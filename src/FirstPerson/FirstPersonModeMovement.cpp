@@ -121,8 +121,7 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 	// objects and doors, and out into the air (see noclipMove). The map's edge still holds.
 	if (noclipOn(unit))
 	{
-		const Tile *destination = _save->getTile(Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
-		return destination && (!destination->getUnit() || destination->getUnit() == unit);
+		return noclipRoom(unit, Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
 	}
 
 	// Work the answer out only once per direction.
@@ -649,7 +648,8 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
  * Doom IDCLIP: moves the soldier straight onto a tile (a neighbour, or the one above or below),
  * through whatever is between: walls, objects, closed doors, floors and ceilings. Nothing is paid
  * (IDCLIP is doom mode too) and nothing happens on the way: no reaction fire, no mines, and no
- * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it.
+ * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it (each of the four a unit
+ * two tiles by two stands on: see noclipRoom).
  * Sight and light follow the soldier as for a walked step: who they see there, and who sees them.
  * @param target The tile.
  * @param across True for a step across: the camera's tile is the new one at once (the eye walks
@@ -659,7 +659,7 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 bool FirstPersonMode::noclipMove(BattleUnit *unit, const Position &target, bool across)
 {
 	Tile *destination = _save->getTile(target);
-	if (!destination || (destination->getUnit() && destination->getUnit() != unit))
+	if (!destination || !noclipRoom(unit, target))
 	{
 		return false;
 	}

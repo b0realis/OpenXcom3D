@@ -1249,6 +1249,22 @@ double FirstPersonView::ceilingAbove(const double world[3]) const
 }
 
 /**
+ * The ceiling a unit is cut off at (see ceilingAbove): none where that would leave less than CeilingCutLeast of its
+ * height. A unit on a raised floor under a low roof, the deck of a transport, has half its height above the floor
+ * over it: the map draws it whole over the roof, and cut off it was a stump ("the element to make voxel units NOT
+ * appear through roofs goes a little too far ... if a unit is, say, above 35% 'reduced' under a roof ... just draw
+ * completely", a player, GitHub issue #233).
+ * @param world The point it stands at, in voxels.
+ * @param unit The unit.
+ * @return The height of the ceiling, in voxels; NoCeilingCut where it isn't cut.
+ */
+double FirstPersonView::ceilingOver(const double world[3], const BattleUnit *unit) const
+{
+	const double ceiling = ceilingAbove(world);
+	return ceiling - world[2] < CeilingCutLeast * (unit->getHeight() + unit->getFloatHeight()) ? NoCeilingCut : ceiling;
+}
+
+/**
  * Whether a voxel is filled by the view's terrain: any of its tile's parts (floor, walls,
  * object) as the view builds them.
  * @param voxelX, voxelY, voxelZ The voxel.
@@ -1830,7 +1846,7 @@ void FirstPersonView::drawUnits()
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
+				true, nullptr, nullptr, body->opacity, ceilingOver(feet, unit));
 			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -1876,7 +1892,7 @@ void FirstPersonView::drawUnits()
 					std::copy(standing, standing + 3, step.sprite.world);
 					step.sprite.depthBias = VoxelOverlayNearer;
 					step.sprite.floorCut = floorUnderside(feet);
-					step.sprite.ceilingCut = ceilingAbove(feet);
+					step.sprite.ceilingCut = ceilingOver(feet, unit);
 					step.sprite.scale = unitScale;
 					step.sprite.unit = unit;
 					step.sprite.layBack = FirstPerson::hullLayBack(unit);
@@ -1918,7 +1934,7 @@ void FirstPersonView::drawUnits()
 			step.sprite.world[1] = feet[1];
 			step.sprite.world[2] = standingHeight(feet);
 			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
-			step.sprite.ceilingCut = ceilingAbove(feet); // (and its top out of the room above, or off the roof)
+			step.sprite.ceilingCut = ceilingOver(feet, unit); // (and its top out of the room above, or off the roof)
 			step.sprite.shade = shade;
 			step.sprite.scale = unitScale;
 			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
@@ -2903,18 +2919,44 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 			box->x1 = box->x1 * factor + factor - 1; box->y1 = box->y1 * factor + factor - 1;
 		}
 	}
-	// A buffer of the frames' size to mix them in (one is kept per size and reused).
+	// The two dissolved are made once a frame and kept through it: a fire burns on many tiles at once, the same few
+	// pairs of frames at the same moment on all of them, and each tile made its own, sent to the card by its bytes (two
+	// thousand burning tiles: 17 ms a frame. A player, GitHub issue #239, "fire in excessive amounts kills frames").
 	const int width = from->getWidth(), height = from->getHeight();
-	Surface *buffer = nullptr;
-	for (Surface *candidate : _blendBuffers)
+	const bool mixed = mixColours && !_nearestRgb.empty();
+	auto show = [&](const BlendedSprite &made) {
+		SpriteDraw draw;
+		draw.sprite = made.picture.get();
+		draw.anchorX = anchorX; draw.anchorY = anchorY;
+		std::copy(world, world + 3, draw.world);
+		draw.depthBias = depthBias; draw.shade = shade; draw.scale = scale;
+		draw.steady = true;
+		drawSprite(draw);
+		// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
+		// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
+		if (made.fading)
+		{
+			SeeThroughSprite fadingPixels = { made.opacity.data(), 1.0f };
+			fadingPixels.steady = true;
+			draw.sprite = made.edge.get();
+			draw.seeThrough = &fadingPixels;
+			drawSprite(draw);
+		}
+	};
+	for (size_t known = 0; known < _blendedCount; ++known)
 	{
-		if (candidate->getWidth() == width && candidate->getHeight() == height) buffer = candidate;
+		const BlendedSprite &made = _blended[known];
+		if (made.from == from && made.to == to && made.blend == blend && made.mixed == mixed)
+		{
+			show(made);
+			return;
+		}
 	}
-	if (!buffer)
-	{
-		buffer = new Surface(width, height);
-		_blendBuffers.push_back(buffer);
-	}
+	if (_blendedCount == _blended.size()) _blended.emplace_back();
+	BlendedSprite &made = _blended[_blendedCount++];
+	made.from = from; made.to = to; made.blend = blend; made.mixed = mixed; made.fading = false;
+	if (!made.picture || made.picture->getWidth() != width || made.picture->getHeight() != height) made.picture = std::make_unique<Surface>(width, height);
+	Surface *buffer = made.picture.get();
 	// A 4x4 ordered dither in sprite space: the pattern travels with the sprite, so it doesn't
 	// crawl. (The same Bayer matrix as the shared one, in whole sixteenths.) Pixels whose level
 	// is below the threshold show the next frame.
@@ -2922,7 +2964,6 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 	const int threshold = (int)(blend * 16.0);
 	// (Mixing colours: how far, in whole steps, and the palette to mix in.)
 	const int FlameMixSteps = 32;
-	const bool mixed = mixColours && !_nearestRgb.empty();
 	const int mixStep = (int)(blend * FlameMixSteps);
 	const SDL_Color *palette = getPalette();
 	const int fadeLevel = (int)(blend * SeeThroughLevels);
@@ -2931,14 +2972,10 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 	if (mixed)
 	{
 		// (The picture and the opacities of the pixels that fade: of the frames' size, cleared.)
-		if (!_blendEdge || _blendEdge->getWidth() != width || _blendEdge->getHeight() != height)
-		{
-			delete _blendEdge;
-			_blendEdge = new Surface(width, height);
-		}
-		edgeSurface = _blendEdge->getSurface();
+		if (!made.edge || made.edge->getWidth() != width || made.edge->getHeight() != height) made.edge = std::make_unique<Surface>(width, height);
+		edgeSurface = made.edge->getSurface();
 		for (int y = 0; y < height; ++y) std::fill_n((Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch, width, (Uint8)0);
-		_blendOpacity.assign((size_t)width * height, 0);
+		made.opacity.assign((size_t)width * height, 0);
 	}
 	// And the shapes meet half way: both frames stretched to the size in between, around the base
 	// they rise from, so a growing explosion is one shape growing, not two ghosting into each other.
@@ -2953,7 +2990,7 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 			for (int x = 0; x < width; ++x)
 				((Uint8 *)outSurface->pixels)[y * outSurface->pitch + x] = bayerLevels[y & 3][x & 3] < threshold
 					? pixel(toSurface, x, y) : pixel(fromSurface, x, y);
-		drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
+		show(made);
 		return;
 	}
 	// The size in between (the boxes' sizes blended), and the base each shape rises from: the
@@ -3038,20 +3075,14 @@ void FirstPersonView::drawSpriteBlend(const Surface *from, const Surface *to, do
 				{
 					Uint8 *edgeRow = (Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch;
 					edgeRow[x] = fromColor ? fromColor : toColor;
-					_blendOpacity[(size_t)y * width + x] = (Uint8)level;
+					made.opacity[(size_t)y * width + x] = (Uint8)level;
 					fading = true;
 				}
 			}
 		}
 	}
-	drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
-	// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
-	// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
-	if (fading)
-	{
-		const SeeThroughSprite fadingPixels = { _blendOpacity.data(), 1.0f };
-		drawSprite(_blendEdge, anchorX, anchorY, world, depthBias, shade, scale, SpritePose::Standing, &fadingPixels);
-	}
+	made.fading = fading;
+	show(made);
 }
 
 /**

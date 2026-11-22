@@ -240,6 +240,9 @@ const float ProfileLyingRound = 0.8165f;
 /// An animal's face (see makeModel's colours): how many cells behind the foremost one on its line a cell still has
 /// the front drawing's colour (the same at the back).
 const int AnimalFaceDepth = 2 * VOXELSCALE;
+/// A tail drawn with the legs (see limb) is this far across to either side of the body's middle: a pixel and a half
+/// of the sprite in all.
+const float TailHalf = 0.75f * VOXELSCALE / PixelsAcross;
 /// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
 /// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
 /// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
@@ -1534,6 +1537,9 @@ void fillPits(std::vector<Uint8> &owner)
 /// Posed arms (see makeModel): what an arm's drawings make of it stays within this of its bones' skin: PosedShoulder
 /// at the shoulder, less along the arm, PosedHand at the hand.
 const float PosedShoulder = 2.0f * VOXELSCALE, PosedHand = 0.25f * VOXELSCALE;
+/// A posed arm whose hand is on an item and whose drawing ends this much lower than that hand holds the item up: the
+/// drawing's lower end is its elbow (the unit table's "arms: elbow", see makeModel).
+const float PosedElbowUnder = 2.0f * VOXELSCALE;
 const float FeetZone = 2.0f * VOXELSCALE, FootUnder = 1.0f * VOXELSCALE;
 const int FootReach = (int)(2.5f * VOXELSCALE * PixelsAcross);
 void continueFeet(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner)
@@ -2494,7 +2500,7 @@ void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cell
 /// middle); a tie goes as the row above went. (Every frontal run as deep as all the side runs together made four
 /// legs of two, seen from between the directions: the owner, "check old models so they dont have 4 legs from the
 /// side", "follow the contour of sprites".)
-std::vector<Uint8> limb(const PartFrames &part, int side)
+std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
 {
 	std::vector<Uint8> cells(GridCells, 0);
 	std::vector<std::pair<int, int>> pairsAbove;
@@ -2503,7 +2509,26 @@ std::vector<Uint8> limb(const PartFrames &part, int side)
 	{
 		const auto front = runs(part, Front, row);
 		if (front.empty()) { pairsAbove.clear(); continue; }
-		const auto profile = runs(part, side, row);
+		auto profile = runs(part, side, row);
+		// A tail drawn with the legs (the unit table's "tail: drawn" for the units it names): of the side drawing's runs
+		// in a row the widest is the legs', and the others are the tail's, a slice each behind the body's middle, TailHalf
+		// to either side. Taken for a second leg seen from the side, the tail had one of the two legs stand where it is,
+		// now the left one, now the right, row by row: both legs in pieces off the hips, which then went as pieces apart
+		// do (a player, GitHub issue #237, XPiratez's cat girls "amputees").
+		if (tailed && profile.size() > 1)
+		{
+			size_t widest = 0;
+			for (size_t run = 1; run < profile.size(); ++run)
+				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
+			for (size_t run = 0; run < profile.size(); ++run)
+			{
+				if (run == widest) continue;
+				float back, fore;
+				sideExtent(profile[run], profile[run], side, back, fore);
+				fillSlice(cells, row, 0.0f, TailHalf, (back + fore) * 0.5f, (fore - back) * 0.5f, &part);
+			}
+			profile.assign(1, std::pair<int, int>(profile[widest]));
+		}
 		const int frontCount = (int)front.size(), sideCount = (int)profile.size();
 		auto middleRight = [&](int run) { return (FloorX - (front[run].first + front[run].second + 1) * 0.5f) / PixelsAcross; };
 		auto halfRight = [&](int run) { return (front[run].second - front[run].first + 1) * 0.5f / PixelsAcross; };
@@ -3776,19 +3801,25 @@ constexpr float WreckSkinDepth = 1.5f * VOXELSCALE;
 /// lying: its corpse's inventory picture laid on the floor and given volume (or, without one, its corpse's picture on
 /// the map's floor). The owner: "deaths should not be like planks! The body should organically collapse like in
 /// sprites - and the death should be like a dead body sprite (in equipment menu - just voxelised to give volume!)".
-void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette, bool big, bool hull)
+void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette, bool big, bool hull,
+	bool animal = false)
 {
 	// The standing body's height and depth: the fall's shapes are as thick as it stood deep, and it lies as long as it
 	// stood tall (not much longer than its tile: it lies in the tile's middle, not through the walls round it).
-	float top = 0.0f, back = 1e9f, fore = -1e9f;
+	// (An animal, a unit the table names a beast or gives legs: as long as it was big. One longer or broader than tall,
+	// a spider, a dog, lies as long as that. As long as it stood tall, a spider twelve voxels long was a corpse of
+	// six: "some corpse items ... like spiders ... seem to MASSIVELY deflate on death", a player, GitHub issue #231.)
+	float top = 0.0f, back = 1e9f, fore = -1e9f, least[2] = { 1e9f, 1e9f }, most[2] = { -1e9f, -1e9f };
 	for (size_t k = 0; k < std::min(model.part.size(), model.addedFrom); ++k)
 	{
 		if (model.part[k] == VoxelUnitModel::Item) continue;
 		top = std::max(top, model.up[k]);
+		least[0] = std::min(least[0], model.right[k]); most[0] = std::max(most[0], model.right[k]);
+		least[1] = std::min(least[1], model.ahead[k]); most[1] = std::max(most[1], model.ahead[k]);
 		if (model.part[k] == VoxelUnitModel::Torso) { back = std::min(back, model.ahead[k]); fore = std::max(fore, model.ahead[k]); }
 	}
 	const float halfMost = std::clamp((fore - back) * 0.5f, 1.5f * VOXELSCALE, 3.5f * VOXELSCALE);
-	const float length = std::min(top, LyingLongest * VOXELSCALE);
+	const float length = std::min(animal ? std::max({ top, most[0] - least[0], most[1] - least[1] }) : top, LyingLongest * VOXELSCALE);
 	// How tall a frame's picture stands, of the standing height.
 	auto tallOf = [&](const std::vector<Uint8> &death) {
 		int topRow = FrameSize;
@@ -4519,6 +4550,181 @@ static void standTank(VoxelUnitModel &model, std::vector<Uint8> &owner, float hu
 	if (noneAdded) model.addedFrom = model.part.size();
 }
 
+/// A creature on thin legs spread all round it, a spider (the unit table's "legs: N" for the units it names; a player,
+/// GitHub issue #231, of spiders: "still have no legs"). Its drawings show legs a pixel thin, each drawn where the
+/// artist had room for it: cut by the eight outlines nothing of them is left, and what is left of the body is whatever
+/// the legs' pixels let stand. So its body is made from the thick part of its drawings alone (see thickPart), and its
+/// legs are made anew (see spreadLegs): N of them round the body, as far out, as high at the knee and as thick as the
+/// front and side drawings show them, painted as the front drawing's legs are.
+/// LegThin: a drawing's thick part is what a square this many pixels a side fits into (the rest is thin: legs,
+/// feelers). LegRadius: half a leg's thickness, a sprite's pixel through. LegFeet: a foot is looked for in the outer
+/// part of the legs' reach, from this share of it on (nearer the body the front pair's feet are drawn, lower than they
+/// stand: they are nearer the eye).
+constexpr int LegThin = 2 * VOXELSCALE;
+constexpr float LegRadius = 0.38f * VOXELSCALE, LegFeet = 0.7f;
+PartFrames thickPart(const PartFrames &part)
+{
+	PartFrames thick;
+	thick.any = part.any;
+	for (int d = 0; d < 8; ++d)
+	{
+		thick.frame[d].assign((size_t)FrameSize * FrameSize, 0);
+		for (int row = 0; row + LegThin <= FrameSize; ++row)
+			for (int column = 0; column + LegThin <= FrameSize; ++column)
+			{
+				bool full = true;
+				for (int dy = 0; dy < LegThin && full; ++dy)
+					for (int dx = 0; dx < LegThin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
+				if (!full) continue;
+				for (int dy = 0; dy < LegThin; ++dy)
+					for (int dx = 0; dx < LegThin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
+			}
+	}
+	return thick;
+}
+
+/// The legs of a creature on thin legs (see thickPart): `perSide` of them on each side of the body made so far, spread
+/// evenly from ahead round to behind. What the drawings show of the legs beside the body is read off the front drawing
+/// (how far out they reach, how high and how far out the knee is, where they leave the body, their colours) and off
+/// the right side's (how far ahead and behind they reach); each leg is two round bars, hip to knee to foot, its foot
+/// on the floor. Nothing is added to a body whose front drawing has nothing thin beside it.
+/// @param part The unit's drawings.
+/// @param thick Their thick part (the body's).
+/// @param perSide How many legs a side.
+/// @param code The part the legs' cells are.
+/// @param owner The body's cells: the legs' are added.
+void spreadLegs(const PartFrames &part, const PartFrames &thick, int perSide, Uint8 code, std::vector<Uint8> &owner)
+{
+	// the body as made: its middle, how broad, long and tall it is
+	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
+	double sums[2] = {};
+	int count = 0;
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up)
+			{
+				if (!owner[cellIndex(across, along, up)]) continue;
+				const float at[3] = { cellRight(across), cellAhead(along), cellUp(up) };
+				for (int i = 0; i < 3; ++i) { low[i] = std::min(low[i], at[i]); high[i] = std::max(high[i], at[i]); }
+				sums[0] += at[0]; sums[1] += at[1];
+				++count;
+			}
+	if (count == 0 || perSide < 1) return;
+	const float middle[2] = { (float)(sums[0] / count), (float)(sums[1] / count) };
+	// A drawing's thin pixels beside its thick part: how far out they reach to its left and its right (pixels from the
+	// thick part's middle column), the knee (their top rows: its row, and how far out it is), the feet's row (the
+	// lowest of the outer ones), the row they leave the body at.
+	struct Reading { bool any = false; int left = 0, right = 0; float middle = 0.0f, reach[2] = {}, kneeRow = 0.0f, kneeOut = 0.0f, footRow = 0.0f, hipRow = 0.0f; };
+	auto thin = [&](int d, int column, int row) { return part.frame[d][row * FrameSize + column] && !thick.frame[d][row * FrameSize + column]; };
+	auto read = [&](int d)
+	{
+		Reading reading;
+		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+			{
+				if (!thick.frame[d][row * FrameSize + column]) continue;
+				left = std::min(left, column); right = std::max(right, column);
+				top = std::min(top, row); bottom = std::max(bottom, row);
+			}
+		if (right < 0) return reading;
+		reading.left = left; reading.right = right;
+		reading.middle = (left + right + 1) * 0.5f;
+		int kneeRow = FrameSize;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+			{
+				// (before or behind the body, whose leg a pixel is can't be told)
+				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
+				float &reach = reading.reach[column < left ? 0 : 1];
+				reach = std::max(reach, std::abs(column + 0.5f - reading.middle));
+				kneeRow = std::min(kneeRow, row);
+				reading.any = true;
+			}
+		if (!reading.any) return reading;
+		float outSum = 0.0f, hipSum = 0.0f;
+		int outCount = 0, hipCount = 0, footRow = -1;
+		for (int row = 0; row < FrameSize; ++row)
+			for (int column = 0; column < FrameSize; ++column)
+			{
+				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
+				const float out = std::abs(column + 0.5f - reading.middle);
+				if (row < kneeRow + LegThin) { outSum += out; ++outCount; }
+				if (out >= LegFeet * reading.reach[column < left ? 0 : 1]) footRow = std::max(footRow, row);
+				if (column >= left - LegThin && column <= right + LegThin) { hipSum += row + 0.5f; ++hipCount; }
+			}
+		reading.kneeRow = (float)kneeRow;
+		reading.kneeOut = outSum / std::max(outCount, 1);
+		reading.footRow = (float)(footRow + 1);
+		reading.hipRow = hipCount ? hipSum / hipCount : (top + bottom + 1) * 0.5f;
+		return reading;
+	};
+	const Reading front = read(Front), side = read(RightSide);
+	if (!front.any) return;
+	// (in the body's own measures: a pixel across a drawing is 1 / PixelsAcross of them, a row is one)
+	const float reachAcross = std::max(front.reach[0], front.reach[1]) / PixelsAcross;
+	const float reachAhead = side.any && side.reach[1] > 0.0f ? side.reach[1] / PixelsAcross : reachAcross;
+	const float reachBehind = side.any && side.reach[0] > 0.0f ? side.reach[0] / PixelsAcross : reachAcross;
+	const float kneeUp = std::max(2.0f * LegRadius, front.footRow - front.kneeRow - LegRadius);
+	const float kneeShare = std::clamp(front.kneeOut / PixelsAcross / std::max(reachAcross, 0.01f), 0.25f, 0.8f);
+	const float hipUp = std::clamp(front.footRow - front.hipRow, std::max(low[2], LegRadius), std::max(high[2], LegRadius));
+	// the legs' colours: the front drawing's thin pixels beside the body, and the commonest of them
+	int seen[256] = {};
+	for (int row = 0; row < FrameSize; ++row)
+		for (int column = 0; column < FrameSize; ++column)
+			if ((column < front.left || column > front.right) && thin(Front, column, row)) ++seen[part.frame[Front][row * FrameSize + column]];
+	const Uint8 commonest = (Uint8)(std::max_element(seen + 1, seen + 256) - seen);
+	auto colourAt = [&](float share, float up, int sideSign) -> Uint8
+	{
+		// (the front drawing has the unit's right on its left)
+		const float reach = front.reach[sideSign > 0 ? 0 : 1] > 0.0f ? front.reach[sideSign > 0 ? 0 : 1] : std::max(front.reach[0], front.reach[1]);
+		const int column = (int)std::floor(front.middle - sideSign * share * reach), row = (int)std::floor(front.footRow - up);
+		for (int ring = 0; ring <= 2 * LegThin; ++ring)
+			for (int dy = -ring; dy <= ring; ++dy)
+				for (int dx = -ring; dx <= ring; ++dx)
+				{
+					if (std::max(std::abs(dx), std::abs(dy)) != ring) continue;
+					const int c = column + dx, r = row + dy;
+					if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || (c >= front.left && c <= front.right) || !thin(Front, c, r)) continue;
+					return part.frame[Front][r * FrameSize + c];
+				}
+		return commonest;
+	};
+	// (the angles: evenly from ahead round to behind; the legs reach as far to the side, ahead and behind as drawn)
+	float mostSine = 0.0f, mostCosine = 0.0f;
+	for (int leg = 0; leg < perSide; ++leg)
+	{
+		const float angle = (float)(Pi * (leg + 0.5) / perSide);
+		mostSine = std::max(mostSine, std::sin(angle));
+		mostCosine = std::max(mostCosine, std::abs(std::cos(angle)));
+	}
+	std::vector<Uint8> cells(GridCells, 0);
+	const bool painted = (int)Painted.size() == GridCells;
+	for (int sideSign = -1; sideSign <= 1; sideSign += 2)
+	{
+		for (int leg = 0; leg < perSide; ++leg)
+		{
+			const float angle = (float)(Pi * (leg + 0.5) / perSide), sine = std::sin(angle), cosine = std::cos(angle);
+			const float out = reachAcross / mostSine * sine, along = (cosine >= 0.0f ? reachAhead : reachBehind) / std::max(mostCosine, 0.3f) * cosine;
+			const float hip[3] = { middle[0] + sideSign * (high[0] - low[0]) * 0.25f * sine, middle[1] + (high[1] - low[1]) * 0.25f * cosine, hipUp };
+			const float foot[3] = { middle[0] + sideSign * out, middle[1] + along, LegRadius };
+			const float knee[3] = { middle[0] + sideSign * out * kneeShare, middle[1] + along * kneeShare, kneeUp };
+			std::fill(cells.begin(), cells.end(), (Uint8)0);
+			fillCapsule(cells, hip, knee, LegRadius);
+			fillCapsule(cells, knee, foot, LegRadius);
+			const float far = std::max(planeLength(foot[0] - middle[0], foot[1] - middle[1]), 0.01f);
+			for (int cell = 0; cell < GridCells; ++cell)
+			{
+				if (!cells[cell] || owner[cell] || cellUp(cell % GridUp) < 0.0f) continue;
+				owner[cell] = code;
+				if (!painted) continue;
+				const float right = cellRight(cell / (GridUp * GridAlong)), ahead = cellAhead((cell / GridUp) % GridAlong);
+				Painted[cell] = colourAt(std::min(1.0f, planeLength(right - middle[0], ahead - middle[1]) / far), cellUp(cell % GridUp), sideSign);
+			}
+		}
+	}
+}
+
 std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 	const SDL_Color *palette)
@@ -4551,7 +4757,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
-	const bool beast = routine.whole && !routine.big && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
+	// (A creature on thin legs spread round it, the unit table's "legs: N": how many a side; see spreadLegs. No long
+	// body, whatever else the table calls it.)
+	const int legsASide = routine.whole && !turret && !tank ? (routine.traits >> 4) & 7 : 0;
+	const bool beast = routine.whole && !routine.big && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
 	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 	float beastLegsTop = 0.0f;
 	std::vector<int> onTop[8], solidOnTop[8];
@@ -4584,6 +4793,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// (with one body for every side, see OneBody, no view's pieces show that detail: it stays in the shape, a
 		// Cacodemon's horns with it)
 		if (routine.big && !OneBody) keepSolid(solid);
+		// (a creature on thin legs: its body is its drawings' thick part; its legs are made after, see spreadLegs)
+		if (legsASide) solid = thickPart(solid);
 		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
 		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 		// agree, and a strict hull of them lost its shell and horns)
@@ -4800,6 +5011,20 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			std::copy(arm.shoulder, arm.shoulder + 3, shoulder);
 			std::copy(arm.hand, arm.hand + 3, hand);
 			placeElbow(shoulder, hand, bone, frames, elbow);
+			// (Posed arms, see below, with the unit table's "arms: elbow" for the units it names: a hand that holds its
+			// item up, the arm's drawing ending well below it, PosedElbowUnder. The drawing's lower end is the elbow then,
+			// no further ahead than the shoulder (the drawing's last row from the side is the forearm's, its middle ahead
+			// of the elbow), the upper arm down to it and the forearm up to the item, each as long as that makes it. Two
+			// bones of one length from the shoulder to a hand so near it fold far out, and the drawings, in which the arm
+			// goes down, don't say which way: out behind the back, "arm is at awkward, tense angle (elbow behind back)
+			// ... for that gun position, elbow should be facing almost straight down, with forearm up to hold gun", a
+			// player, GitHub issue #240.)
+			float drawnEnd[3];
+			if ((routine.arms & 24) == 24 && arm.holds && armEnd(parts[arm.part], arm.right, false, drawnEnd) && drawnEnd[2] < hand[2] - PosedElbowUnder && drawnEnd[2] < shoulder[2])
+			{
+				std::copy(drawnEnd, drawnEnd + 3, elbow);
+				elbow[1] = std::min(elbow[1], shoulder[1]);
+			}
 			armRadii(frames, shoulder, elbow, hand, radius);
 			// Arms outside the body (the unit table's "arms: outside", for the units it names): a body drawn in a robe
 			// is carved as wide as the robe, and the arms its drawings lay over the robe's sides were inside it, flat
@@ -4837,7 +5062,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	{
 		if (!parts[p].any || tank) continue;
 		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
-		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide);
+		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, PartCodes[p] == VoxelUnitModel::Legs && (routine.traits & 4));
 		// (cut by the front and back drawings alone: see Cardinals)
 		// (A limb drawn as a part of its own is still cut by all eight of its drawings, two of them forgiven: an arm
 		// laid across the chest on a weapon is a bar slanting through the body, and its front and side drawings alone
@@ -4958,12 +5183,14 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// its feet along the floor as its side drawings have them, see continueFeet, and its skin's pits are filled;
 	// after the loose cells and the pieces apart went, which took a thin shin and all below it; not a thin thing, a
 	// bat: its wings went on down as curtains)
-	if (routine.whole && !routine.big && !beast && !tank && !turret && !thinDrawing(parts[0]))
+	if (routine.whole && !routine.big && !beast && !tank && !turret && !legsASide && !thinDrawing(parts[0]))
 	{
 		continueLimbs(parts[0], PartCodes[0], owner);
 		continueFeet(parts[0], PartCodes[0], owner);
 		fillPits(owner);
 	}
+	// (the legs of a creature on thin legs, round the body its drawings' thick part left: see spreadLegs)
+	if (legsASide) spreadLegs(parts[0], thickPart(parts[0]), legsASide, PartCodes[0], owner);
 
 	// The waist: each part's shape narrows to nothing at its ends, and where the torso's lowest rows met the legs' highest
 	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
@@ -5336,7 +5563,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// don't shade it alike nor lie on one solid: a civilian's white shirt was blotched with its arms' skin and
 		// shadow, its shorts with its hands, its face a plain patch; a Celatid was striped, a Silacoid speckled. The
 		// owner, of the civilian: "something is very wrong with this model and its colors".)
-		const bool hull = turret || beast || tank || (routine.whole && routine.big && !fourSided);
+		// (and a body on one frame the unit table names "paint: hull": a small saucer is no standing figure with a front
+		// and a back, and painted as one it had its drawings' lowest rows, a visor in its rim, under it: "the blue paint
+		// on the underside, when it should be a frontal visor", a player, GitHub issue #236)
+		const bool hull = turret || beast || tank || (routine.whole && routine.big && !fourSided) || (routine.whole && (routine.traits & 8));
 		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
 		std::vector<int> foremost, rearmost;
 		if (beast && routine.beast)
@@ -5455,6 +5685,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			}
 			// (a cell made for a pixel it doesn't stand behind, a toe, a shoe: that pixel's colour)
 			if ((facing || routine.standard) && (int)Painted.size() == GridCells) colour = Painted[cell];
+			// (a leg made anew, see spreadLegs: the colour it was given)
+			else if (legsASide && (int)Painted.size() == GridCells && Painted[cell]) colour = Painted[cell];
 			if (facing && !colour && !facesUp)
 			{
 				// (the front, back and side drawings first, the one it is turned to most; the quarter drawings where none
@@ -5600,7 +5832,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
 	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
-	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
+	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull, routine.beast || legsASide);
 	return model;
 }
 

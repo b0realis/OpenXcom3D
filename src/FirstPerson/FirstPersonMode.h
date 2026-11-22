@@ -376,6 +376,8 @@ private:
 	void applyGodMode();
 	/// Doom IDCLIP: does this soldier walk and float through anything in 3D right now?
 	bool noclipOn(const BattleUnit *unit) const;
+	/// Doom IDCLIP: is there room for a unit at a place (every tile it would stand on is on the map and free of other units)?
+	bool noclipRoom(const BattleUnit *unit, const Position &target) const;
 	/// Doom IDCLIP: moves the soldier straight to a tile, through whatever is in the way.
 	bool noclipMove(BattleUnit *unit, const Position &target, bool across);
 	/// Doom IDCLIP: leaves out of the picture the parts the eye is inside.

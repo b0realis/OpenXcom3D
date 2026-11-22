@@ -117,8 +117,6 @@ FirstPersonView::~FirstPersonView()
 	delete _spriteBuffer;
 	for (Surface *frame : _composedFrames) delete frame;
 	delete _itemPicture;
-	for (Surface *buffer : _blendBuffers) delete buffer;
-	delete _blendEdge;
 	for (auto &entry : _softSmoke) delete entry.second.colors;
 	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
@@ -688,6 +686,24 @@ void FirstPersonView::beginFrame()
 		_flashlightPos[axis] = _dynamicFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
 			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 	}
+	// Setting "Flashlight": Far light. Its light stands where the crosshair's line first meets the world (terrain, as the
+	// view draws it), AimLightOff voxels this side of it, however far that is: found anew every frame. (And
+	// AimLightLift off a floor or a ceiling the line meets at a slant: a light a voxel above the ground the line skims
+	// lights next to nothing of it.)
+	_aimLight = 0;
+	if (_flashlight && _dynamicFlashlight && Options::fpsFlashlightReach == 1)
+	{
+		const float from[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
+		const float direction[3] = { (float)_forwardInVoxels[0], (float)_forwardInVoxels[1], (float)_forwardInVoxels[2] };
+		float surface[3];
+		_aimLight = 2;
+		if (visibleSurfaceAlong(from, direction, AimLightFarthest, surface))
+		{
+			for (int axis = 0; axis < 3; ++axis) _flashlightPos[axis] = surface[axis] - direction[axis] * AimLightOff;
+			if (std::abs(direction[2]) > 0.05f) _flashlightPos[2] += direction[2] < 0.0f ? AimLightLift : -AimLightLift;
+			_aimLight = 1;
+		}
+	}
 	// A chain of explosions settled at once (setting "Instant chain explosions"): its fireballs
 	// showing now, and the tiles its ripple hasn't passed over yet, as they were (see
 	// FirstPersonChains.cpp).
@@ -747,6 +763,7 @@ void FirstPersonView::drawPass()
 	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 	std::fill(_smokeVeil.begin(), _smokeVeil.end(), (Uint8)0);
 	std::fill(_ownColours.begin(), _ownColours.end(), (Uint8)0);
+	_blendedCount = 0;
 	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);

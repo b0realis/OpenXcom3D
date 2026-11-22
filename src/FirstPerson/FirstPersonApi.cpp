@@ -1256,6 +1256,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
 	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
+	// The flashlight: 0 a beam from the weapon, a spot on the crosshair that fades with the distance; 1 a light where
+	// the crosshair's line meets the world, the same at any range (a player's request, GitHub issue #232, after an
+	// old shooter's flashlight: "it makes the flashlight usable at virtually any distance").
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightReach", &fpsFlashlightReach, 0, "STR_FPS_FLASHLIGHT", category));
 	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 	// setting for players whom flashing light bothers).

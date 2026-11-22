@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d8660da19
+index 000000000..544daf6fa
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,683 @@
+@@ -0,0 +1,687 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -536,6 +536,10 @@ index 000000000..d8660da19
 +  STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
 +  STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
++  STR_FPS_FLASHLIGHT: "Flashlight"
++  STR_FPS_FLASHLIGHT_DESC: "Beam: a spot from your weapon that fades with range. Far light: a light where you aim, as bright at any range."
++  STR_FPS_FLASHLIGHT_BEAM: "Beam"
++  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -813,10 +817,10 @@ index 000000000..d8660da19
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..0b4bb1da2
+index 000000000..10c25dbc9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,683 @@
+@@ -0,0 +1,687 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1225,6 +1229,10 @@ index 000000000..0b4bb1da2
 +  STR_FPS_EYE_LOWER_DESC: "Lowers the 3D camera, in voxels. The soldier's sight is unchanged."
 +  STR_FPS_MUZZLE_FLASH: "Muzzle flashes"
 +  STR_FPS_MUZZLE_FLASH_DESC: "Flashes from gunfire, hits and blasts. Off if flashes bother you."
++  STR_FPS_FLASHLIGHT: "Flashlight"
++  STR_FPS_FLASHLIGHT_DESC: "Beam: a spot from your weapon that fades with range. Far light: a light where you aim, as bright at any range."
++  STR_FPS_FLASHLIGHT_BEAM: "Beam"
++  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colors blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -1502,10 +1510,10 @@ index 000000000..0b4bb1da2
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..6d2a8a15d
+index 000000000..68c0f3a6f
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,302 @@
+@@ -0,0 +1,331 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1599,7 +1607,8 @@ index 000000000..6d2a8a15d
 +    # XPiratez: Mars (Cydonia, Labyrinthus Noctis), the Moon (Moonberia), the orbital stations,
 +    # the space freighter, the sea floor, the Shadowlands (the Diablo catacombs, the City of the
 +    # Dead, the Nightosphere, the Styx, the VR simulations); X-Com Files: Cydonia, the Moon (its
-+    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal
++    # STR_SPACE), the sea floor (a battle it keeps dry), the dreamscape, beyond the Doom portal; the 40k mod: its
++    # ships in deep space
 +    - sky: mars
 +      enviroEffects: [STR_ENVIRO_MARS, STR_ENVIRO_CYDONIA, STR_ENVIRO_CYDONIA_SURFACE, STR_ENVIRO_CYDONIA_2, STR_ENVIRO_CYDONIA_3, STR_ENVIRO_LABYRINTHUS_NOCTIS, STR_CYDONIA]
 +    - sky: moon
@@ -1607,7 +1616,7 @@ index 000000000..6d2a8a15d
 +    - sky: orbit
 +      enviroEffects: [STR_ENVIRO_SPACE]
 +    - sky: space
-+      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER]
++      enviroEffects: [STR_ENVIRO_SPACE_FREIGHTER, STR_DEEPSPACE_ENVIRO]
 +    - sky: sea
 +      enviroEffects: [STR_ENVIRO_SEA, STR_UNDERWATER_GEAR, STR_UNDERWATER_GEAR_HARD, STR_UNDERWATER_GEAR_SEVERE, STR_UNDERWATER_GEAR_EXTREME]
 +    - sky: void
@@ -1727,11 +1736,22 @@ index 000000000..6d2a8a15d
 +  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length),
 +  #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
 +  #           on a shirt), posed (an arm is where its bones are, shoulder to the hand on what it holds; what its
-+  #           drawings add away from them, a second forearm, is left out)
++  #           drawings add away from them, a second forearm, is left out), elbow (with posed: an arm that holds its
++  #           item up, its drawing ending well below its hand, has its elbow there: the upper arm down, the forearm up
++  #           to the item)
 +  #   head: face (only what of the head is turned to the front is painted by the front drawing; its sides, back and
 +  #           top by the back drawing: hair, a helmet), or drawn (as ever)
 +  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show), or
 +  #           drawn (as ever: as broad as its frontal drawings)
++  #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
++  #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
++  #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
++  #           artist had room, and the eight drawings together leave none of them: the body is made from the thick
++  #           part of its drawings, and the legs are made anew, as far out, as high at the knee and as thick as the
++  #           front and side drawings show them; 0: as ever. A unit drawn on one frame only
++  #   paint: hull (a body drawn on one frame is painted as a vehicle's hull is, each cube by the drawing that looks
++  #           onto it most squarely: a small saucer's rim keeps what is drawn low on its front and back), or figure
++  #           (as ever: by its front and back drawings, as a standing figure)
 +  #   humanoid: standard (a person: its body, made from its drawings, is made again as a humanoid is built: an egg
 +  #           of a head on a neck, sloping shoulders, a waist, round arms and legs, feet that point ahead; sizes and
 +  #           pose stay its drawings'; only a unit that walks on two legs), or drawn (as ever: as its drawings alone
@@ -1748,10 +1768,14 @@ index 000000000..6d2a8a15d
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
 +    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
 +      seeThrough: 50
-+    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too)
++    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too);
++    # dead, an animal lies as long as it was long, not as it stood tall
 +    - names: [DOG, DOGE, DOGG, "*DOG", "*DOGE", HOUND, "*HOUND", WOLF, CAT, RAT, GIANTRAT, PIG, BOAR, SHEEP, COW, HORSE, GOAT, FOX, DEER,
 +              BEAR, LION, TIGER, PANTHER, LIZARD, CHUPACABRA, MAGGOT, SPIDER, "*SPIDER", SCORPION, "*SCORPION", BEETLE, BAN_6.PCK]
 +      shape: beast
++    # the spiders (XPiratez's and The X-Com Files' giant spiders and their queens): a body on eight thin legs
++    - names: [SPIDER, "*SPIDER"]
++      legs: 8
 +    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
 +    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
 +    # on the crown, painted along the slant)
@@ -1759,16 +1783,24 @@ index 000000000..6d2a8a15d
 +      torsoDepth: 80
 +      top: back
 +      sculpt: frontal
++    # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
++    # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
++    # drawings
++    - names: [GNOME]
++      sculpt: all
++    # XPiratez's cat girls (sheets XNEKO_n): their tails are drawn in their legs' frames
++    - names: [XNEKO]
++      tail: drawn
 +    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
 +    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
 +    - names: [BAT, SHADOWBAT]
 +      animation: sprite
 +    # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
 +    # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
-+    # is where its bones are (a pistol held out, and no second forearm left at the hip); the head is a face on hair or
-+    # a helmet (no skin on the crown)
++    # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
++    # that holds a gun up at the chest; the head is a face on hair or a helmet (no skin on the crown)
 +    - names: [HUMAN]
-+      arms: own posed
++      arms: own posed elbow
 +      head: face
 +    # Deep Ones (TFTD's and The X-Com Files'): arms on their bones, as above
 +    - names: [DEEPONE, DEEP_ONE.PCK]
@@ -1779,11 +1811,16 @@ index 000000000..6d2a8a15d
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
 +      sculpt: sides
-+    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it); TFTD's
-+    # Hallucinoid, a jellyfish's bell
++    # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it: a low dome
++    # each, still a bulge); TFTD's Hallucinoid, a jellyfish's bell; XPiratez's Academy drone, a small saucer with a
++    # visor in its rim (painted as a hull: the visor on its front, not under it)
 +    - names: [CYBERDISC]
-+      flat: 35
++      flat: 50
++      flatUnder: 60
++    - names: [ADRONE]
++      flat: 60
 +      flatUnder: 50
++      paint: hull
 +    - names: [HALLUCINOID]
 +      flat: 70
 +    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
@@ -22982,7 +23019,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..3f3c1cf1d 100644
+index a08796ced..1dffdd1d8 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23000,7 +23037,7 @@ index a08796ced..3f3c1cf1d 100644
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
 +OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
-+OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
++OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem;
@@ -24050,10 +24087,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..e1b4691a1
+index 000000000..6c9901861
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2010 @@
+@@ -0,0 +1,2014 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25312,6 +25349,10 @@ index 000000000..e1b4691a1
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
 +	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
++	// The flashlight: 0 a beam from the weapon, a spot on the crosshair that fades with the distance; 1 a light where
++	// the crosshair's line meets the world, the same at any range (a player's request, GitHub issue #232, after an
++	// old shooter's flashlight: "it makes the flashlight usable at virtually any distance").
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlashlightReach", &fpsFlashlightReach, 0, "STR_FPS_FLASHLIGHT", category));
 +	// A unit hit, standing or down, flashes for a moment (the owner, on GitHub issue #74: its own
 +	// setting); off, it only flinches. "Muzzle flashes" off turns it off too (every flash: the
 +	// setting for players whom flashing light bothers).
@@ -28157,10 +28198,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..796b25f48
+index 000000000..85e18c005
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3839 @@
+@@ -0,0 +1,3841 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28660,6 +28701,8 @@ index 000000000..796b25f48
 +	number("UnexploredMistTo", UnexploredMistTo);
 +	number("UnexploredMistMax", UnexploredMistMax);
 +	number("FlareReach", FlareReach);
++	number("AimLightReach", AimLightReach);
++	number("AimLightPower", AimLightPower);
 +	whole("AnimatedNearShades", AnimatedNearShades);
 +	number("UfoInsideTint", UfoInsideTint);
 +	number("UfoInsideTintNight", UfoInsideTintNight);
@@ -32545,10 +32588,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..28d453d86
+index 000000000..f444305e5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3211 @@
+@@ -0,0 +1,3245 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32983,7 +33026,7 @@ index 000000000..28d453d86
 +uniform float uWaveSteps[18]; // this frame's wave trains (FirstPersonView::_waveSteps)
 +uniform vec4 uLamps[16];      // the lamps nearby: position, strength
 +uniform int uLampCount;
-+uniform int uFlashlight;      // 0 off, 1 the shoulder flashlight, 2 the dynamic one
++uniform int uFlashlight;      // 0 off, 1 the shoulder flashlight, 2 the dynamic one, 3 a light where the crosshair's line meets the world (setting "Flashlight": Far light)
 +uniform vec3 uFlashlightPos, uForwardInVoxels;
 +uniform vec4 uFlares[8];      // the flares' lights: position, fade
 +uniform float uFlareFlicker[8];
@@ -33254,8 +33297,24 @@ index 000000000..28d453d86
 +		}
 +		light += lit - dark;
 +	}
-+	// The flashlight: the dynamic one a tight spot on the crosshair, the shoulder one a cone.
-+	if (uFlashlight == 2)
++	// The flashlight: the dynamic one a tight spot on the crosshair, the shoulder one a cone; the far light a light
++	// standing where the crosshair's line meets the world (FirstPersonView::pointLight has the same).
++	if (uFlashlight == 3)
++	{
++		vec3 fromLight = point - uFlashlightPos;
++		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
++		if (span < AimLightReach)
++		{
++			float closeness = 1.0 - span / AimLightReach;
++			float facing = span > 0.5 ? -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span : 1.0;
++			float power = closeness * closeness * AimLightPower * (0.4 + 0.6 * max(0.0, facing));
++			if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
++			{
++				light += power;
++			}
++		}
++	}
++	else if (uFlashlight == 2)
 +	{
 +		float range = 16.0 * 20.0;
 +		vec3 fromLight = point - uFlashlightPos;
@@ -34497,9 +34556,9 @@ index 000000000..28d453d86
 +		float thick = uShaftAir + (uShaftSmoke != 0 ? smokeAt(at) * ShaftSmoke : 0.0);
 +		if (thick <= 0.0) continue;
 +		vec3 light = vec3(0.0);
-+		if (uFlashlight != 0)
++		if (uFlashlight == 1 || uFlashlight == 2)
 +		{
-+			// (The flashlight's cone, as pointLight has it.)
++			// (The flashlight's cone, as pointLight has it. The far light has none: it stands where it lights.)
 +			float range = uFlashlight == 2 ? 16.0 * 20.0 : 16.0 * 14.0;
 +			vec3 fromLight = at - uFlashlightPos;
 +			float away = length(fromLight);
@@ -35085,7 +35144,7 @@ index 000000000..28d453d86
 +uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 +layout(location = 0) out uint outColor;
 +layout(location = 1) out float outDepth;
-+layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
++layout(location = 2) out uint outGlow;  // the glow (1, 3), 16 where something solid was drawn over the ray's pixel, 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
 +layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 +
 +const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -35165,8 +35224,13 @@ index 000000000..28d453d86
 +	float depth = texelFetch(uRayDepth, from, 0).r;
 +	int veil = 255, smokeVeil = 0;
 +	uint own = 0u, mark = 0u, lastSolid = 0u, lastPile = 0u; // (mark: a hitbox's outline or line shows there, night vision leaves its colour)
++	// Whether something solid was drawn over the ray's own pixel (a unit, a body, an item, a line, a dot): the ray's full
++	// colour and the light in its air are then not this pixel's, whatever its palette colour and whatever smoke lies over
++	// it (see PresentSource). A player, GitHub issues #242 and #243.
++	uint covered = 0u;
 +	if (uContinue != 0)
 +	{
++		covered = (glow >> 4) & 1u;
 +		uvec4 notes = texelFetch(uNotes, pixel, 0);
 +		veil = int(notes.r & 255u);
 +		mark = (notes.r >> 8) & 1u;
@@ -35202,6 +35266,7 @@ index 000000000..28d453d86
 +			color = outlineColor;
 +			glow = uint(uOutlineGlows);
 +			mark = 1u;
++			covered = 1u;
 +		}
 +	}
 +	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
@@ -35309,6 +35374,7 @@ index 000000000..28d453d86
 +			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 +			own = ownColours;
 +			mark = 0u;
++			covered = 1u;
 +			lastSolid = uint(number + 1);
 +		}
 +		else if (kind == EffectBody)
@@ -35325,6 +35391,7 @@ index 000000000..28d453d86
 +			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 +			own = 1u;
 +			mark = 0u;
++			covered = 1u;
 +			lastSolid = uint(number + 1);
 +			if ((flags & 8) != 0) lastPile = uint(number + 1);
 +		}
@@ -35396,6 +35463,7 @@ index 000000000..28d453d86
 +			}
 +			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
 +			color = uint(head.z);
++			covered = 1u;
 +			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
 +			if ((flags & 16) != 0) mark = 1u;
 +		}
@@ -35408,6 +35476,7 @@ index 000000000..28d453d86
 +			float threshold = dither(pixel.x, pixel.y);
 +			if (t2.w > threshold) continue; // (faded into the haze)
 +			color = t2.z < 0.0 || threshold < t2.z ? uint(head.z) : uint(t2.y);
++			covered = 1u;
 +			if ((flags & 1) != 0) glow = 1u;
 +			else if ((flags & 2) != 0) glow = 0u;
 +		}
@@ -35422,6 +35491,7 @@ index 000000000..28d453d86
 +				float along = length((vec2(pixel) + vec2(0.5) - t2.xy) / vec2(t2.z, t2.z * 1.5));
 +				if (along > 1.0 || head.w >= depth + t2.w || (along > 0.6 && dither(pixel.x, pixel.y) < (along - 0.6) * 2.5)) continue;
 +				color = along < 0.4 ? uint(t3.x) : uint(head.z);
++				covered = 1u;
 +				if (along < 0.4 && (flags & 1) != 0) glow = 1u;
 +				continue;
 +			}
@@ -35430,10 +35500,11 @@ index 000000000..28d453d86
 +			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
 +			if ((flags & 4) != 0)
 +			{
-+				if (fromCentre > t2.z - 1.0) color = uint(head.z);
++				if (fromCentre > t2.z - 1.0) { color = uint(head.z); covered = 1u; }
 +				continue;
 +			}
 +			color = fromCentre < t2.z * t3.z ? uint(t3.x) : fromCentre < t2.z * t3.w ? uint(t3.y) : uint(head.z);
++			covered = 1u;
 +			if ((flags & 1) != 0) glow = 1u;
 +		}
 +		else if (kind == EffectQuad)
@@ -35455,11 +35526,12 @@ index 000000000..28d453d86
 +			if (float(pixel.x) < ceil(leftX - 0.5) || float(pixel.x) > floor(rightX - 0.5) || head.w >= depth) continue;
 +			color = uint(head.z);
 +			depth = head.w;
++			covered = 1u;
 +		}
 +	}
 +	outColor = color;
 +	outDepth = depth;
-+	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
++	outGlow = glow | (covered << 4) | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
 +	outNotes = uvec4(uint(veil) | (mark << 8), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 +}
 +)";
@@ -35637,7 +35709,7 @@ index 000000000..28d453d86
 + * found in the air there (as FirstPersonMode::blit puts the full-colour picture together).
 + */
 +const char *const PresentSource = R"(
-+uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 64: smoke over the pixel), the overlay, the rays' own palette colours
++uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 16: something solid drawn over the ray's pixel; 64: smoke over it), the overlay, the rays' own palette colours
 +uniform sampler2D uRayTrue, uPalette;                  // the rays' full colours; the palette, a texel a colour
 +uniform int uFull, uShafts;                            // 1: in full colour; 1: with light in the air
 +uniform usampler2D uFlameTint;                         // each colour in the flames' orange light
@@ -35667,11 +35739,15 @@ index 000000000..28d453d86
 +	vec3 shown = paletteColor(made);
 +	if (uFull != 0)
 +	{
-+		uint ray = texelFetch(uRayColor, pixel, 0).r;
++		// (A pixel that still has its ray's palette colour shows the ray's full one, and smoke over the ray's own pixel the
++		// light in its air; not where something solid was drawn over the ray, bit 16 of the glow. A body the colour of the
++		// ground behind it took the ground's light, through night vision its green, in patches; and a unit in lit smoke
++		// took the light of the wall behind it and stood there as a ghost. A player, GitHub issues #242 and #243.)
++		uint ray = texelFetch(uRayColor, pixel, 0).r, drawn = texelFetch(uGlow, pixel, 0).r;
 +		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-+		if (overlaid) { }
++		if (overlaid || (drawn & 16u) != 0u) { }
 +		else if (made == ray) shown = full;
-+		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
++		else if (uShafts != 0 && (drawn & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 +	}
 +	outPixel = vec4(shown, 1.0);
 +}
@@ -35745,10 +35821,11 @@ index 000000000..28d453d86
 +	{
 +		// In full colour: the ray's own where the pixel still has its ray's palette colour; under see-through smoke the
 +		// light the card found in the air there, laid on (as PresentSource has both).
-+		uint ray = texelFetch(uRayColor, pixel, 0).r;
++		uint ray = texelFetch(uRayColor, pixel, 0).r, drawn = texelFetch(uGlow, pixel, 0).r;
 +		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-+		if (made == ray) shown = full;
-+		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
++		if ((drawn & 16u) != 0u) { } // (something solid over the ray's own pixel: see PresentSource)
++		else if (made == ray) shown = full;
++		else if (uShafts != 0 && (drawn & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
 +	}
 +	outPixel = vec4(shown, 1.0);
 +	float metres = depth * uDepthPlanes.x;
@@ -37397,10 +37474,10 @@ index 000000000..1974311f2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..7c9b2b0c7
+index 000000000..0304eb90b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3600 @@
+@@ -0,0 +1,3621 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -39439,14 +39516,35 @@ index 000000000..7c9b2b0c7
 + * Doom IDCLIP (a player's request, GitHub issue #45: "turns movement hit detection off ... If
 + * inside terrain when on, grant ghost property to current square to assist visibility. Enable fly
 + * ... so player doesn't fall into terrain"): does this soldier walk and float through anything
-+ * right now? The player's own soldier, one tile big (a 2x2 unit keeps the rules), in the 3D view,
-+ * with IDCLIP on.
++ * right now? The player's own unit, in the 3D view, with IDCLIP on. (A unit two tiles by two as well: it kept the
++ * rules at first, and a player, GitHub issue #234: "2x2 units dont idclip".)
 + * @param unit The soldier looked through.
 + * @return True if their moves go through walls, doors and floors.
 + */
 +bool FirstPersonMode::noclipOn(const BattleUnit *unit) const
 +{
-+	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && unit->getArmor()->getSize() == 1 && !unit->isOut();
++	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && !unit->isOut();
++}
++
++/**
++ * Doom IDCLIP: is there room for a unit at a place? Every tile it would stand on (four, for one two tiles by two) is
++ * on the map, with no other unit on it. Walls, objects, floors and the air don't count.
++ * @param unit The unit.
++ * @param target Where it would stand (its tile; a big unit's north-western one).
++ * @return True if it may be put there.
++ */
++bool FirstPersonMode::noclipRoom(const BattleUnit *unit, const Position &target) const
++{
++	const int size = unit->getArmor()->getSize();
++	for (int x = 0; x < size; ++x)
++	{
++		for (int y = 0; y < size; ++y)
++		{
++			const Tile *tile = _save->getTile(target + Position(x, y, 0));
++			if (!tile || (tile->getUnit() && tile->getUnit() != unit)) return false;
++		}
++	}
++	return true;
 +}
 +
 +/**
@@ -40799,7 +40897,7 @@ index 000000000..7c9b2b0c7
 +				const Uint8 *over = overlayRow(row);
 +				for (int column = 0; column < picture->w; ++column)
 +				{
-+					if (overlaid(over, column))
++					if (overlaid(over, column) || _view->drawnOver((size_t)row * picture->w + column))
 +					{
 +						out[column] = 0u;
 +					}
@@ -41003,10 +41101,10 @@ index 000000000..7c9b2b0c7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..e07e9a58a
+index 000000000..81e8d690b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1586 @@
+@@ -0,0 +1,1588 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -41385,6 +41483,8 @@ index 000000000..e07e9a58a
 +	void applyGodMode();
 +	/// Doom IDCLIP: does this soldier walk and float through anything in 3D right now?
 +	bool noclipOn(const BattleUnit *unit) const;
++	/// Doom IDCLIP: is there room for a unit at a place (every tile it would stand on is on the map and free of other units)?
++	bool noclipRoom(const BattleUnit *unit, const Position &target) const;
 +	/// Doom IDCLIP: moves the soldier straight to a tile, through whatever is in the way.
 +	bool noclipMove(BattleUnit *unit, const Position &target, bool across);
 +	/// Doom IDCLIP: leaves out of the picture the parts the eye is inside.
@@ -46397,7 +46497,7 @@ index 000000000..8271481f6
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..68dace111
+index 000000000..09f67d285
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
 @@ -0,0 +1,2601 @@
@@ -46524,8 +46624,7 @@ index 000000000..68dace111
 +	// objects and doors, and out into the air (see noclipMove). The map's edge still holds.
 +	if (noclipOn(unit))
 +	{
-+		const Tile *destination = _save->getTile(Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
-+		return destination && (!destination->getUnit() || destination->getUnit() == unit);
++		return noclipRoom(unit, Position(_trackedTile.x + stepX, _trackedTile.y + stepY, unit->getPosition().z));
 +	}
 +
 +	// Work the answer out only once per direction.
@@ -47052,7 +47151,8 @@ index 000000000..68dace111
 + * Doom IDCLIP: moves the soldier straight onto a tile (a neighbour, or the one above or below),
 + * through whatever is between: walls, objects, closed doors, floors and ceilings. Nothing is paid
 + * (IDCLIP is doom mode too) and nothing happens on the way: no reaction fire, no mines, and no
-+ * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it.
++ * fall in the air (see noclipFloats). The tile must be on the map, with no other unit on it (each of the four a unit
++ * two tiles by two stands on: see noclipRoom).
 + * Sight and light follow the soldier as for a walked step: who they see there, and who sees them.
 + * @param target The tile.
 + * @param across True for a step across: the camera's tile is the new one at once (the eye walks
@@ -47062,7 +47162,7 @@ index 000000000..68dace111
 +bool FirstPersonMode::noclipMove(BattleUnit *unit, const Position &target, bool across)
 +{
 +	Tile *destination = _save->getTile(target);
-+	if (!destination || (destination->getUnit() && destination->getUnit() != unit))
++	if (!destination || !noclipRoom(unit, target))
 +	{
 +		return false;
 +	}
@@ -62475,10 +62575,10 @@ index 000000000..ad9454552
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..eb85a5c78
+index 000000000..aa66e4f77
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,916 @@
+@@ -0,0 +1,933 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62598,8 +62698,6 @@ index 000000000..eb85a5c78
 +	delete _spriteBuffer;
 +	for (Surface *frame : _composedFrames) delete frame;
 +	delete _itemPicture;
-+	for (Surface *buffer : _blendBuffers) delete buffer;
-+	delete _blendEdge;
 +	for (auto &entry : _softSmoke) delete entry.second.colors;
 +	for (auto &entry : _stippleSmoke) delete entry.second.colors;
 +	for (auto &entry : _softSmokeBlends) delete entry.second.colors;
@@ -63169,6 +63267,24 @@ index 000000000..eb85a5c78
 +		_flashlightPos[axis] = _dynamicFlashlight ? (float)(_eye[axis] - _up[axis] * 1.5 + _forward[axis] * 1.0)
 +			: (float)(_eye[axis] + _right[axis] * 4.0 - _up[axis] * 4.0 + _forward[axis] * 2.0);
 +	}
++	// Setting "Flashlight": Far light. Its light stands where the crosshair's line first meets the world (terrain, as the
++	// view draws it), AimLightOff voxels this side of it, however far that is: found anew every frame. (And
++	// AimLightLift off a floor or a ceiling the line meets at a slant: a light a voxel above the ground the line skims
++	// lights next to nothing of it.)
++	_aimLight = 0;
++	if (_flashlight && _dynamicFlashlight && Options::fpsFlashlightReach == 1)
++	{
++		const float from[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
++		const float direction[3] = { (float)_forwardInVoxels[0], (float)_forwardInVoxels[1], (float)_forwardInVoxels[2] };
++		float surface[3];
++		_aimLight = 2;
++		if (visibleSurfaceAlong(from, direction, AimLightFarthest, surface))
++		{
++			for (int axis = 0; axis < 3; ++axis) _flashlightPos[axis] = surface[axis] - direction[axis] * AimLightOff;
++			if (std::abs(direction[2]) > 0.05f) _flashlightPos[2] += direction[2] < 0.0f ? AimLightLift : -AimLightLift;
++			_aimLight = 1;
++		}
++	}
 +	// A chain of explosions settled at once (setting "Instant chain explosions"): its fireballs
 +	// showing now, and the tiles its ripple hasn't passed over yet, as they were (see
 +	// FirstPersonChains.cpp).
@@ -63228,6 +63344,7 @@ index 000000000..eb85a5c78
 +	std::fill(_unitVeil.begin(), _unitVeil.end(), (Uint8)255);
 +	std::fill(_smokeVeil.begin(), _smokeVeil.end(), (Uint8)0);
 +	std::fill(_ownColours.begin(), _ownColours.end(), (Uint8)0);
++	_blendedCount = 0;
 +	std::fill(&_pointerUnits[0][0], &_pointerUnits[0][0] + sizeof(_pointerUnits) / sizeof(_pointerUnits[0][0]), nullptr);
 +	std::fill(&_pointerBodies[0][0], &_pointerBodies[0][0] + sizeof(_pointerBodies) / sizeof(_pointerBodies[0][0]), nullptr);
 +	std::fill(&_pointerPiles[0][0], &_pointerPiles[0][0] + sizeof(_pointerPiles) / sizeof(_pointerPiles[0][0]), nullptr);
@@ -63397,10 +63514,10 @@ index 000000000..eb85a5c78
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..55a9c467c
+index 000000000..e583bef3f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1920 @@
+@@ -0,0 +1,1940 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63758,7 +63875,8 @@ index 000000000..55a9c467c
 +	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
 +	static bool gpuOpening();
 +	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
-+	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one.
++	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one,
++	/// unless something was drawn over it (see drawnOver).
 +	/// @param smokeVeil Receives, in a frame with light in the air (setting "Light shafts"), how much see-through smoke
 +	/// lies over each pixel (0: none): there the air's light belongs on the smoke drawn; else null.
 +	bool trueColor(const Uint32 *&fullColors, const Uint8 *&rayColors, const Uint8 *&smokeVeil) const
@@ -63769,6 +63887,11 @@ index 000000000..55a9c467c
 +		smokeVeil = _hasLightShafts ? _smokeVeil.data() : nullptr;
 +		return true;
 +	}
++	/// Whether a unit's, a body's or an item's picture or a mark was drawn over a pixel's ray this frame, smoke over it or
++	/// not: the ray's full colour and the light in its air are then not that pixel's, whatever its palette colour. (A body the
++	/// colour of the ground behind it took the ground's light, through night vision its green, in patches; a unit in lit
++	/// smoke the light of the wall behind it, and stood there as a ghost. A player, GitHub issues #242 and #243.)
++	bool drawnOver(size_t pixel) const { return _ownColours[pixel] != 0 || _unitVeil[pixel] != 255; }
 +	/// This frame as the graphics card put it together (see gpuPresent), if it did: a 0xFFRRGGBB number a pixel. The view's own
 +	/// surface then holds only what the CPU drew last (0 elsewhere).
 +	bool cardPicture(const Uint32 *&pixels) const
@@ -64472,6 +64595,7 @@ index 000000000..55a9c467c
 +	bool _flashlight = false;       // flashlight on (its key; the shoulder one only in dark battles)
 +	bool _dynamicFlashlight = false; // it's the dynamic flashlight (the one the game uses; off: a wide beam from the shoulder): from under the eye, a tight spot on the crosshair
 +	float _flashlightPos[3] = {};   // where it is this frame
++	int _aimLight = 0;              // setting "Flashlight": Far light, with the flashlight on: 1 its light stands at _flashlightPos, where the crosshair's line meets the world; 2 the line meets nothing (no light); 0 the beam
 +	float _muzzleFlashPos[3] = {};  // where the last shot flashed, lighting its surroundings for a moment
 +	Uint32 _muzzleFlashTick = 0;    // when it flashed
 +	float _muzzleFlashLight = 0.0f; // the flash's strength this frame
@@ -64620,10 +64744,18 @@ index 000000000..55a9c467c
 +	bool _pointerAimed = false;                         // and whether there is one
 +	const BattleUnit *_aimedUnit = nullptr;             // the unit pointed at (see setAimedUnit)
 +	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
-+	std::vector<Surface*> _blendBuffers;                // sprites dissolving into their next frame, one per sprite size
++	struct BlendedSprite                                // a sprite's frame dissolved into its next one (see drawSpriteBlend)
++	{
++		const Surface *from = nullptr, *to = nullptr;   // the two frames
++		double blend = 0.0;                             // how far from one to the other
++		bool mixed = false;                             // with their colours mixed
++		std::unique_ptr<Surface> picture, edge;         // the solid pixels; the pixels only one of two mixed frames has, which fade
++		std::vector<Uint8> opacity;                     // ... and how opaque each of those is
++		bool fading = false;                            // any such
++	};
++	std::vector<BlendedSprite> _blended;                // this frame's, made once each: the first _blendedCount (the others' pictures are used again)
++	size_t _blendedCount = 0;
 +	std::vector<int> _blendColumns;                     // drawSpriteBlend's source column and row lookups
-+	Surface *_blendEdge = nullptr;                      // ... the pixels only one of two mixed frames has, which fade (see drawSpriteBlend)
-+	std::vector<Uint8> _blendOpacity;                   // ... and how opaque each is
 +	struct SpriteBox { int x0, y0, x1, y1; bool valid; }; // where a sprite frame's pixels are
 +	std::map<const Surface*, SpriteBox> _spriteBoxes;   // measured once per sprite frame
 +
@@ -64649,6 +64781,8 @@ index 000000000..55a9c467c
 +	static constexpr double NoFloorCut = -1e9;
 +	/// A standing sprite isn't cut off under any ceiling (see SpriteDraw::ceilingCut, ceilingAbove).
 +	static constexpr double NoCeilingCut = 1e9;
++	/// ... nor under one that would leave less than this much of its height (see ceilingOver).
++	static constexpr double CeilingCutLeast = 0.65;
 +	/// One sprite to draw standing in the world (see drawSprite).
 +	struct SpriteDraw
 +	{
@@ -64668,6 +64802,7 @@ index 000000000..55a9c467c
 +		double layBack = 0.0;             // the card lies back this far whatever the view's pitch, in radians (a hull's: see hullLayBack)
 +		double floorCut = NoFloorCut;     // no part of a standing sprite below this height, in voxels: the underside of the floor a unit stands on (see floorUnderside)
 +		double ceilingCut = NoCeilingCut; // no part of a standing sprite at or above this height, in voxels: the floor over a unit's head (see ceilingAbove)
++		bool steady = false;              // its pixels stay as they are and where they are through the frame (a picture the view keeps, see drawSpriteBlend): the card looks them up by their address, not by their bytes
 +	};
 +	/// Draws a sprite standing in the world, depth-tested (or see-through, laid over what's there):
 +	/// all of it, or only the screen rows from bandTop up to bandBottom.
@@ -64806,6 +64941,8 @@ index 000000000..55a9c467c
 +	double floorUnderside(const double world[3]) const;
 +	/// The floor over the head of something standing at a point, if the level above has one there (else NoCeilingCut).
 +	double ceilingAbove(const double world[3]) const;
++	/// The ceiling a unit standing at a point is cut off at: ceilingAbove, or none where that would leave too little of it.
++	double ceilingOver(const double world[3], const BattleUnit *unit) const;
 +	/// Whether a voxel is filled by the view's terrain (off the map: no).
 +	bool solidVoxel(int voxelX, int voxelY, int voxelZ) const;
 +	/// The ground under something lying at a point: the plane through its surface round it, its height there and its slope.
@@ -67210,7 +67347,7 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..086fd34d0
+index 000000000..09ab1d0be
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
 @@ -0,0 +1,819 @@
@@ -67520,7 +67657,7 @@ index 000000000..086fd34d0
 +		for (int axis = 0; axis < 3; ++axis) frame.lamps[lamp][axis] = lamp < frame.lampCount ? view._nearbyLights[lamp].pos[axis] : 0.0f;
 +		frame.lamps[lamp][3] = lamp < frame.lampCount ? view._nearbyLights[lamp].strength : 0.0f;
 +	}
-+	frame.flashlight = !view._flashlight ? 0 : view._dynamicFlashlight ? 2 : 1;
++	frame.flashlight = !view._flashlight || view._aimLight == 2 ? 0 : view._aimLight == 1 ? 3 : view._dynamicFlashlight ? 2 : 1;
 +	frame.flareCount = (int)std::min<size_t>(8, view._flareLights.size());
 +	for (int flare = 0; flare < 8; ++flare)
 +	{
@@ -68035,10 +68172,10 @@ index 000000000..086fd34d0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..dc3318e65
+index 000000000..3c811157f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
-@@ -0,0 +1,1073 @@
+@@ -0,0 +1,1077 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68169,7 +68306,7 @@ index 000000000..dc3318e65
 +{
 +	FirstPersonGpu::Effects effects;
 +	std::vector<std::array<int, 4>> boxes;                 // each primitive's box: left, top, one past its right, one past its bottom
-+	std::unordered_map<const void*, int> spritesByAddress; // this frame's see-through sprites, by where their opacity maps are: a cloud has hundreds of puffs of a few pictures, each looked up in the atlas once
++	std::unordered_map<const void*, int> spritesByAddress; // this frame's steady sprites (see SpriteDraw::steady), by where their pixels are; this frame's see-through sprites, by where their opacity maps are: a cloud has hundreds of puffs of a few pictures, each looked up in the atlas once
 +	struct Pictured { BattleUnit *unit, *body; const Tile *pile; };
 +	std::vector<Pictured> pictured;                        // per primitive: whose picture it is
 +	std::vector<Uint32> notes;                             // the card's notes, four numbers a pixel
@@ -68416,12 +68553,13 @@ index 000000000..dc3318e65
 +	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 +	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 +	int pixelsAt;
-+	if (opacityMap && seeThroughSprite->steady)
++	if (opacityMap ? seeThroughSprite->steady : draw.steady)
 +	{
-+		auto known = list.spritesByAddress.find(opacityMap);
++		const void *address = opacityMap ? (const void *)opacityMap : (const void *)surface->pixels;
++		auto known = list.spritesByAddress.find(address);
 +		if (known == list.spritesByAddress.end())
 +		{
-+			known = list.spritesByAddress.emplace(opacityMap, placeInAtlas()).first;
++			known = list.spritesByAddress.emplace(address, placeInAtlas()).first;
 +		}
 +		pixelsAt = known->second;
 +	}
@@ -69013,7 +69151,10 @@ index 000000000..dc3318e65
 +			const SDL_Color &own = palette[made[column]];
 +			int wanted[3] = { own.r, own.g, own.b };
 +			const Uint32 full = _trueColor[index];
-+			if (made[column] == _rayColors[index])
++			if (drawnOver(index))
++			{
++			}
++			else if (made[column] == _rayColors[index])
 +			{
 +				wanted[0] = (full >> 16) & 0xFF; wanted[1] = (full >> 8) & 0xFF; wanted[2] = full & 0xFF;
 +			}
@@ -69114,10 +69255,10 @@ index 000000000..dc3318e65
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..08c3214ab
+index 000000000..34cfd628f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2026 @@
+@@ -0,0 +1,2043 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -69897,7 +70038,24 @@ index 000000000..08c3214ab
 +	// "Flashlight": Dynamic) is a light on the weapon, as in Half-Life: a tight, bright round spot centred on the
 +	// crosshair (full strength within 8 degrees of it, fading out by 13), a faint halo round it
 +	// out to 24 degrees, reaching 20 tiles and fading more slowly.
-+	if (_flashlight && _dynamicFlashlight)
++	if (_flashlight && _aimLight)
++	{
++		// (Setting "Flashlight": Far light. A light standing where the crosshair's line meets the world, see _aimLight:
++		// the same however far off, on what faces it and nothing stands before.)
++		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };
++		const float distance = std::sqrt(fromLight[0] * fromLight[0] + fromLight[1] * fromLight[1] + fromLight[2] * fromLight[2]);
++		if (_aimLight == 1 && distance < AimLightReach)
++		{
++			const float closeness = 1.0f - distance / AimLightReach;
++			const float facing = normal && distance > 0.5f ? -(normal[0] * fromLight[0] + normal[1] * fromLight[1] + normal[2] * fromLight[2]) / distance : 1.0f;
++			const float power = closeness * closeness * AimLightPower * (0.4f + 0.6f * std::max(0.0f, facing));
++			if (power > 0.25f && facing > 0.0f && !(shadows && shadowed(point, _flashlightPos)))
++			{
++				light += power;
++			}
++		}
++	}
++	else if (_flashlight && _dynamicFlashlight)
 +	{
 +		const float range = 16.0f * 20.0f; // voxels
 +		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };
@@ -72462,10 +72620,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..e77a95cb7
+index 000000000..2db5118be
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,732 @@
+@@ -0,0 +1,740 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -72888,6 +73046,14 @@ index 000000000..e77a95cb7
 +/// A floor is still water (see buildModel, RuleFirstPerson::getStillWater) where this much of its art or more is of
 +/// the water's colour groups: a tile of grass with a few blue flowers is none.
 +const float StillWaterLeast = 0.15f;
++/// Setting "Flashlight": Far light (see FirstPersonView::pointLight): the light stands this many voxels off the surface
++/// the crosshair's line meets (and AimLightLift off a floor or a ceiling), lights what is within AimLightReach voxels
++/// of it (six tiles: a small flare's pool), AimLightPower shades at its middle, and the line is followed this far at
++/// most (voxels).
++const float AimLightOff = 6.0f, AimLightLift = 10.0f, AimLightReach = 96.0f, AimLightPower = 12.0f, AimLightFarthest = 16.0f * 300.0f;
++/// A wall drawn flat reads its art as on the tile's edge through all its thickness (see buildModel, wallPlane): its
++/// art may reach this many pixels over the sprite's middle, and the game's shape of it this many voxels from the edge.
++const int WallPlaneSlack = 2, WallPlaneThick = 5;
 +/// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 +/// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 +/// player's report: items on stairs and slopes sank into them): the ground looked for up to
@@ -75550,10 +75716,10 @@ index 000000000..c2ce32f58
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..989de7b34
+index 000000000..bc86d275e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4408 @@
+@@ -0,0 +1,4439 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -76805,6 +76971,22 @@ index 000000000..989de7b34
 +}
 +
 +/**
++ * The ceiling a unit is cut off at (see ceilingAbove): none where that would leave less than CeilingCutLeast of its
++ * height. A unit on a raised floor under a low roof, the deck of a transport, has half its height above the floor
++ * over it: the map draws it whole over the roof, and cut off it was a stump ("the element to make voxel units NOT
++ * appear through roofs goes a little too far ... if a unit is, say, above 35% 'reduced' under a roof ... just draw
++ * completely", a player, GitHub issue #233).
++ * @param world The point it stands at, in voxels.
++ * @param unit The unit.
++ * @return The height of the ceiling, in voxels; NoCeilingCut where it isn't cut.
++ */
++double FirstPersonView::ceilingOver(const double world[3], const BattleUnit *unit) const
++{
++	const double ceiling = ceilingAbove(world);
++	return ceiling - world[2] < CeilingCutLeast * (unit->getHeight() + unit->getFloatHeight()) ? NoCeilingCut : ceiling;
++}
++
++/**
 + * Whether a voxel is filled by the view's terrain: any of its tile's parts (floor, walls,
 + * object) as the view builds them.
 + * @param voxelX, voxelY, voxelZ The voxel.
@@ -77386,7 +77568,7 @@ index 000000000..989de7b34
 +			const size_t stepsBefore = _drawList.size();
 +			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
 +			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-+				true, nullptr, nullptr, body->opacity, ceilingAbove(feet));
++				true, nullptr, nullptr, body->opacity, ceilingOver(feet, unit));
 +			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 +			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -77432,7 +77614,7 @@ index 000000000..989de7b34
 +					std::copy(standing, standing + 3, step.sprite.world);
 +					step.sprite.depthBias = VoxelOverlayNearer;
 +					step.sprite.floorCut = floorUnderside(feet);
-+					step.sprite.ceilingCut = ceilingAbove(feet);
++					step.sprite.ceilingCut = ceilingOver(feet, unit);
 +					step.sprite.scale = unitScale;
 +					step.sprite.unit = unit;
 +					step.sprite.layBack = FirstPerson::hullLayBack(unit);
@@ -77474,7 +77656,7 @@ index 000000000..989de7b34
 +			step.sprite.world[1] = feet[1];
 +			step.sprite.world[2] = standingHeight(feet);
 +			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
-+			step.sprite.ceilingCut = ceilingAbove(feet); // (and its top out of the room above, or off the roof)
++			step.sprite.ceilingCut = ceilingOver(feet, unit); // (and its top out of the room above, or off the roof)
 +			step.sprite.shade = shade;
 +			step.sprite.scale = unitScale;
 +			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
@@ -78459,18 +78641,44 @@ index 000000000..989de7b34
 +			box->x1 = box->x1 * factor + factor - 1; box->y1 = box->y1 * factor + factor - 1;
 +		}
 +	}
-+	// A buffer of the frames' size to mix them in (one is kept per size and reused).
++	// The two dissolved are made once a frame and kept through it: a fire burns on many tiles at once, the same few
++	// pairs of frames at the same moment on all of them, and each tile made its own, sent to the card by its bytes (two
++	// thousand burning tiles: 17 ms a frame. A player, GitHub issue #239, "fire in excessive amounts kills frames").
 +	const int width = from->getWidth(), height = from->getHeight();
-+	Surface *buffer = nullptr;
-+	for (Surface *candidate : _blendBuffers)
++	const bool mixed = mixColours && !_nearestRgb.empty();
++	auto show = [&](const BlendedSprite &made) {
++		SpriteDraw draw;
++		draw.sprite = made.picture.get();
++		draw.anchorX = anchorX; draw.anchorY = anchorY;
++		std::copy(world, world + 3, draw.world);
++		draw.depthBias = depthBias; draw.shade = shade; draw.scale = scale;
++		draw.steady = true;
++		drawSprite(draw);
++		// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
++		// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
++		if (made.fading)
++		{
++			SeeThroughSprite fadingPixels = { made.opacity.data(), 1.0f };
++			fadingPixels.steady = true;
++			draw.sprite = made.edge.get();
++			draw.seeThrough = &fadingPixels;
++			drawSprite(draw);
++		}
++	};
++	for (size_t known = 0; known < _blendedCount; ++known)
 +	{
-+		if (candidate->getWidth() == width && candidate->getHeight() == height) buffer = candidate;
++		const BlendedSprite &made = _blended[known];
++		if (made.from == from && made.to == to && made.blend == blend && made.mixed == mixed)
++		{
++			show(made);
++			return;
++		}
 +	}
-+	if (!buffer)
-+	{
-+		buffer = new Surface(width, height);
-+		_blendBuffers.push_back(buffer);
-+	}
++	if (_blendedCount == _blended.size()) _blended.emplace_back();
++	BlendedSprite &made = _blended[_blendedCount++];
++	made.from = from; made.to = to; made.blend = blend; made.mixed = mixed; made.fading = false;
++	if (!made.picture || made.picture->getWidth() != width || made.picture->getHeight() != height) made.picture = std::make_unique<Surface>(width, height);
++	Surface *buffer = made.picture.get();
 +	// A 4x4 ordered dither in sprite space: the pattern travels with the sprite, so it doesn't
 +	// crawl. (The same Bayer matrix as the shared one, in whole sixteenths.) Pixels whose level
 +	// is below the threshold show the next frame.
@@ -78478,7 +78686,6 @@ index 000000000..989de7b34
 +	const int threshold = (int)(blend * 16.0);
 +	// (Mixing colours: how far, in whole steps, and the palette to mix in.)
 +	const int FlameMixSteps = 32;
-+	const bool mixed = mixColours && !_nearestRgb.empty();
 +	const int mixStep = (int)(blend * FlameMixSteps);
 +	const SDL_Color *palette = getPalette();
 +	const int fadeLevel = (int)(blend * SeeThroughLevels);
@@ -78487,14 +78694,10 @@ index 000000000..989de7b34
 +	if (mixed)
 +	{
 +		// (The picture and the opacities of the pixels that fade: of the frames' size, cleared.)
-+		if (!_blendEdge || _blendEdge->getWidth() != width || _blendEdge->getHeight() != height)
-+		{
-+			delete _blendEdge;
-+			_blendEdge = new Surface(width, height);
-+		}
-+		edgeSurface = _blendEdge->getSurface();
++		if (!made.edge || made.edge->getWidth() != width || made.edge->getHeight() != height) made.edge = std::make_unique<Surface>(width, height);
++		edgeSurface = made.edge->getSurface();
 +		for (int y = 0; y < height; ++y) std::fill_n((Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch, width, (Uint8)0);
-+		_blendOpacity.assign((size_t)width * height, 0);
++		made.opacity.assign((size_t)width * height, 0);
 +	}
 +	// And the shapes meet half way: both frames stretched to the size in between, around the base
 +	// they rise from, so a growing explosion is one shape growing, not two ghosting into each other.
@@ -78509,7 +78712,7 @@ index 000000000..989de7b34
 +			for (int x = 0; x < width; ++x)
 +				((Uint8 *)outSurface->pixels)[y * outSurface->pitch + x] = bayerLevels[y & 3][x & 3] < threshold
 +					? pixel(toSurface, x, y) : pixel(fromSurface, x, y);
-+		drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
++		show(made);
 +		return;
 +	}
 +	// The size in between (the boxes' sizes blended), and the base each shape rises from: the
@@ -78594,20 +78797,14 @@ index 000000000..989de7b34
 +				{
 +					Uint8 *edgeRow = (Uint8 *)edgeSurface->pixels + y * edgeSurface->pitch;
 +					edgeRow[x] = fromColor ? fromColor : toColor;
-+					_blendOpacity[(size_t)y * width + x] = (Uint8)level;
++					made.opacity[(size_t)y * width + x] = (Uint8)level;
 +					fading = true;
 +				}
 +			}
 +		}
 +	}
-+	drawSprite(buffer, anchorX, anchorY, world, depthBias, shade, scale);
-+	// The pixels only one of the two frames has, laid over what is behind them by how far they have faded: see-through,
-+	// as the smoke is, so a flame's edge comes and goes softly instead of in dots.
-+	if (fading)
-+	{
-+		const SeeThroughSprite fadingPixels = { _blendOpacity.data(), 1.0f };
-+		drawSprite(_blendEdge, anchorX, anchorY, world, depthBias, shade, scale, SpritePose::Standing, &fadingPixels);
-+	}
++	made.fading = fading;
++	show(made);
 +}
 +
 +/**
@@ -80955,10 +81152,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..8ff280563
+index 000000000..dcc191fd3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,5832 @@
+@@ -0,0 +1,5906 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84010,6 +84207,46 @@ index 000000000..8ff280563
 +	}
 +	const std::vector<char> &glassPixels = paintedPane ? pane : windowGlass;
 +
++	// A wall drawn flat: a north wall's art on the right half of its sprite alone, a west wall's on the left half, a
++	// plain slab's face as the map's eye sees it, standing on the tile's edge. The game's shape gives the wall two or
++	// three voxels of thickness, and read voxel by voxel each layer behind the edge takes the art a voxel further
++	// east (or south) and a voxel higher: the face turned to the room showed the drawing shifted so, its top rows gone
++	// over the wall's top and its end columns off the art. A wall of panes drawn as a grid, a line down each pane's
++	// end and one along its top, had no top lines and its end lines doubled (a player, GitHub issue #233, "texture is
++	// meant to be a GRID, but seemingly 2 parts are omitted as black"). So every layer of such a wall reads the art
++	// as the layer on the tile's edge does. Not a wall with glass, holes or a shape of the mod's (their own readings
++	// go voxel by voxel), nor one thicker than WallPlaneThick, nor a door's leaves.
++	int wallPlane = -1; // (the axis the wall is thin along: 0 a west wall's, 1 a north wall's; -1: read voxel by voxel)
++	if (wallArt && !glassPane && !hasArtHoles && !solidShape && !cutout && !mapData->isDoor() && !mapData->isUFODoor())
++	{
++		const bool north = mapData->getObjectType() == O_NORTHWALL;
++		bool flat = true, any = false;
++		for (int spriteY = 0; spriteY < sprite->getHeight() && flat; ++spriteY)
++			for (int spriteX = 0; spriteX < sprite->getWidth() && flat; ++spriteX)
++			{
++				if (!sprite->getPixel(spriteX, spriteY)) continue;
++				any = true;
++				flat = north ? spriteX >= 16 - WallPlaneSlack : spriteX < 16 + WallPlaneSlack;
++			}
++		int thinFrom = Position::TileXY, thinTo = -1;
++		for (int z = 0; z < Position::TileZ && flat && any; ++z)
++		{
++			const size_t loftStart = mapData->getLoftID(z / 2) * 16;
++			if (loftStart + 16 > loftData->size()) continue;
++			for (int y = 0; y < Position::TileXY; ++y)
++			{
++				const Uint16 loftRow = (*loftData)[loftStart + y];
++				for (int x = 0; loftRow && x < Position::TileXY; ++x)
++				{
++					if (!(loftRow & (1 << (15 - x)))) continue;
++					thinFrom = std::min(thinFrom, north ? y : x);
++					thinTo = std::max(thinTo, north ? y : x);
++				}
++			}
++		}
++		if (flat && any && thinTo >= 0 && thinTo < WallPlaneThick) wallPlane = north ? 1 : 0;
++	}
++
 +	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 +	// north (y), west to east (x).
 +	const int yOffset = mapData->getYOffset();
@@ -84044,8 +84281,10 @@ index 000000000..8ff280563
 +				// the voxel lands that many rows further down in it. A line of voxels going
 +				// east, south and up together lands on the same pixel, so they all take the
 +				// colour of the front one, the one the art shows (hence colorHiddenSides).
-+				const int spriteX = std::clamp(16 + x - y, 0, sprite->getWidth() - 1);
-+				const int spriteY = 24 + (x + y) / 2 - z + yOffset;
++				// (a wall drawn flat: every layer as the one on the tile's edge, see wallPlane)
++				const int artX = wallPlane == 0 ? 0 : x, artY = wallPlane == 1 ? 0 : y;
++				const int spriteX = std::clamp(16 + artX - artY, 0, sprite->getWidth() - 1);
++				const int spriteY = 24 + (artX + artY) / 2 - z + yOffset;
 +
 +				// The pixel's colour, or if the art left it transparent the nearest drawn pixel
 +				// up or down the column (a pixel outside the sprite counts as transparent).
@@ -84092,6 +84331,32 @@ index 000000000..8ff280563
 +					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
 +					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
 +				}
++			}
++		}
++	}
++
++	// A floor's border lines. The art's diamond is 32 pixels wide and 16 high, and a tile's top 16 voxels by 16: each
++	// voxel takes one pixel of the two it lies under, and along three of the tile's four edges the pixel taken is the
++	// next one inwards for every other voxel or for all of them (only the north edge's voxels land on the diamond's
++	// own edge). So a line drawn along a floor's edge came out dotted, or not at all: a deck drawn as a grid, a line
++	// along each tile's two lower edges, showed one way only (a player, GitHub issue #233, "texture is meant to be a
++	// GRID, but seemingly 2 parts are omitted as black, creating a NOT grid"). Along its west, south and east edges
++	// the floor's top voxels take the diamond's own edge pixel, where that is of another colour group than what they
++	// took: a line, not the floor's own grain a shade off.
++	if (mapData->getObjectType() == O_FLOOR && !cutout && !waterFloor && !model.empty)
++	{
++		for (int along = 0; along < Position::TileXY; ++along)
++		{
++			// (the west edge down from the tile's north-west corner, the south edge and the east edge on to its south-east one)
++			const int cells[3][4] = { { 0, along, 15 - along, along / 2 }, { along, Position::TileXY - 1, along, 8 + along / 2 }, { Position::TileXY - 1, along, 31 - along, 8 + along / 2 } };
++			for (const int *cell : cells)
++			{
++				const int x = cell[0], y = cell[1];
++				int top = model.max[2];
++				while (top >= 0 && !model.color[top][y][x]) --top;
++				if (top < 0) continue;
++				const Uint8 edge = sprite->getPixel(cell[2], 24 + cell[3] - top + yOffset), taken = model.color[top][y][x];
++				if (edge && (edge >> 4) != (taken >> 4)) model.color[top][y][x] = edge;
 +			}
 +		}
 +	}
@@ -84331,37 +84596,43 @@ index 000000000..8ff280563
 +	if (mapData->getObjectType() == O_FLOOR && !waterFloor && !model.empty && !cutout)
 +	{
 +		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
-+		int drawn = 0, wet = 0;
-+		for (int spriteY = 0; groups && spriteY < sprite->getHeight(); ++spriteY)
-+			for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
-+			{
-+				const Uint8 color = sprite->getPixel(spriteX, spriteY);
-+				if (!color) continue;
-+				++drawn;
-+				wet += (groups >> (color >> 4)) & 1;
-+			}
-+		if (drawn > 0 && wet >= StillWaterLeast * drawn)
++		// (A floor that animates is in every frame what its first frame is, as above: water in all of them or in none,
++		// and its face filled in in all of them. Each frame was asked by its own art, and the first frame's filling
++		// took the later frames' with it: a swamp's deep water was a pit of five columns in some frames of its ripples,
++		// a player, GitHub issue #238, "some frames of animations remove tiles".)
++		bool still = firstFrame && firstFrame->stillWater != 0;
++		if (groups && !firstFrame)
++		{
++			int drawn = 0, wet = 0;
++			for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
++				for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
++				{
++					const Uint8 color = sprite->getPixel(spriteX, spriteY);
++					if (!color) continue;
++					++drawn;
++					wet += (groups >> (color >> 4)) & 1;
++				}
++			still = drawn > 0 && wet >= StillWaterLeast * drawn;
++		}
++		if (groups && still)
 +		{
 +			model.stillWater = groups;
 +			_anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
-+			if (model.artFill)
-+			{
-+				// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
-+				const int top = model.max[2];
-+				for (int y = 0; y < Position::TileXY; ++y)
-+					for (int x = 0; x < Position::TileXY; ++x)
-+					{
-+						bool filled = false;
-+						for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
-+						const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
-+						const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
-+						if (!color) continue;
-+						model.color[top][y][x] = color;
-+						model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
-+						model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
-+					}
-+				model.artFill = false;
-+			}
++			// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
++			const int top = model.max[2];
++			for (int y = 0; y < Position::TileXY; ++y)
++				for (int x = 0; x < Position::TileXY; ++x)
++				{
++					bool filled = false;
++					for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
++					const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
++					const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
++					if (!color) continue;
++					model.color[top][y][x] = color;
++					model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
++					model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
++				}
++			model.artFill = false;
 +		}
 +	}
 +	// An object the art draws as a block of crops though the game gives it only a few voxels
@@ -88711,10 +88982,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..ac198b360
+index 000000000..322afae22
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,5689 @@
+@@ -0,0 +1,5921 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88957,6 +89228,9 @@ index 000000000..ac198b360
 +/// An animal's face (see makeModel's colours): how many cells behind the foremost one on its line a cell still has
 +/// the front drawing's colour (the same at the back).
 +const int AnimalFaceDepth = 2 * VOXELSCALE;
++/// A tail drawn with the legs (see limb) is this far across to either side of the body's middle: a pixel and a half
++/// of the sprite in all.
++const float TailHalf = 0.75f * VOXELSCALE / PixelsAcross;
 +/// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
 +/// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
 +/// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
@@ -90251,6 +90525,9 @@ index 000000000..ac198b360
 +/// Posed arms (see makeModel): what an arm's drawings make of it stays within this of its bones' skin: PosedShoulder
 +/// at the shoulder, less along the arm, PosedHand at the hand.
 +const float PosedShoulder = 2.0f * VOXELSCALE, PosedHand = 0.25f * VOXELSCALE;
++/// A posed arm whose hand is on an item and whose drawing ends this much lower than that hand holds the item up: the
++/// drawing's lower end is its elbow (the unit table's "arms: elbow", see makeModel).
++const float PosedElbowUnder = 2.0f * VOXELSCALE;
 +const float FeetZone = 2.0f * VOXELSCALE, FootUnder = 1.0f * VOXELSCALE;
 +const int FootReach = (int)(2.5f * VOXELSCALE * PixelsAcross);
 +void continueFeet(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner)
@@ -91211,7 +91488,7 @@ index 000000000..ac198b360
 +/// middle); a tie goes as the row above went. (Every frontal run as deep as all the side runs together made four
 +/// legs of two, seen from between the directions: the owner, "check old models so they dont have 4 legs from the
 +/// side", "follow the contour of sprites".)
-+std::vector<Uint8> limb(const PartFrames &part, int side)
++std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
 +{
 +	std::vector<Uint8> cells(GridCells, 0);
 +	std::vector<std::pair<int, int>> pairsAbove;
@@ -91220,7 +91497,26 @@ index 000000000..ac198b360
 +	{
 +		const auto front = runs(part, Front, row);
 +		if (front.empty()) { pairsAbove.clear(); continue; }
-+		const auto profile = runs(part, side, row);
++		auto profile = runs(part, side, row);
++		// A tail drawn with the legs (the unit table's "tail: drawn" for the units it names): of the side drawing's runs
++		// in a row the widest is the legs', and the others are the tail's, a slice each behind the body's middle, TailHalf
++		// to either side. Taken for a second leg seen from the side, the tail had one of the two legs stand where it is,
++		// now the left one, now the right, row by row: both legs in pieces off the hips, which then went as pieces apart
++		// do (a player, GitHub issue #237, XPiratez's cat girls "amputees").
++		if (tailed && profile.size() > 1)
++		{
++			size_t widest = 0;
++			for (size_t run = 1; run < profile.size(); ++run)
++				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
++			for (size_t run = 0; run < profile.size(); ++run)
++			{
++				if (run == widest) continue;
++				float back, fore;
++				sideExtent(profile[run], profile[run], side, back, fore);
++				fillSlice(cells, row, 0.0f, TailHalf, (back + fore) * 0.5f, (fore - back) * 0.5f, &part);
++			}
++			profile.assign(1, std::pair<int, int>(profile[widest]));
++		}
 +		const int frontCount = (int)front.size(), sideCount = (int)profile.size();
 +		auto middleRight = [&](int run) { return (FloorX - (front[run].first + front[run].second + 1) * 0.5f) / PixelsAcross; };
 +		auto halfRight = [&](int run) { return (front[run].second - front[run].first + 1) * 0.5f / PixelsAcross; };
@@ -92493,19 +92789,25 @@ index 000000000..ac198b360
 +/// lying: its corpse's inventory picture laid on the floor and given volume (or, without one, its corpse's picture on
 +/// the map's floor). The owner: "deaths should not be like planks! The body should organically collapse like in
 +/// sprites - and the death should be like a dead body sprite (in equipment menu - just voxelised to give volume!)".
-+void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette, bool big, bool hull)
++void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const SDL_Color *palette, bool big, bool hull,
++	bool animal = false)
 +{
 +	// The standing body's height and depth: the fall's shapes are as thick as it stood deep, and it lies as long as it
 +	// stood tall (not much longer than its tile: it lies in the tile's middle, not through the walls round it).
-+	float top = 0.0f, back = 1e9f, fore = -1e9f;
++	// (An animal, a unit the table names a beast or gives legs: as long as it was big. One longer or broader than tall,
++	// a spider, a dog, lies as long as that. As long as it stood tall, a spider twelve voxels long was a corpse of
++	// six: "some corpse items ... like spiders ... seem to MASSIVELY deflate on death", a player, GitHub issue #231.)
++	float top = 0.0f, back = 1e9f, fore = -1e9f, least[2] = { 1e9f, 1e9f }, most[2] = { -1e9f, -1e9f };
 +	for (size_t k = 0; k < std::min(model.part.size(), model.addedFrom); ++k)
 +	{
 +		if (model.part[k] == VoxelUnitModel::Item) continue;
 +		top = std::max(top, model.up[k]);
++		least[0] = std::min(least[0], model.right[k]); most[0] = std::max(most[0], model.right[k]);
++		least[1] = std::min(least[1], model.ahead[k]); most[1] = std::max(most[1], model.ahead[k]);
 +		if (model.part[k] == VoxelUnitModel::Torso) { back = std::min(back, model.ahead[k]); fore = std::max(fore, model.ahead[k]); }
 +	}
 +	const float halfMost = std::clamp((fore - back) * 0.5f, 1.5f * VOXELSCALE, 3.5f * VOXELSCALE);
-+	const float length = std::min(top, LyingLongest * VOXELSCALE);
++	const float length = std::min(animal ? std::max({ top, most[0] - least[0], most[1] - least[1] }) : top, LyingLongest * VOXELSCALE);
 +	// How tall a frame's picture stands, of the standing height.
 +	auto tallOf = [&](const std::vector<Uint8> &death) {
 +		int topRow = FrameSize;
@@ -93236,6 +93538,181 @@ index 000000000..ac198b360
 +	if (noneAdded) model.addedFrom = model.part.size();
 +}
 +
++/// A creature on thin legs spread all round it, a spider (the unit table's "legs: N" for the units it names; a player,
++/// GitHub issue #231, of spiders: "still have no legs"). Its drawings show legs a pixel thin, each drawn where the
++/// artist had room for it: cut by the eight outlines nothing of them is left, and what is left of the body is whatever
++/// the legs' pixels let stand. So its body is made from the thick part of its drawings alone (see thickPart), and its
++/// legs are made anew (see spreadLegs): N of them round the body, as far out, as high at the knee and as thick as the
++/// front and side drawings show them, painted as the front drawing's legs are.
++/// LegThin: a drawing's thick part is what a square this many pixels a side fits into (the rest is thin: legs,
++/// feelers). LegRadius: half a leg's thickness, a sprite's pixel through. LegFeet: a foot is looked for in the outer
++/// part of the legs' reach, from this share of it on (nearer the body the front pair's feet are drawn, lower than they
++/// stand: they are nearer the eye).
++constexpr int LegThin = 2 * VOXELSCALE;
++constexpr float LegRadius = 0.38f * VOXELSCALE, LegFeet = 0.7f;
++PartFrames thickPart(const PartFrames &part)
++{
++	PartFrames thick;
++	thick.any = part.any;
++	for (int d = 0; d < 8; ++d)
++	{
++		thick.frame[d].assign((size_t)FrameSize * FrameSize, 0);
++		for (int row = 0; row + LegThin <= FrameSize; ++row)
++			for (int column = 0; column + LegThin <= FrameSize; ++column)
++			{
++				bool full = true;
++				for (int dy = 0; dy < LegThin && full; ++dy)
++					for (int dx = 0; dx < LegThin && full; ++dx) full = part.frame[d][(row + dy) * FrameSize + column + dx] != 0;
++				if (!full) continue;
++				for (int dy = 0; dy < LegThin; ++dy)
++					for (int dx = 0; dx < LegThin; ++dx) thick.frame[d][(row + dy) * FrameSize + column + dx] = part.frame[d][(row + dy) * FrameSize + column + dx];
++			}
++	}
++	return thick;
++}
++
++/// The legs of a creature on thin legs (see thickPart): `perSide` of them on each side of the body made so far, spread
++/// evenly from ahead round to behind. What the drawings show of the legs beside the body is read off the front drawing
++/// (how far out they reach, how high and how far out the knee is, where they leave the body, their colours) and off
++/// the right side's (how far ahead and behind they reach); each leg is two round bars, hip to knee to foot, its foot
++/// on the floor. Nothing is added to a body whose front drawing has nothing thin beside it.
++/// @param part The unit's drawings.
++/// @param thick Their thick part (the body's).
++/// @param perSide How many legs a side.
++/// @param code The part the legs' cells are.
++/// @param owner The body's cells: the legs' are added.
++void spreadLegs(const PartFrames &part, const PartFrames &thick, int perSide, Uint8 code, std::vector<Uint8> &owner)
++{
++	// the body as made: its middle, how broad, long and tall it is
++	float low[3] = { 1e9f, 1e9f, 1e9f }, high[3] = { -1e9f, -1e9f, -1e9f };
++	double sums[2] = {};
++	int count = 0;
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up)
++			{
++				if (!owner[cellIndex(across, along, up)]) continue;
++				const float at[3] = { cellRight(across), cellAhead(along), cellUp(up) };
++				for (int i = 0; i < 3; ++i) { low[i] = std::min(low[i], at[i]); high[i] = std::max(high[i], at[i]); }
++				sums[0] += at[0]; sums[1] += at[1];
++				++count;
++			}
++	if (count == 0 || perSide < 1) return;
++	const float middle[2] = { (float)(sums[0] / count), (float)(sums[1] / count) };
++	// A drawing's thin pixels beside its thick part: how far out they reach to its left and its right (pixels from the
++	// thick part's middle column), the knee (their top rows: its row, and how far out it is), the feet's row (the
++	// lowest of the outer ones), the row they leave the body at.
++	struct Reading { bool any = false; int left = 0, right = 0; float middle = 0.0f, reach[2] = {}, kneeRow = 0.0f, kneeOut = 0.0f, footRow = 0.0f, hipRow = 0.0f; };
++	auto thin = [&](int d, int column, int row) { return part.frame[d][row * FrameSize + column] && !thick.frame[d][row * FrameSize + column]; };
++	auto read = [&](int d)
++	{
++		Reading reading;
++		int left = FrameSize, right = -1, top = FrameSize, bottom = -1;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				if (!thick.frame[d][row * FrameSize + column]) continue;
++				left = std::min(left, column); right = std::max(right, column);
++				top = std::min(top, row); bottom = std::max(bottom, row);
++			}
++		if (right < 0) return reading;
++		reading.left = left; reading.right = right;
++		reading.middle = (left + right + 1) * 0.5f;
++		int kneeRow = FrameSize;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				// (before or behind the body, whose leg a pixel is can't be told)
++				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
++				float &reach = reading.reach[column < left ? 0 : 1];
++				reach = std::max(reach, std::abs(column + 0.5f - reading.middle));
++				kneeRow = std::min(kneeRow, row);
++				reading.any = true;
++			}
++		if (!reading.any) return reading;
++		float outSum = 0.0f, hipSum = 0.0f;
++		int outCount = 0, hipCount = 0, footRow = -1;
++		for (int row = 0; row < FrameSize; ++row)
++			for (int column = 0; column < FrameSize; ++column)
++			{
++				if ((column >= left && column <= right) || !thin(d, column, row)) continue;
++				const float out = std::abs(column + 0.5f - reading.middle);
++				if (row < kneeRow + LegThin) { outSum += out; ++outCount; }
++				if (out >= LegFeet * reading.reach[column < left ? 0 : 1]) footRow = std::max(footRow, row);
++				if (column >= left - LegThin && column <= right + LegThin) { hipSum += row + 0.5f; ++hipCount; }
++			}
++		reading.kneeRow = (float)kneeRow;
++		reading.kneeOut = outSum / std::max(outCount, 1);
++		reading.footRow = (float)(footRow + 1);
++		reading.hipRow = hipCount ? hipSum / hipCount : (top + bottom + 1) * 0.5f;
++		return reading;
++	};
++	const Reading front = read(Front), side = read(RightSide);
++	if (!front.any) return;
++	// (in the body's own measures: a pixel across a drawing is 1 / PixelsAcross of them, a row is one)
++	const float reachAcross = std::max(front.reach[0], front.reach[1]) / PixelsAcross;
++	const float reachAhead = side.any && side.reach[1] > 0.0f ? side.reach[1] / PixelsAcross : reachAcross;
++	const float reachBehind = side.any && side.reach[0] > 0.0f ? side.reach[0] / PixelsAcross : reachAcross;
++	const float kneeUp = std::max(2.0f * LegRadius, front.footRow - front.kneeRow - LegRadius);
++	const float kneeShare = std::clamp(front.kneeOut / PixelsAcross / std::max(reachAcross, 0.01f), 0.25f, 0.8f);
++	const float hipUp = std::clamp(front.footRow - front.hipRow, std::max(low[2], LegRadius), std::max(high[2], LegRadius));
++	// the legs' colours: the front drawing's thin pixels beside the body, and the commonest of them
++	int seen[256] = {};
++	for (int row = 0; row < FrameSize; ++row)
++		for (int column = 0; column < FrameSize; ++column)
++			if ((column < front.left || column > front.right) && thin(Front, column, row)) ++seen[part.frame[Front][row * FrameSize + column]];
++	const Uint8 commonest = (Uint8)(std::max_element(seen + 1, seen + 256) - seen);
++	auto colourAt = [&](float share, float up, int sideSign) -> Uint8
++	{
++		// (the front drawing has the unit's right on its left)
++		const float reach = front.reach[sideSign > 0 ? 0 : 1] > 0.0f ? front.reach[sideSign > 0 ? 0 : 1] : std::max(front.reach[0], front.reach[1]);
++		const int column = (int)std::floor(front.middle - sideSign * share * reach), row = (int)std::floor(front.footRow - up);
++		for (int ring = 0; ring <= 2 * LegThin; ++ring)
++			for (int dy = -ring; dy <= ring; ++dy)
++				for (int dx = -ring; dx <= ring; ++dx)
++				{
++					if (std::max(std::abs(dx), std::abs(dy)) != ring) continue;
++					const int c = column + dx, r = row + dy;
++					if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || (c >= front.left && c <= front.right) || !thin(Front, c, r)) continue;
++					return part.frame[Front][r * FrameSize + c];
++				}
++		return commonest;
++	};
++	// (the angles: evenly from ahead round to behind; the legs reach as far to the side, ahead and behind as drawn)
++	float mostSine = 0.0f, mostCosine = 0.0f;
++	for (int leg = 0; leg < perSide; ++leg)
++	{
++		const float angle = (float)(Pi * (leg + 0.5) / perSide);
++		mostSine = std::max(mostSine, std::sin(angle));
++		mostCosine = std::max(mostCosine, std::abs(std::cos(angle)));
++	}
++	std::vector<Uint8> cells(GridCells, 0);
++	const bool painted = (int)Painted.size() == GridCells;
++	for (int sideSign = -1; sideSign <= 1; sideSign += 2)
++	{
++		for (int leg = 0; leg < perSide; ++leg)
++		{
++			const float angle = (float)(Pi * (leg + 0.5) / perSide), sine = std::sin(angle), cosine = std::cos(angle);
++			const float out = reachAcross / mostSine * sine, along = (cosine >= 0.0f ? reachAhead : reachBehind) / std::max(mostCosine, 0.3f) * cosine;
++			const float hip[3] = { middle[0] + sideSign * (high[0] - low[0]) * 0.25f * sine, middle[1] + (high[1] - low[1]) * 0.25f * cosine, hipUp };
++			const float foot[3] = { middle[0] + sideSign * out, middle[1] + along, LegRadius };
++			const float knee[3] = { middle[0] + sideSign * out * kneeShare, middle[1] + along * kneeShare, kneeUp };
++			std::fill(cells.begin(), cells.end(), (Uint8)0);
++			fillCapsule(cells, hip, knee, LegRadius);
++			fillCapsule(cells, knee, foot, LegRadius);
++			const float far = std::max(planeLength(foot[0] - middle[0], foot[1] - middle[1]), 0.01f);
++			for (int cell = 0; cell < GridCells; ++cell)
++			{
++				if (!cells[cell] || owner[cell] || cellUp(cell % GridUp) < 0.0f) continue;
++				owner[cell] = code;
++				if (!painted) continue;
++				const float right = cellRight(cell / (GridUp * GridAlong)), ahead = cellAhead((cell / GridUp) % GridAlong);
++				Painted[cell] = colourAt(std::min(1.0f, planeLength(right - middle[0], ahead - middle[1]) / far), cellUp(cell % GridUp), sideSign);
++			}
++		}
++	}
++}
++
 +std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 +	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 +	const SDL_Color *palette)
@@ -93268,7 +93745,10 @@ index 000000000..ac198b360
 +	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 +	// and profile.)
 +	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
-+	const bool beast = routine.whole && !routine.big && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
++	// (A creature on thin legs spread round it, the unit table's "legs: N": how many a side; see spreadLegs. No long
++	// body, whatever else the table calls it.)
++	const int legsASide = routine.whole && !turret && !tank ? (routine.traits >> 4) & 7 : 0;
++	const bool beast = routine.whole && !routine.big && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
 +	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 +	float beastLegsTop = 0.0f;
 +	std::vector<int> onTop[8], solidOnTop[8];
@@ -93301,6 +93781,8 @@ index 000000000..ac198b360
 +		// (with one body for every side, see OneBody, no view's pieces show that detail: it stays in the shape, a
 +		// Cacodemon's horns with it)
 +		if (routine.big && !OneBody) keepSolid(solid);
++		// (a creature on thin legs: its body is its drawings' thick part; its legs are made after, see spreadLegs)
++		if (legsASide) solid = thickPart(solid);
 +		// (a big unit's rows aren't heights: its four tiles' pictures stand on floors 8 rows apart, see tileFloorRows; its
 +		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 +		// agree, and a strict hull of them lost its shell and horns)
@@ -93517,6 +93999,20 @@ index 000000000..ac198b360
 +			std::copy(arm.shoulder, arm.shoulder + 3, shoulder);
 +			std::copy(arm.hand, arm.hand + 3, hand);
 +			placeElbow(shoulder, hand, bone, frames, elbow);
++			// (Posed arms, see below, with the unit table's "arms: elbow" for the units it names: a hand that holds its
++			// item up, the arm's drawing ending well below it, PosedElbowUnder. The drawing's lower end is the elbow then,
++			// no further ahead than the shoulder (the drawing's last row from the side is the forearm's, its middle ahead
++			// of the elbow), the upper arm down to it and the forearm up to the item, each as long as that makes it. Two
++			// bones of one length from the shoulder to a hand so near it fold far out, and the drawings, in which the arm
++			// goes down, don't say which way: out behind the back, "arm is at awkward, tense angle (elbow behind back)
++			// ... for that gun position, elbow should be facing almost straight down, with forearm up to hold gun", a
++			// player, GitHub issue #240.)
++			float drawnEnd[3];
++			if ((routine.arms & 24) == 24 && arm.holds && armEnd(parts[arm.part], arm.right, false, drawnEnd) && drawnEnd[2] < hand[2] - PosedElbowUnder && drawnEnd[2] < shoulder[2])
++			{
++				std::copy(drawnEnd, drawnEnd + 3, elbow);
++				elbow[1] = std::min(elbow[1], shoulder[1]);
++			}
 +			armRadii(frames, shoulder, elbow, hand, radius);
 +			// Arms outside the body (the unit table's "arms: outside", for the units it names): a body drawn in a robe
 +			// is carved as wide as the robe, and the arms its drawings lay over the robe's sides were inside it, flat
@@ -93554,7 +94050,7 @@ index 000000000..ac198b360
 +	{
 +		if (!parts[p].any || tank) continue;
 +		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
-+		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide);
++		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, PartCodes[p] == VoxelUnitModel::Legs && (routine.traits & 4));
 +		// (cut by the front and back drawings alone: see Cardinals)
 +		// (A limb drawn as a part of its own is still cut by all eight of its drawings, two of them forgiven: an arm
 +		// laid across the chest on a weapon is a bar slanting through the body, and its front and side drawings alone
@@ -93675,12 +94171,14 @@ index 000000000..ac198b360
 +	// its feet along the floor as its side drawings have them, see continueFeet, and its skin's pits are filled;
 +	// after the loose cells and the pieces apart went, which took a thin shin and all below it; not a thin thing, a
 +	// bat: its wings went on down as curtains)
-+	if (routine.whole && !routine.big && !beast && !tank && !turret && !thinDrawing(parts[0]))
++	if (routine.whole && !routine.big && !beast && !tank && !turret && !legsASide && !thinDrawing(parts[0]))
 +	{
 +		continueLimbs(parts[0], PartCodes[0], owner);
 +		continueFeet(parts[0], PartCodes[0], owner);
 +		fillPits(owner);
 +	}
++	// (the legs of a creature on thin legs, round the body its drawings' thick part left: see spreadLegs)
++	if (legsASide) spreadLegs(parts[0], thickPart(parts[0]), legsASide, PartCodes[0], owner);
 +
 +	// The waist: each part's shape narrows to nothing at its ends, and where the torso's lowest rows met the legs' highest
 +	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
@@ -94053,7 +94551,10 @@ index 000000000..ac198b360
 +		// don't shade it alike nor lie on one solid: a civilian's white shirt was blotched with its arms' skin and
 +		// shadow, its shorts with its hands, its face a plain patch; a Celatid was striped, a Silacoid speckled. The
 +		// owner, of the civilian: "something is very wrong with this model and its colors".)
-+		const bool hull = turret || beast || tank || (routine.whole && routine.big && !fourSided);
++		// (and a body on one frame the unit table names "paint: hull": a small saucer is no standing figure with a front
++		// and a back, and painted as one it had its drawings' lowest rows, a visor in its rim, under it: "the blue paint
++		// on the underside, when it should be a frontal visor", a player, GitHub issue #236)
++		const bool hull = turret || beast || tank || (routine.whole && routine.big && !fourSided) || (routine.whole && (routine.traits & 8));
 +		// (an animal's face, see below: the cells furthest ahead and furthest back on each line along the body)
 +		std::vector<int> foremost, rearmost;
 +		if (beast && routine.beast)
@@ -94172,6 +94673,8 @@ index 000000000..ac198b360
 +			}
 +			// (a cell made for a pixel it doesn't stand behind, a toe, a shoe: that pixel's colour)
 +			if ((facing || routine.standard) && (int)Painted.size() == GridCells) colour = Painted[cell];
++			// (a leg made anew, see spreadLegs: the colour it was given)
++			else if (legsASide && (int)Painted.size() == GridCells && Painted[cell]) colour = Painted[cell];
 +			if (facing && !colour && !facesUp)
 +			{
 +				// (the front, back and side drawings first, the one it is turned to most; the quarter drawings where none
@@ -94317,7 +94820,7 @@ index 000000000..ac198b360
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
-+	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull);
++	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull, routine.beast || legsASide);
 +	return model;
 +}
 +
@@ -94406,10 +94909,10 @@ index 000000000..ac198b360
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.h b/src/FirstPerson/FirstPersonVoxelBodies.h
 new file mode 100644
-index 000000000..20ddabafe
+index 000000000..eece060a0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.h
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,167 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -94506,11 +95009,14 @@ index 000000000..20ddabafe
 +/// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 +/// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 +/// length, 4 painted by their own drawing alone, 8 posed: an arm is where its bones are, and what its drawings add
-+/// away from them is left out (see makeModel).
++/// away from them is left out, 16 with posed: an arm that holds its item up has its elbow where its drawing ends below
++/// the hand (see makeModel).
 +/// Traits: more the unit table says of a named unit, a bit each: 1 its trunk is round ("trunk: round": a long body as
 +/// broad as it is tall, whatever its frontal drawings show; see profile), 2 its head is its face and its hair ("head:
 +/// face": only what is turned to the front is the front drawing's, the rest of the head the back drawing's; see
-+/// makeModel).
++/// makeModel), 4 its legs' frames draw a tail too ("tail: drawn": see limb), 8 drawn on one frame, it is painted as
++/// a hull is ("paint: hull": see makeModel); and in the bits from 16 up, how many thin legs it has on each side, made
++/// anew round its body ("legs: N", N all told: see spreadLegs).
 +/// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
 +/// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
 +/// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see
@@ -95078,10 +95584,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..807b588b7
+index 000000000..2b9d335e6
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1274 @@
+@@ -0,0 +1,1320 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -95199,6 +95705,8 @@ index 000000000..807b588b7
 +/// A unit drawn the same from every side is lopsided, and made as a relief (see VoxelBodies::Routine), when fewer than
 +/// this many in a hundred of its drawing's pixels have their mirror pixel drawn too (see modelFor).
 +const int ReliefAlike = 75;
++/// A unit that can't move is a mount (see modelFor) when this many of its eight drawings are the same picture.
++const int MountAlike = 3;
 +/// A tank's turret tops out this many voxels up (see modelFor): the owner's number.
 +const int TankTop = 20;
 +
@@ -95677,6 +96185,28 @@ index 000000000..807b588b7
 +	unitSprite.setViewRotation(0);
 +	unitSprite.setDrawOut(false);
 +	unitSprite.setAnimationFrame(animNow);
++	// A mount: a unit that can't move, one tile big, drawn the same from MountAlike of its eight sides or more, though
++	// not from all: a gun on a plate bolted to a vehicle's side, the plate drawn the same whichever way the unit
++	// faces, the gun only where it can point (the 40k mod's sponsons). Its drawings are no body's seen from eight
++	// sides, and what the eight leave in common is a crumb: it has no body, and is drawn as its picture, as with the
++	// setting off ("turret SEEMS to have issue displaying because its a unit limited in turn radius", a player, GitHub
++	// issue #233). (A body that turns is drawn differently from every side; one drawn the same from all eight is a
++	// Silacoid's or a relief, see above.)
++	if (routine->whole && !routine->big && !relief && !unit->getArmor()->allowsMoving())
++	{
++		int most = 0;
++		for (int d = 0; d < 8; ++d)
++		{
++			int alike = 0;
++			for (int other = 0; other < 8; ++other) alike += parts[0].frame[other] == parts[0].frame[d];
++			most = std::max(most, alike);
++		}
++		if (most >= MountAlike && most < 8)
++		{
++			_models[key] = nullptr;
++			return nullptr;
++		}
++	}
 +	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 +	std::vector<Uint8> corpse;
 +	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
@@ -95810,7 +96340,7 @@ index 000000000..807b588b7
 +		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 +	}
 +	const Uint8 pose[12] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)std::max(look.frontal, 0), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.standard == 1), (Uint8)((look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0)) };
++		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)std::max(look.frontal, 0), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.standard == 1), (Uint8)((look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0) | (look.tail == 1 ? 4 : 0) | (look.hullPaint == 1 ? 8 : 0) | (look.legs > 0 ? (look.legs / 2) << 4 : 0)) };
 +	hashBytes(hash, pose, 12);
 +	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 +	hashBytes(hash, tankHeights, 2);
@@ -95853,7 +96383,7 @@ index 000000000..807b588b7
 +		job->arms = std::max(look.arms, 0);
 +		job->standard = look.standard == 1;
 +		job->sides = look.frontal == 2;
-+		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0);
++		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0) | (look.tail == 1 ? 4 : 0) | (look.hullPaint == 1 ? 8 : 0) | (look.legs > 0 ? (look.legs / 2) << 4 : 0);
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -95968,20 +96498,41 @@ index 000000000..807b588b7
 +
 +int VoxelUnits::restFrame(const BattleUnit *unit, const SavedBattleGame *save)
 +{
-+	auto known = _restFrames.find(unit->getId());
-+	if (known != _restFrames.end()) return known->second;
-+	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
-+	// rest at once). Looked for over 32 frames; none: the first, as ever.
-+	int rest = 0;
 +	Uint8 tables[48][256];
-+	bool scripted = true;
-+	for (int frame = 0; scripted && frame < 48; ++frame) scripted = recolourTable(unit, save, frame, tables[frame]);
-+	for (int frame = 0; scripted && frame < 32; ++frame)
++	auto known = _restFrames.find(unit->getId());
++	// (The frame found before, while the sprite is still recoloured there as it was. A flash is told by the frame of
++	// the hit that set it off: XPiratez's hit effect is on at every frame up to three past the unit's last hit, every
++	// earlier frame too. A frame at rest when it was found is in the flash of any later hit.)
++	if (known != _restFrames.end()
++		&& (!known->second.scripted || (recolourTable(unit, save, known->second.frame, tables[0]) && std::equal(tables[0], tables[0] + 256, known->second.table))))
 +	{
-+		if (std::equal(tables[frame], tables[frame] + 256, tables[frame + 8]) && std::equal(tables[frame], tables[frame] + 256, tables[frame + 16])) { rest = frame; break; }
++		return known->second.frame;
 +	}
-+	_restFrames[unit->getId()] = rest;
-+	return rest;
++	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
++	// rest at once). Looked for from now on, over 32 frames: a body made of a unit hit earlier in the battle, in a
++	// battle loaded above all, was looked for at rest from the battle's first frames on, all of them in its hit's
++	// flash, and stood in the flash's one colour for good, its corpse after it (a player, GitHub issue #241, "smoke
++	// effect seems to trigger improperly ... this was after a load"). None: now, as ever.
++	RestFrame &rest = _restFrames[unit->getId()];
++	const int now = save->getAnimFrame();
++	rest.frame = 0;
++	rest.scripted = true;
++	for (int ahead = 0; rest.scripted && ahead < 48; ++ahead) rest.scripted = recolourTable(unit, save, now + ahead, tables[ahead]);
++	if (!rest.scripted) return rest.frame; // (no script: the battle's first frame, so that two units alike share a body)
++	int found = 0;
++	for (int ahead = 0; ahead < 32; ++ahead)
++	{
++		if (std::equal(tables[ahead], tables[ahead] + 256, tables[ahead + 8]) && std::equal(tables[ahead], tables[ahead] + 256, tables[ahead + 16])) { found = ahead; break; }
++	}
++	rest.frame = now + found;
++	std::copy(tables[found], tables[found] + 256, rest.table);
++	// (One of the battle's first frames instead, where the sprite is drawn there as at rest: two units alike are then
++	// made at one frame, as those without a script are, and share a body.)
++	for (int first = 0; first < 32; ++first)
++	{
++		if (recolourTable(unit, save, first, tables[0]) && std::equal(tables[0], tables[0] + 256, rest.table)) { rest.frame = first; break; }
++	}
++	return rest.frame;
 +}
 +
 +const VoxelUnitModel *VoxelUnits::lastBody(const BattleUnit *unit) const
@@ -96081,6 +96632,7 @@ index 000000000..807b588b7
 +	_waiting.clear();
 +	_lastBodies.clear();
 +	_lastFacings.clear();
++	_restFrames.clear();
 +}
 +
 +/**
@@ -96358,10 +96910,10 @@ index 000000000..807b588b7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..816dba46c
+index 000000000..a53939f68
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,276 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -96575,7 +97127,8 @@ index 000000000..816dba46c
 +	/// colour itself where the script leaves it. False, and nothing done, for an armor without such a script.
 +	static bool recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256]);
 +	/// The frame of the battle's animation a unit's body is made at: one at which its sprite's recolouring is at rest
-+	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on.
++	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on, or of one its mod
++	/// still tells by the frame of a hit long past.
 +	int restFrame(const BattleUnit *unit, const SavedBattleGame *save);
 +	/// The way a unit faced when it was last drawn as a body, up.
 +	int lastFacing(const BattleUnit *unit) const;
@@ -96589,7 +97142,8 @@ index 000000000..816dba46c
 +	/// Forgets every body, and those being made (a new battle).
 +	void clear();
 +private:
-+	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
++	struct RestFrame { int frame = 0; bool scripted = false; Uint8 table[256]; }; // (table: what the unit's script made of each colour there, when found)
++	std::map<int, RestFrame> _restFrames; // each unit's (by its id), found again when its sprite is no longer at rest there (see restFrame)
 +	std::map<int, float> _handLongest; // by hand drawing: the longest inventory picture among the melee weapons that use it (see handShare)
 +	float handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites);
 +	/// The frames and pictures a body is being made from (defined with the builder).
@@ -102504,10 +103058,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..5476845ad
+index 000000000..8a2f68446
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1171 @@
+@@ -0,0 +1,1181 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -102745,7 +103299,7 @@ index 000000000..5476845ad
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
@@ -103044,6 +103598,11 @@ index 000000000..5476845ad
 +		{
 +			static const char *const leanNames[] = { "STR_FPS_LEAN_OFF", "STR_FPS_LEAN_PEEK", "STR_FPS_LEAN_TILT" };
 +			return std::string(tr(leanNames[std::clamp(*option.asInt(), 0, 2)]));
++		}
++		// The flashlight is a choice of two, shown by name.
++		if (option.id() == "fpsFlashlightReach")
++		{
++			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_FLASHLIGHT_FAR" : "STR_FPS_FLASHLIGHT_BEAM"));
 +		}
 +		// The rangefinder is a choice of three, shown by name.
 +		if (option.id() == "fpsRangefinder")
@@ -103435,6 +103994,11 @@ index 000000000..5476845ad
 +		{
 +			*value = (*value + direction + 3) % 3;
 +		}
++		// The flashlight (beam, far light): either button switches.
++		else if (value == &Options::fpsFlashlightReach)
++		{
++			*value = *value == 1 ? 0 : 1;
++		}
 +		// Movement (free, tiles) and VR turning (smooth, snap): either button switches.
 +		else if (value == &Options::fpsMovement || value == &Options::fpsVrTurning)
 +		{
@@ -103802,10 +104366,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..b124a13de
+index 000000000..053936dc0
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,558 @@
+@@ -0,0 +1,567 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -103932,10 +104496,13 @@ index 000000000..b124a13de
 +		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 +		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 +		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
-+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones; 0 as drawn)
++		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends; 0 as drawn)
 +		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 +		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 +		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
++		int tail = -1; // (its legs' frames draw a tail too: 1; every run of theirs is a leg's, as ever: 0)
++		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
++		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
 +		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
@@ -104164,8 +104731,8 @@ index 000000000..b124a13de
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head;
-+				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint;
++				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
 +				if (entry.tryRead("shape", shape))
@@ -104186,12 +104753,15 @@ index 000000000..b124a13de
 +					{
 +						const size_t end = std::min(arms.find_first_of(" ,", at), arms.size());
 +						const std::string word = arms.substr(at, end - at);
-+						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : 0;
++						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : word == "elbow" ? 16 : 0;
 +						at = end + 1;
 +					}
 +				}
 +				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 +				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
++				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
++				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
++				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
 +				if (entry.tryRead("flat", flat)) look.flatTop = std::clamp(flat, 10, 100);
 +				if (entry.tryRead("flatUnder", flatUnder)) look.flatUnder = std::clamp(flatUnder, 10, 100);
@@ -104298,6 +104868,9 @@ index 000000000..b124a13de
 +			if (entry.second.standard != -1) look.standard = entry.second.standard;
 +			if (entry.second.roundTrunk != -1) look.roundTrunk = entry.second.roundTrunk;
 +			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
++			if (entry.second.tail != -1) look.tail = entry.second.tail;
++			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
++			if (entry.second.legs != -1) look.legs = entry.second.legs;
 +			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
 +			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 +		}

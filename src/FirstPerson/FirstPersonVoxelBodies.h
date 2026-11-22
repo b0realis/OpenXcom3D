@@ -94,11 +94,14 @@ constexpr int PartCount = 6, BodyParts = 4, RightItem = 4, LeftItem = 5;
 /// drawings have it). The one body not as high as its sprite: the owner's ruling on GitHub issue #201.
 /// Arms: what the unit table says of a named unit's arms, a bit each: 1 outside the body, 2 coloured along their
 /// length, 4 painted by their own drawing alone, 8 posed: an arm is where its bones are, and what its drawings add
-/// away from them is left out (see makeModel).
+/// away from them is left out, 16 with posed: an arm that holds its item up has its elbow where its drawing ends below
+/// the hand (see makeModel).
 /// Traits: more the unit table says of a named unit, a bit each: 1 its trunk is round ("trunk: round": a long body as
 /// broad as it is tall, whatever its frontal drawings show; see profile), 2 its head is its face and its hair ("head:
 /// face": only what is turned to the front is the front drawing's, the rest of the head the back drawing's; see
-/// makeModel).
+/// makeModel), 4 its legs' frames draw a tail too ("tail: drawn": see limb), 8 drawn on one frame, it is painted as
+/// a hull is ("paint: hull": see makeModel); and in the bits from 16 up, how many thin legs it has on each side, made
+/// anew round its body ("legs: N", N all told: see spreadLegs).
 /// Kneeling: the pose the body is made in (set for the unit being made). Standard: the unit table names it a person
 /// ("humanoid: standard"): its body is cut by its front, back and side drawings alone, painted by the drawing each
 /// cube is turned to, holds no item if it is drawn on one frame, and is made the standard humanoid (see

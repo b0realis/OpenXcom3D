@@ -304,7 +304,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 		for (int axis = 0; axis < 3; ++axis) frame.lamps[lamp][axis] = lamp < frame.lampCount ? view._nearbyLights[lamp].pos[axis] : 0.0f;
 		frame.lamps[lamp][3] = lamp < frame.lampCount ? view._nearbyLights[lamp].strength : 0.0f;
 	}
-	frame.flashlight = !view._flashlight ? 0 : view._dynamicFlashlight ? 2 : 1;
+	frame.flashlight = !view._flashlight || view._aimLight == 2 ? 0 : view._aimLight == 1 ? 3 : view._dynamicFlashlight ? 2 : 1;
 	frame.flareCount = (int)std::min<size_t>(8, view._flareLights.size());
 	for (int flare = 0; flare < 8; ++flare)
 	{

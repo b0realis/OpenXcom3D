@@ -211,7 +211,8 @@ public:
 	/// colour itself where the script leaves it. False, and nothing done, for an armor without such a script.
 	static bool recolourTable(const BattleUnit *unit, const SavedBattleGame *save, int frame, Uint8 table[256]);
 	/// The frame of the battle's animation a unit's body is made at: one at which its sprite's recolouring is at rest
-	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on.
+	/// (see recolourTable), so a body isn't made in the colours of a flash that happened to be on, or of one its mod
+	/// still tells by the frame of a hit long past.
 	int restFrame(const BattleUnit *unit, const SavedBattleGame *save);
 	/// The way a unit faced when it was last drawn as a body, up.
 	int lastFacing(const BattleUnit *unit) const;
@@ -225,7 +226,8 @@ public:
 	/// Forgets every body, and those being made (a new battle).
 	void clear();
 private:
-	std::map<int, int> _restFrames; // each unit's (by its id), once found (see restFrame)
+	struct RestFrame { int frame = 0; bool scripted = false; Uint8 table[256]; }; // (table: what the unit's script made of each colour there, when found)
+	std::map<int, RestFrame> _restFrames; // each unit's (by its id), found again when its sprite is no longer at rest there (see restFrame)
 	std::map<int, float> _handLongest; // by hand drawing: the longest inventory picture among the melee weapons that use it (see handShare)
 	float handShare(const RuleItem *rule, const Mod *mod, const SurfaceSet *inventorySprites);
 	/// The frames and pictures a body is being made from (defined with the builder).

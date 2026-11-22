@@ -115,6 +115,8 @@ const int DitherShare = 33;
 /// A unit drawn the same from every side is lopsided, and made as a relief (see VoxelBodies::Routine), when fewer than
 /// this many in a hundred of its drawing's pixels have their mirror pixel drawn too (see modelFor).
 const int ReliefAlike = 75;
+/// A unit that can't move is a mount (see modelFor) when this many of its eight drawings are the same picture.
+const int MountAlike = 3;
 /// A tank's turret tops out this many voxels up (see modelFor): the owner's number.
 const int TankTop = 20;
 
@@ -593,6 +595,28 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	unitSprite.setViewRotation(0);
 	unitSprite.setDrawOut(false);
 	unitSprite.setAnimationFrame(animNow);
+	// A mount: a unit that can't move, one tile big, drawn the same from MountAlike of its eight sides or more, though
+	// not from all: a gun on a plate bolted to a vehicle's side, the plate drawn the same whichever way the unit
+	// faces, the gun only where it can point (the 40k mod's sponsons). Its drawings are no body's seen from eight
+	// sides, and what the eight leave in common is a crumb: it has no body, and is drawn as its picture, as with the
+	// setting off ("turret SEEMS to have issue displaying because its a unit limited in turn radius", a player, GitHub
+	// issue #233). (A body that turns is drawn differently from every side; one drawn the same from all eight is a
+	// Silacoid's or a relief, see above.)
+	if (routine->whole && !routine->big && !relief && !unit->getArmor()->allowsMoving())
+	{
+		int most = 0;
+		for (int d = 0; d < 8; ++d)
+		{
+			int alike = 0;
+			for (int other = 0; other < 8; ++other) alike += parts[0].frame[other] == parts[0].frame[d];
+			most = std::max(most, alike);
+		}
+		if (most >= MountAlike && most < 8)
+		{
+			_models[key] = nullptr;
+			return nullptr;
+		}
+	}
 	// And its corpse's picture on the floor (FLOOROB.PCK, as the map draws a corpse), for the body to end lying as it shows.
 	std::vector<Uint8> corpse;
 	const auto &corpseItems = unit->getArmor()->getCorpseBattlescape();
@@ -726,7 +750,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		tankHull = std::min(tankHull, tankTop - 4.0f); // (room for the turret)
 	}
 	const Uint8 pose[12] = { (Uint8)aiming, (Uint8)routine->number, (Uint8)FineBodies, (Uint8)std::lround(shows * 100.0f), (Uint8)(look.beast == 1),
-		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)std::max(look.frontal, 0), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.standard == 1), (Uint8)((look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0)) };
+		(Uint8)std::max(look.torsoDepth, 0), (Uint8)(look.backTop == 1), (Uint8)std::max(look.frontal, 0), (Uint8)relief, (Uint8)std::max(look.arms, 0), (Uint8)(look.standard == 1), (Uint8)((look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0) | (look.tail == 1 ? 4 : 0) | (look.hullPaint == 1 ? 8 : 0) | (look.legs > 0 ? (look.legs / 2) << 4 : 0)) };
 	hashBytes(hash, pose, 12);
 	const Uint8 tankHeights[2] = { (Uint8)tankHull, (Uint8)tankTop };
 	hashBytes(hash, tankHeights, 2);
@@ -769,7 +793,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->arms = std::max(look.arms, 0);
 		job->standard = look.standard == 1;
 		job->sides = look.frontal == 2;
-		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0);
+		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0) | (look.tail == 1 ? 4 : 0) | (look.hullPaint == 1 ? 8 : 0) | (look.legs > 0 ? (look.legs / 2) << 4 : 0);
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;
@@ -884,20 +908,41 @@ bool VoxelUnits::recolourTable(const BattleUnit *unit, const SavedBattleGame *sa
 
 int VoxelUnits::restFrame(const BattleUnit *unit, const SavedBattleGame *save)
 {
-	auto known = _restFrames.find(unit->getId());
-	if (known != _restFrames.end()) return known->second;
-	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
-	// rest at once). Looked for over 32 frames; none: the first, as ever.
-	int rest = 0;
 	Uint8 tables[48][256];
-	bool scripted = true;
-	for (int frame = 0; scripted && frame < 48; ++frame) scripted = recolourTable(unit, save, frame, tables[frame]);
-	for (int frame = 0; scripted && frame < 32; ++frame)
+	auto known = _restFrames.find(unit->getId());
+	// (The frame found before, while the sprite is still recoloured there as it was. A flash is told by the frame of
+	// the hit that set it off: XPiratez's hit effect is on at every frame up to three past the unit's last hit, every
+	// earlier frame too. A frame at rest when it was found is in the flash of any later hit.)
+	if (known != _restFrames.end()
+		&& (!known->second.scripted || (recolourTable(unit, save, known->second.frame, tables[0]) && std::equal(tables[0], tables[0] + 256, known->second.table))))
 	{
-		if (std::equal(tables[frame], tables[frame] + 256, tables[frame + 8]) && std::equal(tables[frame], tables[frame] + 256, tables[frame + 16])) { rest = frame; break; }
+		return known->second.frame;
 	}
-	_restFrames[unit->getId()] = rest;
-	return rest;
+	// At rest: as it is 8 and 16 frames on too (a flash is a few frames long; a recolouring that never changes is at
+	// rest at once). Looked for from now on, over 32 frames: a body made of a unit hit earlier in the battle, in a
+	// battle loaded above all, was looked for at rest from the battle's first frames on, all of them in its hit's
+	// flash, and stood in the flash's one colour for good, its corpse after it (a player, GitHub issue #241, "smoke
+	// effect seems to trigger improperly ... this was after a load"). None: now, as ever.
+	RestFrame &rest = _restFrames[unit->getId()];
+	const int now = save->getAnimFrame();
+	rest.frame = 0;
+	rest.scripted = true;
+	for (int ahead = 0; rest.scripted && ahead < 48; ++ahead) rest.scripted = recolourTable(unit, save, now + ahead, tables[ahead]);
+	if (!rest.scripted) return rest.frame; // (no script: the battle's first frame, so that two units alike share a body)
+	int found = 0;
+	for (int ahead = 0; ahead < 32; ++ahead)
+	{
+		if (std::equal(tables[ahead], tables[ahead] + 256, tables[ahead + 8]) && std::equal(tables[ahead], tables[ahead] + 256, tables[ahead + 16])) { found = ahead; break; }
+	}
+	rest.frame = now + found;
+	std::copy(tables[found], tables[found] + 256, rest.table);
+	// (One of the battle's first frames instead, where the sprite is drawn there as at rest: two units alike are then
+	// made at one frame, as those without a script are, and share a body.)
+	for (int first = 0; first < 32; ++first)
+	{
+		if (recolourTable(unit, save, first, tables[0]) && std::equal(tables[0], tables[0] + 256, rest.table)) { rest.frame = first; break; }
+	}
+	return rest.frame;
 }
 
 const VoxelUnitModel *VoxelUnits::lastBody(const BattleUnit *unit) const
@@ -997,6 +1042,7 @@ void VoxelUnits::clear()
 	_waiting.clear();
 	_lastBodies.clear();
 	_lastFacings.clear();
+	_restFrames.clear();
 }
 
 /**

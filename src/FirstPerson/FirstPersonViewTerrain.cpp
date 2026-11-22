@@ -3049,6 +3049,46 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	}
 	const std::vector<char> &glassPixels = paintedPane ? pane : windowGlass;
 
+	// A wall drawn flat: a north wall's art on the right half of its sprite alone, a west wall's on the left half, a
+	// plain slab's face as the map's eye sees it, standing on the tile's edge. The game's shape gives the wall two or
+	// three voxels of thickness, and read voxel by voxel each layer behind the edge takes the art a voxel further
+	// east (or south) and a voxel higher: the face turned to the room showed the drawing shifted so, its top rows gone
+	// over the wall's top and its end columns off the art. A wall of panes drawn as a grid, a line down each pane's
+	// end and one along its top, had no top lines and its end lines doubled (a player, GitHub issue #233, "texture is
+	// meant to be a GRID, but seemingly 2 parts are omitted as black"). So every layer of such a wall reads the art
+	// as the layer on the tile's edge does. Not a wall with glass, holes or a shape of the mod's (their own readings
+	// go voxel by voxel), nor one thicker than WallPlaneThick, nor a door's leaves.
+	int wallPlane = -1; // (the axis the wall is thin along: 0 a west wall's, 1 a north wall's; -1: read voxel by voxel)
+	if (wallArt && !glassPane && !hasArtHoles && !solidShape && !cutout && !mapData->isDoor() && !mapData->isUFODoor())
+	{
+		const bool north = mapData->getObjectType() == O_NORTHWALL;
+		bool flat = true, any = false;
+		for (int spriteY = 0; spriteY < sprite->getHeight() && flat; ++spriteY)
+			for (int spriteX = 0; spriteX < sprite->getWidth() && flat; ++spriteX)
+			{
+				if (!sprite->getPixel(spriteX, spriteY)) continue;
+				any = true;
+				flat = north ? spriteX >= 16 - WallPlaneSlack : spriteX < 16 + WallPlaneSlack;
+			}
+		int thinFrom = Position::TileXY, thinTo = -1;
+		for (int z = 0; z < Position::TileZ && flat && any; ++z)
+		{
+			const size_t loftStart = mapData->getLoftID(z / 2) * 16;
+			if (loftStart + 16 > loftData->size()) continue;
+			for (int y = 0; y < Position::TileXY; ++y)
+			{
+				const Uint16 loftRow = (*loftData)[loftStart + y];
+				for (int x = 0; loftRow && x < Position::TileXY; ++x)
+				{
+					if (!(loftRow & (1 << (15 - x)))) continue;
+					thinFrom = std::min(thinFrom, north ? y : x);
+					thinTo = std::max(thinTo, north ? y : x);
+				}
+			}
+		}
+		if (flat && any && thinTo >= 0 && thinTo < WallPlaneThick) wallPlane = north ? 1 : 0;
+	}
+
 	// Go through the tile's voxels, layer by layer from the bottom (z), row by row from the
 	// north (y), west to east (x).
 	const int yOffset = mapData->getYOffset();
@@ -3083,8 +3123,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				// the voxel lands that many rows further down in it. A line of voxels going
 				// east, south and up together lands on the same pixel, so they all take the
 				// colour of the front one, the one the art shows (hence colorHiddenSides).
-				const int spriteX = std::clamp(16 + x - y, 0, sprite->getWidth() - 1);
-				const int spriteY = 24 + (x + y) / 2 - z + yOffset;
+				// (a wall drawn flat: every layer as the one on the tile's edge, see wallPlane)
+				const int artX = wallPlane == 0 ? 0 : x, artY = wallPlane == 1 ? 0 : y;
+				const int spriteX = std::clamp(16 + artX - artY, 0, sprite->getWidth() - 1);
+				const int spriteY = 24 + (artX + artY) / 2 - z + yOffset;
 
 				// The pixel's colour, or if the art left it transparent the nearest drawn pixel
 				// up or down the column (a pixel outside the sprite counts as transparent).
@@ -3131,6 +3173,32 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
 					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
 				}
+			}
+		}
+	}
+
+	// A floor's border lines. The art's diamond is 32 pixels wide and 16 high, and a tile's top 16 voxels by 16: each
+	// voxel takes one pixel of the two it lies under, and along three of the tile's four edges the pixel taken is the
+	// next one inwards for every other voxel or for all of them (only the north edge's voxels land on the diamond's
+	// own edge). So a line drawn along a floor's edge came out dotted, or not at all: a deck drawn as a grid, a line
+	// along each tile's two lower edges, showed one way only (a player, GitHub issue #233, "texture is meant to be a
+	// GRID, but seemingly 2 parts are omitted as black, creating a NOT grid"). Along its west, south and east edges
+	// the floor's top voxels take the diamond's own edge pixel, where that is of another colour group than what they
+	// took: a line, not the floor's own grain a shade off.
+	if (mapData->getObjectType() == O_FLOOR && !cutout && !waterFloor && !model.empty)
+	{
+		for (int along = 0; along < Position::TileXY; ++along)
+		{
+			// (the west edge down from the tile's north-west corner, the south edge and the east edge on to its south-east one)
+			const int cells[3][4] = { { 0, along, 15 - along, along / 2 }, { along, Position::TileXY - 1, along, 8 + along / 2 }, { Position::TileXY - 1, along, 31 - along, 8 + along / 2 } };
+			for (const int *cell : cells)
+			{
+				const int x = cell[0], y = cell[1];
+				int top = model.max[2];
+				while (top >= 0 && !model.color[top][y][x]) --top;
+				if (top < 0) continue;
+				const Uint8 edge = sprite->getPixel(cell[2], 24 + cell[3] - top + yOffset), taken = model.color[top][y][x];
+				if (edge && (edge >> 4) != (taken >> 4)) model.color[top][y][x] = edge;
 			}
 		}
 	}
@@ -3370,37 +3438,43 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	if (mapData->getObjectType() == O_FLOOR && !waterFloor && !model.empty && !cutout)
 	{
 		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
-		int drawn = 0, wet = 0;
-		for (int spriteY = 0; groups && spriteY < sprite->getHeight(); ++spriteY)
-			for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
-			{
-				const Uint8 color = sprite->getPixel(spriteX, spriteY);
-				if (!color) continue;
-				++drawn;
-				wet += (groups >> (color >> 4)) & 1;
-			}
-		if (drawn > 0 && wet >= StillWaterLeast * drawn)
+		// (A floor that animates is in every frame what its first frame is, as above: water in all of them or in none,
+		// and its face filled in in all of them. Each frame was asked by its own art, and the first frame's filling
+		// took the later frames' with it: a swamp's deep water was a pit of five columns in some frames of its ripples,
+		// a player, GitHub issue #238, "some frames of animations remove tiles".)
+		bool still = firstFrame && firstFrame->stillWater != 0;
+		if (groups && !firstFrame)
+		{
+			int drawn = 0, wet = 0;
+			for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+				for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+				{
+					const Uint8 color = sprite->getPixel(spriteX, spriteY);
+					if (!color) continue;
+					++drawn;
+					wet += (groups >> (color >> 4)) & 1;
+				}
+			still = drawn > 0 && wet >= StillWaterLeast * drawn;
+		}
+		if (groups && still)
 		{
 			model.stillWater = groups;
 			_anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
-			if (model.artFill)
-			{
-				// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
-				const int top = model.max[2];
-				for (int y = 0; y < Position::TileXY; ++y)
-					for (int x = 0; x < Position::TileXY; ++x)
-					{
-						bool filled = false;
-						for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
-						const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
-						const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
-						if (!color) continue;
-						model.color[top][y][x] = color;
-						model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
-						model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
-					}
-				model.artFill = false;
-			}
+			// (the rest of its art on its top layer, solid, whatever "Parts without shape" says: it is the tile's floor)
+			const int top = model.max[2];
+			for (int y = 0; y < Position::TileXY; ++y)
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					bool filled = false;
+					for (int z = 0; z <= top && !filled; ++z) filled = model.color[z][y][x] != 0;
+					const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - top + yOffset;
+					const Uint8 color = !filled && spriteX >= 0 && spriteY >= 0 && spriteX < sprite->getWidth() && spriteY < sprite->getHeight() ? sprite->getPixel(spriteX, spriteY) : 0;
+					if (!color) continue;
+					model.color[top][y][x] = color;
+					model.min[0] = std::min<int>(model.min[0], x); model.max[0] = std::max<int>(model.max[0], x);
+					model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
+				}
+			model.artFill = false;
 		}
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels

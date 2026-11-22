@@ -777,7 +777,24 @@ float FirstPersonView::pointLight(const float point[3], const float normal[3], b
 	// "Flashlight": Dynamic) is a light on the weapon, as in Half-Life: a tight, bright round spot centred on the
 	// crosshair (full strength within 8 degrees of it, fading out by 13), a faint halo round it
 	// out to 24 degrees, reaching 20 tiles and fading more slowly.
-	if (_flashlight && _dynamicFlashlight)
+	if (_flashlight && _aimLight)
+	{
+		// (Setting "Flashlight": Far light. A light standing where the crosshair's line meets the world, see _aimLight:
+		// the same however far off, on what faces it and nothing stands before.)
+		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };
+		const float distance = std::sqrt(fromLight[0] * fromLight[0] + fromLight[1] * fromLight[1] + fromLight[2] * fromLight[2]);
+		if (_aimLight == 1 && distance < AimLightReach)
+		{
+			const float closeness = 1.0f - distance / AimLightReach;
+			const float facing = normal && distance > 0.5f ? -(normal[0] * fromLight[0] + normal[1] * fromLight[1] + normal[2] * fromLight[2]) / distance : 1.0f;
+			const float power = closeness * closeness * AimLightPower * (0.4f + 0.6f * std::max(0.0f, facing));
+			if (power > 0.25f && facing > 0.0f && !(shadows && shadowed(point, _flashlightPos)))
+			{
+				light += power;
+			}
+		}
+	}
+	else if (_flashlight && _dynamicFlashlight)
 	{
 		const float range = 16.0f * 20.0f; // voxels
 		const float fromLight[3] = { point[0] - _flashlightPos[0], point[1] - _flashlightPos[1], point[2] - _flashlightPos[2] };

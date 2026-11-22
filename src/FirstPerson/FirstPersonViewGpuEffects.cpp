@@ -128,7 +128,7 @@ struct GpuEffectList
 {
 	FirstPersonGpu::Effects effects;
 	std::vector<std::array<int, 4>> boxes;                 // each primitive's box: left, top, one past its right, one past its bottom
-	std::unordered_map<const void*, int> spritesByAddress; // this frame's see-through sprites, by where their opacity maps are: a cloud has hundreds of puffs of a few pictures, each looked up in the atlas once
+	std::unordered_map<const void*, int> spritesByAddress; // this frame's steady sprites (see SpriteDraw::steady), by where their pixels are; this frame's see-through sprites, by where their opacity maps are: a cloud has hundreds of puffs of a few pictures, each looked up in the atlas once
 	struct Pictured { BattleUnit *unit, *body; const Tile *pile; };
 	std::vector<Pictured> pictured;                        // per primitive: whose picture it is
 	std::vector<Uint32> notes;                             // the card's notes, four numbers a pixel
@@ -375,12 +375,13 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 	const Uint8 *opacityMap = seeThroughSprite ? seeThroughSprite->opacityMap : nullptr;
 	auto placeInAtlas = [&]() { return atlasPlace((const Uint8 *)surface->pixels, surface->pitch, spriteWidth, spriteHeight, opacityMap); };
 	int pixelsAt;
-	if (opacityMap && seeThroughSprite->steady)
+	if (opacityMap ? seeThroughSprite->steady : draw.steady)
 	{
-		auto known = list.spritesByAddress.find(opacityMap);
+		const void *address = opacityMap ? (const void *)opacityMap : (const void *)surface->pixels;
+		auto known = list.spritesByAddress.find(address);
 		if (known == list.spritesByAddress.end())
 		{
-			known = list.spritesByAddress.emplace(opacityMap, placeInAtlas()).first;
+			known = list.spritesByAddress.emplace(address, placeInAtlas()).first;
 		}
 		pixelsAt = known->second;
 	}
@@ -972,7 +973,10 @@ void FirstPersonView::gpuPresent()
 			const SDL_Color &own = palette[made[column]];
 			int wanted[3] = { own.r, own.g, own.b };
 			const Uint32 full = _trueColor[index];
-			if (made[column] == _rayColors[index])
+			if (drawnOver(index))
+			{
+			}
+			else if (made[column] == _rayColors[index])
 			{
 				wanted[0] = (full >> 16) & 0xFF; wanted[1] = (full >> 8) & 0xFF; wanted[2] = full & 0xFF;
 			}

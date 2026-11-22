@@ -124,10 +124,13 @@ public:
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
 		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
-		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones; 0 as drawn)
+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends; 0 as drawn)
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
+		int tail = -1; // (its legs' frames draw a tail too: 1; every run of theirs is a leg's, as ever: 0)
+		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
+		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
@@ -356,8 +359,8 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head;
-				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint;
+				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
 				if (entry.tryRead("shape", shape))
@@ -378,12 +381,15 @@ public:
 					{
 						const size_t end = std::min(arms.find_first_of(" ,", at), arms.size());
 						const std::string word = arms.substr(at, end - at);
-						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : 0;
+						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : word == "elbow" ? 16 : 0;
 						at = end + 1;
 					}
 				}
 				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
+				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
+				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
+				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
 				if (entry.tryRead("flat", flat)) look.flatTop = std::clamp(flat, 10, 100);
 				if (entry.tryRead("flatUnder", flatUnder)) look.flatUnder = std::clamp(flatUnder, 10, 100);
@@ -490,6 +496,9 @@ public:
 			if (entry.second.standard != -1) look.standard = entry.second.standard;
 			if (entry.second.roundTrunk != -1) look.roundTrunk = entry.second.roundTrunk;
 			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
+			if (entry.second.tail != -1) look.tail = entry.second.tail;
+			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
+			if (entry.second.legs != -1) look.legs = entry.second.legs;
 			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
 			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 		}

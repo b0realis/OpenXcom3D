@@ -2036,14 +2036,35 @@ bool FirstPersonMode::noclipFloats(BattlescapeState *state, const BattleUnit *un
  * Doom IDCLIP (a player's request, GitHub issue #45: "turns movement hit detection off ... If
  * inside terrain when on, grant ghost property to current square to assist visibility. Enable fly
  * ... so player doesn't fall into terrain"): does this soldier walk and float through anything
- * right now? The player's own soldier, one tile big (a 2x2 unit keeps the rules), in the 3D view,
- * with IDCLIP on.
+ * right now? The player's own unit, in the 3D view, with IDCLIP on. (A unit two tiles by two as well: it kept the
+ * rules at first, and a player, GitHub issue #234: "2x2 units dont idclip".)
  * @param unit The soldier looked through.
  * @return True if their moves go through walls, doors and floors.
  */
 bool FirstPersonMode::noclipOn(const BattleUnit *unit) const
 {
-	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && unit->getArmor()->getSize() == 1 && !unit->isOut();
+	return Options::fpsDoomIdclip && isActive() && unit && unit->getFaction() == FACTION_PLAYER && !unit->isOut();
+}
+
+/**
+ * Doom IDCLIP: is there room for a unit at a place? Every tile it would stand on (four, for one two tiles by two) is
+ * on the map, with no other unit on it. Walls, objects, floors and the air don't count.
+ * @param unit The unit.
+ * @param target Where it would stand (its tile; a big unit's north-western one).
+ * @return True if it may be put there.
+ */
+bool FirstPersonMode::noclipRoom(const BattleUnit *unit, const Position &target) const
+{
+	const int size = unit->getArmor()->getSize();
+	for (int x = 0; x < size; ++x)
+	{
+		for (int y = 0; y < size; ++y)
+		{
+			const Tile *tile = _save->getTile(target + Position(x, y, 0));
+			if (!tile || (tile->getUnit() && tile->getUnit() != unit)) return false;
+		}
+	}
+	return true;
 }
 
 /**
@@ -3396,7 +3417,7 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 				const Uint8 *over = overlayRow(row);
 				for (int column = 0; column < picture->w; ++column)
 				{
-					if (overlaid(over, column))
+					if (overlaid(over, column) || _view->drawnOver((size_t)row * picture->w + column))
 					{
 						out[column] = 0u;
 					}

@@ -189,6 +189,7 @@ SETTINGS = [
         ('Voxel units', 'NO', 'YES / NO', 'Experimental, on the first Settings page. YES: units are 3D bodies of little cubes made from their own sprites, walking and going down as their frames show. NO: the game\'s pictures.', 'What shots hit is set by Realistic hitboxes: NO the original shapes, YES the whole body.'),
         ('Smooth fire', 'YES', 'YES / NO', 'Flames\' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14.', ''),
         ('Muzzle flashes', 'YES', 'YES / NO', 'Gunfire, hits and blasts flash. NO: no flashes, steady UFO lights, no camera glitches.', 'Off if flashing light bothers you.'),
+        ('Flashlight', 'Beam', 'Beam / Far light', 'Beam: a spot from your weapon that fades with range. Far light: a light where you aim, a pool six tiles across, as bright at any range.', ''),
         ('Hit flash', 'YES', 'YES / NO', 'A unit hit, standing or down, flashes for a moment (with Muzzle flashes on). NO: it only flinches.', ''),
         ('Screen shake', 'YES', 'YES / NO', 'Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it.', ''),
         ('Futuristic night vision', 'YES', 'YES / NO', 'YES: under night vision units, bodies and items keep their colours, as on the map; the world goes green. NO: realistic, all green.', ''),

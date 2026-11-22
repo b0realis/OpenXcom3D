@@ -432,7 +432,7 @@ uniform vec3 uSunDir, uMoonDir;
 uniform float uWaveSteps[18]; // this frame's wave trains (FirstPersonView::_waveSteps)
 uniform vec4 uLamps[16];      // the lamps nearby: position, strength
 uniform int uLampCount;
-uniform int uFlashlight;      // 0 off, 1 the shoulder flashlight, 2 the dynamic one
+uniform int uFlashlight;      // 0 off, 1 the shoulder flashlight, 2 the dynamic one, 3 a light where the crosshair's line meets the world (setting "Flashlight": Far light)
 uniform vec3 uFlashlightPos, uForwardInVoxels;
 uniform vec4 uFlares[8];      // the flares' lights: position, fade
 uniform float uFlareFlicker[8];
@@ -703,8 +703,24 @@ float pointLight(vec3 point, vec3 normal, bool shadows)
 		}
 		light += lit - dark;
 	}
-	// The flashlight: the dynamic one a tight spot on the crosshair, the shoulder one a cone.
-	if (uFlashlight == 2)
+	// The flashlight: the dynamic one a tight spot on the crosshair, the shoulder one a cone; the far light a light
+	// standing where the crosshair's line meets the world (FirstPersonView::pointLight has the same).
+	if (uFlashlight == 3)
+	{
+		vec3 fromLight = point - uFlashlightPos;
+		float span = sqrt(fromLight.x * fromLight.x + fromLight.y * fromLight.y + fromLight.z * fromLight.z);
+		if (span < AimLightReach)
+		{
+			float closeness = 1.0 - span / AimLightReach;
+			float facing = span > 0.5 ? -(normal.x * fromLight.x + normal.y * fromLight.y + normal.z * fromLight.z) / span : 1.0;
+			float power = closeness * closeness * AimLightPower * (0.4 + 0.6 * max(0.0, facing));
+			if (power > 0.25 && facing > 0.0 && !(shadows && shadowed(point, uFlashlightPos)))
+			{
+				light += power;
+			}
+		}
+	}
+	else if (uFlashlight == 2)
 	{
 		float range = 16.0 * 20.0;
 		vec3 fromLight = point - uFlashlightPos;
@@ -1946,9 +1962,9 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 		float thick = uShaftAir + (uShaftSmoke != 0 ? smokeAt(at) * ShaftSmoke : 0.0);
 		if (thick <= 0.0) continue;
 		vec3 light = vec3(0.0);
-		if (uFlashlight != 0)
+		if (uFlashlight == 1 || uFlashlight == 2)
 		{
-			// (The flashlight's cone, as pointLight has it.)
+			// (The flashlight's cone, as pointLight has it. The far light has none: it stands where it lights.)
 			float range = uFlashlight == 2 ? 16.0 * 20.0 : 16.0 * 14.0;
 			vec3 fromLight = at - uFlashlightPos;
 			float away = length(fromLight);
@@ -2534,7 +2550,7 @@ uniform int uSmokeNight;            // the night vision's colour group + 1 (0: o
 uniform int uOwnOverNight;              // futuristic night vision's colour group + 1 (0: any other time)
 layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
-layout(location = 2) out uint outGlow;  // the glow (1, 3), 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
+layout(location = 2) out uint outGlow;  // the glow (1, 3), 16 where something solid was drawn over the ray's pixel, 32 where the pixel keeps its own colours under night vision, 64 where see-through smoke lies over it, 128 a mark's pixel (night vision leaves it)
 layout(location = 3) out uvec4 outNotes; // the unit veil left, own colours | smoke veil << 1, and for the pointer: 1 + the last solid sprite's number, 1 + the last pile's
 
 const float Bayer[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
@@ -2614,8 +2630,13 @@ void main()
 	float depth = texelFetch(uRayDepth, from, 0).r;
 	int veil = 255, smokeVeil = 0;
 	uint own = 0u, mark = 0u, lastSolid = 0u, lastPile = 0u; // (mark: a hitbox's outline or line shows there, night vision leaves its colour)
+	// Whether something solid was drawn over the ray's own pixel (a unit, a body, an item, a line, a dot): the ray's full
+	// colour and the light in its air are then not this pixel's, whatever its palette colour and whatever smoke lies over
+	// it (see PresentSource). A player, GitHub issues #242 and #243.
+	uint covered = 0u;
 	if (uContinue != 0)
 	{
+		covered = (glow >> 4) & 1u;
 		uvec4 notes = texelFetch(uNotes, pixel, 0);
 		veil = int(notes.r & 255u);
 		mark = (notes.r >> 8) & 1u;
@@ -2651,6 +2672,7 @@ void main()
 			color = outlineColor;
 			glow = uint(uOutlineGlows);
 			mark = 1u;
+			covered = 1u;
 		}
 	}
 	// The pixel's ray, reaching one unit ahead (so how far along it is the view depth too).
@@ -2758,6 +2780,7 @@ void main()
 			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 			own = ownColours;
 			mark = 0u;
+			covered = 1u;
 			lastSolid = uint(number + 1);
 		}
 		else if (kind == EffectBody)
@@ -2774,6 +2797,7 @@ void main()
 			veil = (flags & 2) != 0 ? UnitVeilMax : 255;
 			own = 1u;
 			mark = 0u;
+			covered = 1u;
 			lastSolid = uint(number + 1);
 			if ((flags & 8) != 0) lastPile = uint(number + 1);
 		}
@@ -2845,6 +2869,7 @@ void main()
 			}
 			if (!drawn || (t3.w < 1.0 && dither(pixel.x, pixel.y) >= t3.w)) continue;
 			color = uint(head.z);
+			covered = 1u;
 			if ((flags & 4) == 0) glow = (flags & 1) != 0 ? 1u : 0u;
 			if ((flags & 16) != 0) mark = 1u;
 		}
@@ -2857,6 +2882,7 @@ void main()
 			float threshold = dither(pixel.x, pixel.y);
 			if (t2.w > threshold) continue; // (faded into the haze)
 			color = t2.z < 0.0 || threshold < t2.z ? uint(head.z) : uint(t2.y);
+			covered = 1u;
 			if ((flags & 1) != 0) glow = 1u;
 			else if ((flags & 2) != 0) glow = 0u;
 		}
@@ -2871,6 +2897,7 @@ void main()
 				float along = length((vec2(pixel) + vec2(0.5) - t2.xy) / vec2(t2.z, t2.z * 1.5));
 				if (along > 1.0 || head.w >= depth + t2.w || (along > 0.6 && dither(pixel.x, pixel.y) < (along - 0.6) * 2.5)) continue;
 				color = along < 0.4 ? uint(t3.x) : uint(head.z);
+				covered = 1u;
 				if (along < 0.4 && (flags & 1) != 0) glow = 1u;
 				continue;
 			}
@@ -2879,10 +2906,11 @@ void main()
 			if (fromCentre > t2.z || head.w >= depth + t2.w) continue;
 			if ((flags & 4) != 0)
 			{
-				if (fromCentre > t2.z - 1.0) color = uint(head.z);
+				if (fromCentre > t2.z - 1.0) { color = uint(head.z); covered = 1u; }
 				continue;
 			}
 			color = fromCentre < t2.z * t3.z ? uint(t3.x) : fromCentre < t2.z * t3.w ? uint(t3.y) : uint(head.z);
+			covered = 1u;
 			if ((flags & 1) != 0) glow = 1u;
 		}
 		else if (kind == EffectQuad)
@@ -2904,11 +2932,12 @@ void main()
 			if (float(pixel.x) < ceil(leftX - 0.5) || float(pixel.x) > floor(rightX - 0.5) || head.w >= depth) continue;
 			color = uint(head.z);
 			depth = head.w;
+			covered = 1u;
 		}
 	}
 	outColor = color;
 	outDepth = depth;
-	outGlow = glow | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
+	outGlow = glow | (covered << 4) | (own << 5) | (smokeVeil > 0 ? 64u : 0u) | (mark << 7);
 	outNotes = uvec4(uint(veil) | (mark << 8), own | uint(smokeVeil) << 1, lastSolid, lastPile);
 }
 )";
@@ -3086,7 +3115,7 @@ void main()
  * found in the air there (as FirstPersonMode::blit puts the full-colour picture together).
  */
 const char *const PresentSource = R"(
-uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 64: smoke over the pixel), the overlay, the rays' own palette colours
+uniform usampler2D uColor, uGlow, uOverlay, uRayColor; // the finished picture, its glow (bit 16: something solid drawn over the ray's pixel; 64: smoke over it), the overlay, the rays' own palette colours
 uniform sampler2D uRayTrue, uPalette;                  // the rays' full colours; the palette, a texel a colour
 uniform int uFull, uShafts;                            // 1: in full colour; 1: with light in the air
 uniform usampler2D uFlameTint;                         // each colour in the flames' orange light
@@ -3116,11 +3145,15 @@ void main()
 	vec3 shown = paletteColor(made);
 	if (uFull != 0)
 	{
-		uint ray = texelFetch(uRayColor, pixel, 0).r;
+		// (A pixel that still has its ray's palette colour shows the ray's full one, and smoke over the ray's own pixel the
+		// light in its air; not where something solid was drawn over the ray, bit 16 of the glow. A body the colour of the
+		// ground behind it took the ground's light, through night vision its green, in patches; and a unit in lit smoke
+		// took the light of the wall behind it and stood there as a ghost. A player, GitHub issues #242 and #243.)
+		uint ray = texelFetch(uRayColor, pixel, 0).r, drawn = texelFetch(uGlow, pixel, 0).r;
 		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-		if (overlaid) { }
+		if (overlaid || (drawn & 16u) != 0u) { }
 		else if (made == ray) shown = full;
-		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
+		else if (uShafts != 0 && (drawn & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - paletteColor(ray)));
 	}
 	outPixel = vec4(shown, 1.0);
 }
@@ -3194,10 +3227,11 @@ void main()
 	{
 		// In full colour: the ray's own where the pixel still has its ray's palette colour; under see-through smoke the
 		// light the card found in the air there, laid on (as PresentSource has both).
-		uint ray = texelFetch(uRayColor, pixel, 0).r;
+		uint ray = texelFetch(uRayColor, pixel, 0).r, drawn = texelFetch(uGlow, pixel, 0).r;
 		vec3 full = texelFetch(uRayTrue, pixel, 0).rgb;
-		if (made == ray) shown = full;
-		else if (uShafts != 0 && (texelFetch(uGlow, pixel, 0).r & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
+		if ((drawn & 16u) != 0u) { } // (something solid over the ray's own pixel: see PresentSource)
+		else if (made == ray) shown = full;
+		else if (uShafts != 0 && (drawn & 64u) != 0u) shown = min(vec3(1.0), shown + max(vec3(0.0), full - texelFetch(uPalette, ivec2(int(ray), 0), 0).rgb));
 	}
 	outPixel = vec4(shown, 1.0);
 	float metres = depth * uDepthPlanes.x;

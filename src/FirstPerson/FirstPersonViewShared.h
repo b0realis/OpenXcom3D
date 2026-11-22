@@ -420,6 +420,14 @@ const int ArtFillMinCells = 40;
 /// A floor is still water (see buildModel, RuleFirstPerson::getStillWater) where this much of its art or more is of
 /// the water's colour groups: a tile of grass with a few blue flowers is none.
 const float StillWaterLeast = 0.15f;
+/// Setting "Flashlight": Far light (see FirstPersonView::pointLight): the light stands this many voxels off the surface
+/// the crosshair's line meets (and AimLightLift off a floor or a ceiling), lights what is within AimLightReach voxels
+/// of it (six tiles: a small flare's pool), AimLightPower shades at its middle, and the line is followed this far at
+/// most (voxels).
+const float AimLightOff = 6.0f, AimLightLift = 10.0f, AimLightReach = 96.0f, AimLightPower = 12.0f, AimLightFarthest = 16.0f * 300.0f;
+/// A wall drawn flat reads its art as on the tile's edge through all its thickness (see buildModel, wallPlane): its
+/// art may reach this many pixels over the sprite's middle, and the game's shape of it this many voxels from the edge.
+const int WallPlaneSlack = 2, WallPlaneThick = 5;
 /// The floor a lying sprite's rows lie on (items, corpses) rises towards the camera with the ground
 /// in front of it, a step or a slope (see lyingRise), so they lie on it rather than in it (a
 /// player's report: items on stairs and slopes sank into them): the ground looked for up to

@@ -497,6 +497,8 @@ std::string shaderConstants()
 	number("UnexploredMistTo", UnexploredMistTo);
 	number("UnexploredMistMax", UnexploredMistMax);
 	number("FlareReach", FlareReach);
+	number("AimLightReach", AimLightReach);
+	number("AimLightPower", AimLightPower);
 	whole("AnimatedNearShades", AnimatedNearShades);
 	number("UfoInsideTint", UfoInsideTint);
 	number("UfoInsideTintNight", UfoInsideTintNight);
