@@ -131,6 +131,7 @@ SETTINGS = [
         ('Flight cost per level (TU)', '0', '0 to 24', 'What a flying (or swimming) soldier pays to rise or sink a level in 3D.', 'The original game charges about 8.'),
         ('Flight cost overrides rules', 'NO', 'YES / NO', 'YES: every flyer pays the cost above. NO: each pays its armor\'s own cost.', 'NO keeps the game\'s slower flyers slow.'),
         ('Jump over low obstacles', 'NO', 'YES / NO', 'Jump while walking forwards or sideways into something low (up to 15 voxels high) vaults over it, for 30 TU.', 'Bends the rules a little: on the map a fence makes you walk round.'),
+        ('Right click opens doors', 'YES', 'YES / NO', 'A right click on a closed door under the crosshair, within reach, opens it without walking in (the door\'s TU). Any other right click cancels or zooms as before.', 'As a right click on a door does on the isometric map.'),
         ('Falling', 'YES', 'YES / NO', 'Walk off a ledge and fall to the level below.', 'A shortcut the map never offers, at the price of the fall.'),
         ('Check the landing', 'YES', 'YES / NO', 'A step off a ledge onto ground no one can walk on (a moat, the sea) or where no step leads on stops at the edge: UNSAFE LANDING! PUSH AGAIN.',
          'Keeps a soldier out of places they could never leave.'),

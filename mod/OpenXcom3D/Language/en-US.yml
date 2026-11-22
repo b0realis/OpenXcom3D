@@ -464,6 +464,8 @@ en-US:
   STR_FPS_SIGNAL_LOST: "SIGNAL LOST"
   STR_FPS_VAULT: "Jump over low obstacles"
   STR_FPS_VAULT_DESC: "A jump while walking into a fence, table or crate up to 15 voxels high takes the soldier over it, for 30 TU."
+  STR_FPS_RIGHT_CLICK_DOORS: "Right click opens doors"
+  STR_FPS_RIGHT_CLICK_DOORS_DESC: "A right click on a closed door you point at, within reach, opens it, as on the map (costs TU). NO: it only zooms."
   STR_FPS_KEY_JUMP: "Jump"
   STR_FPS_KEY_JUMP_DESC: "A hop on the spot (1 TU). While walking into a low obstacle: vaults over it (30 TU; setting Jump over low obstacles)."
   STR_FPS_KEY_EMERGENCY_CLIMB: "Emergency climb"

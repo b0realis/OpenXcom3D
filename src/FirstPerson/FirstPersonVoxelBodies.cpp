@@ -4530,20 +4530,51 @@ static bool thinEnd(const PartFrames &part, int d, bool atRight, int &from, int 
 /// of its widest row. Two barrels where the lowest of those rows is drawn in two runs (two muzzles side by side),
 /// each as thick as its run is wide; one otherwise, as thick as those rows are wide at their middle one. A gun the
 /// frontal drawing doesn't show under the turret (a stub drawn on the turret's face) is one barrel on the turret's
-/// middle line. A barrel is never thicker than the side drawing has the gun: a round bar seen along the game's slant
-/// is drawn BarrelSeen times as tall as it is thick, and one beside it is drawn half its distance lower.
+/// middle line (the middle of all the frontal drawing shows of it: a turret needn't stand on its unit's middle). A barrel is never thicker than the side drawing has the gun: a round bar seen along the game's slant
+/// is drawn BarrelSeen times as tall as it is thick, and one beside it is drawn half its distance lower. A turret
+/// whose side drawings have no thin end has no gun, unless the unit table gives it barrels: then a gun of a plain
+/// size on its front, so that any turret can be given barrels by name.
 /// @param part The turret's drawings.
 /// @param wanted How many barrels it has by the unit table (0: none, the turret as ever; under 0: as drawn).
 /// @param gun Set to the gun.
 /// @return True if it has a gun.
-constexpr float BarrelSeen = 1.2247449f, BarrelLeast = 1.0f * VOXELSCALE;
+constexpr float BarrelSeen = 1.2247449f, BarrelLeast = 1.0f * VOXELSCALE, BarrelPlainLong = 0.2f, BarrelPlainThick = 0.3f;
 static bool findGun(const PartFrames &part, int wanted, Gun &gun)
 {
 	gun = Gun();
 	int otherFrom, otherTo, otherTop, otherBottom;
-	if (wanted == 0 || !thinEnd(part, RightSide, true, gun.from, gun.to, gun.top, gun.bottom) || !thinEnd(part, LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
+	if (wanted == 0)
 	{
 		return false;
+	}
+	if (!thinEnd(part, RightSide, true, gun.from, gun.to, gun.top, gun.bottom) || !thinEnd(part, LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
+	{
+		// No thin end drawn. A turret the unit table gives barrels all the same has a gun of a plain size: from its
+		// front end, BarrelPlainLong of its length long and BarrelPlainThick of its height thick, as high up as the
+		// middle of its tallest part (so it comes out of the turret's face, not over it). So any turret can be given
+		// barrels by name.
+		if (wanted < 0)
+		{
+			return false;
+		}
+		int left = FrameSize, right = -1, most = 0, middle = 0;
+		for (int column = 0; column < FrameSize; ++column)
+		{
+			int high = 0, first = FrameSize, last = -1;
+			for (int row = 0; row < FrameSize; ++row)
+				if (part.frame[RightSide][row * FrameSize + column]) { ++high; first = std::min(first, row); last = row; }
+			if (high) { left = std::min(left, column); right = column; }
+			if (high > most) { most = high; middle = (first + last) / 2; }
+		}
+		if (right < 0)
+		{
+			return false;
+		}
+		const int length = right - left + 1, thick = std::max(4 * VOXELSCALE, (int)(most * BarrelPlainThick));
+		gun.from = right + 1;
+		gun.to = std::min(FrameSize - 1, right + std::max(4 * VOXELSCALE, (int)(length * BarrelPlainLong)));
+		gun.top = std::max(0, middle - thick / 2);
+		gun.bottom = std::min(FrameSize - 1, gun.top + thick - 1);
 	}
 	gun.root = (gun.from - FloorX) / PixelsAcross;
 	gun.muzzle = (gun.to + 1 - FloorX) / PixelsAcross;
@@ -4552,14 +4583,16 @@ static bool findGun(const PartFrames &part, int wanted, Gun &gun)
 
 	// The frontal drawing's gun: its rows, each one's first and last drawn pixel and its runs.
 	std::vector<int> wide(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
-	int most = 0, lowest = -1;
+	int most = 0, lowest = -1, drawn = 0;
+	float midline = 0.0f; // (the turret's middle line there: a gun the drawing doesn't show apart lies on it)
 	for (int row = 0; row < FrameSize; ++row)
 	{
 		for (int column = 0; column < FrameSize; ++column)
-			if (part.frame[Front][row * FrameSize + column]) { ++wide[row]; first[row] = std::min(first[row], column); last[row] = column; }
+			if (part.frame[Front][row * FrameSize + column]) { ++wide[row]; first[row] = std::min(first[row], column); last[row] = column; midline += column + 0.5f; ++drawn; }
 		most = std::max(most, wide[row]);
 		if (wide[row]) lowest = row;
 	}
+	midline = drawn ? midline / drawn : (float)FloorX;
 	std::vector<int> rows;
 	for (int row = lowest; row >= 0 && wide[row] > 0 && wide[row] <= most * BarrelThin; --row) rows.push_back(row);
 	auto runsOf = [&](int row) {
@@ -4572,7 +4605,7 @@ static bool findGun(const PartFrames &part, int wanted, Gun &gun)
 		}
 		return runs;
 	};
-	float centres[MaxBarrels] = { (float)FloorX, (float)FloorX, (float)FloorX, (float)FloorX }, width = tall / BarrelSeen * PixelsAcross; // (in the frontal drawing's pixels)
+	float centres[MaxBarrels] = { midline, midline, midline, midline }, width = tall / BarrelSeen * PixelsAcross; // (in the frontal drawing's pixels)
 	gun.barrels = 1;
 	if (!rows.empty())
 	{
@@ -4603,7 +4636,7 @@ static bool findGun(const PartFrames &part, int wanted, Gun &gun)
 	if (wanted > 0 && wanted != gun.barrels)
 	{
 		float left = centres[0] - width * 0.5f, right = centres[gun.barrels - 1] + width * 0.5f;
-		if (gun.barrels == 1 && rows.empty()) { left = FloorX - width * wanted * 0.65f; right = FloorX + width * wanted * 0.65f; }
+		if (gun.barrels == 1 && rows.empty()) { left = midline - width * wanted * 0.65f; right = midline + width * wanted * 0.65f; }
 		gun.barrels = std::min(wanted, MaxBarrels);
 		const float each = (right - left) / gun.barrels;
 		for (int n = 0; n < gun.barrels; ++n) centres[n] = left + each * (n + 0.5f);
@@ -4758,6 +4791,7 @@ static void mountBarrels(VoxelUnitModel &model, std::vector<Uint8> &owner, const
 			const Uint8 colour = part.frame[RightSide][row * FrameSize + column];
 			if (colour && (!dark || luminance(palette[colour]) < luminance(palette[dark]))) dark = colour;
 		}
+	if (!dark) dark = drawnNear(gun.from, (gun.top + gun.bottom) / 2); // (a gun of a plain size: the turret's colour there)
 	if (dark && luminance(palette[dark / 16 * 16 + 15]) < luminance(palette[dark])) dark = (Uint8)(dark / 16 * 16 + 15);
 	// (the nearest cube's colour, for a cell of the body laid bare)
 	auto cubeNear = [&](int across, int along, int up) -> Uint8 {

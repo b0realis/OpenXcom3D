@@ -2631,9 +2631,10 @@ void FirstPersonMode::openDoor(BattleUnit *unit)
  * doors within reach are the game's own (ReachableDoors), on the level it opens them on: the one
  * above when the soldier stands high on stairs, as TileEngine::unitOpensDoor has it.
  * @param unit The soldier (one tile).
+ * @param pointedAtOnly Only the door pointed at (a right click on it: see handleMouse).
  * @return The facing (0 north to 7, clockwise), or -1 if there's no closed door within reach.
  */
-int FirstPersonMode::doorWithinReach(BattleUnit *unit)
+int FirstPersonMode::doorWithinReach(BattleUnit *unit, bool pointedAtOnly)
 {
 	const Position origin = unit->getPosition() + Position(0, 0, unit->getTile()->getTerrainLevel() < -12 ? 1 : 0);
 	// Is this door within reach closed? (A UFO door already opening counts as open.)
@@ -2660,6 +2661,10 @@ int FirstPersonMode::doorWithinReach(BattleUnit *unit)
 				return door.direction;
 			}
 		}
+	}
+	if (pointedAtOnly)
+	{
+		return -1;
 	}
 
 	// Else the nearest one the view looks towards: the door's middle seen from the eye, as a

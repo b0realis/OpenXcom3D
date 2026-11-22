@@ -1143,6 +1143,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCost", &fpsFlightCost, 0, "STR_FPS_FLIGHT_COST", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFlightCostOverride", &fpsFlightCostOverride, false, "STR_FPS_FLIGHT_COST_OVERRIDE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVault", &fpsVault, false, "STR_FPS_VAULT", category));
+	// A right click on a closed door pointed at, within the soldier's reach, opens it, as on the isometric map (a
+	// player, GitHub issue #244: "greater iso parity"); see FirstPersonMode::handleMouse.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsRightClickDoors", &fpsRightClickDoors, true, "STR_FPS_RIGHT_CLICK_DOORS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsFalling", &fpsFalling, true, "STR_FPS_FALLING", category));
 	// Fall damage, on its own (a player, GitHub issue #137: "Falling" off to play without the
 	// damage also stopped every step off a ledge): off, a landing only jolts the view.

@@ -667,7 +667,7 @@ private:
 	/// Opens the door the player points at (or the nearest one in view) within the soldier's reach, without walking through it.
 	void openDoor(BattleUnit *unit);
 	/// The facing that opens the door the player points at, or else the closed one within reach nearest the view; -1 for none.
-	int doorWithinReach(BattleUnit *unit);
+	int doorWithinReach(BattleUnit *unit, bool pointedAtOnly = false);
 	/// Opens the door once the paid turn towards it (turning by the rules) is done.
 	void openDoorAfterTurn(BattleUnit *unit);
 	/// The game's turn on the spot that opens the door the soldier faces, at its usual cost.

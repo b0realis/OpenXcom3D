@@ -246,7 +246,8 @@ firstPerson:
   #   barrels: how many barrels a turret's or a tank's gun is made with (a turret: a unit two tiles by two that
   #           cannot move; a tank: one with a turret of its own). Not said, as its drawings show: one, or two where
   #           its frontal drawing has two muzzles side by side. 0: none, the turret as its eight drawings leave it
-  #           (for a unit whose thin end is no gun); 1 to 4: that many, spread over the gun's width
+  #           (for a unit whose thin end is no gun); 1 to 4: that many, spread over the gun's width. A turret whose
+  #           drawings show no gun to read gets barrels of a plain size on its front when given a number here
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
@@ -311,6 +312,10 @@ firstPerson:
       paint: hull
     - names: [HALLUCINOID]
       flat: 70
+    # a tank whose drawings show its gun as a ring on the turret's face, no barrel to read: X-COM's Hovertank/Launcher
+    # (a launcher's tube of a plain size on the turret's front)
+    - names: [STR_HOVERTANK_LAUNCHER]
+      barrels: 1
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
     # arms posed on their guns (arms outside the body, coloured along their length)
     - names: [DAGON]

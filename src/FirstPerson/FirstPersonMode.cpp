@@ -3021,10 +3021,20 @@ bool FirstPersonMode::handleMouseLook(Action *action)
 	else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT && !_dragLook)
 	{
 		// The right button forgets a target marked for confirm fire, or cancels a picked action
-		// (or a walk), as on the isometric map; with nothing to cancel, it zooms while held
-		// (setting "Zoom").
+		// (or a walk), as on the isometric map; with nothing to cancel, it opens the closed door
+		// the crosshair points at, when that is within the soldier's reach, as a right click on a
+		// door does there (setting "Right click opens doors"; a player, GitHub issue #244: "greater
+		// iso parity ... if you are directly on the door"); and with no such door, it zooms while
+		// held.
 		if (_confirmTile.x >= 0) clearConfirmMark();
-		else if (!_state->_battleGame->cancelCurrentAction()) _zoomButtonHeld = true;
+		else if (!_state->_battleGame->cancelCurrentAction())
+		{
+			BattleUnit *unit = _save->getSelectedUnit();
+			const bool atDoor = Options::fpsRightClickDoors && unit && !unit->isBigUnit() && canAct() && _state->playableUnitSelected()
+				&& unit->getStatus() == STATUS_STANDING && !_state->_battleGame->isBusy() && doorWithinReach(unit, true) >= 0;
+			if (atDoor) openDoor(unit);
+			else _zoomButtonHeld = true;
+		}
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT)
 	{
