@@ -122,7 +122,7 @@ public:
 		int torsoDepth = -1;
 		int backTop = -1;
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
-		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
+		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0; one body that rises, sinks and swells in a slow beat: 2)
 		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
 		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends; 0 as drawn)
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
@@ -377,7 +377,7 @@ public:
 				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : sculpt == "sides" ? 2 : 0;
-				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
+				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : animation == "pulse" ? 2 : 0;
 				if (entry.tryRead("arms", arms))
 				{
 					// (one word or several: "own posed")

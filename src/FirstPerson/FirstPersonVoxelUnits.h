@@ -101,6 +101,9 @@ struct VoxelUnitModel
 	/// Whether the unit, big and flying, hovers on a rain of sparks (the unit table's "hover: sparks": a hover tank, a
 	/// Cyberdisc; see FirstPersonView::spawnBodyEffects).
 	bool sparks = false;
+	/// Whether the body rises, sinks and swells in a slow beat as it stands (the unit table's "animation: pulse": a
+	/// jellyfish; see FirstPersonView::drawUnits).
+	bool pulse = false;
 	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
 	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
 	float lowest = 0.0f;

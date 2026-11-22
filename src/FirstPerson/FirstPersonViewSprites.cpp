@@ -1843,6 +1843,15 @@ void FirstPersonView::drawUnits()
 				standing[2] += CelatidBob * (1.0 + std::sin(turn));
 				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
 			}
+			else if (body->pulse && fall <= 0.0)
+			{
+				// (a jellyfish's beat, see PulseBob: each one in its own step)
+				const double turn = (now + (Uint32)unit->getId() * 377u) % PulseTime / (double)PulseTime * 2.0 * Pi;
+				const double rise = PulseBob * (1.0 + std::sin(turn));
+				standing[2] += rise;
+				glide.lift += rise; // (what a shot meets rises with it: see drawnLift)
+				bodyScale *= 1.0 + PulseSwell * std::sin(turn * 2.0);
+			}
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck coming down faces the way the unit did, as it will lie: see drawFloorItems)
 			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,

@@ -243,6 +243,10 @@ const double VoxelCorpsePast = 16.0;
 /// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
 const double CelatidBob = 1.2, CelatidSwell = 0.04;
 const Uint32 CelatidBobTime = 1400;
+/// A body the unit table names "animation: pulse" (a jellyfish: TFTD's Hallucinoid) beats the same way, slower and a
+/// little more: up and down by PulseBob (voxels), once in PulseTime (ms), swelling and shrinking by PulseSwell.
+const double PulseBob = 1.5, PulseSwell = 0.05;
+const Uint32 PulseTime = 1800;
 /// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
 /// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 /// off); a downed unit's body flashes the same way.

@@ -552,7 +552,9 @@ struct Presets
  * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
  * detail"'s (see graphicsSwitches: 2 at Low on the CPU): it is set on the choice only and is
  * no part of what makes XMbl, so a player on Low, or with a size of their own, is on XMbl
- * all the same.
+ * all the same. The same way XMbl, when it is chosen, makes the flashlight the far light (a
+ * player, GitHub issue #245: "make far light preference for XMBL"): a profile on XMbl keeps
+ * the flashlight it has.
  * @return The settings.
  */
 const std::vector<PresetSwitch> &gameplaySwitches()
@@ -599,6 +601,7 @@ const std::vector<PresetSwitch> &gameplaySwitches()
 		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
 		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
 		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
+		{ "fpsFlashlightReach",   nullptr, &fpsFlashlightReach,   { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
 		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
 		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
 		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },

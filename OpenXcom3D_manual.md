@@ -1,6 +1,6 @@
 # OpenXcom3D manual
 
-Version 1.14. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
+Version 1.15. OpenXcom3D is **OpenXcom Extended (OXCE)** with a first-person 3D battlescape: an engine add-on (`src/FirstPerson/`, with small hooks in the core) and a data mod (`OpenXcom3D`) that switches it on.
 
 In short, with pictures: the [play guide](https://b0realis.github.io/OpenXcom3D/play.html) has [every key](https://b0realis.github.io/OpenXcom3D/play.html#keys), [every setting](https://b0realis.github.io/OpenXcom3D/play.html#settings) and how each plays, what's on the screen, and every feature. This manual has the whole story.
 
@@ -388,7 +388,7 @@ Eight rows, the ones most players touch:
 - **Renderer** (CPU): the processor or the graphics card draws the 3D world. See *Screen*.
 - **Graphics detail** (Medium): how finely it is drawn, as one choice. See below.
 - **Render scale**, **Show trajectory**, **Realistic hitboxes**, **Mouse sensitivity**, **Start battles in 3D**: the same settings as under Advanced, here because they are changed often.
-- **Recommended game options** (Apply): a click sets OpenXcom's own options, the ones on the game's other tabs, to a recommended lot (the list is under "After 1.14", the rulings on GitHub issue #193), and the row says Applied. Kept with OK, dropped with Cancel; a second click sets them again; there is no taking them back but on the game's own tabs. No Gameplay preset touches the game's options.
+- **Recommended game options** (Apply): a click sets OpenXcom's own options, the ones on the game's other tabs, to a recommended lot (the list is under "1.15", the rulings on GitHub issue #193), and the row says Applied. Kept with OK, dropped with Cancel; a second click sets them again; there is no taking them back but on the game's own tabs. No Gameplay preset touches the game's options.
 
 Everything else, and these too, is under **Advanced**: every setting in its section, the sections and the settings in each by the alphabet. The sections below describe them all, with the default in brackets.
 
@@ -453,6 +453,8 @@ A setting no preset changes is yours alone, whatever Gameplay says. The cheats s
 | UFO lights and aura | NO | NO | NO | NO | YES | YES |
 | Hit, kill and swing sounds | NO | NO | YES | NO | YES | YES |
 | Dynamic music | NO | NO | NO | NO | YES | YES |
+
+Choosing **XMbl** also sets *Pixel size* to 1 and *Flashlight* to Far light. Those two are no part of what makes the preset: changing either afterwards leaves you on XMbl, and a profile already on XMbl keeps what it has.
 
 ### Graphics detail
 
@@ -840,7 +842,7 @@ The voxel bodies (setting *Voxel units*) are made from a unit's sprites by gener
 - `torsoDepth:` the most a torso is deep below the shoulders, in hundredths of its width (**80**), cut at the front; 0 for no limit. For units whose side drawings have a deep lower torso that is never seen, under an arm (XPiratez's gals: a belly, in 3D).
 - `top:` **back** (what faces up is painted by the back drawing, so the top of a head is hair) or **slant** (as ever: along the slant of the front or back drawing). For units whose faces are drawn high on the head.
 - `sculpt:` **frontal** (nothing of the body stands outside what its front drawing or its back drawing shows, all its parts as the game lays them: the gap between an arm and the waist, the legs apart below the hips, as drawn) or **all** (as ever: by all eight drawings, a little forgiving of each). For human bodies, which the side drawings alone leave heavier than they are drawn. **sides**, for a big walking creature (two tiles by two): its shape is its four drawings' from front, back and sides alone, rounded between them, each cube painted by the drawing it is turned to (the table names frogs and toads so).
-- `animation:` **none** (one body, whatever its sprite does) or **sprite** (as ever). Any unit drawn on one frame, one tile big, with nothing showing in its hands, whose standing sprite changes outline with the battle's animation and comes round after 8 frames, has a body for each of the 8, played as the sprite is: a bat flaps as it hovers, a Celatid and a Silacoid pulse. This needs no entry; `none` switches it off for the units named.
+- `animation:` **none** (one body, whatever its sprite does), **pulse** (one body that rises, sinks and swells in a slow beat: a jellyfish) or **sprite** (as ever; a unit two tiles by two has it only when named so, and never one with a turret). Any unit drawn on one frame, one tile big, with nothing showing in its hands, whose standing sprite changes outline with the battle's animation and comes round after 8 frames, has a body for each of the 8, played as the sprite is: a bat flaps as it hovers, a Celatid and a Silacoid pulse. This needs no entry; `none` switches it off for the units named.
 - `arms:` **outside** (the arms lie outside the body: for a unit in a robe, whose body is carved as wide as the robe, with the arms its drawings lay over the robe inside it), **along** (an arm posed on what it holds is coloured along its length, shoulder to hand, as its longest drawing has it: the sleeve ends where it does on the arm), **both**, or **drawn** (as ever). Or **own**: an arm is painted by its own drawing alone, never by the body drawn over it (hands on a shirt); the table names The X-Com Files' human race so (`HUMAN`: its civilians of every trade, gangers, hunters). Or **posed**: an arm that has bones is where its bones are, shoulder to elbow to the hand on what it holds, and of what its drawings make of it only what lies close to the bones stays (2 voxels at the shoulder, a quarter at the hand): no second forearm beside the one that holds. Or **elbow** (with posed): an arm that holds its item up, its drawing ending 2 voxels or more below its hand, has its elbow where the drawing ends: the upper arm down, the forearm up to the item. Several words may be given: `arms: own posed elbow`.
 - `head:` **face** (only what of the head is turned to the front, within 53 degrees, is painted by the front drawing; its sides, back and top by the back drawing: hair, a helmet. For a body drawn in parts the head is the torso above where the arms begin) or **drawn** (as ever).
 - `trunk:` **round** (a long body, `shape: beast`, is as broad as it is tall whatever its frontal drawings show: for a creature drawn from the front with its legs out beside its trunk. What hangs under its belly without reaching the ground, a muzzle, a tail's tip, is of its head or tail, not a pair of legs, and nothing of it stands apart as ears: one big round head) or **drawn** (as ever: as broad as its frontal drawings).
@@ -976,7 +978,7 @@ So a full 1920×1080 view, which the CPU draws at about 25 frames a second, runs
 | Branch | **`oxce-plus`** |
 | Commit | **`f0134ef8065799c7723953d64b565f7832bfd782`** — 2026-09-29 15:04:49 +0200, author Meridian, "Merge remote-tracking branch 'SupSuper/master' into oxce-plus" |
 | Version string | **OpenXcom Extended 8.7.1 (v2026-09-19)** |
-| OpenXcom3D | engine add-on and mod version **1.14** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.14"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10, 1.0.11, 1.0.12) |
+| OpenXcom3D | engine add-on and mod version **1.15** (`requiredExtendedEngine: OpenXcom3D`, `requiredExtendedVersion: "1.0.15"`: OXCE would read "1.09" as 1.9, so the engine counts 1.0.9, 1.0.10, 1.0.11, 1.0.12) |
 
 `openxcom3d.patch` holds every change on top of that commit:
 
@@ -1097,18 +1099,20 @@ What `FirstPersonView` draws:
 | `OptionInfo.cpp` | Loading a key binding clears Shift, Alt and Ctrl, except for `keyFpsLeanHold` (the lean key, held with the strafe keys, Left Shift by default) |
 | `OptionsBaseState.{h,cpp}` | 3D VIEW tab via `FirstPerson::hasOptionsTab/createOptionsTab` |
 | `Mod.{h,cpp}` | Parses `firstPerson:` at the end of `Mod::loadFile` |
-| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.14}` (add-on builds only; 1.14) |
+| `ModInfo.cpp` | Engine row `{"OpenXcom3D", 1.0.15}` (add-on builds only; 1.15) |
 | `CrossPlatform.cpp` | Add-on builds use their own user/config folders (`~/.local/share/openxcom3d`, `~/.config/openxcom3d`, `Documents/OpenXcom3D`, …). Data folders are shared with stock OXCE |
 | `OpenXcom.2010.vcxproj{,.filters}` | The add-on's files |
 
 ## 11. Version history
 
-### After 1.14 (not released)
+### 1.15 (2026-11-22)
 
 - *Voxel units*, a player's last list before a release (GitHub issue #245):
   - **Kneeling soldiers sit low** ("shots at a flat angle will go DIRECTLY into the skull of the forward unit ... I should be able to reliably fire over a kneeling units head"; "lowering the torso so the butt sits on (even partially merges with) the heel"). The unit table's new word `kneel: low`, said of every unit: a kneeling body's trunk, arms and weapon come straight down, in whole cubes, until its hips are two voxels over the ground; its legs stay as they were, the raised knee before the chest. X-COM's soldier, 21.9 voxels tall kneeling as drawn (24.9 standing), is 15.9 now; TFTD's 13.9 to 14.9: the height the games' rules give a kneeling unit (14 of 22), under a standing soldier's line of fire (18). What is hit is what is seen. `kneel: drawn` brings the drawings' height back for a unit, or for all by taking the first entry out.
   - **Arms of four more kinds of people** ("remaining arm residue / jank", "bad arm paint"; an earlier report's dark, patched arms on the 40k mod's Eldar): The X-Com Files' Church of Dagon (a disciple's pistol arm stood beside the arm as drawn), its Red Dawn, the 40k mod's Eldar and XPiratez's two punk outfits have their arms on their bones, elbow down under a hand that holds a gun up, painted by their own drawings along their length (a sleeve, then a bare hand). By name, as every such rule: tried on every kind of unit drawn as the soldier is, the same rule made the 40k mod's marines' arms too long, so it is not general.
   - **The Gilldog's head** ("no big dopey ears, just a big fat head plz"): its muzzle, two rows under its belly in the side drawing, was taken for a pair of legs a row long, as far apart as its forelegs. For a body named `trunk: round`, what hangs under the belly without reaching the ground is of the head or the tail, and nothing stands apart as ears.
+  - **The big sea creatures move** ("2x2 animations for xarquid and halucinoid"): TFTD's Xarquid has a body for each of its sprite's four frames, its shell and arms writhing as the sprite's do (`animation: sprite`, which a unit two tiles by two gets only by name). The Hallucinoid, a jellyfish, beats: one body that rises, sinks and swells in a slow rhythm, each in its own step (`animation: pulse`, new). Its eight frames, each made a body by itself, came out a dome, then a diamond, in other colours each; what a shot meets rises and sinks with the body.
+  - **XMbl prefers the far light** ("make far light preference for XMBL"): choosing the Gameplay preset XMbl sets *Flashlight* to Far light, as it sets *Pixel size* to 1; a profile already on XMbl keeps its flashlight.
   - **No slot in the back** ("slot in back on SS troopers", and an earlier report's "segmented back slot" on the 40k mod's Eldar): where a head of hair, a crest or a collar stands out behind the neck and a jacket or a pack stands out lower down, the nape between them was as deep as the side drawings have the neck: a channel across the back under the hair, three voxels high and a voxel and a half deep on XPiratez's slave soldier in the punk outfit. The unit table's new word `back: smooth` fills such a hollow of the trunk, behind the body's middle, up to four voxels high; said of XPiratez's soldiers (names with PIR) and the Eldar.
   - **The bloodhound's missing leg** ("blood hound strange leg"; "this will apply to gildog in XCF most likely, these are literally pallet swaps"): its muzzle, hanging under the chest in the side drawing, was taken for a second foreleg, the left one, a stump, and the real forelegs for the right one alone. The hounds drawn as the Gilldog is (XPiratez's blood dog and bloodhound soldier, sheet BAN_6.PCK; The X-Com Files' bloodhound) are named `trunk: round` with it: a round trunk, one head, four legs on the ground.
   - **A ghost leaves no body** ("a ghost gal ... dies, and leaves a 3d corpse, despite none in iso"): a corpse whose own picture is blank, as XPiratez's ghosts', is not laid out as a voxel body either.
@@ -1235,7 +1239,7 @@ What `FirstPersonView` draws:
 - **New defaults**, those of Extended+ and of issue #167: the map camera Small, hitboxes Always, parts without shape All, every shot's line shown, see-through crops and corpses, camera artifacts Light, futuristic night vision; UFO lights, hit sounds, combat music, the accuracy line and fall damage off; pixel size 1. A profile from before keeps every value it has, and reads Custom where they match no preset.
 - The manual's *Renderer* entry said the GPU renderer had run on Windows only under Wine and not yet on a Mac: it has been played on both since.
 - *Throwing*'s two values are named Classic and Modern (they were "Classic (tile)" and "Modern (continuous)", too long for the value's column: they took two lines); the help line says which is by tile and which continuous.
-- **V** is a second key for the isometric / 3D switch beside F8; the auto shot has no key of its own by default (the wheel and the next fire mode key reach it). A profile from before, where V was the auto shot's, kept it so for a while and had no second key; since the owner's ruling of 2026-11-21 (see "After 1.14") it too has V on the switch and no key on the auto shot (`settleOptions`). On the Steam Deck's layout the left trackpad's down click sends V: the view switch.
+- **V** is a second key for the isometric / 3D switch beside F8; the auto shot has no key of its own by default (the wheel and the next fire mode key reach it). A profile from before, where V was the auto shot's, kept it so for a while and had no second key; since the owner's ruling of 2026-11-21 (see above) it too has V on the switch and no key on the auto shot (`settleOptions`). On the Steam Deck's layout the left trackpad's down click sends V: the view switch.
 
 ### 1.14 (2026-11-13)
 

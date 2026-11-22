@@ -217,7 +217,9 @@ firstPerson:
   #           its drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
-  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
+  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps; a unit two tiles by two only
+  #           when it is named so here), pulse (one body that rises, sinks and swells in a slow beat: a jellyfish), or
+  #           none (one body, still)
   #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length:
   #           each stretch of an arm by what its own drawing has there, a sleeve, then a bare hand),
   #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
@@ -303,6 +305,13 @@ firstPerson:
     # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]
       animation: sprite
+    # TFTD's big sea creatures (and the big mods' own of that name): the Xarquid's shell and arms writhe as its sprite's
+    # four frames do; the Hallucinoid, a jellyfish, beats (its eight frames, each carved by itself, are a dome, then a
+    # diamond, in other colours each: one body, pulsing)
+    - names: [XARQUID]
+      animation: sprite
+    - names: [HALLUCINOID]
+      animation: pulse
     # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
     # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
     # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
@@ -311,12 +320,14 @@ firstPerson:
       arms: own posed elbow
       head: face
     # Deep Ones (TFTD's and The X-Com Files'): arms on their bones, as above
-    - names: [DEEPONE, DEEP_ONE.PCK]
+    # (DEEP_3.PCK: XPiratez's, the same drawings)
+    - names: [DEEPONE, DEEP_ONE.PCK, DEEP_3.PCK]
       arms: posed
     # The X-Com Files' Gilldog: drawn from the front crouching, its legs out beside its trunk
-    # (and the big hounds drawn the same way in other colours: XPiratez's blood dog and bloodhound soldier, sheet
-    # BAN_6.PCK, and The X-Com Files' own bloodhound)
-    - names: [GILLDOG, BLOODHOUND, BAN_6.PCK]
+    # (and the big hounds drawn the same way: The X-Com Files' bloodhound and XPiratez's slime dog are the Gilldog's
+    # drawings in other colours; XPiratez's blood dog and bloodhound soldier, sheet BAN_6.PCK, and its armoured one,
+    # BH_ARMORED.PCK, are drawn anew in the same pose)
+    - names: [GILLDOG, BLOODHOUND, SLIMEDOGE.PCK, BAN_6.PCK, BH_ARMORED.PCK]
       trunk: round
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
@@ -341,7 +352,9 @@ firstPerson:
     # arms posed on their guns (arms outside the body, coloured along their length)
     # (and posed on their bones, the elbow down under a hand that holds a gun up: a disciple's pistol arm stood
     # beside the arm as drawn)
-    - names: [DAGON]
+    # (and the units drawn as its disciples and priests are, in other colours: The X-Com Files' ghost cultist and
+    # Brother of the Apocalypse, XPiratez's sheets NAZ_7 and COS_7)
+    - names: [DAGON, GHOST_CULTIST.PCK, BROTHER_OF_APOCALYPSE.PCK, NAZ_7.PCK, COS_7.PCK]
       arms: both own posed elbow
     # The X-Com Files' Red Dawn, and the 40k mod's Eldar: people under names of their own, as the HUMAN entry above;
     # their arms are coloured along their length by their own drawings too (a sleeve, then a bare hand). The Eldar's

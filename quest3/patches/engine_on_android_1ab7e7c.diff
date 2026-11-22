@@ -1562,10 +1562,10 @@ index 000000000..1bb72b637
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..60644366a
+index 000000000..f21d314d3
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,392 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1785,7 +1785,9 @@ index 000000000..60644366a
 +  #           its drawings' from front, back and sides alone, rounded between them, its legs and the gap under it as
 +  #           drawn), or all (as ever: by all eight drawings, a little forgiving)
 +  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
-+  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
++  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps; a unit two tiles by two only
++  #           when it is named so here), pulse (one body that rises, sinks and swells in a slow beat: a jellyfish), or
++  #           none (one body, still)
 +  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length:
 +  #           each stretch of an arm by what its own drawing has there, a sleeve, then a bare hand),
 +  #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
@@ -1871,6 +1873,13 @@ index 000000000..60644366a
 +    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
 +    - names: [BAT, SHADOWBAT]
 +      animation: sprite
++    # TFTD's big sea creatures (and the big mods' own of that name): the Xarquid's shell and arms writhe as its sprite's
++    # four frames do; the Hallucinoid, a jellyfish, beats (its eight frames, each carved by itself, are a dome, then a
++    # diamond, in other colours each: one body, pulsing)
++    - names: [XARQUID]
++      animation: sprite
++    - names: [HALLUCINOID]
++      animation: pulse
 +    # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
 +    # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
 +    # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
@@ -1879,12 +1888,14 @@ index 000000000..60644366a
 +      arms: own posed elbow
 +      head: face
 +    # Deep Ones (TFTD's and The X-Com Files'): arms on their bones, as above
-+    - names: [DEEPONE, DEEP_ONE.PCK]
++    # (DEEP_3.PCK: XPiratez's, the same drawings)
++    - names: [DEEPONE, DEEP_ONE.PCK, DEEP_3.PCK]
 +      arms: posed
 +    # The X-Com Files' Gilldog: drawn from the front crouching, its legs out beside its trunk
-+    # (and the big hounds drawn the same way in other colours: XPiratez's blood dog and bloodhound soldier, sheet
-+    # BAN_6.PCK, and The X-Com Files' own bloodhound)
-+    - names: [GILLDOG, BLOODHOUND, BAN_6.PCK]
++    # (and the big hounds drawn the same way: The X-Com Files' bloodhound and XPiratez's slime dog are the Gilldog's
++    # drawings in other colours; XPiratez's blood dog and bloodhound soldier, sheet BAN_6.PCK, and its armoured one,
++    # BH_ARMORED.PCK, are drawn anew in the same pose)
++    - names: [GILLDOG, BLOODHOUND, SLIMEDOGE.PCK, BAN_6.PCK, BH_ARMORED.PCK]
 +      trunk: round
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
@@ -1909,7 +1920,9 @@ index 000000000..60644366a
 +    # arms posed on their guns (arms outside the body, coloured along their length)
 +    # (and posed on their bones, the elbow down under a hand that holds a gun up: a disciple's pistol arm stood
 +    # beside the arm as drawn)
-+    - names: [DAGON]
++    # (and the units drawn as its disciples and priests are, in other colours: The X-Com Files' ghost cultist and
++    # Brother of the Apocalypse, XPiratez's sheets NAZ_7 and COS_7)
++    - names: [DAGON, GHOST_CULTIST.PCK, BROTHER_OF_APOCALYPSE.PCK, NAZ_7.PCK, COS_7.PCK]
 +      arms: both own posed elbow
 +    # The X-Com Files' Red Dawn, and the 40k mod's Eldar: people under names of their own, as the HUMAN entry above;
 +    # their arms are coloured along their length by their own drawings too (a sleeve, then a bare hand). The Eldar's
@@ -1947,7 +1960,7 @@ index 000000000..60644366a
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..bd14ebcdd
+index 000000000..106d33b91
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -1955,13 +1968,13 @@ index 000000000..bd14ebcdd
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.14
++version: 1.15
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.14"
++requiredExtendedVersion: "1.0.15"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -23053,7 +23066,7 @@ index 0595954e6..d34146aeb 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..a3c685b7c 100644
+index cca815d3e..695d8318d 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -23061,7 +23074,7 @@ index cca815d3e..a3c685b7c 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 14, 0 } }, // first-person add-on 1.14, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 15, 0 } }, // first-person add-on 1.15, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
@@ -24226,10 +24239,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..fdea0fa8f
+index 000000000..226ee72d3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2023 @@
+@@ -0,0 +1,2026 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24784,7 +24797,9 @@ index 000000000..fdea0fa8f
 + * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
 + * detail"'s (see graphicsSwitches: 2 at Low on the CPU): it is set on the choice only and is
 + * no part of what makes XMbl, so a player on Low, or with a size of their own, is on XMbl
-+ * all the same.
++ * all the same. The same way XMbl, when it is chosen, makes the flashlight the far light (a
++ * player, GitHub issue #245: "make far light preference for XMBL"): a profile on XMbl keeps
++ * the flashlight it has.
 + * @return The settings.
 + */
 +const std::vector<PresetSwitch> &gameplaySwitches()
@@ -24831,6 +24846,7 @@ index 000000000..fdea0fa8f
 +		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
 +		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
 +		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
++		{ "fpsFlashlightReach",   nullptr, &fpsFlashlightReach,   { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
 +		{ "fpsHaze",              nullptr, &fpsHaze,              { 0,    0,    0,    2,    2,    2 } },
 +		{ "fpsViewDistance",      nullptr, &fpsViewDistance,      { plain, plain, plain, 130, 130, 130 } },
 +		{ "fpsSmokeOpacity",      nullptr, &fpsSmokeOpacity,      { 80,   80,   80,   65,   65,   65 } },
@@ -72976,10 +72992,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..7c9a89e65
+index 000000000..485ea815c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,742 @@
+@@ -0,0 +1,746 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73225,6 +73241,10 @@ index 000000000..7c9a89e65
 +/// swelling and shrinking by this share meanwhile (the owner: "Celatid should have some movement in voxel units also").
 +const double CelatidBob = 1.2, CelatidSwell = 0.04;
 +const Uint32 CelatidBobTime = 1400;
++/// A body the unit table names "animation: pulse" (a jellyfish: TFTD's Hallucinoid) beats the same way, slower and a
++/// little more: up and down by PulseBob (voxels), once in PulseTime (ms), swelling and shrinking by PulseSwell.
++const double PulseBob = 1.5, PulseSwell = 0.05;
++const Uint32 PulseTime = 1800;
 +/// A hit unit flinches back and flashes for this many milliseconds (see FirstPersonView::watchUnits), the flash up to
 +/// HitFlashShade shade steps brighter at the hit (settings "Hit flash" and "Muzzle flashes", which turns every flash
 +/// off); a downed unit's body flashes the same way.
@@ -76064,10 +76084,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..8931e3a79
+index 000000000..90a83dcb8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4498 @@
+@@ -0,0 +1,4507 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -77912,6 +77932,15 @@ index 000000000..8931e3a79
 +				const double turn = (now + (Uint32)unit->getId() * 377u) % CelatidBobTime / (double)CelatidBobTime * 2.0 * Pi;
 +				standing[2] += CelatidBob * (1.0 + std::sin(turn));
 +				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
++			}
++			else if (body->pulse && fall <= 0.0)
++			{
++				// (a jellyfish's beat, see PulseBob: each one in its own step)
++				const double turn = (now + (Uint32)unit->getId() * 377u) % PulseTime / (double)PulseTime * 2.0 * Pi;
++				const double rise = PulseBob * (1.0 + std::sin(turn));
++				standing[2] += rise;
++				glide.lift += rise; // (what a shot meets rises with it: see drawnLift)
++				bodyScale *= 1.0 + PulseSwell * std::sin(turn * 2.0);
 +			}
 +			const size_t stepsBefore = _drawList.size();
 +			// (a wreck coming down faces the way the unit did, as it will lie: see drawFloorItems)
@@ -96714,10 +96743,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..b1a22bb78
+index 000000000..e39cb2191
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1361 @@
+@@ -0,0 +1,1373 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -96912,6 +96941,7 @@ index 000000000..b1a22bb78
 +	bool still = false; // (it can't move: see Routine)
 +	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
 +	bool sparks = false; // (it hovers on sparks, by the unit table: see VoxelUnitModel::sparks)
++	bool pulse = false; // (it beats as a jellyfish does, by the unit table: see VoxelUnitModel::pulse)
 +	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
 +	/// whose sprite changes shape with it (see modelFor); empty for any other.
 +	std::vector<std::vector<Uint8>> anim;
@@ -97256,15 +97286,18 @@ index 000000000..b1a22bb78
 +	// blink, is not an animation.)
 +	auto shownInHand = [](const BattleItem *item) { return item && (!item->getRules()->isFixed() || item->getRules()->getFixedShow()); };
 +	std::vector<std::vector<Uint8>> anim;
-+	if (look.animated != 0 && routine->whole && !routine->big && !shownInHand(unit->getRightHandWeapon()) && !shownInHand(unit->getLeftHandWeapon()))
++	// (A big unit, two tiles by two, only where the unit table says "animation: sprite" of it, and none with a turret of
++	// its own: TFTD's Xarquid, whose shell and arms writhe; a player, GitHub issue #245: "2x2 animations for xarquid
++	// and halucinoid". A hover tank's glow under its hull changes its outline too, and is no body's shape. "animation:
++	// pulse" is one body that beats, see VoxelUnitModel::pulse: TFTD's Hallucinoid, whose eight frames, each carved by
++	// itself, came out a dome, then a diamond, then a dome, in other colours each.)
++	const bool animates = routine->big ? look.animated == 1 && unit->getTurretType() == -1 : look.animated != 0 && look.animated != 2;
++	// (a big unit's drawing shows nothing in its hands, whatever it carries)
++	if (animates && routine->whole && (routine->big || (!shownInHand(unit->getRightHandWeapon()) && !shownInHand(unit->getLeftHandWeapon()))))
 +	{
 +		auto drawn = [&](int animFrame, int d) {
-+			frames[0]->clear();
 +			unitSprite.setAnimationFrame(animFrame);
-+			unitSprite.setViewRotation(d - unit->getDirection());
-+			unitSprite.setPartCapture(capture);
-+			unitSprite.draw(unit, 0, 16, 8, 0, mask, false);
-+			unitSprite.setPartCapture(nullptr);
++			drawFacing(d); // (a big unit's four tiles on the one frame)
 +			return pixelsOf(frames[0].get());
 +		};
 +		auto sameOutline = [](const std::vector<Uint8> &one, const std::vector<Uint8> &other) {
@@ -97493,6 +97526,12 @@ index 000000000..b1a22bb78
 +		const Uint8 barrels[2] = { 'b', (Uint8)look.barrels };
 +		hashBytes(hash, barrels, 2);
 +	}
++	// (beating, by the unit table: only said of a unit hashed in, as above)
++	if (look.animated == 2)
++	{
++		const Uint8 beat[2] = { 'p', 1 };
++		hashBytes(hash, beat, 2);
++	}
 +	// (hovering on sparks, by the unit table: only said of a unit hashed in, as above; units alike share a body)
 +	if (look.sparks == 1)
 +	{
@@ -97535,6 +97574,7 @@ index 000000000..b1a22bb78
 +		job->still = !unit->getArmor()->allowsMoving();
 +		job->shows = shows;
 +		job->sparks = look.sparks == 1;
++		job->pulse = look.animated == 2;
 +		job->beast = look.beast == 1;
 +		job->anim = std::move(anim);
 +		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
@@ -97904,6 +97944,7 @@ index 000000000..b1a22bb78
 +		{
 +			model->opacity = job->shows;
 +			model->sparks = job->sparks;
++			model->pulse = job->pulse;
 +			float lowest = 1e9f;
 +			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
 +			{
@@ -98081,10 +98122,10 @@ index 000000000..b1a22bb78
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..d0b3e7c50
+index 000000000..0e2be808e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,279 @@
+@@ -0,0 +1,282 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -98188,6 +98229,9 @@ index 000000000..d0b3e7c50
 +	/// Whether the unit, big and flying, hovers on a rain of sparks (the unit table's "hover: sparks": a hover tank, a
 +	/// Cyberdisc; see FirstPersonView::spawnBodyEffects).
 +	bool sparks = false;
++	/// Whether the body rises, sinks and swells in a slow beat as it stands (the unit table's "animation: pulse": a
++	/// jellyfish; see FirstPersonView::drawUnits).
++	bool pulse = false;
 +	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
 +	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
 +	float lowest = 0.0f;
@@ -105540,7 +105584,7 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..36aa3d423
+index 000000000..fe2c60542
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
 @@ -0,0 +1,580 @@
@@ -105668,7 +105712,7 @@ index 000000000..36aa3d423
 +		int torsoDepth = -1;
 +		int backTop = -1;
 +		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
-+		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0)
++		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0; one body that rises, sinks and swells in a slow beat: 2)
 +		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
 +		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends; 0 as drawn)
 +		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
@@ -105923,7 +105967,7 @@ index 000000000..36aa3d423
 +				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
 +				if (entry.tryRead("top", top)) look.backTop = top == "back" ? 1 : 0;
 +				if (entry.tryRead("sculpt", sculpt)) look.frontal = sculpt == "frontal" ? 1 : sculpt == "sides" ? 2 : 0;
-+				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : 0;
++				if (entry.tryRead("animation", animation)) look.animated = animation == "sprite" ? 1 : animation == "pulse" ? 2 : 0;
 +				if (entry.tryRead("arms", arms))
 +				{
 +					// (one word or several: "own posed")

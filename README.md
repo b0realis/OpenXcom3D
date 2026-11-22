@@ -41,6 +41,16 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 **But be careful!** It can be a traumatic experience.
 
+## New in 1.15
+
+- **Voxel units** (experimental, off by default; the switch is on the first page of the 3D VIEW settings): soldiers, aliens, civilians and tanks as 3D bodies of small cubes made from their own sprites, in both games and in mods: they turn smoothly, walk, kneel, fall and lie where they fell, and what you see is what a shot hits. A table in the mod's rules shapes kinds of units by name (people, animals, spiders, ghosts, tanks with hollow barrels).
+- **The 3D VIEW settings redesigned:** a first page of eight rows, Controls, and Advanced by section; **Gameplay** in six presets (FAITHFUL, Extended+, TACTICUS, XMbl, FullQoL, FPS), **Graphics detail** Low, Medium or High, and **Recommended game options** on a click.
+- **Tactical map:** the map opened from the 3D view fills the screen, with soldiers' numbers, the enemies' classes and a view cone on every dot.
+- **On the graphics card:** *Surface relief* (walls and hulls catch the light by what is drawn on them), reflections on window glass and still water, and no freeze on a battle's first 3D frame.
+- **Flashlight** as a beam or a far light; the flashlight, flares, zoom (now up to 8 times) and night vision are always there.
+- **Emergency climb** (a key) for units stuck in a pit or a fenced yard, **a right click opens the door you point at**, **facing icons**, and **V** for the map / 3D switch.
+- **Fixed:** fire in great amounts no longer costs frames; every animated tile part moves in 3D; a unit killed in the air plummets; a melee blow at a wall no longer turns the soldier away; swamp water has no pits; smoke through night vision has no neon rings.
+
 ## New in 1.14
 
 - **A GPU renderer** (setting *Renderer*: GPU; proved on Linux and on an Apple silicon Mac, new on Windows): the graphics card casts the 3D world's rays, the same walk and the same shading as the CPU's, checked pixel for pixel against it, and draws the units and effects over them. The CPU renderer stays the default, and takes over by itself wherever the card can't.
