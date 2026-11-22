@@ -4473,6 +4473,350 @@ static std::unique_ptr<VoxelUnitModel> reliefModel(const PartFrames &part, const
 	return model;
 }
 
+/// A turret's gun as its drawings have it (see findGun): how many barrels, where each lies across the turret (voxels
+/// right of its middle), their radius, how far ahead of the turret's middle they leave it and end, the height of
+/// their axis as drawn, and where the right side drawing has them (its columns from..to, its rows top..bottom).
+constexpr int MaxBarrels = 4;
+struct Gun
+{
+	int barrels = 0;
+	float right[MaxBarrels] = {};
+	float radius = 0.0f, root = 0.0f, muzzle = 0.0f, height = 0.0f;
+	int from = 0, to = 0, top = 0, bottom = 0;
+};
+
+/// Where a turret's side drawing runs out thin ahead of it: the columns from its front end inwards drawn no higher
+/// than BarrelThin of its tallest column, two or more, and no more than BarrelMost of its length (a low body behind a
+/// tall mast is no gun).
+/// @param part The turret's drawings.
+/// @param d The side drawing's direction.
+/// @param atRight Its front is at the right.
+/// @param from, to Set to the thin columns, left to right.
+/// @param top, bottom Set to the rows they are drawn on: the middle one of their columns' first and last rows (where it
+///   leaves the turret a gun is drawn into it, taller than it is thick).
+/// @return True if it has such an end.
+constexpr float BarrelMost = 0.5f;
+static bool thinEnd(const PartFrames &part, int d, bool atRight, int &from, int &to, int &top, int &bottom)
+{
+	std::vector<int> high(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
+	int most = 0, left = FrameSize, right = -1;
+	for (int column = 0; column < FrameSize; ++column)
+	{
+		for (int row = 0; row < FrameSize; ++row)
+			if (part.frame[d][row * FrameSize + column]) { ++high[column]; first[column] = std::min(first[column], row); last[column] = row; }
+		most = std::max(most, high[column]);
+		if (high[column]) { left = std::min(left, column); right = std::max(right, column); }
+	}
+	if (right < 0) return false;
+	from = to = atRight ? right : left;
+	std::vector<int> tops, bottoms;
+	for (int column = from; column >= left && column <= right && high[column] > 0 && high[column] <= most * BarrelThin; column += atRight ? -1 : 1)
+	{
+		(atRight ? from : to) = column;
+		tops.push_back(first[column]); bottoms.push_back(last[column]);
+	}
+	if (tops.empty()) return false;
+	std::sort(tops.begin(), tops.end());
+	std::sort(bottoms.begin(), bottoms.end());
+	top = tops[tops.size() / 2];
+	bottom = std::max(top, bottoms[bottoms.size() / 2]);
+	return to - from + 1 >= 2 * VOXELSCALE && to - from + 1 <= (right - left + 1) * BarrelMost;
+}
+
+/// A turret's gun, read from its drawings (the owner: "Artificially make one or two voxel barrels (depending on the
+/// turret) and join them to the turret body at place indicated where sprite says it is a turret barrel"). Its length
+/// and height are the thin end of its two side drawings (see thinEnd). How many barrels, where across the turret and
+/// how thick: from its frontal drawing, whose gun is its rows from the bottom up that are no wider than BarrelThin
+/// of its widest row. Two barrels where the lowest of those rows is drawn in two runs (two muzzles side by side),
+/// each as thick as its run is wide; one otherwise, as thick as those rows are wide at their middle one. A gun the
+/// frontal drawing doesn't show under the turret (a stub drawn on the turret's face) is one barrel on the turret's
+/// middle line. A barrel is never thicker than the side drawing has the gun: a round bar seen along the game's slant
+/// is drawn BarrelSeen times as tall as it is thick, and one beside it is drawn half its distance lower.
+/// @param part The turret's drawings.
+/// @param wanted How many barrels it has by the unit table (0: none, the turret as ever; under 0: as drawn).
+/// @param gun Set to the gun.
+/// @return True if it has a gun.
+constexpr float BarrelSeen = 1.2247449f, BarrelLeast = 1.0f * VOXELSCALE;
+static bool findGun(const PartFrames &part, int wanted, Gun &gun)
+{
+	gun = Gun();
+	int otherFrom, otherTo, otherTop, otherBottom;
+	if (wanted == 0 || !thinEnd(part, RightSide, true, gun.from, gun.to, gun.top, gun.bottom) || !thinEnd(part, LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
+	{
+		return false;
+	}
+	gun.root = (gun.from - FloorX) / PixelsAcross;
+	gun.muzzle = (gun.to + 1 - FloorX) / PixelsAcross;
+	gun.height = FloorY - (gun.top + gun.bottom + 1) * 0.5f;
+	const float tall = (float)(gun.bottom - gun.top + 1);
+
+	// The frontal drawing's gun: its rows, each one's first and last drawn pixel and its runs.
+	std::vector<int> wide(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
+	int most = 0, lowest = -1;
+	for (int row = 0; row < FrameSize; ++row)
+	{
+		for (int column = 0; column < FrameSize; ++column)
+			if (part.frame[Front][row * FrameSize + column]) { ++wide[row]; first[row] = std::min(first[row], column); last[row] = column; }
+		most = std::max(most, wide[row]);
+		if (wide[row]) lowest = row;
+	}
+	std::vector<int> rows;
+	for (int row = lowest; row >= 0 && wide[row] > 0 && wide[row] <= most * BarrelThin; --row) rows.push_back(row);
+	auto runsOf = [&](int row) {
+		std::vector<std::pair<int, int>> runs;
+		for (int column = 0; column < FrameSize; ++column)
+		{
+			if (!part.frame[Front][row * FrameSize + column]) continue;
+			if (!runs.empty() && runs.back().second == column - 1) runs.back().second = column;
+			else runs.push_back({ column, column });
+		}
+		return runs;
+	};
+	float centres[MaxBarrels] = { (float)FloorX, (float)FloorX, (float)FloorX, (float)FloorX }, width = tall / BarrelSeen * PixelsAcross; // (in the frontal drawing's pixels)
+	gun.barrels = 1;
+	if (!rows.empty())
+	{
+		const std::vector<std::pair<int, int>> muzzles = runsOf(rows[0]);
+		if (muzzles.size() == 2 && muzzles[0].second - muzzles[0].first + 1 >= 2 * VOXELSCALE && muzzles[1].second - muzzles[1].first + 1 >= 2 * VOXELSCALE)
+		{
+			gun.barrels = 2;
+			width = 0.0f;
+			for (size_t n = 0; n < rows.size(); ++n)
+			{
+				const std::vector<std::pair<int, int>> runs = runsOf(rows[n]);
+				if (runs.size() != 2) break;
+				for (int side = 0; side < 2; ++side) width = std::max(width, (float)(runs[side].second - runs[side].first + 1));
+			}
+			for (int side = 0; side < 2; ++side) centres[side] = (muzzles[side].first + muzzles[side].second + 1) * 0.5f;
+		}
+		else
+		{
+			std::vector<int> widths;
+			float middle = 0.0f;
+			for (int row : rows) { widths.push_back(last[row] - first[row] + 1); middle += (first[row] + last[row] + 1) * 0.5f; }
+			std::sort(widths.begin(), widths.end());
+			width = (float)widths[widths.size() / 2];
+			centres[0] = middle / rows.size();
+		}
+	}
+	// (the unit table's count: that many, spread evenly over the gun's width where the drawing shows another number)
+	if (wanted > 0 && wanted != gun.barrels)
+	{
+		float left = centres[0] - width * 0.5f, right = centres[gun.barrels - 1] + width * 0.5f;
+		if (gun.barrels == 1 && rows.empty()) { left = FloorX - width * wanted * 0.65f; right = FloorX + width * wanted * 0.65f; }
+		gun.barrels = std::min(wanted, MaxBarrels);
+		const float each = (right - left) / gun.barrels;
+		for (int n = 0; n < gun.barrels; ++n) centres[n] = left + each * (n + 0.5f);
+		width = std::min(width, std::max(each - 1.0f * VOXELSCALE, 2.0f * VOXELSCALE));
+	}
+	gun.radius = width / PixelsAcross * 0.5f;
+	// (no thicker than the side drawing has the gun)
+	const float apart = gun.barrels > 1 ? std::abs(centres[gun.barrels - 1] - centres[0]) / PixelsAcross : 0.0f;
+	const float seen = (tall - apart * PixelsAcross * 0.5f) / BarrelSeen * 0.5f;
+	if (seen > 0.0f) gun.radius = std::min(gun.radius, seen);
+	gun.radius = std::max(gun.radius, BarrelLeast);
+	for (int n = 0; n < gun.barrels; ++n) gun.right[n] = (FloorX - centres[n]) / PixelsAcross;
+	return true;
+}
+
+/// A turret's barrels, made and joined to it (the owner: "Artificially make one or two voxel barrels ... and join them
+/// to the turret body at place indicated where sprite says it is a turret barrel. And yes turret barrels should be
+/// hollow to look like proper tank barrels"; a player, GitHub issue #233: "barrel breach being more defined (round
+/// looking black opening, and barrel ends being flatter"). Done on the finished body: what the turret has ahead of the
+/// place its side drawings' thin end begins (the gun as its outlines left it: a slab, a lump on its face) goes, and each
+/// barrel is a round tube from inside the turret to the gun's end as drawn, its end cut flat. Round on the grid: its
+/// axis lies on the grid's lines and its radius is whole cells (two at least), so its cubes lie evenly round it.
+/// Hollow from its mouth back to the turret, behind a wall of BarrelWall of its radius: two cells at least from three
+/// cells of radius on, the inner one painted dark with the bore's end; a tube two cells in radius has a wall of one,
+/// and a bore BarrelShallow cells deep, dark at its end alone. It is as high up the turret as drawn, moved only as
+/// far as it must to meet the turret where it leaves it (looked for BarrelJoin back from there; on a turret lower than
+/// the barrel is thick it stands on the turret's underside). Its skin is the side
+/// drawing's gun, column for column along it, its rows from the top of the tube to its underside; what of the body
+/// is left bare where the old gun was takes the nearest cube's colour. A tank's turret turned from its hull has its
+/// barrels turned with it, about the tank's middle.
+/// @param model The body, done but for its hit shape.
+/// @param owner Its cells.
+/// @param gun Its gun (see findGun), in the turret's own measure.
+/// @param code The turret's cells' code in owner.
+/// @param level The height of the gun's axis, in the grid's levels.
+/// @param turn How far the turret is turned from the body, in eighths of a turn to the right.
+/// @param part The turret's drawings, by the way the turret faces.
+/// @param palette The battle's colours.
+constexpr float BarrelWall = 0.35f, BarrelJoin = 6.0f * VOXELSCALE;
+constexpr int BarrelShallow = 2, BarrelPaintReach = 8;
+static void mountBarrels(VoxelUnitModel &model, std::vector<Uint8> &owner, const Gun &gun, Uint8 code, float level, int turn, const PartFrames &part, const SDL_Color *palette)
+{
+	// The turret's own ways over the body's grid: how far ahead of its middle a place is, and how far to its right.
+	const float angle = turn * 0.78539816f, aheadWay[2] = { std::sin(angle), std::cos(angle) }, rightWay[2] = { std::cos(angle), -std::sin(angle) };
+	auto aheadOf = [&](int across, int along) { return cellRight(across) * aheadWay[0] + cellAhead(along) * aheadWay[1]; };
+	auto besideOf = [&](int across, int along) { return cellRight(across) * rightWay[0] + cellAhead(along) * rightWay[1]; };
+	// The gun's root and end ahead of the turret's middle: three cells of it at least.
+	const float muzzle = gun.muzzle, root = std::min(gun.root, muzzle - 3.0f * Cell);
+
+	// The gun as the body has it goes: the turret's cells ahead of the root, and their cubes.
+	const size_t count = model.part.size();
+	const bool viewed = model.views.size() == count, noneAdded = model.addedFrom >= count;
+	std::vector<Uint8> cube(GridCells, 0); // (the colour of the cube each cell has: 0 none)
+	int first[3] = { GridAcross, GridAlong, GridUp }, last[3] = { -1, -1, -1 }; // (the cells changed)
+	auto changed = [&](int across, int along, int up) {
+		first[0] = std::min(first[0], across); first[1] = std::min(first[1], along); first[2] = std::min(first[2], up);
+		last[0] = std::max(last[0], across); last[1] = std::max(last[1], along); last[2] = std::max(last[2], up);
+	};
+	size_t kept = 0;
+	for (size_t k = 0; k < count; ++k)
+	{
+		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell),
+			up = (int)std::floor((model.up[k] - UpFrom) / Cell);
+		const bool inside = across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp;
+		if (inside && owner[cellIndex(across, along, up)] == code && aheadOf(across, along) > root) continue;
+		if (inside) cube[cellIndex(across, along, up)] = std::max<Uint8>(1, model.colours[k * 16]);
+		if (kept != k)
+		{
+			model.right[kept] = model.right[k]; model.ahead[kept] = model.ahead[k]; model.up[kept] = model.up[k]; model.part[kept] = model.part[k];
+			std::copy(model.colours.begin() + k * 16, model.colours.begin() + k * 16 + 16, model.colours.begin() + kept * 16);
+			if (viewed) model.views[kept] = model.views[k];
+		}
+		++kept;
+	}
+	model.right.resize(kept); model.ahead.resize(kept); model.up.resize(kept); model.part.resize(kept); model.colours.resize(kept * 16);
+	if (viewed) model.views.resize(kept);
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+		{
+			if (aheadOf(across, along) <= root) continue;
+			for (int up = 0; up < GridUp; ++up)
+				if (owner[cellIndex(across, along, up)] == code) { owner[cellIndex(across, along, up)] = 0; changed(across, along, up); }
+		}
+
+	// The tubes. The radius in cells, no more than leaves two barrels apart; each axis on the grid's lines.
+	int rings = std::max(2, (int)std::lround(gun.radius / Cell));
+	float beside[MaxBarrels];
+	for (int n = 0; n < gun.barrels; ++n) beside[n] = std::round(gun.right[n] / Cell) * Cell;
+	for (int n = 1; n < gun.barrels; ++n) rings = std::max(2, std::min(rings, (int)std::lround(std::abs(beside[n] - beside[n - 1]) / Cell) / 2));
+	const int wall = rings < 3 ? 1 : std::max(2, (int)std::lround(rings * BarrelWall));
+	const float radius = rings * Cell, bore = (rings - wall) * Cell, boreFrom = rings < 3 ? std::max(root, muzzle - BarrelShallow * Cell) : root;
+	std::vector<Uint8> tube(GridCells, 0); // (1: a barrel's wall; 2: its bore)
+	for (int n = 0; n < gun.barrels; ++n)
+	{
+		// Where the barrel meets the turret: the nearest place back along its line that has the turret, and the levels
+		// the turret has there.
+		float height = UpFrom + std::round(level) * Cell, back = root - 2.0f * VOXELSCALE;
+		for (float behind = Cell * 0.5f; behind <= BarrelJoin; behind += Cell * 0.5f)
+		{
+			const float place[2] = { beside[n] * rightWay[0] + (root - behind) * aheadWay[0], beside[n] * rightWay[1] + (root - behind) * aheadWay[1] };
+			const int across = (int)std::floor((place[0] - AcrossFrom) / Cell), along = (int)std::floor((place[1] - AlongFrom) / Cell);
+			if (across < 0 || along < 0 || across >= GridAcross || along >= GridAlong) break;
+			int low = GridUp, high = -1;
+			for (int up = 0; up < GridUp; ++up) if (owner[cellIndex(across, along, up)] == code) { low = std::min(low, up); high = std::max(high, up); }
+			if (high < 0) continue;
+			const float bottom = UpFrom + low * Cell, top = UpFrom + (high + 1) * Cell;
+			// (a turret lower than the barrel is thick: the barrel stands on the turret's underside, not sunk into what is under it)
+			height = top - bottom >= 2.0f * radius ? std::clamp(height, bottom + radius, top - radius) : bottom + radius;
+			back = root - behind - Cell;
+			break;
+		}
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+			{
+				const float ahead = aheadOf(across, along), off = besideOf(across, along) - beside[n];
+				if (ahead < back || ahead > muzzle || std::abs(off) > radius) continue;
+				for (int up = 0; up < GridUp; ++up)
+				{
+					const float rise = cellUp(up) - height, far = off * off + rise * rise;
+					if (far > radius * radius + 1e-4f) continue;
+					const int cell = cellIndex(across, along, up);
+					if (owner[cell]) continue;
+					if (ahead > boreFrom && far <= bore * bore + 1e-4f) tube[cell] = 2;
+					else { owner[cell] = code; tube[cell] = 1; }
+					changed(across, along, up);
+				}
+			}
+	}
+	if (last[0] < 0) return;
+
+	// Colours. The gun's own: the side drawing's nearest drawn pixel to a place on it; the dark of its bore: its
+	// darkest colour, or the darkest shade of that colour's block of the palette.
+	auto drawnNear = [&](int column, int row) -> Uint8 {
+		for (int away = 0; away < FrameSize; ++away)
+			for (int side = -1; side <= 1; side += 2)
+			{
+				const int c = column + away * side;
+				if (c < 0 || c >= FrameSize) continue;
+				for (int off = 0; off < FrameSize; ++off)
+					for (int way = -1; way <= 1; way += 2)
+					{
+						const int r = row + off * way;
+						if (r >= 0 && r < FrameSize && part.frame[RightSide][r * FrameSize + c]) return part.frame[RightSide][r * FrameSize + c];
+					}
+			}
+		return 0;
+	};
+	Uint8 dark = 0;
+	for (int column = gun.from; column <= gun.to; ++column)
+		for (int row = gun.top; row <= gun.bottom; ++row)
+		{
+			const Uint8 colour = part.frame[RightSide][row * FrameSize + column];
+			if (colour && (!dark || luminance(palette[colour]) < luminance(palette[dark]))) dark = colour;
+		}
+	if (dark && luminance(palette[dark / 16 * 16 + 15]) < luminance(palette[dark])) dark = (Uint8)(dark / 16 * 16 + 15);
+	// (the nearest cube's colour, for a cell of the body laid bare)
+	auto cubeNear = [&](int across, int along, int up) -> Uint8 {
+		for (int reach = 1; reach <= BarrelPaintReach; ++reach)
+			for (int a = across - reach; a <= across + reach; ++a)
+				for (int b = along - reach; b <= along + reach; ++b)
+					for (int c = up - reach; c <= up + reach; ++c)
+					{
+						if (std::max(std::abs(a - across), std::max(std::abs(b - along), std::abs(c - up))) != reach) continue;
+						if (a < 0 || b < 0 || c < 0 || a >= GridAcross || b >= GridAlong || c >= GridUp) continue;
+						if (cube[cellIndex(a, b, c)] > 1) return cube[cellIndex(a, b, c)];
+					}
+		return 0;
+	};
+
+	// The cubes: every cell round what changed that has air beside it and no cube yet: the tubes', and the body's
+	// where the old gun stood against it.
+	static const int Sides[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+	const float middleRow = (gun.top + gun.bottom) * 0.5f, halfRows = (gun.bottom - gun.top) * 0.5f;
+	for (int across = std::max(0, first[0] - 1); across <= std::min(GridAcross - 1, last[0] + 1); ++across)
+		for (int along = std::max(0, first[1] - 1); along <= std::min(GridAlong - 1, last[1] + 1); ++along)
+			for (int up = std::max(0, first[2] - 1); up <= std::min(GridUp - 1, last[2] + 1); ++up)
+			{
+				const int cell = cellIndex(across, along, up);
+				if (!owner[cell] || cube[cell]) continue;
+				bool outside = false, atBore = false;
+				for (const int *step : Sides)
+				{
+					const int a = across + step[0], b = along + step[1], c = up + step[2];
+					if (a < 0 || b < 0 || c < 0 || a >= GridAcross || b >= GridAlong || c >= GridUp) { outside = true; continue; }
+					if (!owner[cellIndex(a, b, c)]) { outside = true; atBore = atBore || tube[cellIndex(a, b, c)] == 2; }
+				}
+				if (!outside) continue;
+				const float ahead = aheadOf(across, along);
+				Uint8 colour = 0;
+				// (dark inside: the wall's inner cells where it is two thick, and whatever the bore ends on)
+				if (atBore && (rings >= 3 || ahead <= boreFrom)) colour = dark;
+				else if (tube[cell] == 1)
+				{
+					// (a cell of a barrel's skin: the side drawing's column along it, its row by how high on the tube it is)
+					float low = 1e9f, high = -1e9f;
+					for (int other = 0; other < GridUp; ++other) if (tube[cellIndex(across, along, other)]) { low = std::min(low, (float)other); high = std::max(high, (float)other); }
+					const float share = high > low ? ((up - low) / (high - low)) * 2.0f - 1.0f : 0.0f; // (-1 its underside, 1 its top)
+					const int column = std::clamp((int)std::floor(FloorX + ahead * PixelsAcross), gun.from, gun.to);
+					colour = drawnNear(column, (int)std::lround(middleRow - share * halfRows));
+				}
+				else colour = cubeNear(across, along, up);
+				if (!colour) colour = drawnNear(gun.from, (int)std::lround(middleRow));
+				if (!colour) continue;
+				model.right.push_back(cellRight(across));
+				model.ahead.push_back(cellAhead(along));
+				model.up.push_back(cellUp(up));
+				model.part.push_back(PartCodes[0]);
+				model.colours.insert(model.colours.end(), 16, colour);
+				if (viewed) model.views.push_back(0xFFFF);
+			}
+	if (noneAdded) model.addedFrom = model.part.size();
+}
+
 /// A tank made as high as the game's units are (see Routine::tankHull): its hull, from its underside to its deck,
 /// stretched to reach hullTop, and its turret, from the deck to its top, to reach turretTop; heights in the body's own
 /// measure. The cells and the cubes move by whole layers of the grid: a layer of the body as made becomes the one or
@@ -4780,6 +5124,14 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	removeOutlines(parts, palette);
 	addContrast(parts, palette);
 
+	// (A turret's or a tank's gun: see findGun. How many barrels the unit table says it has, the word "barrels:"; none
+	// said, as many as its drawings show, one or two.)
+	const int barrelsWanted = ((routine.traits >> 8) & 7) - 1;
+	const int turretTurn = (routine.traits >> 11) & 7; // (a tank's turret turned from its hull, eighths of a turn to the right)
+	Gun mounted;
+	PartFrames gunFrames;
+	bool gunFound = false;
+
 	// The parts' shapes, each claiming its cells in this order (the torso first).
 	std::vector<Uint8> owner(GridCells, 0);
 	bool leaning = false; // (a creature on one frame whose drawings are no standing body's seen along the slant: see below)
@@ -4835,6 +5187,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 		if (fourSided) roundPlan(hull);
 		if (turret) levelOff(solid, hull);
+		// (a turret's gun: found in its drawings here, made once the body is done: see findGun and mountBarrels)
+		if (turret && (gunFound = findGun(solid, barrelsWanted, mounted))) gunFrames = solid;
 		if (tank) flattenHull(hull);
 		for (int i = 0; i < GridCells; ++i) if (shape[i] && hull[i]) owner[i] = PartCodes[0];
 		if (tank)
@@ -4873,39 +5227,13 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 					for (int up = lowest - 1; up >= 0 && roof < 0; --up) if (owner[cellIndex(across, along, up)]) roof = up;
 					for (int up = roof + 1; roof >= 0 && up < lowest; ++up) gun[cellIndex(across, along, up)] = 1;
 				}
-			// (Its barrel: where its side drawing runs out ahead of it thin, under BarrelThin of the turret's own height
-			// there, for two pixels or more, in both side drawings: a round bar as long, as high up and as thick as
-			// drawn, from inside the turret. "Tank barrel for cannon / laser / standard 1 barrel tank, should have a
-			// protruding barrel, to give definition", the same issue; its outlines left the stub on the turret's face.)
-			{
-				auto thinEnd = [&](int d, bool atRight, int &from, int &to, int &top, int &bottom) {
-					std::vector<int> high(FrameSize, 0), first(FrameSize, FrameSize), last(FrameSize, -1);
-					int most = 0, left = FrameSize, right = -1;
-					for (int column = 0; column < FrameSize; ++column)
-					{
-						for (int row = 0; row < FrameSize; ++row)
-							if (parts[1].frame[d][row * FrameSize + column]) { ++high[column]; first[column] = std::min(first[column], row); last[column] = row; }
-						most = std::max(most, high[column]);
-						if (high[column]) { left = std::min(left, column); right = std::max(right, column); }
-					}
-					if (right < 0) return false;
-					from = to = atRight ? right : left;
-					top = FrameSize; bottom = -1;
-					for (int column = from; column >= left && column <= right && high[column] > 0 && high[column] <= most * BarrelThin; column += atRight ? -1 : 1)
-					{
-						(atRight ? from : to) = column;
-						top = std::min(top, first[column]); bottom = std::max(bottom, last[column]);
-					}
-					return bottom >= 0 && to - from + 1 >= 2 * VOXELSCALE;
-				};
-				int from, to, top, bottom, otherFrom, otherTo, otherTop, otherBottom;
-				if (thinEnd(RightSide, true, from, to, top, bottom) && thinEnd(LeftSide, false, otherFrom, otherTo, otherTop, otherBottom))
-				{
-					const float height = FloorY - (top + bottom + 1) * 0.5f, thick = std::max(1.0f * VOXELSCALE, (bottom - top + 1) * 0.5f);
-					const float root[3] = { 0.0f, (from - FloorX) / PixelsAcross - 2.0f * VOXELSCALE, height }, muzzle[3] = { 0.0f, (to + 1 - FloorX) / PixelsAcross, height };
-					fillCapsule(gun, root, muzzle, thick);
-				}
-			}
+			// (Its barrel: where its side drawing runs out ahead of it thin: see findGun and mountBarrels, which makes it
+			// once the body is done. "Tank barrel for cannon / laser / standard 1 barrel tank, should have a protruding
+			// barrel, to give definition", the same issue; its outlines left the stub on the turret's face.)
+			// (found in the turret's own drawings: turned from its hull, the turret looks right in another of the eight)
+			gunFrames.any = parts[1].any;
+			for (int d = 0; d < 8; ++d) gunFrames.frame[d] = parts[1].frame[(d - turretTurn + 8) % 8];
+			gunFound = findGun(gunFrames, barrelsWanted, mounted);
 			for (int i = 0; i < GridCells; ++i) if (gun[i]) owner[i] = PartCodes[1];
 		}
 	}
@@ -5827,7 +6155,26 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// (a tank's turret is of its body from here on: nothing of it swings, and a shot at it meets the tank)
 	for (size_t k = 0; tank && k < model->part.size(); ++k) if (model->part[k] == PartCodes[1]) model->part[k] = PartCodes[0];
 	// (a tank as high as the game's units are, by the owner's ruling: see standTank)
+	// (the levels a tank's turret stands between as made, then as stood: its gun is as high up it as drawn)
+	auto turretLevels = [&](int &low, int &high) {
+		low = GridUp; high = -1;
+		for (int cell = 0; cell < GridCells; ++cell)
+			if (owner[cell] == PartCodes[1]) { low = std::min(low, cell % GridUp); high = std::max(high, cell % GridUp); }
+	};
+	int madeLow = 0, madeHigh = -1, stoodLow = 0, stoodHigh = -1;
+	if (tank && gunFound) turretLevels(madeLow, madeHigh);
 	if (tank && routine.tankTop > 0.0f) standTank(*model, owner, routine.tankHull * VOXELSCALE, routine.tankTop * VOXELSCALE);
+	if (gunFound)
+	{
+		// (the height of the gun's axis, in levels of the grid from its bottom: a tank's carried with its turret)
+		float level = (mounted.height - UpFrom) / Cell;
+		if (tank)
+		{
+			turretLevels(stoodLow, stoodHigh);
+			if (madeHigh > madeLow && stoodHigh > stoodLow) level = stoodLow + (level - madeLow) * (float)(stoodHigh - stoodLow) / (float)(madeHigh - madeLow);
+		}
+		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank ? turretTurn : 0, gunFrames, palette);
+	}
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);

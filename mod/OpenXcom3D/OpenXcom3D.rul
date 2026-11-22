@@ -243,6 +243,10 @@ firstPerson:
   #   flat: how much of what stands above its widest level the body keeps, in hundredths, rounded off (35: the cone
   #           the eight drawings leave on a saucer, all made from the same height above it, becomes a low dome);
   #           flatUnder: the same for what hangs under its widest level; 100: as ever
+  #   barrels: how many barrels a turret's or a tank's gun is made with (a turret: a unit two tiles by two that
+  #           cannot move; a tank: one with a turret of its own). Not said, as its drawings show: one, or two where
+  #           its frontal drawing has two muzzles side by side. 0: none, the turret as its eight drawings leave it
+  #           (for a unit whose thin end is no gun); 1 to 4: that many, spread over the gun's width
   # A later entry (or a later mod's) overrides what it sets.
   units:
     # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the

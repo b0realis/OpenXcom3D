@@ -1437,17 +1437,43 @@ bool FirstPersonMode::isClimbable(const Tile *tile, int part, bool openSky) cons
 }
 
 /**
+ * What the emergency climb costs a unit, in time units (a player's idea, taken up by the owner: "half of tu, plus 1% tu
+ * for every unit of weight %. No scaling for the overweight", so that a fast animal with a long bar cannot hop fence
+ * after fence in a turn): a share of the unit's full bar. Half of it with nothing carried (ClimbShareEmpty), rising
+ * evenly with what it carries, as a share of its strength, to all of it at a full load (ClimbShareLoaded); a unit
+ * carrying more than its strength pays no more than that. Read to the letter, a hundredth of the bar for every
+ * hundredth of load would be the whole bar from half a load on, and more than the bar above it: here the bar is
+ * reached at a full load, so a unit with a fresh turn can always climb. The full bar is what the game gives the unit
+ * at a turn's start: its time units stat, less in the game's own way when it is overweight, and a tenth less for each
+ * fatal wound to a leg.
+ * @param unit The unit.
+ * @return The cost, 1 at least.
+ */
+int FirstPersonMode::climbTimeUnits(const BattleUnit *unit) const
+{
+	const UnitStats *stats = unit->getBaseStats();
+	const int strength = std::max(1, (int)stats->strength), weight = std::max(0, unit->getCarriedWeight());
+	int bar = (int)stats->tu;
+	if (weight > strength) bar = (int)((float)strength / (float)weight * bar); // (as BattleUnit::prepareTimeUnits)
+	bar -= bar * (unit->getFatalWound(BODYPART_LEFTLEG) + unit->getFatalWound(BODYPART_RIGHTLEG)) * 10 / 100;
+	const int load = std::min(100, weight * 100 / strength); // hundredths of its strength
+	const int share = ClimbShareEmpty + (ClimbShareLoaded - ClimbShareEmpty) * load / 100;
+	return std::max(1, (bar * share + 99) / 100);
+}
+
+/**
  * The emergency climb (its key, none at first; the owner: "a bindable key - emergency climb (50 TUs - a unit can climb
  * out of a pit ... if floor/tile is available next where the unit climbs out - sometimes units can get stuck in level
  * depressions with no way out; ... can also climb over a fence if free space tile is available on other side"). For the
  * maps where the rules leave a unit no way out: a sunken railway track, a ditch, a yard fenced all round. Only where
  * the plain step that way is refused, straight along the grid the way the view looks, for a unit one tile big, for
- * ClimbTimeUnits (and what the game reserves for a shot is kept; free in the debug "doom mode"):
+ * a share of its time units (see climbTimeUnits; what the game reserves for a shot is kept; free in the debug "doom mode"):
  * - up a ledge: onto the next tile on the same level, with nothing between but the height the game won't step up;
  * - over a fence: a wall between here and the next tile, or something standing on the next tile (then onto the tile
  *   beyond it), that can be climbed (see isClimbable: up to ClimbMaxHeight voxels, or a taller one that sight passes,
  *   under the open sky);
- * - out of a pit: onto the next tile a level up, when it has a floor and nothing is over the unit's own head.
+ * - out of a pit: onto the next tile a level up, when it has a floor and nothing is over the unit's own head (a low
+ *   flat roof beside the unit is climbed the same way: the owner, "Roofs; yes").
  * The tile climbed onto must have a floor and be free: no unit, nothing on it that stops walking. An object drawn as
  * a wall along a tile's side counts as a wall between the tiles. The unit is set there (no walk: the rules have none
  * for it), on its feet, faces the way it climbed, and what follows a step follows the climb (proximity grenades,
@@ -1539,12 +1565,13 @@ void FirstPersonMode::emergencyClimb(BattleUnit *unit)
 	}
 	if (!doomModeOn())
 	{
-		if (unit->getTimeUnits() < ClimbTimeUnits || !reserveAllows(unit, ClimbTimeUnits, 0))
+		const int cost = climbTimeUnits(unit);
+		if (unit->getTimeUnits() < cost || !reserveAllows(unit, cost, 0))
 		{
 			_state->warning("STR_NOT_ENOUGH_TIME_UNITS");
 			return;
 		}
-		unit->spendTimeUnits(ClimbTimeUnits);
+		unit->spendTimeUnits(cost);
 	}
 
 	// There: the unit set on the tile, on its feet, facing the way it climbed; then what the game does after a step:

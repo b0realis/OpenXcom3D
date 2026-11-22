@@ -763,6 +763,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 flats[2] = { (Uint8)flatTop, (Uint8)flatUnder };
 		hashBytes(hash, flats, 2);
 	}
+	// (a turret's barrels, by the unit table: only said of a unit hashed in, as above)
+	if (look.barrels >= 0)
+	{
+		const Uint8 barrels[2] = { 'b', (Uint8)look.barrels };
+		hashBytes(hash, barrels, 2);
+	}
 	_byQuick[quick] = hash;
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
@@ -796,6 +802,9 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->standard = look.standard == 1;
 		job->sides = look.frontal == 2;
 		job->traits = (look.roundTrunk == 1 ? 1 : 0) | (look.faceHead == 1 ? 2 : 0) | (look.tail == 1 ? 4 : 0) | (look.hullPaint == 1 ? 8 : 0) | (look.legs > 0 ? (look.legs / 2) << 4 : 0);
+		// (and a turret's barrels by the unit table, one more than the count: 0 nothing said; a tank's turret's turn
+		// from its hull: see VoxelBodies::makeModel)
+		job->traits |= (look.barrels >= 0 ? (std::min(look.barrels, 4) + 1) << 8 : 0) | (std::get<7>(key) & 7) << 11;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

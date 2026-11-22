@@ -31,7 +31,7 @@ KEYS = [
          'Walk on past enemies at walking pace; sprinting does the same at a run.'),
         ('<kbd>Space</kbd>', 'Jump: a hop on the spot (1 TU); while walking forwards or sideways into something low (a fence, a crate, up to 15 voxels high) it vaults over, for 30 TU (a setting).',
          'A small bend of the rules (setting <i>Jump over low obstacles</i>).'),
-        ('<i>no key at first</i>', 'Emergency climb, for 50 TU: where the step ahead is refused, up a ledge, over a fence (up to 20 voxels high; a tall wire fence too under the open sky) or out of a pit onto the tile a level up. The tile climbed onto must have a floor and be free.',
+        ('<i>no key at first</i>', 'Emergency climb: where the step ahead is refused, up a ledge, over a fence (up to 20 voxels high; a tall wire fence too under the open sky) or out of a pit (or onto a low roof) onto the tile a level up. Costs half the unit\'s TU with nothing carried, up to all of them at a full load. The tile climbed onto must have a floor and be free.',
          'For the maps where a unit gets stuck with no way out (a sunken railway track, a ditch, a fenced yard). Bind it under Controls.'),
         ('<kbd>Page Up</kbd> <kbd>Page Down</kbd>', 'Fly up/down, ride a grav lift, climb a ladder. Off a lift, Page Up switches flight on, Page Down on the ground off. Purple arrows with LIFT PLATFORM show where a lift goes.',
          ''),
