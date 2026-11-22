@@ -1119,7 +1119,7 @@ private:
 	// The weapon in hand, bottom right (FirstPersonModeWeaponInHand.cpp)
 	// =====================================================================================
 
-	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48)
+	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48, or a mod's bigger one)
 	const BattleItem *_heldItem = nullptr;              // the item drawn in hand
 	const BattleUnit *_heldBy = nullptr;                // and whose hand it's in (another soldier's: no dip, see updateWeaponInHand)
 	const RuleItem *_heldRules = nullptr;               // its rules
@@ -1164,8 +1164,6 @@ private:
 	void analyzeWeapon(bool gun, bool melee = false, bool bow = false);
 	/// Is a weapon held as a bow: upright, its curve towards the crosshair?
 	bool heldAsBow(const RuleItem *weapon) const;
-	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
-	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 	/// Gives the held picture (weapon or other item) volume as voxels.
 	void voxelizeWeapon();
 	/// How the muzzle flashes, by the damage the weapon's ammo does.

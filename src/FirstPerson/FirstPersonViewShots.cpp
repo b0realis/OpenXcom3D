@@ -105,17 +105,7 @@ const FirstPersonView::ItemModel &FirstPersonView::itemModel(BattleItem *item)
 	// The picture, drawn as the inventory draws it (its recolouring scripts), whole at the
 	// frame's own place (the hand slot would centre it by the item's size and could push a
 	// picture drawn wider than the item off the frame), then given volume.
-	if (!_itemPicture)
-	{
-		_itemPicture = new Surface(32, 48, 0, 0);
-	}
-	_itemPicture->clear();
-	if (const Surface *frame = item->getBigSprite(inventorySprites, _save, 0))
-	{
-		ScriptWorkerBlit worker;
-		BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
-		worker.executeBlit(frame, _itemPicture, 0, 0, 0);
-	}
+	drawItemPicture(item, inventorySprites, _save, _itemPicture);
 	voxelizePicture(_itemPicture, model.faces, pictureIsPlate(_game->getMod()->getFirstPerson(), item->getRules(), _itemPicture));
 
 	// The middle of its opaque pixels: the point that flies along the game's path.

@@ -143,30 +143,6 @@ void FirstPersonMode::makeWeaponInHand()
 }
 
 /**
- * Draws an item's inventory picture (BIGOBS.PCK, with the item's own recolouring scripts, as the
- * game draws it in a hand) into a picture of the frame's size, whole, at the frame's own place.
- * The game's hand slot centres the frame by the item's inventory size instead, which pushes a
- * picture drawn wider than its item (a mod's sword lying across the frame, one square wide in
- * the inventory) partly off the frame: its tip was cut off, and the thicker end left looked
- * like the business end.
- * @param item The item.
- * @param inventorySprites The game's BIGOBS.PCK.
- * @param picture Where to draw it (32x48, cleared first).
- */
-void FirstPersonMode::drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const
-{
-	picture->clear();
-	const Surface *frame = item->getBigSprite(inventorySprites, _save, 0);
-	if (!frame)
-	{
-		return;
-	}
-	ScriptWorkerBlit worker;
-	BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
-	worker.executeBlit(frame, picture, 0, 0, 0);
-}
-
-/**
  * Is a weapon held as a bow (see analyzeWeapon)? As the mod's item table says (`bow: true` or
  * `false` in an entry of `items:`), or else by its name: a ranged weapon whose type has BOW in it
  * and isn't a crossbow (CROSSBOW, XBOW), nor a word that only contains it (ELBOW, RAINBOW, BOWL).
@@ -194,7 +170,7 @@ bool FirstPersonMode::heldAsBow(const RuleItem *weapon) const
 
 /**
  * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
- * _heldSprite, see drawHeldPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
+ * _heldSprite, see drawItemPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
  * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
  * magazine (the one sticking out further from the axis) down. Then gives it volume
  * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
@@ -1091,13 +1067,13 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	_heldBy = unit;
 	_heldClipId = clipId;
 
-	// A different kind of weapon: draw its inventory picture (see drawHeldPicture) and
+	// A different kind of weapon: draw its inventory picture (see drawItemPicture) and
 	// measure it again. Guns and clubs are drawn pointing at the crosshair, the rest held up.
 	const BattleType battleType = weapon->getRules()->getBattleType();
 	if (weapon->getRules() != _heldRules)
 	{
 		_heldRules = weapon->getRules();
-		drawHeldPicture(weapon, inventorySprites, _heldSprite);
+		drawItemPicture(weapon, inventorySprites, _save, _heldSprite);
 		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE, heldAsBow(weapon->getRules()));
 	}
 
@@ -1283,7 +1259,7 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 			if (otherWeapon->getRules() != _heldRules)
 			{
 				_heldRules = otherWeapon->getRules();
-				drawHeldPicture(otherWeapon, inventorySprites, _heldSprite);
+				drawItemPicture(otherWeapon, inventorySprites, _save, _heldSprite);
 				analyzeWeapon(true, false, heldAsBow(otherWeapon->getRules()));
 			}
 			if (_heldShape.gun)

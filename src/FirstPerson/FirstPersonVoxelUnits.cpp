@@ -75,6 +75,7 @@
 #endif
 #include "FirstPersonVoxelBodies.h"
 #include "FirstPersonVoxelBodiesFine.h"
+#include "FirstPersonVoxelModel.h"
 #include "../Engine/Exception.h"
 #include "../Engine/Options.h"
 #include "../Battlescape/UnitSprite.h"
@@ -703,6 +704,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		ScriptWorkerBlit worker;
 		BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
 		worker.executeBlit(frame, &picture, 0, 0, 0);
+		clearSlotFrame(&picture, handSlotBottom(item->getRules()->getInventoryHeight())); // (a mod's frame drawn for the inventory screen)
 		items[hand].width = picture.getWidth();
 		items[hand].height = picture.getHeight();
 		items[hand].picture.resize(items[hand].width * items[hand].height);
@@ -863,11 +865,13 @@ float VoxelUnits::handShare(const RuleItem *rule, const Mod *mod, const SurfaceS
 	auto reach = [&](const RuleItem *item) -> float {
 		const Surface *frame = item->getBigSprite() >= 0 ? const_cast<SurfaceSet*>(inventorySprites)->getFrame(item->getBigSprite()) : nullptr;
 		if (!frame) return 0.0f;
+		std::vector<Uint8> screens; // (what a mod drew for the inventory screen is no part of the item: see slotFrame)
+		slotFrame(frame, handSlotBottom(item->getInventoryHeight()), screens);
 		int left = frame->getWidth(), right = -1, top = frame->getHeight(), bottom = -1;
 		for (int y = 0; y < frame->getHeight(); ++y)
 			for (int x = 0; x < frame->getWidth(); ++x)
 			{
-				if (!frame->getPixel(x, y)) continue;
+				if (!frame->getPixel(x, y) || screens[y * frame->getWidth() + x]) continue;
 				left = std::min(left, x); right = std::max(right, x);
 				top = std::min(top, y); bottom = std::max(bottom, y);
 			}

@@ -49,8 +49,12 @@
 #include "FirstPersonVoxelModel.h"
 #include <algorithm>
 #include <cmath>
+#include "../Engine/Script.h"
 #include "../Engine/Surface.h"
+#include "../Engine/SurfaceSet.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/Unit.h"
+#include "../Savegame/BattleItem.h"
 #include "../Mod/RuleDamageType.h"
 #include "RuleFirstPerson.h"
 
@@ -141,6 +145,140 @@ bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface 
 	stepsToOutside(picture, steps);
 	const int thickest = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
 	return thickest > 0 && thickest <= BladeMaxThickness;
+}
+
+/**
+ * Finds what a mod drew into an item's inventory picture for the inventory screen, not for the item. A picture taller
+ * than the hand slot (32x48) hangs out under it there, and a mod (the 40k mod, in some 55 pictures of long weapons) draws
+ * the screen's grid anew round it: the slot's old bottom line, and any grid line further down, painted over in the
+ * background's black, and a new frame in the grid's colour down both sides of the picture to a line along its bottom.
+ * Given volume with the item, the frame was a wire loop round the weapon's butt and the painted line a black slab
+ * across it (a player's report, GitHub issue #235: "items which exceed the window size act funny").
+ * Known by the frame: both side columns of the picture in one colour from under the slot down to a row that is mostly
+ * that colour. The paint is the colour most seen on the slot's old line where nothing is drawn over and under it. A
+ * pixel of the frame's bottom line or of a painted line across stays where the item is drawn on both sides of it (the
+ * item drawn through the line); a painted pixel off those lines goes only as a piece of a line running down, nothing
+ * drawn to its left and right.
+ * @param picture The picture (palette colours, 0 transparent).
+ * @param slotBottom The row the hand slot's bottom line runs along (see handSlotBottom).
+ * @param marks Set to 1 for each pixel that is the screen's, 0 for the item's (a row after a row, the picture's size).
+ * @return True if the picture has such a frame.
+ */
+bool slotFrame(const Surface *picture, int slotBottom, std::vector<Uint8> &marks)
+{
+	const int width = picture->getWidth(), height = picture->getHeight();
+	marks.assign(width * height, 0);
+	if (width < 4 || slotBottom < 1 || height < slotBottom + 2)
+	{
+		return false;
+	}
+	// The frame: its sides, and the lowest row they reach that is three quarters of their colour.
+	const Uint8 grid = picture->getPixel(0, slotBottom + 1);
+	int bottom = -1;
+	for (int y = slotBottom + 1; grid && y < height && picture->getPixel(0, y) == grid && picture->getPixel(width - 1, y) == grid; ++y)
+	{
+		int same = 0;
+		for (int x = 0; x < width; ++x) same += picture->getPixel(x, y) == grid;
+		if (same * 4 >= width * 3) bottom = y;
+	}
+	if (bottom < 0)
+	{
+		return false;
+	}
+	// (the item's own drawing: drawn, and not found to be the screen's)
+	auto drawn = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0 && !marks[y * width + x]; };
+	for (int y = slotBottom + 1; y <= bottom; ++y) marks[y * width] = marks[y * width + width - 1] = 1;
+	for (int x = 1; x < width - 1; ++x)
+	{
+		if (picture->getPixel(x, bottom) == grid && !(drawn(x, bottom - 1) && drawn(x, bottom + 1))) marks[bottom * width + x] = 1;
+	}
+
+	// The paint over the old lines.
+	int seen[256] = {}, paint = 0;
+	for (int x = 1; x < width - 1; ++x)
+	{
+		const Uint8 colour = picture->getPixel(x, slotBottom);
+		if (colour && !drawn(x, slotBottom - 1) && !drawn(x, slotBottom + 1)) ++seen[colour];
+	}
+	for (int colour = 1; colour < 256; ++colour)
+	{
+		if (seen[colour] > seen[paint]) paint = colour; // (nothing is counted for 0)
+	}
+	// (found again while it finds more: a pixel where two painted lines cross has paint on every side at first)
+	for (bool more = paint != 0; more; )
+	{
+		more = false;
+		for (int y = slotBottom; y < bottom; ++y)
+		{
+			const bool across = y == slotBottom || picture->getPixel(1, y) == paint || picture->getPixel(width - 2, y) == paint;
+			for (int x = 1; x < width - 1; ++x)
+			{
+				if (picture->getPixel(x, y) != paint || marks[y * width + x]) continue;
+				if ((across && !(drawn(x, y - 1) && drawn(x, y + 1))) || (!drawn(x - 1, y) && !drawn(x + 1, y)))
+				{
+					marks[y * width + x] = 1;
+					more = true;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/**
+ * Clears from an item's inventory picture what a mod drew into it for the inventory screen (see slotFrame).
+ * @param picture The picture.
+ * @param slotBottom The row the hand slot's bottom line runs along (see handSlotBottom).
+ */
+void clearSlotFrame(Surface *picture, int slotBottom)
+{
+	std::vector<Uint8> marks;
+	if (!slotFrame(picture, slotBottom, marks))
+	{
+		return;
+	}
+	const int width = picture->getWidth(), height = picture->getHeight();
+	for (int y = 0; y < height; ++y)
+	{
+		for (int x = 0; x < width; ++x)
+		{
+			if (marks[y * width + x]) picture->setPixel(x, y, 0);
+		}
+	}
+}
+
+/**
+ * Draws an item's inventory picture (BIGOBS.PCK, with the item's own recolouring scripts, as the game draws it in a
+ * hand) whole, at the frame's own place and size: a hand slot's (32x48) at least, more where a mod's picture is
+ * bigger (a long weapon's, hanging out under the slot: its butt was cut off). The game's hand slot centres the frame
+ * by the item's inventory size instead, which pushes a picture drawn wider than its item (a mod's sword lying across
+ * the frame, one square wide in the inventory) partly off the frame: its tip was cut off, and the thicker end left
+ * looked like the business end. What a mod drew into the picture for the inventory screen is cleared (see slotFrame).
+ * @param item The item.
+ * @param inventorySprites The game's BIGOBS.PCK.
+ * @param save The battle.
+ * @param picture Where to draw it: cleared first, and made anew (with the old one's palette) when its size is not the frame's.
+ */
+void drawItemPicture(const BattleItem *item, const SurfaceSet *inventorySprites, const SavedBattleGame *save, Surface *&picture)
+{
+	const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
+	const int width = std::max(HandSlotWidth, frame ? frame->getWidth() : 0), height = std::max(HandSlotHeight, frame ? frame->getHeight() : 0);
+	if (!picture || picture->getWidth() != width || picture->getHeight() != height)
+	{
+		Surface *fresh = new Surface(width, height, 0, 0);
+		if (picture && picture->getPalette()) fresh->setPalette(picture->getPalette());
+		delete picture;
+		picture = fresh;
+	}
+	picture->clear();
+	if (!frame)
+	{
+		return;
+	}
+	ScriptWorkerBlit worker;
+	BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
+	worker.executeBlit(frame, picture, 0, 0, 0);
+	clearSlotFrame(picture, handSlotBottom(item->getRules()->getInventoryHeight()));
 }
 
 /**

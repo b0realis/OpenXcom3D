@@ -57,8 +57,11 @@ namespace OpenXcom
 {
 
 class Surface;
+class SurfaceSet;
 class RuleFirstPerson;
 class RuleItem;
+class BattleItem;
+class SavedBattleGame;
 
 /// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
 /// depth (depth centred on 0), wound so that the cross product of its first two edges points
@@ -67,6 +70,18 @@ struct VoxelFace { float corner[4][3]; Uint8 color; };
 
 /// Gives a picture volume: the faces of its voxel model (none for an empty picture), a cushion or a flat plate.
 void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate = false);
+/// The inventory screen's hand slot, in pixels (two squares by three, 16 pixels a square): the size an item's
+/// inventory picture has in the games.
+const int HandSlotWidth = 32, HandSlotHeight = 48;
+/// The row of an item's inventory picture that the hand slot's bottom line runs along: the screen centres an item in
+/// the slot by its height in squares.
+inline int handSlotBottom(int squaresHigh) { return HandSlotHeight - 1 - (3 - (squaresHigh < 3 ? squaresHigh : 3)) * 8; }
+/// Finds what a mod drew into an inventory picture for the inventory screen and not for the item (see the function).
+bool slotFrame(const Surface *picture, int slotBottom, std::vector<Uint8> &marks);
+/// Clears it from the picture.
+void clearSlotFrame(Surface *picture, int slotBottom);
+/// Draws an item's inventory picture whole and clean, as the 3D view gives it volume.
+void drawItemPicture(const BattleItem *item, const SurfaceSet *inventorySprites, const SavedBattleGame *save, Surface *&picture);
 /// Is an item's picture given volume as a flat plate (a blade: a sword, a knife, an axe) rather than a cushion?
 bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture);
 

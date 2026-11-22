@@ -41111,10 +41111,10 @@ index 000000000..d722a22cb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f7fbad892
+index 000000000..c27129a91
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1592 @@
+@@ -0,0 +1,1590 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42236,7 +42236,7 @@ index 000000000..f7fbad892
 +	// The weapon in hand, bottom right (FirstPersonModeWeaponInHand.cpp)
 +	// =====================================================================================
 +
-+	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48)
++	Surface *_weaponInHand = nullptr, *_heldSprite = nullptr; // where it's drawn; the held item's inventory picture (32x48, or a mod's bigger one)
 +	const BattleItem *_heldItem = nullptr;              // the item drawn in hand
 +	const BattleUnit *_heldBy = nullptr;                // and whose hand it's in (another soldier's: no dip, see updateWeaponInHand)
 +	const RuleItem *_heldRules = nullptr;               // its rules
@@ -42281,8 +42281,6 @@ index 000000000..f7fbad892
 +	void analyzeWeapon(bool gun, bool melee = false, bool bow = false);
 +	/// Is a weapon held as a bow: upright, its curve towards the crosshair?
 +	bool heldAsBow(const RuleItem *weapon) const;
-+	/// Draws an item's inventory picture whole into a 32x48 picture (not shifted as the hand slot does).
-+	void drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const;
 +	/// Gives the held picture (weapon or other item) volume as voxels.
 +	void voxelizeWeapon();
 +	/// How the muzzle flashes, by the damage the weapon's ammo does.
@@ -57965,10 +57963,10 @@ index 000000000..28b79eea5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeWeaponInHand.cpp b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
 new file mode 100644
-index 000000000..9e900e074
+index 000000000..1c27a32b2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeWeaponInHand.cpp
-@@ -0,0 +1,1326 @@
+@@ -0,0 +1,1302 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -58114,30 +58112,6 @@ index 000000000..9e900e074
 +}
 +
 +/**
-+ * Draws an item's inventory picture (BIGOBS.PCK, with the item's own recolouring scripts, as the
-+ * game draws it in a hand) into a picture of the frame's size, whole, at the frame's own place.
-+ * The game's hand slot centres the frame by the item's inventory size instead, which pushes a
-+ * picture drawn wider than its item (a mod's sword lying across the frame, one square wide in
-+ * the inventory) partly off the frame: its tip was cut off, and the thicker end left looked
-+ * like the business end.
-+ * @param item The item.
-+ * @param inventorySprites The game's BIGOBS.PCK.
-+ * @param picture Where to draw it (32x48, cleared first).
-+ */
-+void FirstPersonMode::drawHeldPicture(const BattleItem *item, const SurfaceSet *inventorySprites, Surface *picture) const
-+{
-+	picture->clear();
-+	const Surface *frame = item->getBigSprite(inventorySprites, _save, 0);
-+	if (!frame)
-+	{
-+		return;
-+	}
-+	ScriptWorkerBlit worker;
-+	BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
-+	worker.executeBlit(frame, picture, 0, 0, 0);
-+}
-+
-+/**
 + * Is a weapon held as a bow (see analyzeWeapon)? As the mod's item table says (`bow: true` or
 + * `false` in an entry of `items:`), or else by its name: a ranged weapon whose type has BOW in it
 + * and isn't a crossbow (CROSSBOW, XBOW), nor a word that only contains it (ELBOW, RAINBOW, BOWL).
@@ -58165,7 +58139,7 @@ index 000000000..9e900e074
 +
 +/**
 + * Measures the weapon's inventory picture (the game's own, from BIGOBS.PCK, already drawn into
-+ * _heldSprite, see drawHeldPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
++ * _heldSprite, see drawItemPicture), so it can be drawn with its barrel on the line to the crosshair: its long axis
 + * (the direction its pixels spread out furthest), its muzzle end, and the side with the grip and
 + * magazine (the one sticking out further from the axis) down. Then gives it volume
 + * (voxelizeWeapon). All measures are in picture pixels, along and across the long axis from
@@ -59062,13 +59036,13 @@ index 000000000..9e900e074
 +	_heldBy = unit;
 +	_heldClipId = clipId;
 +
-+	// A different kind of weapon: draw its inventory picture (see drawHeldPicture) and
++	// A different kind of weapon: draw its inventory picture (see drawItemPicture) and
 +	// measure it again. Guns and clubs are drawn pointing at the crosshair, the rest held up.
 +	const BattleType battleType = weapon->getRules()->getBattleType();
 +	if (weapon->getRules() != _heldRules)
 +	{
 +		_heldRules = weapon->getRules();
-+		drawHeldPicture(weapon, inventorySprites, _heldSprite);
++		drawItemPicture(weapon, inventorySprites, _save, _heldSprite);
 +		analyzeWeapon(battleType == BT_FIREARM || battleType == BT_MELEE, battleType == BT_MELEE, heldAsBow(weapon->getRules()));
 +	}
 +
@@ -59254,7 +59228,7 @@ index 000000000..9e900e074
 +			if (otherWeapon->getRules() != _heldRules)
 +			{
 +				_heldRules = otherWeapon->getRules();
-+				drawHeldPicture(otherWeapon, inventorySprites, _heldSprite);
++				drawItemPicture(otherWeapon, inventorySprites, _save, _heldSprite);
 +				analyzeWeapon(true, false, heldAsBow(otherWeapon->getRules()));
 +			}
 +			if (_heldShape.gun)
@@ -73559,10 +73533,10 @@ index 000000000..2db5118be
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..c2ce32f58
+index 000000000..6f630badd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2344 @@
+@@ -0,0 +1,2334 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73670,17 +73644,7 @@ index 000000000..c2ce32f58
 +	// The picture, drawn as the inventory draws it (its recolouring scripts), whole at the
 +	// frame's own place (the hand slot would centre it by the item's size and could push a
 +	// picture drawn wider than the item off the frame), then given volume.
-+	if (!_itemPicture)
-+	{
-+		_itemPicture = new Surface(32, 48, 0, 0);
-+	}
-+	_itemPicture->clear();
-+	if (const Surface *frame = item->getBigSprite(inventorySprites, _save, 0))
-+	{
-+		ScriptWorkerBlit worker;
-+		BattleItem::ScriptFill(&worker, item, _save, BODYPART_ITEM_INVENTORY, 0, 0);
-+		worker.executeBlit(frame, _itemPicture, 0, 0, 0);
-+	}
++	drawItemPicture(item, inventorySprites, _save, _itemPicture);
 +	voxelizePicture(_itemPicture, model.faces, pictureIsPlate(_game->getMod()->getFirstPerson(), item->getRules(), _itemPicture));
 +
 +	// The middle of its opaque pixels: the point that flies along the game's path.
@@ -95473,10 +95437,10 @@ index 000000000..b9d9fffaf
 +}
 diff --git a/src/FirstPerson/FirstPersonVoxelModel.cpp b/src/FirstPerson/FirstPersonVoxelModel.cpp
 new file mode 100644
-index 000000000..bf9645fcf
+index 000000000..671ec5575
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelModel.cpp
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,376 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -95528,8 +95492,12 @@ index 000000000..bf9645fcf
 +#include "FirstPersonVoxelModel.h"
 +#include <algorithm>
 +#include <cmath>
++#include "../Engine/Script.h"
 +#include "../Engine/Surface.h"
++#include "../Engine/SurfaceSet.h"
 +#include "../Mod/RuleItem.h"
++#include "../Mod/Unit.h"
++#include "../Savegame/BattleItem.h"
 +#include "../Mod/RuleDamageType.h"
 +#include "RuleFirstPerson.h"
 +
@@ -95620,6 +95588,140 @@ index 000000000..bf9645fcf
 +	stepsToOutside(picture, steps);
 +	const int thickest = steps.empty() ? 0 : *std::max_element(steps.begin(), steps.end());
 +	return thickest > 0 && thickest <= BladeMaxThickness;
++}
++
++/**
++ * Finds what a mod drew into an item's inventory picture for the inventory screen, not for the item. A picture taller
++ * than the hand slot (32x48) hangs out under it there, and a mod (the 40k mod, in some 55 pictures of long weapons) draws
++ * the screen's grid anew round it: the slot's old bottom line, and any grid line further down, painted over in the
++ * background's black, and a new frame in the grid's colour down both sides of the picture to a line along its bottom.
++ * Given volume with the item, the frame was a wire loop round the weapon's butt and the painted line a black slab
++ * across it (a player's report, GitHub issue #235: "items which exceed the window size act funny").
++ * Known by the frame: both side columns of the picture in one colour from under the slot down to a row that is mostly
++ * that colour. The paint is the colour most seen on the slot's old line where nothing is drawn over and under it. A
++ * pixel of the frame's bottom line or of a painted line across stays where the item is drawn on both sides of it (the
++ * item drawn through the line); a painted pixel off those lines goes only as a piece of a line running down, nothing
++ * drawn to its left and right.
++ * @param picture The picture (palette colours, 0 transparent).
++ * @param slotBottom The row the hand slot's bottom line runs along (see handSlotBottom).
++ * @param marks Set to 1 for each pixel that is the screen's, 0 for the item's (a row after a row, the picture's size).
++ * @return True if the picture has such a frame.
++ */
++bool slotFrame(const Surface *picture, int slotBottom, std::vector<Uint8> &marks)
++{
++	const int width = picture->getWidth(), height = picture->getHeight();
++	marks.assign(width * height, 0);
++	if (width < 4 || slotBottom < 1 || height < slotBottom + 2)
++	{
++		return false;
++	}
++	// The frame: its sides, and the lowest row they reach that is three quarters of their colour.
++	const Uint8 grid = picture->getPixel(0, slotBottom + 1);
++	int bottom = -1;
++	for (int y = slotBottom + 1; grid && y < height && picture->getPixel(0, y) == grid && picture->getPixel(width - 1, y) == grid; ++y)
++	{
++		int same = 0;
++		for (int x = 0; x < width; ++x) same += picture->getPixel(x, y) == grid;
++		if (same * 4 >= width * 3) bottom = y;
++	}
++	if (bottom < 0)
++	{
++		return false;
++	}
++	// (the item's own drawing: drawn, and not found to be the screen's)
++	auto drawn = [&](int x, int y) { return x >= 0 && y >= 0 && x < width && y < height && picture->getPixel(x, y) != 0 && !marks[y * width + x]; };
++	for (int y = slotBottom + 1; y <= bottom; ++y) marks[y * width] = marks[y * width + width - 1] = 1;
++	for (int x = 1; x < width - 1; ++x)
++	{
++		if (picture->getPixel(x, bottom) == grid && !(drawn(x, bottom - 1) && drawn(x, bottom + 1))) marks[bottom * width + x] = 1;
++	}
++
++	// The paint over the old lines.
++	int seen[256] = {}, paint = 0;
++	for (int x = 1; x < width - 1; ++x)
++	{
++		const Uint8 colour = picture->getPixel(x, slotBottom);
++		if (colour && !drawn(x, slotBottom - 1) && !drawn(x, slotBottom + 1)) ++seen[colour];
++	}
++	for (int colour = 1; colour < 256; ++colour)
++	{
++		if (seen[colour] > seen[paint]) paint = colour; // (nothing is counted for 0)
++	}
++	// (found again while it finds more: a pixel where two painted lines cross has paint on every side at first)
++	for (bool more = paint != 0; more; )
++	{
++		more = false;
++		for (int y = slotBottom; y < bottom; ++y)
++		{
++			const bool across = y == slotBottom || picture->getPixel(1, y) == paint || picture->getPixel(width - 2, y) == paint;
++			for (int x = 1; x < width - 1; ++x)
++			{
++				if (picture->getPixel(x, y) != paint || marks[y * width + x]) continue;
++				if ((across && !(drawn(x, y - 1) && drawn(x, y + 1))) || (!drawn(x - 1, y) && !drawn(x + 1, y)))
++				{
++					marks[y * width + x] = 1;
++					more = true;
++				}
++			}
++		}
++	}
++	return true;
++}
++
++/**
++ * Clears from an item's inventory picture what a mod drew into it for the inventory screen (see slotFrame).
++ * @param picture The picture.
++ * @param slotBottom The row the hand slot's bottom line runs along (see handSlotBottom).
++ */
++void clearSlotFrame(Surface *picture, int slotBottom)
++{
++	std::vector<Uint8> marks;
++	if (!slotFrame(picture, slotBottom, marks))
++	{
++		return;
++	}
++	const int width = picture->getWidth(), height = picture->getHeight();
++	for (int y = 0; y < height; ++y)
++	{
++		for (int x = 0; x < width; ++x)
++		{
++			if (marks[y * width + x]) picture->setPixel(x, y, 0);
++		}
++	}
++}
++
++/**
++ * Draws an item's inventory picture (BIGOBS.PCK, with the item's own recolouring scripts, as the game draws it in a
++ * hand) whole, at the frame's own place and size: a hand slot's (32x48) at least, more where a mod's picture is
++ * bigger (a long weapon's, hanging out under the slot: its butt was cut off). The game's hand slot centres the frame
++ * by the item's inventory size instead, which pushes a picture drawn wider than its item (a mod's sword lying across
++ * the frame, one square wide in the inventory) partly off the frame: its tip was cut off, and the thicker end left
++ * looked like the business end. What a mod drew into the picture for the inventory screen is cleared (see slotFrame).
++ * @param item The item.
++ * @param inventorySprites The game's BIGOBS.PCK.
++ * @param save The battle.
++ * @param picture Where to draw it: cleared first, and made anew (with the old one's palette) when its size is not the frame's.
++ */
++void drawItemPicture(const BattleItem *item, const SurfaceSet *inventorySprites, const SavedBattleGame *save, Surface *&picture)
++{
++	const Surface *frame = inventorySprites ? item->getBigSprite(inventorySprites, save, 0) : nullptr;
++	const int width = std::max(HandSlotWidth, frame ? frame->getWidth() : 0), height = std::max(HandSlotHeight, frame ? frame->getHeight() : 0);
++	if (!picture || picture->getWidth() != width || picture->getHeight() != height)
++	{
++		Surface *fresh = new Surface(width, height, 0, 0);
++		if (picture && picture->getPalette()) fresh->setPalette(picture->getPalette());
++		delete picture;
++		picture = fresh;
++	}
++	picture->clear();
++	if (!frame)
++	{
++		return;
++	}
++	ScriptWorkerBlit worker;
++	BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
++	worker.executeBlit(frame, picture, 0, 0, 0);
++	clearSlotFrame(picture, handSlotBottom(item->getRules()->getInventoryHeight()));
 +}
 +
 +/**
@@ -95717,10 +95819,10 @@ index 000000000..bf9645fcf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelModel.h b/src/FirstPerson/FirstPersonVoxelModel.h
 new file mode 100644
-index 000000000..ae24ad8ad
+index 000000000..2b8e58cc7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelModel.h
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,90 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -95780,8 +95882,11 @@ index 000000000..ae24ad8ad
 +{
 +
 +class Surface;
++class SurfaceSet;
 +class RuleFirstPerson;
 +class RuleItem;
++class BattleItem;
++class SavedBattleGame;
 +
 +/// One face of a voxel model, between a voxel and the air: its four corners in picture x, y and
 +/// depth (depth centred on 0), wound so that the cross product of its first two edges points
@@ -95790,6 +95895,18 @@ index 000000000..ae24ad8ad
 +
 +/// Gives a picture volume: the faces of its voxel model (none for an empty picture), a cushion or a flat plate.
 +void voxelizePicture(Surface *picture, std::vector<VoxelFace> &faces, bool plate = false);
++/// The inventory screen's hand slot, in pixels (two squares by three, 16 pixels a square): the size an item's
++/// inventory picture has in the games.
++const int HandSlotWidth = 32, HandSlotHeight = 48;
++/// The row of an item's inventory picture that the hand slot's bottom line runs along: the screen centres an item in
++/// the slot by its height in squares.
++inline int handSlotBottom(int squaresHigh) { return HandSlotHeight - 1 - (3 - (squaresHigh < 3 ? squaresHigh : 3)) * 8; }
++/// Finds what a mod drew into an inventory picture for the inventory screen and not for the item (see the function).
++bool slotFrame(const Surface *picture, int slotBottom, std::vector<Uint8> &marks);
++/// Clears it from the picture.
++void clearSlotFrame(Surface *picture, int slotBottom);
++/// Draws an item's inventory picture whole and clean, as the 3D view gives it volume.
++void drawItemPicture(const BattleItem *item, const SurfaceSet *inventorySprites, const SavedBattleGame *save, Surface *&picture);
 +/// Is an item's picture given volume as a flat plate (a blade: a sword, a knife, an axe) rather than a cushion?
 +bool pictureIsPlate(const RuleFirstPerson &table, const RuleItem *item, Surface *picture);
 +
@@ -95798,10 +95915,10 @@ index 000000000..ae24ad8ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..2b9d335e6
+index 000000000..96c4e8f4c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1320 @@
+@@ -0,0 +1,1324 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -95879,6 +95996,7 @@ index 000000000..2b9d335e6
 +#endif
 +#include "FirstPersonVoxelBodies.h"
 +#include "FirstPersonVoxelBodiesFine.h"
++#include "FirstPersonVoxelModel.h"
 +#include "../Engine/Exception.h"
 +#include "../Engine/Options.h"
 +#include "../Battlescape/UnitSprite.h"
@@ -96507,6 +96625,7 @@ index 000000000..2b9d335e6
 +		ScriptWorkerBlit worker;
 +		BattleItem::ScriptFill(&worker, item, save, BODYPART_ITEM_INVENTORY, 0, 0);
 +		worker.executeBlit(frame, &picture, 0, 0, 0);
++		clearSlotFrame(&picture, handSlotBottom(item->getRules()->getInventoryHeight())); // (a mod's frame drawn for the inventory screen)
 +		items[hand].width = picture.getWidth();
 +		items[hand].height = picture.getHeight();
 +		items[hand].picture.resize(items[hand].width * items[hand].height);
@@ -96667,11 +96786,13 @@ index 000000000..2b9d335e6
 +	auto reach = [&](const RuleItem *item) -> float {
 +		const Surface *frame = item->getBigSprite() >= 0 ? const_cast<SurfaceSet*>(inventorySprites)->getFrame(item->getBigSprite()) : nullptr;
 +		if (!frame) return 0.0f;
++		std::vector<Uint8> screens; // (what a mod drew for the inventory screen is no part of the item: see slotFrame)
++		slotFrame(frame, handSlotBottom(item->getInventoryHeight()), screens);
 +		int left = frame->getWidth(), right = -1, top = frame->getHeight(), bottom = -1;
 +		for (int y = 0; y < frame->getHeight(); ++y)
 +			for (int x = 0; x < frame->getWidth(); ++x)
 +			{
-+				if (!frame->getPixel(x, y)) continue;
++				if (!frame->getPixel(x, y) || screens[y * frame->getWidth() + x]) continue;
 +				left = std::min(left, x); right = std::max(right, x);
 +				top = std::min(top, y); bottom = std::max(bottom, y);
 +			}
