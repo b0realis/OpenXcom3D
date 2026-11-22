@@ -256,6 +256,8 @@ firstPerson:
   #           hips are just over the ground, the raised knee before the chest; about as tall as the game's rules have a
   #           kneeling unit, so a soldier standing behind fires over it), or drawn (as ever: on one knee with a straight
   #           back, as the kneeling drawings have it, nearly as tall as it stands)
+  #   back: smooth (no hollow across the back: where a head of hair, a crest or a collar stands out behind the neck and
+  #           a jacket or a pack lower down, the nape between them is filled out level with them), or drawn (as ever)
   #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
   #           saucer), or none (nothing under it; not said, the same)
   # A name of one star, "*", is every unit.
@@ -283,10 +285,12 @@ firstPerson:
     # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
     # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
     # on the crown, painted along the slant)
+    # (and no hollow across the back under a head of hair standing out behind the neck)
     - names: [PIR]
       torsoDepth: 80
       top: back
       sculpt: frontal
+      back: smooth
     # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
     # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
     # drawings
@@ -310,7 +314,9 @@ firstPerson:
     - names: [DEEPONE, DEEP_ONE.PCK]
       arms: posed
     # The X-Com Files' Gilldog: drawn from the front crouching, its legs out beside its trunk
-    - names: [GILLDOG]
+    # (and the big hounds drawn the same way in other colours: XPiratez's blood dog and bloodhound soldier, sheet
+    # BAN_6.PCK, and The X-Com Files' own bloodhound)
+    - names: [GILLDOG, BLOODHOUND, BAN_6.PCK]
       trunk: round
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
@@ -345,6 +351,7 @@ firstPerson:
     - names: [ELDAR]
       arms: along own posed elbow
       shape: upright
+      back: smooth
     # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
     - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
       arms: along own posed elbow

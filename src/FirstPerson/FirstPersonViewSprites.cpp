@@ -2774,8 +2774,11 @@ void FirstPersonView::drawFloorItems()
 		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
 		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
 		// the pile), faint when the pile is (see-through corpses); not under a floor it would poke through.
+		// (Not a corpse whose own picture is blank: the map shows nothing of it, and neither does the 3D view. XPiratez's
+		// ghosts leave such a corpse, an item of no size with an empty picture; a player, GitHub issue #245: "a ghost gal
+		// ... dies, and leaves a 3d corpse, despite none in iso".)
 		BattleUnit *owner = item->getUnit();
-		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && bottomColouredRow(step.sprite.sprite) >= 0
 			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
 		// the way the unit faced when it went down, as a one-tile body does; a player, GitHub issue #245: big units'

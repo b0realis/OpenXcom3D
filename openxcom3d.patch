@@ -1524,10 +1524,10 @@ index 000000000..1bb72b637
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..5d4739143
+index 000000000..60644366a
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,372 @@
+@@ -0,0 +1,379 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1786,6 +1786,8 @@ index 000000000..5d4739143
 +  #           hips are just over the ground, the raised knee before the chest; about as tall as the game's rules have a
 +  #           kneeling unit, so a soldier standing behind fires over it), or drawn (as ever: on one knee with a straight
 +  #           back, as the kneeling drawings have it, nearly as tall as it stands)
++  #   back: smooth (no hollow across the back: where a head of hair, a crest or a collar stands out behind the neck and
++  #           a jacket or a pack lower down, the nape between them is filled out level with them), or drawn (as ever)
 +  #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
 +  #           saucer), or none (nothing under it; not said, the same)
 +  # A name of one star, "*", is every unit.
@@ -1813,10 +1815,12 @@ index 000000000..5d4739143
 +    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
 +    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
 +    # on the crown, painted along the slant)
++    # (and no hollow across the back under a head of hair standing out behind the neck)
 +    - names: [PIR]
 +      torsoDepth: 80
 +      top: back
 +      sculpt: frontal
++      back: smooth
 +    # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
 +    # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
 +    # drawings
@@ -1840,7 +1844,9 @@ index 000000000..5d4739143
 +    - names: [DEEPONE, DEEP_ONE.PCK]
 +      arms: posed
 +    # The X-Com Files' Gilldog: drawn from the front crouching, its legs out beside its trunk
-+    - names: [GILLDOG]
++    # (and the big hounds drawn the same way in other colours: XPiratez's blood dog and bloodhound soldier, sheet
++    # BAN_6.PCK, and The X-Com Files' own bloodhound)
++    - names: [GILLDOG, BLOODHOUND, BAN_6.PCK]
 +      trunk: round
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    - names: [FROG, "*FROG", TOAD, "*TOAD"]
@@ -1875,6 +1881,7 @@ index 000000000..5d4739143
 +    - names: [ELDAR]
 +      arms: along own posed elbow
 +      shape: upright
++      back: smooth
 +    # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
 +    - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
 +      arms: along own posed elbow
@@ -75980,10 +75987,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..36f88996d
+index 000000000..8931e3a79
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4495 @@
+@@ -0,0 +1,4498 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -78760,8 +78767,11 @@ index 000000000..36f88996d
 +		// Setting "Voxel units": the corpse on top a unit's that was drawn as its voxel body (dead, or knocked out: one
 +		// tile big) lies here as that body, on its back as it fell (see drawUnits), its hands empty (what it held is in
 +		// the pile), faint when the pile is (see-through corpses); not under a floor it would poke through.
++		// (Not a corpse whose own picture is blank: the map shows nothing of it, and neither does the 3D view. XPiratez's
++		// ghosts leave such a corpse, an item of no size with an empty picture; a player, GitHub issue #245: "a ghost gal
++		// ... dies, and leaves a 3d corpse, despite none in iso".)
 +		BattleUnit *owner = item->getUnit();
-+		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
++		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse && bottomColouredRow(step.sprite.sprite) >= 0
 +			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 +		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
 +		// the way the unit faced when it went down, as a one-tile body does; a player, GitHub issue #245: big units'
@@ -89323,10 +89333,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..01227843d
+index 000000000..8cf55004b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6440 @@
+@@ -0,0 +1,6470 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -90866,6 +90876,8 @@ index 000000000..01227843d
 +/// Posed arms (see makeModel): what an arm's drawings make of it stays within this of its bones' skin: PosedShoulder
 +/// at the shoulder, less along the arm, PosedHand at the hand.
 +const float PosedShoulder = 2.0f * VOXELSCALE, PosedHand = 0.25f * VOXELSCALE;
++/// A smooth back (the unit table's "back: smooth") has no hollow across it this high or lower (see makeModel).
++const float BackSlot = 4.0f * VOXELSCALE;
 +/// A posed arm whose hand is on an item and whose drawing ends this much lower than that hand holds the item up: the
 +/// drawing's lower end is its elbow (the unit table's "arms: elbow", see makeModel).
 +const float PosedElbowUnder = 2.0f * VOXELSCALE;
@@ -91431,7 +91443,9 @@ index 000000000..01227843d
 +		for (int row = strokesFrom; row <= bottom; ++row)
 +			for (int column = left; column <= right; ++column)
 +			{
-+				if (!part.at(RightSide, column, row) || stroke[(size_t)row * FrameSize + column] >= 0) continue;
++				// (what hangs under a round trunk's belly, see hangs, is no leg's stroke: taken for one, a muzzle was the
++				// second foreleg, the left one, a stump under the chest, and the forelegs' own stroke the right one alone)
++				if (!part.at(RightSide, column, row) || stroke[(size_t)row * FrameSize + column] >= 0 || hanging(column, row)) continue;
 +				Stroke found = { (int)strokeSide.size(), 0, row, row, 0.0f };
 +				std::vector<std::pair<int, int>> stack(1, { column, row });
 +				stroke[(size_t)row * FrameSize + column] = found.label;
@@ -91446,7 +91460,7 @@ index 000000000..01227843d
 +						for (int dx = -1; dx <= 1; ++dx)
 +						{
 +							const int c = at.first + dx, r = at.second + dy;
-+							if (r < strokesFrom || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || stroke[(size_t)r * FrameSize + c] >= 0) continue;
++							if (r < strokesFrom || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || stroke[(size_t)r * FrameSize + c] >= 0 || hanging(c, r)) continue;
 +							stroke[(size_t)r * FrameSize + c] = found.label;
 +							stack.push_back({ c, r });
 +						}
@@ -94952,6 +94966,32 @@ index 000000000..01227843d
 +					}
 +				}
 +	}
++	// A smooth back (the unit table's "back: smooth", for the units it names): a head of hair, a helmet's crest or a
++	// collar stands out behind the neck, and so does a jacket or a pack lower down; the rows between them, the nape and
++	// the top of the back, are as deep as the side drawings have the neck, and the back has a channel across it under
++	// the hair, a few voxels high and a voxel or two deep: "slot in back", a player, GitHub issue #245, of XPiratez's
++	// slave soldiers, and "segmented back slot" of the 40k mod's Eldar (#233). Behind the body's middle, an empty
++	// stretch of a column of cells with the trunk above it and below, BackSlot high at most, is the trunk's.
++	if ((routine.traits & 16384) && !routine.whole && !routine.big)
++	{
++		const int slot = std::max(1, (int)std::floor(BackSlot / Cell));
++		for (int across = 0; across < GridAcross; ++across)
++			for (int along = 0; along < GridAlong; ++along)
++			{
++				if (cellAhead(along) >= 0.0f) continue;
++				int kept = -1;
++				for (int up = 0; up < GridUp; ++up)
++				{
++					const Uint8 cell = owner[cellIndex(across, along, up)];
++					if (cell != VoxelUnitModel::Torso) { if (cell) kept = -1; continue; } // (another part between: not the trunk's own hollow)
++					if (kept >= 0 && up - kept > 1 && up - kept - 1 <= slot)
++					{
++						for (int between = kept + 1; between < up; ++between) owner[cellIndex(across, along, between)] = VoxelUnitModel::Torso;
++					}
++					kept = up;
++				}
++			}
++	}
 +	// Loose cells (fewer than 3 of their 6 neighbours filled) go, and with them the specks they'd show.
 +	auto filled = [&](int across, int along, int up) {
 +		return across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && owner[cellIndex(across, along, up)];
@@ -96597,10 +96637,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..98250aadd
+index 000000000..b1a22bb78
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1353 @@
+@@ -0,0 +1,1361 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -97382,6 +97422,12 @@ index 000000000..98250aadd
 +		const Uint8 hover[2] = { 's', 1 };
 +		hashBytes(hash, hover, 2);
 +	}
++	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
++	if (look.smoothBack == 1)
++	{
++		const Uint8 back[2] = { 'B', 1 };
++		hashBytes(hash, back, 2);
++	}
 +	// (kneeling, sat low, by the unit table: only a kneeling body it is said of is hashed in, as above)
 +	if (look.kneelLow == 1 && unit->isKneeled())
 +	{
@@ -97427,6 +97473,8 @@ index 000000000..98250aadd
 +		job->traits |= (look.barrels >= 0 ? (std::min(look.barrels, 4) + 1) << 8 : 0) | (std::get<7>(key) & 7) << 11;
 +		// (kneeling, sat low, by the unit table: see sitLow in FirstPersonVoxelBodies.cpp)
 +		if (look.kneelLow == 1 && unit->isKneeled()) job->traits |= 128;
++		// (a smooth back, by the unit table: see makeModel)
++		if (look.smoothBack == 1) job->traits |= 16384;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -105415,10 +105463,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..74669b04b
+index 000000000..36aa3d423
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,577 @@
+@@ -0,0 +1,580 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -105553,6 +105601,7 @@ index 000000000..74669b04b
 +		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 +		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 +		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
++		int smoothBack = -1; // (no hollow across its back under a head of hair or a crest: 1; its back as its drawings leave it, as ever: 0)
 +		int sparks = -1; // (big and flying, it hovers on a rain of sparks: 1; nothing under it, as every other unit: 0)
 +		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 +		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
@@ -105784,7 +105833,7 @@ index 000000000..74669b04b
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back;
 +				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -105816,6 +105865,7 @@ index 000000000..74669b04b
 +				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
 +				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
 +				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
++				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 +				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -105928,6 +105978,7 @@ index 000000000..74669b04b
 +			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
 +			if (entry.second.kneelLow != -1) look.kneelLow = entry.second.kneelLow;
 +			if (entry.second.sparks != -1) look.sparks = entry.second.sparks;
++			if (entry.second.smoothBack != -1) look.smoothBack = entry.second.smoothBack;
 +			if (entry.second.legs != -1) look.legs = entry.second.legs;
 +			if (entry.second.barrels != -1) look.barrels = entry.second.barrels;
 +			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;

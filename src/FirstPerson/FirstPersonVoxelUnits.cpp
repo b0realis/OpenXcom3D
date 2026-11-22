@@ -779,6 +779,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 hover[2] = { 's', 1 };
 		hashBytes(hash, hover, 2);
 	}
+	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
+	if (look.smoothBack == 1)
+	{
+		const Uint8 back[2] = { 'B', 1 };
+		hashBytes(hash, back, 2);
+	}
 	// (kneeling, sat low, by the unit table: only a kneeling body it is said of is hashed in, as above)
 	if (look.kneelLow == 1 && unit->isKneeled())
 	{
@@ -824,6 +830,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->traits |= (look.barrels >= 0 ? (std::min(look.barrels, 4) + 1) << 8 : 0) | (std::get<7>(key) & 7) << 11;
 		// (kneeling, sat low, by the unit table: see sitLow in FirstPersonVoxelBodies.cpp)
 		if (look.kneelLow == 1 && unit->isKneeled()) job->traits |= 128;
+		// (a smooth back, by the unit table: see makeModel)
+		if (look.smoothBack == 1) job->traits |= 16384;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

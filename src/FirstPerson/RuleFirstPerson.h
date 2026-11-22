@@ -132,6 +132,7 @@ public:
 		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
+		int smoothBack = -1; // (no hollow across its back under a head of hair or a crest: 1; its back as its drawings leave it, as ever: 0)
 		int sparks = -1; // (big and flying, it hovers on a rain of sparks: 1; nothing under it, as every other unit: 0)
 		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
@@ -363,7 +364,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -395,6 +396,7 @@ public:
 				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
 				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
 				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
+				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -507,6 +509,7 @@ public:
 			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
 			if (entry.second.kneelLow != -1) look.kneelLow = entry.second.kneelLow;
 			if (entry.second.sparks != -1) look.sparks = entry.second.sparks;
+			if (entry.second.smoothBack != -1) look.smoothBack = entry.second.smoothBack;
 			if (entry.second.legs != -1) look.legs = entry.second.legs;
 			if (entry.second.barrels != -1) look.barrels = entry.second.barrels;
 			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;

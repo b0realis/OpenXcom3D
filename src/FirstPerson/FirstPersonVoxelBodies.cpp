@@ -1537,6 +1537,8 @@ void fillPits(std::vector<Uint8> &owner)
 /// Posed arms (see makeModel): what an arm's drawings make of it stays within this of its bones' skin: PosedShoulder
 /// at the shoulder, less along the arm, PosedHand at the hand.
 const float PosedShoulder = 2.0f * VOXELSCALE, PosedHand = 0.25f * VOXELSCALE;
+/// A smooth back (the unit table's "back: smooth") has no hollow across it this high or lower (see makeModel).
+const float BackSlot = 4.0f * VOXELSCALE;
 /// A posed arm whose hand is on an item and whose drawing ends this much lower than that hand holds the item up: the
 /// drawing's lower end is its elbow (the unit table's "arms: elbow", see makeModel).
 const float PosedElbowUnder = 2.0f * VOXELSCALE;
@@ -2102,7 +2104,9 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 		for (int row = strokesFrom; row <= bottom; ++row)
 			for (int column = left; column <= right; ++column)
 			{
-				if (!part.at(RightSide, column, row) || stroke[(size_t)row * FrameSize + column] >= 0) continue;
+				// (what hangs under a round trunk's belly, see hangs, is no leg's stroke: taken for one, a muzzle was the
+				// second foreleg, the left one, a stump under the chest, and the forelegs' own stroke the right one alone)
+				if (!part.at(RightSide, column, row) || stroke[(size_t)row * FrameSize + column] >= 0 || hanging(column, row)) continue;
 				Stroke found = { (int)strokeSide.size(), 0, row, row, 0.0f };
 				std::vector<std::pair<int, int>> stack(1, { column, row });
 				stroke[(size_t)row * FrameSize + column] = found.label;
@@ -2117,7 +2121,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 						for (int dx = -1; dx <= 1; ++dx)
 						{
 							const int c = at.first + dx, r = at.second + dy;
-							if (r < strokesFrom || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || stroke[(size_t)r * FrameSize + c] >= 0) continue;
+							if (r < strokesFrom || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || stroke[(size_t)r * FrameSize + c] >= 0 || hanging(c, r)) continue;
 							stroke[(size_t)r * FrameSize + c] = found.label;
 							stack.push_back({ c, r });
 						}
@@ -5622,6 +5626,32 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 						if (c < 0 || r < 0 || c >= FrameSize || r >= FrameSize || onTop[d][r * FrameSize + c] < 0) { cell = 0; break; }
 					}
 				}
+	}
+	// A smooth back (the unit table's "back: smooth", for the units it names): a head of hair, a helmet's crest or a
+	// collar stands out behind the neck, and so does a jacket or a pack lower down; the rows between them, the nape and
+	// the top of the back, are as deep as the side drawings have the neck, and the back has a channel across it under
+	// the hair, a few voxels high and a voxel or two deep: "slot in back", a player, GitHub issue #245, of XPiratez's
+	// slave soldiers, and "segmented back slot" of the 40k mod's Eldar (#233). Behind the body's middle, an empty
+	// stretch of a column of cells with the trunk above it and below, BackSlot high at most, is the trunk's.
+	if ((routine.traits & 16384) && !routine.whole && !routine.big)
+	{
+		const int slot = std::max(1, (int)std::floor(BackSlot / Cell));
+		for (int across = 0; across < GridAcross; ++across)
+			for (int along = 0; along < GridAlong; ++along)
+			{
+				if (cellAhead(along) >= 0.0f) continue;
+				int kept = -1;
+				for (int up = 0; up < GridUp; ++up)
+				{
+					const Uint8 cell = owner[cellIndex(across, along, up)];
+					if (cell != VoxelUnitModel::Torso) { if (cell) kept = -1; continue; } // (another part between: not the trunk's own hollow)
+					if (kept >= 0 && up - kept > 1 && up - kept - 1 <= slot)
+					{
+						for (int between = kept + 1; between < up; ++between) owner[cellIndex(across, along, between)] = VoxelUnitModel::Torso;
+					}
+					kept = up;
+				}
+			}
 	}
 	// Loose cells (fewer than 3 of their 6 neighbours filled) go, and with them the specks they'd show.
 	auto filled = [&](int across, int along, int up) {
