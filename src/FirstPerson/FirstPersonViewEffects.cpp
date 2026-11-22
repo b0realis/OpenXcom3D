@@ -647,9 +647,9 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 
 /**
  * Setting "Voxel units", what else the game draws over a unit's picture, as particles on its body: the bubbles of its
- * breath under the sea, rising from its head; and under a big unit that hovers (a hover tank, a Cyberdisc: the glow
- * and sparks its pictures have under the hull, which its body leaves out), a rain of bright sparks down to the ground
- * and the dust they raise. Units in sight, standing, within 20 tiles.
+ * breath under the sea, rising from its head; and under a big unit that hovers, named so by the unit table (a hover
+ * tank, a Cyberdisc: the glow and sparks its pictures have under the hull, which its body leaves out), a rain of bright
+ * sparks down to the ground and the dust they raise. Units in sight, standing, within 20 tiles.
  * @param elapsedSeconds Seconds since the last frame.
  */
 void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
@@ -661,7 +661,11 @@ void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
 	{
 		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode())) continue;
 		const int unitSize = unit->getArmor()->getSize();
-		const bool hovers = unitSize > 1 && unit->getMovementType() == MT_FLY;
+		// (Only the units the unit table names "hover: sparks", by their bodies: any big unit that flies had them, a
+		// Xarquid and a Hallucinoid drifting in the sea, a mod's gate, a demon; a player, GitHub issue #245, "hover
+		// particles off by default ... I can't be arsed to go through which should, and shouldn't have it".)
+		const VoxelUnitModel *hoverBody = unitSize > 1 && unit->getMovementType() == MT_FLY && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
+		const bool hovers = hoverBody && hoverBody->sparks;
 		const bool breathes = unit->getBreathExhaleFrame() >= 0;
 		if (!hovers && !breathes) continue;
 		auto glide = _unitGlides.find(unit);

@@ -506,6 +506,8 @@ const float ControlHazeFrom = 0.45f;
 /// The units' facing rings (see FirstPersonView::drawFacing): the arrow reaches this many voxels out
 /// from the ring, this many to each side at its base.
 const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
+/// The facing icon (setting "Facing icons", see drawFacing) is on a unit at this share of its height.
+const double FacingIconHeight = 0.6;
 /// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
 /// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
 /// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).

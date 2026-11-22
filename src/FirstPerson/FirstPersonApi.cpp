@@ -1402,6 +1402,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
 	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 2, "STR_FPS_DOWNED_ICONS", category));
+	// With the key that shows which way the units face held: an arrow on each unit as well as the ring round its feet
+	// (a player, GitHub issue #245: the ring "under foot is unreliable to see, depending on height and distance").
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsFacingIcons", &fpsFacingIcons, true, "STR_FPS_FACING_ICONS", category));
 	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and

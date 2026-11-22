@@ -191,6 +191,7 @@ struct VoxelUnits::Job
 	bool aiming = false;
 	bool still = false; // (it can't move: see Routine)
 	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
+	bool sparks = false; // (it hovers on sparks, by the unit table: see VoxelUnitModel::sparks)
 	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
 	/// whose sprite changes shape with it (see modelFor); empty for any other.
 	std::vector<std::vector<Uint8>> anim;
@@ -519,8 +520,11 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
 	const Unit *unitRules = unit->getUnitRules();
 	const Soldier *soldier = unit->getGeoscapeSoldier();
+	// (and by the routine the game draws it with, as the name "routine:N": the big mods have thousands of units, most of
+	// them people drawn as the games' own soldiers are, under every kind of name)
 	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
-		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string(),
+		"routine:" + std::to_string(unit->getArmor()->getDrawingRoutine()) });
 	// A unit whose standing drawing changes shape with the battle's animation frame (the game's routine draws a frame
 	// of it for each: the Silacoid and the Celatid pulse; or a mod's script picks its sprite by it: X-Com Files'
 	// shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner: "voxel models
@@ -769,6 +773,18 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 barrels[2] = { 'b', (Uint8)look.barrels };
 		hashBytes(hash, barrels, 2);
 	}
+	// (hovering on sparks, by the unit table: only said of a unit hashed in, as above; units alike share a body)
+	if (look.sparks == 1)
+	{
+		const Uint8 hover[2] = { 's', 1 };
+		hashBytes(hash, hover, 2);
+	}
+	// (kneeling, sat low, by the unit table: only a kneeling body it is said of is hashed in, as above)
+	if (look.kneelLow == 1 && unit->isKneeled())
+	{
+		const Uint8 kneel[2] = { 'k', 1 };
+		hashBytes(hash, kneel, 2);
+	}
 	_byQuick[quick] = hash;
 	auto alike = _byFrames.find(hash);
 	if (alike != _byFrames.end())
@@ -792,6 +808,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->aiming = aiming;
 		job->still = !unit->getArmor()->allowsMoving();
 		job->shows = shows;
+		job->sparks = look.sparks == 1;
 		job->beast = look.beast == 1;
 		job->anim = std::move(anim);
 		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
@@ -805,6 +822,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		// (and a turret's barrels by the unit table, one more than the count: 0 nothing said; a tank's turret's turn
 		// from its hull: see VoxelBodies::makeModel)
 		job->traits |= (look.barrels >= 0 ? (std::min(look.barrels, 4) + 1) << 8 : 0) | (std::get<7>(key) & 7) << 11;
+		// (kneeling, sat low, by the unit table: see sitLow in FirstPersonVoxelBodies.cpp)
+		if (look.kneelLow == 1 && unit->isKneeled()) job->traits |= 128;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;
@@ -1156,6 +1175,7 @@ void VoxelUnits::build()
 		if (model)
 		{
 			model->opacity = job->shows;
+			model->sparks = job->sparks;
 			float lowest = 1e9f;
 			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
 			{

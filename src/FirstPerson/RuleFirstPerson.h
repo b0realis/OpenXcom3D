@@ -132,14 +132,17 @@ public:
 		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
+		int sparks = -1; // (big and flying, it hovers on a rain of sparks: 1; nothing under it, as every other unit: 0)
+		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
 	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*); or the whole name itself (one unit:
-	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same.
+	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same. A star alone is every unit.
 	static bool nameHas(const std::string &name, const std::string &pattern)
 	{
+		if (pattern == "*") return !name.empty();
 		if (name.size() == pattern.size() && std::equal(name.begin(), name.end(), pattern.begin(),
 			[](char one, char other) { return std::toupper((unsigned char)one) == std::toupper((unsigned char)other); })) return true;
 		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
@@ -360,7 +363,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -390,6 +393,8 @@ public:
 				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
 				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
 				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
+				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
+				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -500,6 +505,8 @@ public:
 			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
 			if (entry.second.tail != -1) look.tail = entry.second.tail;
 			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
+			if (entry.second.kneelLow != -1) look.kneelLow = entry.second.kneelLow;
+			if (entry.second.sparks != -1) look.sparks = entry.second.sparks;
 			if (entry.second.legs != -1) look.legs = entry.second.legs;
 			if (entry.second.barrels != -1) look.barrels = entry.second.barrels;
 			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;

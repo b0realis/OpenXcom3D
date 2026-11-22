@@ -203,7 +203,8 @@ firstPerson:
   # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). What the voxel bodies do
   # for one kind of unit, they do for the units named here and for no others: a unit the table doesn't name is made by
   # the general rules, as ever. Each entry lists words to look for in a unit's names (its type, its armor's, the
-  # armor's sprite sheet, its race) and what it says of those units. A word matches a whole word of a name (CAT:
+  # armor's sprite sheet, its race, a soldier's type; and the routine the game draws it with, as the whole name
+  # routine:N, 0 the soldier's) and what it says of those units. A word matches a whole word of a name (CAT:
   # BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*), its end (*DOGE: BLOODOGE) or any part of it
   # (*SPIDER*); or it is a whole name, for one unit (BAN_6.PCK). Capitals or not is the same.
   #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
@@ -217,7 +218,8 @@ firstPerson:
   #           drawn), or all (as ever: by all eight drawings, a little forgiving)
   #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
   #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
-  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length),
+  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length:
+  #           each stretch of an arm by what its own drawing has there, a sleeve, then a bare hand),
   #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
   #           on a shirt), posed (an arm is where its bones are, shoulder to the hand on what it holds; what its
   #           drawings add away from them, a second forearm, is left out), elbow (with posed: an arm that holds its
@@ -225,8 +227,10 @@ firstPerson:
   #           to the item)
   #   head: face (only what of the head is turned to the front is painted by the front drawing; its sides, back and
   #           top by the back drawing: hair, a helmet), or drawn (as ever)
-  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show), or
-  #           drawn (as ever: as broad as its frontal drawings)
+  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show; what
+  #           hangs under its belly without reaching the ground, a muzzle, a tail's tip, is of its head or its tail,
+  #           no pair of legs, and it has no ears standing apart: a big round head), or drawn (as ever: as broad as
+  #           its frontal drawings)
   #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
   #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
   #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
@@ -248,14 +252,25 @@ firstPerson:
   #           its frontal drawing has two muzzles side by side. 0: none, the turret as its eight drawings leave it
   #           (for a unit whose thin end is no gun); 1 to 4: that many, spread over the gun's width. A turret whose
   #           drawings show no gun to read gets barrels of a plain size on its front when given a number here
+  #   kneel: low (kneeling, its body sits down on its heel: the trunk, arms and weapon come straight down until the
+  #           hips are just over the ground, the raised knee before the chest; about as tall as the game's rules have a
+  #           kneeling unit, so a soldier standing behind fires over it), or drawn (as ever: on one knee with a straight
+  #           back, as the kneeling drawings have it, nearly as tall as it stands)
+  #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
+  #           saucer), or none (nothing under it; not said, the same)
+  # A name of one star, "*", is every unit.
   # A later entry (or a later mod's) overrides what it sets.
   units:
+    # every unit that kneels: it sits low (take this entry out, or say kneel: drawn of a unit, for the kneeling
+    # drawings' own height)
+    - names: ["*"]
+      kneel: low
     # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
     # games' civilians. Whole names: STR_SECTOID_SOLDIER is no person
     - names: [STR_SOLDIER, MALE_CIVILIAN, FEMALE_CIVILIAN, SAILOR_CIVILIAN, DOCKER_CIVILIAN]
       humanoid: standard
     # ghosts (XPiratez, The X-Com Files): there, but seen through
-    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
+    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, APPARITION]
       seeThrough: 50
     # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too);
     # dead, an animal lies as long as it was long, not as it stood tall
@@ -318,8 +333,25 @@ firstPerson:
       barrels: 1
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
     # arms posed on their guns (arms outside the body, coloured along their length)
+    # (and posed on their bones, the elbow down under a hand that holds a gun up: a disciple's pistol arm stood
+    # beside the arm as drawn)
     - names: [DAGON]
-      arms: both
+      arms: both own posed elbow
+    # The X-Com Files' Red Dawn, and the 40k mod's Eldar: people under names of their own, as the HUMAN entry above;
+    # their arms are coloured along their length by their own drawings too (a sleeve, then a bare hand). The Eldar's
+    # Striking Scorpions are no animals
+    - names: [ZSRR]
+      arms: along own posed elbow
+    - names: [ELDAR]
+      arms: along own posed elbow
+      shape: upright
+    # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
+    - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
+      arms: along own posed elbow
+    # what hovers on sparks: saucers and hover vehicles (X-COM's Cyberdisc and Hovertanks, TFTD's Displacers, the big
+    # mods' own). A creature that flies, a gate, a walker, a jellyfish in the sea has nothing under it
+    - names: [CYBERDISC, "*DISC", HOVERTANK, "HOVER*", DISPLACER]
+      hover: sparks
 
 interfaces:
   - type: firstPerson

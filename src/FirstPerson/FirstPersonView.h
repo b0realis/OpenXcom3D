@@ -1208,7 +1208,7 @@ private:
 	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; int stack; int stackSize; };
 	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 	bool _showFacing = false;                           // which way the units face shown (the key for it held)
-	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };
+	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; double middle; };
 	std::vector<FacingSpot> _facingSpots;               // the units in sight this frame, for their facing rings
 	int _uiScale = 1;                                   // markers drawn this many times bigger
 	int _pointerX = -1, _pointerY = -1;                 // where the player points on the view (see setPointer)

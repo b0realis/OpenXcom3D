@@ -1993,6 +1993,42 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 	int legRows = 0;
 	while (legged && bottom - legRows > top && drawn[bottom - legRows] < longest * LegsShare) ++legRows;
 	const int belly = bottom - legRows; // (the lowest row of the body as drawn)
+	// (A body the unit table names "trunk: round": a leg stands on the ground. What the side drawing has under the belly
+	// that ends well above the feet, joined to nothing that goes down to them, is no leg: a muzzle hanging lower than
+	// the chest, a tail's tip. The X-Com Files' Gilldog's nose, two rows under its belly's, was a pair of legs a row
+	// long, as far apart as its forelegs: "big dopey ears", a player, GitHub issue #245, "just a big fat head plz".
+	// Hangs: such pixels, the body's own.)
+	std::vector<Uint8> hangs;
+	if (RoundTrunk && legRows > 0)
+	{
+		hangs.assign((size_t)FrameSize * FrameSize, 0);
+		std::vector<Uint8> seen((size_t)FrameSize * FrameSize, 0);
+		for (int row = belly + 1; row <= bottom; ++row)
+			for (int column = left; column <= right; ++column)
+			{
+				if (!part.at(RightSide, column, row) || seen[(size_t)row * FrameSize + column]) continue;
+				std::vector<std::pair<int, int>> piece, stack(1, { column, row });
+				seen[(size_t)row * FrameSize + column] = 1;
+				int lowest = row;
+				while (!stack.empty())
+				{
+					const std::pair<int, int> at = stack.back();
+					stack.pop_back();
+					piece.push_back(at);
+					lowest = std::max(lowest, at.second);
+					for (int dy = -1; dy <= 1; ++dy)
+						for (int dx = -1; dx <= 1; ++dx)
+						{
+							const int c = at.first + dx, r = at.second + dy;
+							if (r <= belly || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || seen[(size_t)r * FrameSize + c]) continue;
+							seen[(size_t)r * FrameSize + c] = 1;
+							stack.push_back({ c, r });
+						}
+				}
+				if (lowest < bottom - legRows / 2) for (const std::pair<int, int> &at : piece) hangs[(size_t)at.second * FrameSize + at.first] = 1;
+			}
+	}
+	auto hanging = [&](int column, int row) { return !hangs.empty() && column >= 0 && column < FrameSize && row >= 0 && row < FrameSize && hangs[(size_t)row * FrameSize + column]; };
 	// how far the belly is raised: BellyRise of the body's width, at most BellyMost of the rows above the legs
 	int rise = 0;
 	if (legRows > 0 && drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom))
@@ -2004,7 +2040,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 	// where the legs stand along the body: the columns the side drawing has in the legs' upper rows
 	std::vector<Uint8> stands(FrameSize, 0);
 	for (int row = belly + 1; row <= std::min(bottom, belly + 1 + VOXELSCALE); ++row)
-		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row)) stands[column] = 1;
+		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row) && !hanging(column, row)) stands[column] = 1;
 	int standsFirst = FrameSize, standsLast = -1;
 	for (int column = 0; column < FrameSize; ++column) if (stands[column]) { standsFirst = std::min(standsFirst, column); standsLast = column; }
 	// the columns a pair of legs keeps to: what a drawing (the front's, the back's) has in its lowest rows
@@ -2222,7 +2258,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			// (the legs' rows: below the belly all of them; of the belly's raised rows, what stands between the first leg
 			// and the last. What the drawing has there behind the hind legs or before the front ones is no belly to
 			// raise: a rat's tail lying low went with it.)
-			const bool leg = row >= legsFrom && (row > belly || (sideRight >= standsFirst && sideRight <= standsLast));
+			const bool leg = row >= legsFrom && (row > belly || (sideRight >= standsFirst && sideRight <= standsLast)) && !hanging(sideRight, row);
 			// (Round: the drawing's stretch through this pixel, up and down or along the body, whichever is the shorter,
 			// is a round thing's thickness there, and it is as far across as that from its middle. As deep as the
 			// outline is near, all of it was a slab with its edges cut: the owner, of the dog, "needs to be much more
@@ -2231,7 +2267,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			while (runTop > 0 && part.at(RightSide, sideRight, runTop - 1)) --runTop;
 			// (the trunk's stretch ends at the belly: the legs under it are their own)
 			while (runBottom < FrameSize - 1 && part.at(RightSide, sideRight, runBottom + 1)
-				&& (leg || runBottom + 1 < legsFrom || (runBottom + 1 <= belly && (sideRight < standsFirst || sideRight > standsLast)))) ++runBottom;
+				&& (leg || runBottom + 1 < legsFrom || (runBottom + 1 <= belly && (sideRight < standsFirst || sideRight > standsLast)) || hanging(sideRight, runBottom + 1))) ++runBottom;
 			while (runFirst > 0 && part.at(RightSide, runFirst - 1, row)) --runFirst;
 			while (runLast < FrameSize - 1 && part.at(RightSide, runLast + 1, row)) ++runLast;
 			const float tall = (runBottom - runTop + 1) * 0.5f, lengthways = (runLast - runFirst + 1) * 0.5f;
@@ -2265,7 +2301,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 					if (drawnBreadth > 0.0f) breadth = drawnBreadth;
 					else if (RoundTrunk && !lying) breadth = std::min(breadth, tall); // (a part standing: no broader than it is tall there)
 				}
-				else pair = end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2;
+				else pair = !RoundTrunk && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2; // (a round trunk has no ears: a thin part of it is round too)
 			}
 			const float half = std::min(widest, std::max(ProfileHalfLeast, breadth * std::sqrt(std::max(0.0f, 1.0f - off * off))));
 			// (the belly's raised rows: only the legs are left of them)
@@ -4928,6 +4964,106 @@ static void standTank(VoxelUnitModel &model, std::vector<Uint8> &owner, float hu
 	if (noneAdded) model.addedFrom = model.part.size();
 }
 
+/// A kneeling body sat low (the unit table's "kneel: low", for the units it names): the game's kneeling drawings have a
+/// soldier on one knee with his back straight up, his hips at two thirds of their standing height and his head not three
+/// pixels lower than as he stands, where the game's own rules have him two thirds as tall (14 voxels of 22). A body made
+/// as drawn stands as high as a standing soldier's weapon: "shots at a flat angle will go DIRECTLY into the skull of the
+/// forward unit ... I should be able to reliably fire over a kneeling units head", a player, GitHub issue #245, who
+/// asked for "lowering the torso so the butt sits on (even partially merges with) the heel". So all of the body that
+/// isn't its legs, with what its hands hold, comes straight down until its trunk's foot is KneelSeat over the ground,
+/// in whole cells (every cube stays on the grid, the weapon level in the hands): it sits on its heel, its raised knee
+/// before its chest. What comes under the ground is left out; cubes that end inside the body are dropped, and a cell
+/// laid bare takes the colours of the nearest cube of its part.
+constexpr float KneelSeat = 2.0f * VOXELSCALE;
+static void sitLow(VoxelUnitModel &model, std::vector<Uint8> &owner)
+{
+	int trunkFoot = GridUp;
+	for (int cell = 0; cell < GridCells; ++cell) if (owner[cell] == VoxelUnitModel::Torso) trunkFoot = std::min(trunkFoot, cell % GridUp);
+	int seat = 0;
+	while (seat < GridUp && cellUp(seat) < KneelSeat) ++seat;
+	const int drop = trunkFoot - seat;
+	if (trunkFoot >= GridUp || drop <= 0) return;
+	std::vector<Uint8> sat(GridCells, 0);
+	for (int cell = 0; cell < GridCells; ++cell) if (owner[cell] == VoxelUnitModel::Legs) sat[cell] = owner[cell];
+	for (int cell = 0; cell < GridCells; ++cell)
+	{
+		const int up = cell % GridUp;
+		if (!owner[cell] || owner[cell] == VoxelUnitModel::Legs || up - drop < 0 || cellUp(up - drop) < 0.0f) continue;
+		sat[cell - drop] = owner[cell];
+	}
+	owner.swap(sat);
+	auto bare = [&](int across, int along, int up) {
+		static const int Beside[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+		for (const int *way : Beside)
+		{
+			const int a = across + way[0], b = along + way[1], c = up + way[2];
+			if (a < 0 || b < 0 || c < 0 || a >= GridAcross || b >= GridAlong || c >= GridUp || !owner[cellIndex(a, b, c)]) return true;
+		}
+		return false;
+	};
+	const size_t count = model.part.size();
+	const bool viewed = model.views.size() == count, noneAdded = model.addedFrom >= count;
+	std::vector<float> right, ahead, up;
+	std::vector<Uint8> part, colours;
+	std::vector<Uint16> views;
+	std::vector<int> cubeAt(GridCells, -1);
+	auto keep = [&](size_t k, float height) {
+		right.push_back(model.right[k]);
+		ahead.push_back(model.ahead[k]);
+		up.push_back(height);
+		part.push_back(model.part[k]);
+		colours.insert(colours.end(), model.colours.begin() + k * 16, model.colours.begin() + k * 16 + 16);
+		if (viewed) views.push_back(model.views[k]);
+	};
+	for (size_t k = 0; k < count; ++k)
+	{
+		if (model.part[k] == VoxelUnitModel::Item) continue;
+		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell);
+		const int layer = (int)std::floor((model.up[k] - UpFrom) / Cell) - (model.part[k] == VoxelUnitModel::Legs ? 0 : drop);
+		if (across < 0 || along < 0 || layer < 0 || across >= GridAcross || along >= GridAlong || layer >= GridUp) continue;
+		const int cell = cellIndex(across, along, layer);
+		// (its cell another part's now, or one already has it, or it is inside the body: gone)
+		if ((owner[cell] == VoxelUnitModel::Legs) != (model.part[k] == VoxelUnitModel::Legs) || !owner[cell] || cubeAt[cell] >= 0 || !bare(across, along, layer)) continue;
+		cubeAt[cell] = (int)part.size();
+		keep(k, cellUp(layer));
+	}
+	// (cells laid bare: the legs' top behind the trunk, the trunk's foot where no leg is under it)
+	const size_t painted = part.size();
+	for (int across = 0; across < GridAcross && painted > 0; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int layer = 0; layer < GridUp; ++layer)
+			{
+				const int cell = cellIndex(across, along, layer);
+				if (!owner[cell] || cubeAt[cell] >= 0 || !bare(across, along, layer)) continue;
+				const float at[3] = { cellRight(across), cellAhead(along), cellUp(layer) };
+				size_t nearest = 0;
+				float least = 1e18f;
+				for (size_t k = 0; k < painted; ++k)
+				{
+					const float off[3] = { right[k] - at[0], ahead[k] - at[1], up[k] - at[2] };
+					// (a cube of its own part first)
+					const float far = off[0] * off[0] + off[1] * off[1] + off[2] * off[2] + ((part[k] == VoxelUnitModel::Legs) != (owner[cell] == VoxelUnitModel::Legs) ? 1e6f : 0.0f);
+					if (far < least) { least = far; nearest = k; }
+				}
+				cubeAt[cell] = (int)part.size();
+				right.push_back(at[0]);
+				ahead.push_back(at[1]);
+				up.push_back(at[2]);
+				part.push_back(owner[cell]);
+				for (int i = 0; i < 16; ++i) colours.push_back(colours[nearest * 16 + i]);
+				if (viewed) views.push_back(views[nearest]);
+			}
+	// (what its hands hold comes down with them, as it is)
+	for (size_t k = 0; k < count; ++k) if (model.part[k] == VoxelUnitModel::Item) keep(k, model.up[k] - drop * Cell);
+	model.right.swap(right);
+	model.ahead.swap(ahead);
+	model.up.swap(up);
+	model.part.swap(part);
+	model.colours.swap(colours);
+	if (viewed) model.views.swap(views);
+	if (noneAdded) model.addedFrom = model.part.size();
+}
+
 /// A creature on thin legs spread all round it, a spider (the unit table's "legs: N" for the units it names; a player,
 /// GitHub issue #231, of spiders: "still have no legs"). Its drawings show legs a pixel thin, each drawn where the
 /// artist had room for it: cut by the eight outlines nothing of them is left, and what is left of the body is whatever
@@ -6209,6 +6345,8 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		}
 		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank ? turretTurn : 0, gunFrames, palette);
 	}
+	// (a kneeling body sat low, by the unit table: see sitLow)
+	if (routine.kneeling && (routine.traits & 128) && !routine.whole && !routine.big) sitLow(*model, owner);
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);

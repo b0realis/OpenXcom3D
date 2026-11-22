@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..659f67d91
+index 000000000..81caf22fe
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,692 @@
+@@ -0,0 +1,694 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -424,7 +424,7 @@ index 000000000..659f67d91
 +  STR_FPS_NOTHING_UNDERFOOT: "NOTHING UNDERFOOT"
 +  STR_FPS_ITEM_GRABBED: "{0} TAKEN"
 +  STR_FPS_KEY_SHOW_FACING: "Show facing"
-+  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour, over everything."
++  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour (and Facing icons)."
 +  STR_FPS_KEY_OPEN_DOOR_DESC: "Opens the door you look at, within reach, without walking in (costs TU)."
 +  STR_FPS_WOUNDS: "WOUNDS {0}"
 +  STR_FPS_HEAD_BOB: "Head bob"
@@ -740,6 +740,8 @@ index 000000000..659f67d91
 +  STR_FPS_STAT_BARS_PERCENT: "Percent"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY: "Middle click identifies"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY_DESC: "Middle click on a unit shows it, as on the map."
++  STR_FPS_FACING_ICONS: "Facing icons"
++  STR_FPS_FACING_ICONS_DESC: "With Show facing held: an arrow on each unit too, as seen from above with you at the bottom. Up: it faces away."
 +  STR_FPS_DOWNED_ICONS: "Downed unit icons"
 +  STR_FPS_DOWNED_ICONS_DESC: "Over the downed: burning, bleeding, shock, out cold."
 +  STR_FPS_DOWNED_ICONS_OFF: "Off"
@@ -822,10 +824,10 @@ index 000000000..659f67d91
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..0070eb343
+index 000000000..1bb72b637
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,692 @@
+@@ -0,0 +1,694 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1122,7 +1124,7 @@ index 000000000..0070eb343
 +  STR_FPS_NOTHING_UNDERFOOT: "NOTHING UNDERFOOT"
 +  STR_FPS_ITEM_GRABBED: "{0} TAKEN"
 +  STR_FPS_KEY_SHOW_FACING: "Show facing"
-+  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour, over everything."
++  STR_FPS_KEY_SHOW_FACING_DESC: "Held: a ring with an arrow on the floor round every unit in sight shows which way it faces, in its side's colour (and Facing icons)."
 +  STR_FPS_KEY_OPEN_DOOR_DESC: "Opens the door you look at, within reach, without walking in (costs TU)."
 +  STR_FPS_WOUNDS: "WOUNDS {0}"
 +  STR_FPS_HEAD_BOB: "Head bob"
@@ -1438,6 +1440,8 @@ index 000000000..0070eb343
 +  STR_FPS_STAT_BARS_PERCENT: "Percent"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY: "Middle click identifies"
 +  STR_FPS_MIDDLE_CLICK_IDENTIFY_DESC: "Middle click on a unit shows it, as on the map."
++  STR_FPS_FACING_ICONS: "Facing icons"
++  STR_FPS_FACING_ICONS_DESC: "With Show facing held: an arrow on each unit too, as seen from above with you at the bottom. Up: it faces away."
 +  STR_FPS_DOWNED_ICONS: "Downed unit icons"
 +  STR_FPS_DOWNED_ICONS_DESC: "Over the downed: burning, bleeding, shock, out cold."
 +  STR_FPS_DOWNED_ICONS_OFF: "Off"
@@ -1520,10 +1524,10 @@ index 000000000..0070eb343
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..7ca84dd05
+index 000000000..5d4739143
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,372 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1729,7 +1733,8 @@ index 000000000..7ca84dd05
 +  # The unit table: units told by their names, for the voxel bodies (setting "Voxel units"). What the voxel bodies do
 +  # for one kind of unit, they do for the units named here and for no others: a unit the table doesn't name is made by
 +  # the general rules, as ever. Each entry lists words to look for in a unit's names (its type, its armor's, the
-+  # armor's sprite sheet, its race) and what it says of those units. A word matches a whole word of a name (CAT:
++  # armor's sprite sheet, its race, a soldier's type; and the routine the game draws it with, as the whole name
++  # routine:N, 0 the soldier's) and what it says of those units. A word matches a whole word of a name (CAT:
 +  # BLACK_CAT, not CATGIRL); with a star, a word's start (GHOST*), its end (*DOGE: BLOODOGE) or any part of it
 +  # (*SPIDER*); or it is a whole name, for one unit (BAN_6.PCK). Capitals or not is the same.
 +  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
@@ -1743,7 +1748,8 @@ index 000000000..7ca84dd05
 +  #           drawn), or all (as ever: by all eight drawings, a little forgiving)
 +  #   animation: sprite (a unit whose standing sprite changes shape with the battle's animation, by a script of its mod,
 +  #           has a body for each of the 8 frames, played as the sprite is: a bat flaps), or none (as ever: one body)
-+  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length),
++  #   arms: one word or several: outside (a robe's arms lie outside the body), along (coloured along their length:
++  #           each stretch of an arm by what its own drawing has there, a sleeve, then a bare hand),
 +  #           both (those two), own (an arm is painted by its own drawing alone, not by the body drawn over it: hands
 +  #           on a shirt), posed (an arm is where its bones are, shoulder to the hand on what it holds; what its
 +  #           drawings add away from them, a second forearm, is left out), elbow (with posed: an arm that holds its
@@ -1751,8 +1757,10 @@ index 000000000..7ca84dd05
 +  #           to the item)
 +  #   head: face (only what of the head is turned to the front is painted by the front drawing; its sides, back and
 +  #           top by the back drawing: hair, a helmet), or drawn (as ever)
-+  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show), or
-+  #           drawn (as ever: as broad as its frontal drawings)
++  #   trunk: round (a long body, shape: beast, is as broad as it is tall, whatever its frontal drawings show; what
++  #           hangs under its belly without reaching the ground, a muzzle, a tail's tip, is of its head or its tail,
++  #           no pair of legs, and it has no ears standing apart: a big round head), or drawn (as ever: as broad as
++  #           its frontal drawings)
 +  #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
 +  #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
 +  #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
@@ -1774,14 +1782,25 @@ index 000000000..7ca84dd05
 +  #           its frontal drawing has two muzzles side by side. 0: none, the turret as its eight drawings leave it
 +  #           (for a unit whose thin end is no gun); 1 to 4: that many, spread over the gun's width. A turret whose
 +  #           drawings show no gun to read gets barrels of a plain size on its front when given a number here
++  #   kneel: low (kneeling, its body sits down on its heel: the trunk, arms and weapon come straight down until the
++  #           hips are just over the ground, the raised knee before the chest; about as tall as the game's rules have a
++  #           kneeling unit, so a soldier standing behind fires over it), or drawn (as ever: on one knee with a straight
++  #           back, as the kneeling drawings have it, nearly as tall as it stands)
++  #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
++  #           saucer), or none (nothing under it; not said, the same)
++  # A name of one star, "*", is every unit.
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
++    # every unit that kneels: it sits low (take this entry out, or say kneel: drawn of a unit, for the kneeling
++    # drawings' own height)
++    - names: ["*"]
++      kneel: low
 +    # people: X-COM's soldiers in every armour (the soldiers' type, in both games and the mods that keep it) and the
 +    # games' civilians. Whole names: STR_SECTOID_SOLDIER is no person
 +    - names: [STR_SOLDIER, MALE_CIVILIAN, FEMALE_CIVILIAN, SAILOR_CIVILIAN, DOCKER_CIVILIAN]
 +      humanoid: standard
 +    # ghosts (XPiratez, The X-Com Files): there, but seen through
-+    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, BANSHEE, APPARITION]
++    - names: [GHOST*, "*GHOST", SPECTRE, SPECTER, SPECTRAL, POLTERGEIST, PHANTOM, PHANTASMAL, APPARITION]
 +      seeThrough: 50
 +    # animals on four legs or more (XPiratez, The X-Com Files; BAN_6.PCK: XPiratez's bloodhound's sheet, its bandits' too);
 +    # dead, an animal lies as long as it was long, not as it stood tall
@@ -1844,8 +1863,25 @@ index 000000000..7ca84dd05
 +      barrels: 1
 +    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
 +    # arms posed on their guns (arms outside the body, coloured along their length)
++    # (and posed on their bones, the elbow down under a hand that holds a gun up: a disciple's pistol arm stood
++    # beside the arm as drawn)
 +    - names: [DAGON]
-+      arms: both
++      arms: both own posed elbow
++    # The X-Com Files' Red Dawn, and the 40k mod's Eldar: people under names of their own, as the HUMAN entry above;
++    # their arms are coloured along their length by their own drawings too (a sleeve, then a bare hand). The Eldar's
++    # Striking Scorpions are no animals
++    - names: [ZSRR]
++      arms: along own posed elbow
++    - names: [ELDAR]
++      arms: along own posed elbow
++      shape: upright
++    # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
++    - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
++      arms: along own posed elbow
++    # what hovers on sparks: saucers and hover vehicles (X-COM's Cyberdisc and Hovertanks, TFTD's Displacers, the big
++    # mods' own). A creature that flies, a gate, a walker, a jellyfish in the sea has nothing under it
++    - names: [CYBERDISC, "*DISC", HOVERTANK, "HOVER*", DISPLACER]
++      hover: sparks
 +
 +interfaces:
 +  - type: firstPerson
@@ -23038,7 +23074,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..6e5f9a461 100644
+index a08796ced..d6ef2ac77 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23055,7 +23091,7 @@ index a08796ced..6e5f9a461 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
++OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -24106,10 +24142,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..41fe1c81f
+index 000000000..fdea0fa8f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2020 @@
+@@ -0,0 +1,2023 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25514,6 +25550,9 @@ index 000000000..41fe1c81f
 +	// Icons over the downed (unconscious) units in sight, for burning, bleeding, shock and
 +	// stunned: off (0), over the body under the crosshair (1), over every body in sight (2).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDownedIcons", &fpsDownedIcons, 2, "STR_FPS_DOWNED_ICONS", category));
++	// With the key that shows which way the units face held: an arrow on each unit as well as the ring round its feet
++	// (a player, GitHub issue #245: the ring "under foot is unreliable to see, depending on height and distance").
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsFacingIcons", &fpsFacingIcons, true, "STR_FPS_FACING_ICONS", category));
 +	// The colours of the markers over the enemies (a player, GitHub issue #117: "markers should be red if visible, green
 +	// if unseen, and perhaps yellow if viable line of fire, but otherwise unseen"; the owner: a setting): all red (0, as
 +	// before), as the map's buttons for them (1: red if the soldier sees it, green if only the squad does), or that and
@@ -63743,7 +63782,7 @@ index 000000000..aa66e4f77
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..e583bef3f
+index 000000000..a5206d0e4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1940 @@
@@ -64957,7 +64996,7 @@ index 000000000..e583bef3f
 +	struct MarkerSpot { double pos[3]; int number; MarkerKind kind; int stack; int stackSize; };
 +	std::vector<MarkerSpot> _markerSpots;               // where they are this frame
 +	bool _showFacing = false;                           // which way the units face shown (the key for it held)
-+	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; };
++	struct FacingSpot { double feet[3]; double radius; int direction; Uint8 color; double middle; };
 +	std::vector<FacingSpot> _facingSpots;               // the units in sight this frame, for their facing rings
 +	int _uiScale = 1;                                   // markers drawn this many times bigger
 +	int _pointerX = -1, _pointerY = -1;                 // where the player points on the view (see setPointer)
@@ -65689,10 +65728,10 @@ index 000000000..e583bef3f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..fd9b0e4a4
+index 000000000..e78daa4e8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1474 @@
+@@ -0,0 +1,1478 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -66342,9 +66381,9 @@ index 000000000..fd9b0e4a4
 +
 +/**
 + * Setting "Voxel units", what else the game draws over a unit's picture, as particles on its body: the bubbles of its
-+ * breath under the sea, rising from its head; and under a big unit that hovers (a hover tank, a Cyberdisc: the glow
-+ * and sparks its pictures have under the hull, which its body leaves out), a rain of bright sparks down to the ground
-+ * and the dust they raise. Units in sight, standing, within 20 tiles.
++ * breath under the sea, rising from its head; and under a big unit that hovers, named so by the unit table (a hover
++ * tank, a Cyberdisc: the glow and sparks its pictures have under the hull, which its body leaves out), a rain of bright
++ * sparks down to the ground and the dust they raise. Units in sight, standing, within 20 tiles.
 + * @param elapsedSeconds Seconds since the last frame.
 + */
 +void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
@@ -66356,7 +66395,11 @@ index 000000000..fd9b0e4a4
 +	{
 +		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode())) continue;
 +		const int unitSize = unit->getArmor()->getSize();
-+		const bool hovers = unitSize > 1 && unit->getMovementType() == MT_FLY;
++		// (Only the units the unit table names "hover: sparks", by their bodies: any big unit that flies had them, a
++		// Xarquid and a Hallucinoid drifting in the sea, a mod's gate, a demon; a player, GitHub issue #245, "hover
++		// particles off by default ... I can't be arsed to go through which should, and shouldn't have it".)
++		const VoxelUnitModel *hoverBody = unitSize > 1 && unit->getMovementType() == MT_FLY && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
++		const bool hovers = hoverBody && hoverBody->sparks;
 +		const bool breathes = unit->getBreathExhaleFrame() >= 0;
 +		if (!hovers && !breathes) continue;
 +		auto glide = _unitGlides.find(unit);
@@ -72849,10 +72892,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..2db5118be
+index 000000000..7c9a89e65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,740 @@
+@@ -0,0 +1,742 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73361,6 +73404,8 @@ index 000000000..2db5118be
 +/// The units' facing rings (see FirstPersonView::drawFacing): the arrow reaches this many voxels out
 +/// from the ring, this many to each side at its base.
 +const double FacingArrowLength = 7.0, FacingArrowWidth = 4.0;
++/// The facing icon (setting "Facing icons", see drawFacing) is on a unit at this share of its height.
++const double FacingIconHeight = 0.6;
 +/// A rocket's or a cannon shell's lasting trail (see spawnTrailSegment): its white specks hang this
 +/// many seconds, at random between the two (a player: they lasted "far, far too long" at 25 to 35,
 +/// "cut their particle lifetime down 2 thirds"; the owner: the specks only, not the smoke puffs).
@@ -75935,10 +75980,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..bc86d275e
+index 000000000..36f88996d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4439 @@
+@@ -0,0 +1,4495 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -77785,8 +77830,8 @@ index 000000000..bc86d275e
 +				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
 +			}
 +			const size_t stepsBefore = _drawList.size();
-+			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
-+			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
++			// (a wreck coming down faces the way the unit did, as it will lie: see drawFloorItems)
++			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
 +				true, nullptr, nullptr, body->opacity, ceilingOver(feet, unit));
 +			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 +			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
@@ -77938,7 +77983,8 @@ index 000000000..bc86d275e
 +		if (_showFacing && !fallingDown)
 +		{
 +			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
-+				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
++				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2],
++				feet[2] + unit->getFloatHeight() + unit->getHeight() * FacingIconHeight };
 +			_facingSpots.push_back(spot);
 +		}
 +	}
@@ -78718,7 +78764,9 @@ index 000000000..bc86d275e
 +		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 +			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 +		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
-+		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
++		// the way the unit faced when it went down, as a one-tile body does; a player, GitHub issue #245: big units'
++		// corpses "always face toward iso screen". The game turns a unit to the screen as it dies, so one that went
++		// down unseen, or before the battle was loaded, lies as the map shows it. Parts carried apart are their pictures.)
 +		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
 +		// (A body lying there stands up from the floor, where its picture lay flat: a heap hides the legs of who stands
 +		// behind it, a wreck far more, and the picture's rule, the crosshair on it and the aim ending on another tile,
@@ -78766,7 +78814,8 @@ index 000000000..bc86d275e
 +		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
 +		if (wreck && wreck->fallAt(1.0))
 +		{
-+			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
++			auto well = _facingsWell.find(owner);
++			recordVoxelUnit(*wreck, -1, well != _facingsWell.end() ? well->second : 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
 +				step.sprite.body, step.sprite.pile, bodyOpacity);
 +			continue;
 +		}
@@ -79922,6 +79971,58 @@ index 000000000..bc86d275e
 +		drawLine3D(base[0], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
 +		drawLine3D(base[1], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
 +		drawLine3D(base[0], base[1], spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
++	}
++	// Setting "Facing icons": and an arrow on each unit, at a fixed size on the screen as the downed units' icons are, so
++	// it reads from any height and distance (a player, GitHub issue #245: the ring "under foot is unreliable to see,
++	// depending on height and distance": from a soldier's eye a ring far off is a line). The unit as seen from above
++	// with the viewer at the bottom: up, it faces away; down, this way; one of eight ways.
++	if (!Options::fpsFacingIcons) return;
++	// (the arrow pointing up and the one up to the right; the other six are these turned by quarter turns)
++	static const char *const Arrows[2][7] = {
++		{ "...#...", "..###..", ".#####.", "...#...", "...#...", "...#...", "...#..." },
++		{ "..#####", "....###", "...#.##", "..#...#", ".#.....", "#......", "......." } };
++	const int width = getWidth(), height = getHeight(), uiScale = std::max(1, _uiScale);
++	for (const FacingSpot &spot : _facingSpots)
++	{
++		const double middle[3] = { spot.feet[0], spot.feet[1], spot.middle };
++		double screenX, screenY, depth;
++		if (!projectToScreen(middle, screenX, screenY, depth)) continue;
++		// (away from the viewer and to the viewer's right, on the ground)
++		double away[2] = { spot.feet[0] - _eye[0], spot.feet[1] - _eye[1] };
++		const double far = std::hypot(away[0], away[1]);
++		if (far < 1e-6) continue;
++		away[0] /= far; away[1] /= far;
++		double right[2] = { -away[1], away[0] };
++		if (right[0] * _right[0] + right[1] * _right[1] < 0.0) { right[0] = -right[0]; right[1] = -right[1]; }
++		const double facing = (spot.direction * 45.0 - 90.0) * Pi / 180.0;
++		const double ahead[2] = { std::cos(facing), std::sin(facing) };
++		const double turn = std::atan2(ahead[0] * right[0] + ahead[1] * right[1], ahead[0] * away[0] + ahead[1] * away[1]); // (0 away, a quarter turn to the right)
++		const int way = (((int)std::lround(turn / (Pi / 4.0))) % 8 + 8) % 8;
++		// (twice the size of the downed units' icons: one sign a unit, to be read far off)
++		const int dot = 2 * uiScale;
++		const int originX = std::clamp((int)screenX, 5 * dot, width - 6 * dot), originY = std::clamp((int)screenY, 5 * dot, height - 6 * dot);
++		auto lit = [&](int column, int row) {
++			// (the art turned back by the way's quarter turns to the right)
++			for (int quarter = 0; quarter < way / 2; ++quarter) { const int was = column; column = row; row = 6 - was; }
++			return column >= 0 && row >= 0 && column < 7 && row < 7 && Arrows[way % 2][row][column] == '#';
++		};
++		auto put = [&](int column, int row, Uint8 color) {
++			const int pixelX = originX + (column - 3) * dot, pixelY = originY + (row - 3) * dot;
++			for (int offsetY = 0; offsetY < dot; ++offsetY)
++				for (int offsetX = 0; offsetX < dot; ++offsetX)
++					if (pixelX + offsetX >= 0 && pixelY + offsetY >= 0 && pixelX + offsetX < width && pixelY + offsetY < height)
++						*getRaw(pixelX + offsetX, pixelY + offsetY) = color;
++		};
++		// First a black outline round every lit pixel, then the pixels.
++		for (int pass = 0; pass < 2; ++pass)
++			for (int row = 0; row < 7; ++row)
++				for (int column = 0; column < 7; ++column)
++				{
++					if (!lit(column, row)) continue;
++					if (pass == 1) { put(column, row, spot.color); continue; }
++					for (int outlineY = -1; outlineY <= 1; ++outlineY)
++						for (int outlineX = -1; outlineX <= 1; ++outlineX) put(column + outlineX, row + outlineY, _colors.tapeBlack);
++				}
 +	}
 +}
 +
@@ -89222,10 +89323,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..8f2aa5a5e
+index 000000000..01227843d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6302 @@
+@@ -0,0 +1,6440 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -91221,6 +91322,42 @@ index 000000000..8f2aa5a5e
 +	int legRows = 0;
 +	while (legged && bottom - legRows > top && drawn[bottom - legRows] < longest * LegsShare) ++legRows;
 +	const int belly = bottom - legRows; // (the lowest row of the body as drawn)
++	// (A body the unit table names "trunk: round": a leg stands on the ground. What the side drawing has under the belly
++	// that ends well above the feet, joined to nothing that goes down to them, is no leg: a muzzle hanging lower than
++	// the chest, a tail's tip. The X-Com Files' Gilldog's nose, two rows under its belly's, was a pair of legs a row
++	// long, as far apart as its forelegs: "big dopey ears", a player, GitHub issue #245, "just a big fat head plz".
++	// Hangs: such pixels, the body's own.)
++	std::vector<Uint8> hangs;
++	if (RoundTrunk && legRows > 0)
++	{
++		hangs.assign((size_t)FrameSize * FrameSize, 0);
++		std::vector<Uint8> seen((size_t)FrameSize * FrameSize, 0);
++		for (int row = belly + 1; row <= bottom; ++row)
++			for (int column = left; column <= right; ++column)
++			{
++				if (!part.at(RightSide, column, row) || seen[(size_t)row * FrameSize + column]) continue;
++				std::vector<std::pair<int, int>> piece, stack(1, { column, row });
++				seen[(size_t)row * FrameSize + column] = 1;
++				int lowest = row;
++				while (!stack.empty())
++				{
++					const std::pair<int, int> at = stack.back();
++					stack.pop_back();
++					piece.push_back(at);
++					lowest = std::max(lowest, at.second);
++					for (int dy = -1; dy <= 1; ++dy)
++						for (int dx = -1; dx <= 1; ++dx)
++						{
++							const int c = at.first + dx, r = at.second + dy;
++							if (r <= belly || r > bottom || c < left || c > right || !part.at(RightSide, c, r) || seen[(size_t)r * FrameSize + c]) continue;
++							seen[(size_t)r * FrameSize + c] = 1;
++							stack.push_back({ c, r });
++						}
++				}
++				if (lowest < bottom - legRows / 2) for (const std::pair<int, int> &at : piece) hangs[(size_t)at.second * FrameSize + at.first] = 1;
++			}
++	}
++	auto hanging = [&](int column, int row) { return !hangs.empty() && column >= 0 && column < FrameSize && row >= 0 && row < FrameSize && hangs[(size_t)row * FrameSize + column]; };
 +	// how far the belly is raised: BellyRise of the body's width, at most BellyMost of the rows above the legs
 +	int rise = 0;
 +	if (legRows > 0 && drawnBox(part, Front, frontLeft, frontRight, frontTop, frontBottom))
@@ -91232,7 +91369,7 @@ index 000000000..8f2aa5a5e
 +	// where the legs stand along the body: the columns the side drawing has in the legs' upper rows
 +	std::vector<Uint8> stands(FrameSize, 0);
 +	for (int row = belly + 1; row <= std::min(bottom, belly + 1 + VOXELSCALE); ++row)
-+		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row)) stands[column] = 1;
++		for (int column = left; column <= right; ++column) if (part.at(RightSide, column, row) && !hanging(column, row)) stands[column] = 1;
 +	int standsFirst = FrameSize, standsLast = -1;
 +	for (int column = 0; column < FrameSize; ++column) if (stands[column]) { standsFirst = std::min(standsFirst, column); standsLast = column; }
 +	// the columns a pair of legs keeps to: what a drawing (the front's, the back's) has in its lowest rows
@@ -91450,7 +91587,7 @@ index 000000000..8f2aa5a5e
 +			// (the legs' rows: below the belly all of them; of the belly's raised rows, what stands between the first leg
 +			// and the last. What the drawing has there behind the hind legs or before the front ones is no belly to
 +			// raise: a rat's tail lying low went with it.)
-+			const bool leg = row >= legsFrom && (row > belly || (sideRight >= standsFirst && sideRight <= standsLast));
++			const bool leg = row >= legsFrom && (row > belly || (sideRight >= standsFirst && sideRight <= standsLast)) && !hanging(sideRight, row);
 +			// (Round: the drawing's stretch through this pixel, up and down or along the body, whichever is the shorter,
 +			// is a round thing's thickness there, and it is as far across as that from its middle. As deep as the
 +			// outline is near, all of it was a slab with its edges cut: the owner, of the dog, "needs to be much more
@@ -91459,7 +91596,7 @@ index 000000000..8f2aa5a5e
 +			while (runTop > 0 && part.at(RightSide, sideRight, runTop - 1)) --runTop;
 +			// (the trunk's stretch ends at the belly: the legs under it are their own)
 +			while (runBottom < FrameSize - 1 && part.at(RightSide, sideRight, runBottom + 1)
-+				&& (leg || runBottom + 1 < legsFrom || (runBottom + 1 <= belly && (sideRight < standsFirst || sideRight > standsLast)))) ++runBottom;
++				&& (leg || runBottom + 1 < legsFrom || (runBottom + 1 <= belly && (sideRight < standsFirst || sideRight > standsLast)) || hanging(sideRight, runBottom + 1))) ++runBottom;
 +			while (runFirst > 0 && part.at(RightSide, runFirst - 1, row)) --runFirst;
 +			while (runLast < FrameSize - 1 && part.at(RightSide, runLast + 1, row)) ++runLast;
 +			const float tall = (runBottom - runTop + 1) * 0.5f, lengthways = (runLast - runFirst + 1) * 0.5f;
@@ -91493,7 +91630,7 @@ index 000000000..8f2aa5a5e
 +					if (drawnBreadth > 0.0f) breadth = drawnBreadth;
 +					else if (RoundTrunk && !lying) breadth = std::min(breadth, tall); // (a part standing: no broader than it is tall there)
 +				}
-+				else pair = end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2;
++				else pair = !RoundTrunk && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2; // (a round trunk has no ears: a thin part of it is round too)
 +			}
 +			const float half = std::min(widest, std::max(ProfileHalfLeast, breadth * std::sqrt(std::max(0.0f, 1.0f - off * off))));
 +			// (the belly's raised rows: only the legs are left of them)
@@ -94156,6 +94293,106 @@ index 000000000..8f2aa5a5e
 +	if (noneAdded) model.addedFrom = model.part.size();
 +}
 +
++/// A kneeling body sat low (the unit table's "kneel: low", for the units it names): the game's kneeling drawings have a
++/// soldier on one knee with his back straight up, his hips at two thirds of their standing height and his head not three
++/// pixels lower than as he stands, where the game's own rules have him two thirds as tall (14 voxels of 22). A body made
++/// as drawn stands as high as a standing soldier's weapon: "shots at a flat angle will go DIRECTLY into the skull of the
++/// forward unit ... I should be able to reliably fire over a kneeling units head", a player, GitHub issue #245, who
++/// asked for "lowering the torso so the butt sits on (even partially merges with) the heel". So all of the body that
++/// isn't its legs, with what its hands hold, comes straight down until its trunk's foot is KneelSeat over the ground,
++/// in whole cells (every cube stays on the grid, the weapon level in the hands): it sits on its heel, its raised knee
++/// before its chest. What comes under the ground is left out; cubes that end inside the body are dropped, and a cell
++/// laid bare takes the colours of the nearest cube of its part.
++constexpr float KneelSeat = 2.0f * VOXELSCALE;
++static void sitLow(VoxelUnitModel &model, std::vector<Uint8> &owner)
++{
++	int trunkFoot = GridUp;
++	for (int cell = 0; cell < GridCells; ++cell) if (owner[cell] == VoxelUnitModel::Torso) trunkFoot = std::min(trunkFoot, cell % GridUp);
++	int seat = 0;
++	while (seat < GridUp && cellUp(seat) < KneelSeat) ++seat;
++	const int drop = trunkFoot - seat;
++	if (trunkFoot >= GridUp || drop <= 0) return;
++	std::vector<Uint8> sat(GridCells, 0);
++	for (int cell = 0; cell < GridCells; ++cell) if (owner[cell] == VoxelUnitModel::Legs) sat[cell] = owner[cell];
++	for (int cell = 0; cell < GridCells; ++cell)
++	{
++		const int up = cell % GridUp;
++		if (!owner[cell] || owner[cell] == VoxelUnitModel::Legs || up - drop < 0 || cellUp(up - drop) < 0.0f) continue;
++		sat[cell - drop] = owner[cell];
++	}
++	owner.swap(sat);
++	auto bare = [&](int across, int along, int up) {
++		static const int Beside[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
++		for (const int *way : Beside)
++		{
++			const int a = across + way[0], b = along + way[1], c = up + way[2];
++			if (a < 0 || b < 0 || c < 0 || a >= GridAcross || b >= GridAlong || c >= GridUp || !owner[cellIndex(a, b, c)]) return true;
++		}
++		return false;
++	};
++	const size_t count = model.part.size();
++	const bool viewed = model.views.size() == count, noneAdded = model.addedFrom >= count;
++	std::vector<float> right, ahead, up;
++	std::vector<Uint8> part, colours;
++	std::vector<Uint16> views;
++	std::vector<int> cubeAt(GridCells, -1);
++	auto keep = [&](size_t k, float height) {
++		right.push_back(model.right[k]);
++		ahead.push_back(model.ahead[k]);
++		up.push_back(height);
++		part.push_back(model.part[k]);
++		colours.insert(colours.end(), model.colours.begin() + k * 16, model.colours.begin() + k * 16 + 16);
++		if (viewed) views.push_back(model.views[k]);
++	};
++	for (size_t k = 0; k < count; ++k)
++	{
++		if (model.part[k] == VoxelUnitModel::Item) continue;
++		const int across = (int)std::floor((model.right[k] - AcrossFrom) / Cell), along = (int)std::floor((model.ahead[k] - AlongFrom) / Cell);
++		const int layer = (int)std::floor((model.up[k] - UpFrom) / Cell) - (model.part[k] == VoxelUnitModel::Legs ? 0 : drop);
++		if (across < 0 || along < 0 || layer < 0 || across >= GridAcross || along >= GridAlong || layer >= GridUp) continue;
++		const int cell = cellIndex(across, along, layer);
++		// (its cell another part's now, or one already has it, or it is inside the body: gone)
++		if ((owner[cell] == VoxelUnitModel::Legs) != (model.part[k] == VoxelUnitModel::Legs) || !owner[cell] || cubeAt[cell] >= 0 || !bare(across, along, layer)) continue;
++		cubeAt[cell] = (int)part.size();
++		keep(k, cellUp(layer));
++	}
++	// (cells laid bare: the legs' top behind the trunk, the trunk's foot where no leg is under it)
++	const size_t painted = part.size();
++	for (int across = 0; across < GridAcross && painted > 0; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int layer = 0; layer < GridUp; ++layer)
++			{
++				const int cell = cellIndex(across, along, layer);
++				if (!owner[cell] || cubeAt[cell] >= 0 || !bare(across, along, layer)) continue;
++				const float at[3] = { cellRight(across), cellAhead(along), cellUp(layer) };
++				size_t nearest = 0;
++				float least = 1e18f;
++				for (size_t k = 0; k < painted; ++k)
++				{
++					const float off[3] = { right[k] - at[0], ahead[k] - at[1], up[k] - at[2] };
++					// (a cube of its own part first)
++					const float far = off[0] * off[0] + off[1] * off[1] + off[2] * off[2] + ((part[k] == VoxelUnitModel::Legs) != (owner[cell] == VoxelUnitModel::Legs) ? 1e6f : 0.0f);
++					if (far < least) { least = far; nearest = k; }
++				}
++				cubeAt[cell] = (int)part.size();
++				right.push_back(at[0]);
++				ahead.push_back(at[1]);
++				up.push_back(at[2]);
++				part.push_back(owner[cell]);
++				for (int i = 0; i < 16; ++i) colours.push_back(colours[nearest * 16 + i]);
++				if (viewed) views.push_back(views[nearest]);
++			}
++	// (what its hands hold comes down with them, as it is)
++	for (size_t k = 0; k < count; ++k) if (model.part[k] == VoxelUnitModel::Item) keep(k, model.up[k] - drop * Cell);
++	model.right.swap(right);
++	model.ahead.swap(ahead);
++	model.up.swap(up);
++	model.part.swap(part);
++	model.colours.swap(colours);
++	if (viewed) model.views.swap(views);
++	if (noneAdded) model.addedFrom = model.part.size();
++}
++
 +/// A creature on thin legs spread all round it, a spider (the unit table's "legs: N" for the units it names; a player,
 +/// GitHub issue #231, of spiders: "still have no legs"). Its drawings show legs a pixel thin, each drawn where the
 +/// artist had room for it: cut by the eight outlines nothing of them is left, and what is left of the body is whatever
@@ -95437,6 +95674,8 @@ index 000000000..8f2aa5a5e
 +		}
 +		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank ? turretTurn : 0, gunFrames, palette);
 +	}
++	// (a kneeling body sat low, by the unit table: see sitLow)
++	if (routine.kneeling && (routine.traits & 128) && !routine.whole && !routine.big) sitLow(*model, owner);
 +	makeHits(*model, owner, solidOnTop);
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
@@ -96358,10 +96597,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..584fd0a91
+index 000000000..98250aadd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1333 @@
+@@ -0,0 +1,1353 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -96555,6 +96794,7 @@ index 000000000..584fd0a91
 +	bool aiming = false;
 +	bool still = false; // (it can't move: see Routine)
 +	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
++	bool sparks = false; // (it hovers on sparks, by the unit table: see VoxelUnitModel::sparks)
 +	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
 +	/// whose sprite changes shape with it (see modelFor); empty for any other.
 +	std::vector<std::vector<Uint8>> anim;
@@ -96883,8 +97123,11 @@ index 000000000..584fd0a91
 +	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
 +	const Unit *unitRules = unit->getUnitRules();
 +	const Soldier *soldier = unit->getGeoscapeSoldier();
++	// (and by the routine the game draws it with, as the name "routine:N": the big mods have thousands of units, most of
++	// them people drawn as the games' own soldiers are, under every kind of name)
 +	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
-+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string() });
++		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string(),
++		"routine:" + std::to_string(unit->getArmor()->getDrawingRoutine()) });
 +	// A unit whose standing drawing changes shape with the battle's animation frame (the game's routine draws a frame
 +	// of it for each: the Silacoid and the Celatid pulse; or a mod's script picks its sprite by it: X-Com Files'
 +	// shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner: "voxel models
@@ -97133,6 +97376,18 @@ index 000000000..584fd0a91
 +		const Uint8 barrels[2] = { 'b', (Uint8)look.barrels };
 +		hashBytes(hash, barrels, 2);
 +	}
++	// (hovering on sparks, by the unit table: only said of a unit hashed in, as above; units alike share a body)
++	if (look.sparks == 1)
++	{
++		const Uint8 hover[2] = { 's', 1 };
++		hashBytes(hash, hover, 2);
++	}
++	// (kneeling, sat low, by the unit table: only a kneeling body it is said of is hashed in, as above)
++	if (look.kneelLow == 1 && unit->isKneeled())
++	{
++		const Uint8 kneel[2] = { 'k', 1 };
++		hashBytes(hash, kneel, 2);
++	}
 +	_byQuick[quick] = hash;
 +	auto alike = _byFrames.find(hash);
 +	if (alike != _byFrames.end())
@@ -97156,6 +97411,7 @@ index 000000000..584fd0a91
 +		job->aiming = aiming;
 +		job->still = !unit->getArmor()->allowsMoving();
 +		job->shows = shows;
++		job->sparks = look.sparks == 1;
 +		job->beast = look.beast == 1;
 +		job->anim = std::move(anim);
 +		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
@@ -97169,6 +97425,8 @@ index 000000000..584fd0a91
 +		// (and a turret's barrels by the unit table, one more than the count: 0 nothing said; a tank's turret's turn
 +		// from its hull: see VoxelBodies::makeModel)
 +		job->traits |= (look.barrels >= 0 ? (std::min(look.barrels, 4) + 1) << 8 : 0) | (std::get<7>(key) & 7) << 11;
++		// (kneeling, sat low, by the unit table: see sitLow in FirstPersonVoxelBodies.cpp)
++		if (look.kneelLow == 1 && unit->isKneeled()) job->traits |= 128;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -97520,6 +97778,7 @@ index 000000000..584fd0a91
 +		if (model)
 +		{
 +			model->opacity = job->shows;
++			model->sparks = job->sparks;
 +			float lowest = 1e9f;
 +			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
 +			{
@@ -97697,10 +97956,10 @@ index 000000000..584fd0a91
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.h b/src/FirstPerson/FirstPersonVoxelUnits.h
 new file mode 100644
-index 000000000..a53939f68
+index 000000000..d0b3e7c50
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.h
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,279 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -97801,6 +98060,9 @@ index 000000000..a53939f68
 +	/// pixel left out so the map shows through it (XPiratez's stealth and spectre suits: VoxelDitherFaint), or one the
 +	/// mod's rules name a ghost (the unit table's seeThrough, see RuleFirstPerson::UnitLook).
 +	float opacity = 1.0f;
++	/// Whether the unit, big and flying, hovers on a rain of sparks (the unit table's "hover: sparks": a hover tank, a
++	/// Cyberdisc; see FirstPersonView::spawnBodyEffects).
++	bool sparks = false;
 +	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
 +	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
 +	float lowest = 0.0f;
@@ -103845,7 +104107,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..ddcba36a3
+index 000000000..05658c4b9
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1181 @@
@@ -104089,7 +104351,7 @@ index 000000000..ddcba36a3
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
++			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
@@ -105153,10 +105415,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..be0e5d55d
+index 000000000..74669b04b
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,570 @@
+@@ -0,0 +1,577 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -105291,14 +105553,17 @@ index 000000000..be0e5d55d
 +		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 +		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 +		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
++		int sparks = -1; // (big and flying, it hovers on a rain of sparks: 1; nothing under it, as every other unit: 0)
++		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 +		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
 +	/// GHOSTLY), a word's end (*DOGE: BLOODOGE) or any part of a word (*SPIDER*); or the whole name itself (one unit:
-+	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same.
++	/// BAN_6.PCK, STR_MY_UNIT_ARMOR). Capitals or not is the same. A star alone is every unit.
 +	static bool nameHas(const std::string &name, const std::string &pattern)
 +	{
++		if (pattern == "*") return !name.empty();
 +		if (name.size() == pattern.size() && std::equal(name.begin(), name.end(), pattern.begin(),
 +			[](char one, char other) { return std::toupper((unsigned char)one) == std::toupper((unsigned char)other); })) return true;
 +		const bool openStart = !pattern.empty() && pattern.front() == '*', openEnd = pattern.size() > 1 && pattern.back() == '*';
@@ -105519,7 +105784,7 @@ index 000000000..be0e5d55d
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover;
 +				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -105549,6 +105814,8 @@ index 000000000..be0e5d55d
 +				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
 +				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
 +				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
++				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
++				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
 +				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -105659,6 +105926,8 @@ index 000000000..be0e5d55d
 +			if (entry.second.faceHead != -1) look.faceHead = entry.second.faceHead;
 +			if (entry.second.tail != -1) look.tail = entry.second.tail;
 +			if (entry.second.hullPaint != -1) look.hullPaint = entry.second.hullPaint;
++			if (entry.second.kneelLow != -1) look.kneelLow = entry.second.kneelLow;
++			if (entry.second.sparks != -1) look.sparks = entry.second.sparks;
 +			if (entry.second.legs != -1) look.legs = entry.second.legs;
 +			if (entry.second.barrels != -1) look.barrels = entry.second.barrels;
 +			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;

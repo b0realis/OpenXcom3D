@@ -1844,8 +1844,8 @@ void FirstPersonView::drawUnits()
 				bodyScale *= 1.0 + CelatidSwell * std::sin(turn * 2.0);
 			}
 			const size_t stepsBefore = _drawList.size();
-			// (a wreck lies as the map shows it, whichever way the unit faced: see drawFloorItems)
-			recordVoxelUnit(*body, walkPhase, wreckFalling && fall >= 1.0 ? 3 : facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
+			// (a wreck coming down faces the way the unit did, as it will lie: see drawFloorItems)
+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
 				true, nullptr, nullptr, body->opacity, ceilingOver(feet, unit));
 			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
@@ -1997,7 +1997,8 @@ void FirstPersonView::drawUnits()
 		if (_showFacing && !fallingDown)
 		{
 			FacingSpot spot = { { feet[0], feet[1], feet[2] + unit->getFloatHeight() + 1.0 }, 8.0 * unitSize - 1.5, unit->getDirection(),
-				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2] };
+				_colors.hitbox[unit->getFaction() == FACTION_PLAYER ? 0 : unit->getFaction() == FACTION_HOSTILE ? 1 : 2],
+				feet[2] + unit->getFloatHeight() + unit->getHeight() * FacingIconHeight };
 			_facingSpots.push_back(spot);
 		}
 	}
@@ -2777,7 +2778,9 @@ void FirstPersonView::drawFloorItems()
 		const VoxelUnitModel *lying = Options::fpsVoxelUnits && owner && owner->isOut() && !wholeCorpse
 			&& step.sprite.standingSquash >= 1.0 && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
 		// (A big unit's whole corpse, its four parts in their places: its wreck as the map draws it, given volume, lying
-		// as the map shows it whichever way the unit faced. Parts carried apart are their pictures.)
+		// the way the unit faced when it went down, as a one-tile body does; a player, GitHub issue #245: big units'
+		// corpses "always face toward iso screen". The game turns a unit to the screen as it dies, so one that went
+		// down unseen, or before the battle was loaded, lies as the map shows it. Parts carried apart are their pictures.)
 		const VoxelUnitModel *wreck = Options::fpsVoxelUnits && owner && owner->isOut() && wholeCorpse ? _voxelUnits->lastBody(owner) : nullptr;
 		// (A body lying there stands up from the floor, where its picture lay flat: a heap hides the legs of who stands
 		// behind it, a wreck far more, and the picture's rule, the crosshair on it and the aim ending on another tile,
@@ -2825,7 +2828,8 @@ void FirstPersonView::drawFloorItems()
 		if (bodyOpacity < 1.0) bodyOpacity *= VoxelCorpseFaint;
 		if (wreck && wreck->fallAt(1.0))
 		{
-			recordVoxelUnit(*wreck, -1, 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
+			auto well = _facingsWell.find(owner);
+			recordVoxelUnit(*wreck, -1, well != _facingsWell.end() ? well->second : 3, 3, false, step.sprite.world, NoFloorCut, step.sprite.shade, itemScale, nullptr, 1.0, false,
 				step.sprite.body, step.sprite.pile, bodyOpacity);
 			continue;
 		}
@@ -3981,6 +3985,58 @@ void FirstPersonView::drawFacing()
 		drawLine3D(base[0], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
 		drawLine3D(base[1], tip, spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
 		drawLine3D(base[0], base[1], spot.color, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
+	}
+	// Setting "Facing icons": and an arrow on each unit, at a fixed size on the screen as the downed units' icons are, so
+	// it reads from any height and distance (a player, GitHub issue #245: the ring "under foot is unreliable to see,
+	// depending on height and distance": from a soldier's eye a ring far off is a line). The unit as seen from above
+	// with the viewer at the bottom: up, it faces away; down, this way; one of eight ways.
+	if (!Options::fpsFacingIcons) return;
+	// (the arrow pointing up and the one up to the right; the other six are these turned by quarter turns)
+	static const char *const Arrows[2][7] = {
+		{ "...#...", "..###..", ".#####.", "...#...", "...#...", "...#...", "...#..." },
+		{ "..#####", "....###", "...#.##", "..#...#", ".#.....", "#......", "......." } };
+	const int width = getWidth(), height = getHeight(), uiScale = std::max(1, _uiScale);
+	for (const FacingSpot &spot : _facingSpots)
+	{
+		const double middle[3] = { spot.feet[0], spot.feet[1], spot.middle };
+		double screenX, screenY, depth;
+		if (!projectToScreen(middle, screenX, screenY, depth)) continue;
+		// (away from the viewer and to the viewer's right, on the ground)
+		double away[2] = { spot.feet[0] - _eye[0], spot.feet[1] - _eye[1] };
+		const double far = std::hypot(away[0], away[1]);
+		if (far < 1e-6) continue;
+		away[0] /= far; away[1] /= far;
+		double right[2] = { -away[1], away[0] };
+		if (right[0] * _right[0] + right[1] * _right[1] < 0.0) { right[0] = -right[0]; right[1] = -right[1]; }
+		const double facing = (spot.direction * 45.0 - 90.0) * Pi / 180.0;
+		const double ahead[2] = { std::cos(facing), std::sin(facing) };
+		const double turn = std::atan2(ahead[0] * right[0] + ahead[1] * right[1], ahead[0] * away[0] + ahead[1] * away[1]); // (0 away, a quarter turn to the right)
+		const int way = (((int)std::lround(turn / (Pi / 4.0))) % 8 + 8) % 8;
+		// (twice the size of the downed units' icons: one sign a unit, to be read far off)
+		const int dot = 2 * uiScale;
+		const int originX = std::clamp((int)screenX, 5 * dot, width - 6 * dot), originY = std::clamp((int)screenY, 5 * dot, height - 6 * dot);
+		auto lit = [&](int column, int row) {
+			// (the art turned back by the way's quarter turns to the right)
+			for (int quarter = 0; quarter < way / 2; ++quarter) { const int was = column; column = row; row = 6 - was; }
+			return column >= 0 && row >= 0 && column < 7 && row < 7 && Arrows[way % 2][row][column] == '#';
+		};
+		auto put = [&](int column, int row, Uint8 color) {
+			const int pixelX = originX + (column - 3) * dot, pixelY = originY + (row - 3) * dot;
+			for (int offsetY = 0; offsetY < dot; ++offsetY)
+				for (int offsetX = 0; offsetX < dot; ++offsetX)
+					if (pixelX + offsetX >= 0 && pixelY + offsetY >= 0 && pixelX + offsetX < width && pixelY + offsetY < height)
+						*getRaw(pixelX + offsetX, pixelY + offsetY) = color;
+		};
+		// First a black outline round every lit pixel, then the pixels.
+		for (int pass = 0; pass < 2; ++pass)
+			for (int row = 0; row < 7; ++row)
+				for (int column = 0; column < 7; ++column)
+				{
+					if (!lit(column, row)) continue;
+					if (pass == 1) { put(column, row, spot.color); continue; }
+					for (int outlineY = -1; outlineY <= 1; ++outlineY)
+						for (int outlineX = -1; outlineX <= 1; ++outlineX) put(column + outlineX, row + outlineY, _colors.tapeBlack);
+				}
 	}
 }
 
