@@ -963,8 +963,10 @@ private:
 	void fireTurnShot();
 	/// Fires a shot or a throw at a tile through the game's own action, the other gun joining in (or not).
 	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, Position targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
-	/// Notes the weapon about to be used in the game's hit log, as the map's weapon menu does.
-	void noteWeaponInHitLog(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode);
+	/// Notes the weapon about to be used in the game's hit log where the map's weapon menu would: at a new pick.
+	void noteWeaponInHitLog(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, bool gamePick);
+	/// The pick the 3D view's shots stand for ends, as a map's pick does when it is put down.
+	void endHitLogPick() { _hitLogPick.open = false; }
 	/// The fire modes the left mouse button can use with an item, in wheel order.
 	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
 	/// The mode an item starts on: a gun's snap shot where it has one, else the first (of the shots only, if asked).
@@ -1142,16 +1144,20 @@ private:
 	// a melee swing: wound up, struck in towards the crosshair, back; the view lunges with it
 	Uint32 _swingStart = 0;
 	bool _swingJolted = false; // the view has lunged for this swing already
-	// What the hit log was last told a soldier uses from the 3D view (see noteWeaponInHitLog).
-	struct HitLogNote
+	// The pick the 3D view's shots stand for, as the map's weapon menu makes one: its note heads the hit log, and the
+	// shots after it go under it while it lasts (see noteWeaponInHitLog).
+	struct HitLogPick
 	{
 		const BattleUnit *unit = nullptr;
 		const BattleItem *weapon = nullptr;
 		BattleActionType mode = BA_NONE;
 		Position tile = Position(-1, -1, -1);
 		int turn = -1;
+		unsigned callOffs = 0; // the game's aim called off so many times when it was made (FirstPerson::aimCallOffs)
+		bool open = false;
 	};
-	HitLogNote _hitLogNote;
+	HitLogPick _hitLogPick;
+	bool _pairTurnFiring = false; // akimbo in turn: the other gun's shot is being launched (it goes under the first gun's note)
 	// dual wield (option): the gun in the other hand, drawn on the other side (its picture, shape
 	// and voxels, swapped in while it's drawn), and its flash when its round leaves
 	Surface *_offHandSprite = nullptr;

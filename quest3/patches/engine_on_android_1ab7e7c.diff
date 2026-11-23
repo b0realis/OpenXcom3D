@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..4d6612347
+index 000000000..d763e214b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,699 @@
+@@ -0,0 +1,698 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -385,10 +385,9 @@ index 000000000..4d6612347
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_METALLIC: "Metallic surfaces"
-+  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal. Sheen: it glints in the sun and under lamps. Mirror: with Reflections, it also mirrors faintly."
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and in True colour mirrors what is before it."
 +  STR_FPS_METALLIC_OFF: "Off"
-+  STR_FPS_METALLIC_SHEEN: "Sheen"
-+  STR_FPS_METALLIC_MIRROR: "Mirror"
++  STR_FPS_METALLIC_ON: "On"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -867,10 +866,10 @@ index 000000000..4d6612347
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..224659ea3
+index 000000000..44ec3773a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,699 @@
+@@ -0,0 +1,698 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1090,10 +1089,9 @@ index 000000000..224659ea3
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_METALLIC: "Metallic surfaces"
-+  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal. Sheen: it glints in the sun and under lamps. Mirror: with Reflections, it also mirrors faintly."
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and in True colour mirrors what is before it."
 +  STR_FPS_METALLIC_OFF: "Off"
-+  STR_FPS_METALLIC_SHEEN: "Sheen"
-+  STR_FPS_METALLIC_MIRROR: "Mirror"
++  STR_FPS_METALLIC_ON: "On"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
 +  STR_FPS_SURFACE_RELIEF_SUBTLE: "Subtle"
 +  STR_FPS_SURFACE_RELIEF_STRONG: "Strong"
@@ -19319,7 +19317,7 @@ zS5@`!3aHaZGtp45!Lxph$oiM+^CR%dVZh&K3*XTV@UN4gPwa!|{1W=Aba=<@`1p*z
 ih*j<5N1;eik|IX<zbW+g$UZrfr}=t{<U#TybpHoxAdk2J
 
 diff --git a/src/Battlescape/BattlescapeGame.cpp b/src/Battlescape/BattlescapeGame.cpp
-index 2648b2db3..3547a750a 100644
+index 2648b2db3..ec5a0551c 100644
 --- a/src/Battlescape/BattlescapeGame.cpp
 +++ b/src/Battlescape/BattlescapeGame.cpp
 @@ -59,6 +59,7 @@
@@ -19358,7 +19356,23 @@ index 2648b2db3..3547a750a 100644
  	{
  		getMap()->getCamera()->centerOnPosition(unit->getPosition());
  		if (status == STATUS_PANICKING)
-@@ -1791,8 +1804,16 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1670,6 +1683,7 @@ bool BattlescapeGame::cancelCurrentAction(bool bForce)
+ 				_currentAction.type = BA_NONE;
+ 				_currentAction.skillRules = nullptr;
+ 				_currentAction.result = ""; // TODO
++				FirstPerson::aimCalledOff(); // (OpenXcom3D: the hit log's note from the 3D view ends with the pick)
+ 				setupCursor();
+ 				_parentState->getGame()->getCursor()->setVisible(true);
+ 				return true;
+@@ -1700,6 +1714,7 @@ void BattlescapeGame::cancelAllActions()
+ 	_currentAction.type = BA_NONE;
+ 	_currentAction.skillRules = nullptr;
+ 	_currentAction.result = ""; // TODO
++	FirstPerson::aimCalledOff(); // (OpenXcom3D: the hit log's note from the 3D view ends with the pick)
+ 	setupCursor();
+ 	_parentState->getGame()->getCursor()->setVisible(true);
+ }
+@@ -1791,8 +1806,16 @@ void BattlescapeGame::primaryAction(Position pos)
  				getMap()->getWaypoints()->clear();
  				_parentState->getGame()->getCursor()->setVisible(false);
  				_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
@@ -19377,7 +19391,7 @@ index 2648b2db3..3547a750a 100644
  				_currentAction.sprayTargeting = false;
  				_currentAction.waypoints.clear();
  			}
-@@ -1926,8 +1947,16 @@ void BattlescapeGame::primaryAction(Position pos)
+@@ -1926,8 +1949,16 @@ void BattlescapeGame::primaryAction(Position pos)
  
  			_parentState->getGame()->getCursor()->setVisible(false);
  			_currentAction.cameraPosition = getMap()->getCamera()->getMapOffset();
@@ -24349,10 +24363,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..4e463d0a0
+index 000000000..5a76988f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2034 @@
+@@ -0,0 +1,2059 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -26226,6 +26240,31 @@ index 000000000..4e463d0a0
 +	FirstPersonMode::drawMapAkimbo(state, unit, leftHand, rightHand);
 +}
 +
++namespace
++{
++unsigned &aimCallOffCount()
++{
++	static unsigned count = 0;
++	return count;
++}
++}
++
++/**
++ * The game's aim was called off (see FirstPersonApi.h).
++ */
++void aimCalledOff()
++{
++	++aimCallOffCount();
++}
++
++/**
++ * How many times the game's aim was called off (see FirstPersonApi.h).
++ */
++unsigned aimCallOffs()
++{
++	return aimCallOffCount();
++}
++
 +/**
 + * Called by the game as it launches a shot clicked on the map: akimbo on the map (see
 + * FirstPersonMode::mapAkimbo).
@@ -26389,10 +26428,10 @@ index 000000000..4e463d0a0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..270268bf8
+index 000000000..531f68fdf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,518 @@
+@@ -0,0 +1,526 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26755,6 +26794,12 @@ index 000000000..270268bf8
 +/// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
 +/// the other hand's gun fires along.
 +void reactionAkimbo(BattlescapeState *state, BattleAction &action);
++/// The game's aim was called off (BattlescapeGame::cancelCurrentAction as it ends the aim, cancelAllActions): a weapon
++/// picked from its menu on the map is put down. The 3D view's shots go under the hit log's note of their weapon only
++/// while the pick it stands for lasts, as the map's do (see FirstPersonMode::noteWeaponInHitLog).
++void aimCalledOff();
++/// How many times the game's aim was called off so far.
++unsigned aimCallOffs();
 +/// Reaction fire came at this unit (TileEngine::checkReactionFire: a reactor shot at it or struck
 +/// it), in either view: as the game stops a walk on the map then, the 3D view stops the walk of the
 +/// soldier it looks through (the movement keys are ignored until they're all let go).
@@ -26855,6 +26900,8 @@ index 000000000..270268bf8
 +inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 +inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 +inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
++inline void aimCalledOff() { }
++inline unsigned aimCallOffs() { return 0; }
 +inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 +inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
@@ -28480,10 +28527,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..1473ada08
+index 000000000..b35c81bda
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3866 @@
+@@ -0,0 +1,3871 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28979,6 +29026,10 @@ index 000000000..1473ada08
 +	number("MetalBrightest", MetalBrightest);
 +	number("MetalRoom", MetalRoom);
 +	number("MetalMirror", MetalMirror);
++	number("MetalFlakeTilt", MetalFlakeTilt);
++	number("MetalFlake", MetalFlake);
++	number("MetalFlakeShine", MetalFlakeShine);
++	whole("MetalFlakeEvery", MetalFlakeEvery);
 +	number("DarkOverflowFrom", DarkOverflowFrom);
 +	number("DarkOverflowTo", DarkOverflowTo);
 +	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
@@ -30188,6 +30239,7 @@ index 000000000..1473ada08
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 +	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 +	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
++	Gl::Uniform1i(location("uWorldMirrors"), frame.worldMirrors ? 1 : 0);
 +	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 +	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 +	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
@@ -32352,10 +32404,10 @@ index 000000000..1473ada08
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..58bdc9374
+index 000000000..5401cd282
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,329 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32458,7 +32510,8 @@ index 000000000..58bdc9374
 +		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
 +		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 +		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
-+		bool reflections;                         // setting "Reflections": the sea mirrors the sky and what stands in it, window glass what is in front of it (in full colour)
++		bool reflections;                         // the mirrors are drawn (in full colour): those of the setting "Reflections", or a UFO's metal's
++		bool worldMirrors;                        // setting "Reflections": the sea and still water mirror the sky and what stands by them, window glass what is in front of it
 +		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 +		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
@@ -32898,10 +32951,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..86736157d
+index 000000000..0fe32297d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3385 @@
+@@ -0,0 +1,3399 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33355,7 +33408,8 @@ index 000000000..86736157d
 +uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the map (else only the sea's water scatters light)
 +uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 +#endif
-+uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
++uniform int uReflections;       // the mirrors are drawn (in full colour): those of "Reflections" and the metal's
++uniform int uWorldMirrors;      // setting "Reflections": the sea, still water and window glass mirror what stands by them
 +uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 +uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 +// (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
@@ -33379,7 +33433,7 @@ index 000000000..86736157d
 +const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 +const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
 +#ifdef METAL
-+uniform int uMetal;          // setting "Metallic surfaces": 1 a UFO's parts glint, 2 and mirror faintly (with the reflections)
++uniform int uMetal;          // setting "Metallic surfaces": a UFO's parts are metal: they glint, sparkle and mirror faintly (in full colour)
 +#endif
 +#ifdef RELIEF
 +// Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
@@ -34119,12 +34173,12 @@ index 000000000..86736157d
 +			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 +				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
 +#ifdef REFLECTIONS
-+			bool mirrors = uReflections != 0 && groundIsWater && uUnderwater == 0;
++			bool mirrors = uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0;
 +#else
 +			bool mirrors = false;
 +#endif
 +#ifdef MIRROR_FLAGS
-+			if (uReflections != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
++			if (uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
 +#endif
 +			if (uSmoothLight != 0 || mirrors)
 +			{
@@ -34782,6 +34836,19 @@ index 000000000..86736157d
 +		float lookedAlong = 1.0 - metalFacing;
 +		sheen += MetalRim * lookedAlong * lookedAlong * lookedAlong * (indoors ? 0.3 : 1.0) * (1.0 - 0.7 * uNight);
 +		sheen += MetalLamp * (lampLight + flare * 10.0) * pow(metalFacing, 6.0);
++		// The speckle: flakes in the metal, one voxel in MetalFlakeEvery, each turned a little its own way (MetalFlakeTilt),
++		// glint where the sun or a lamp catches them, on their own: as the eye moves they flash and go out.
++		ivec3 flakeVoxel = ivec3(floor(rayOrigin + rayDirection * hit.t - normal * 0.5));
++		uint flakeHash = hash2(flakeVoxel.x + flakeVoxel.z * 7919, flakeVoxel.y + flakeVoxel.z * 104729);
++		if (flakeHash % uint(MetalFlakeEvery) == 0u)
++		{
++			vec3 flakeTilt = vec3(float((flakeHash >> 8) & 255u), float((flakeHash >> 16) & 255u), float((flakeHash >> 24) & 255u)) / 127.5 - 1.0;
++			vec3 flakeNormal = normalize(metalNormal + flakeTilt * MetalFlakeTilt);
++			float flakeGlint = 0.0;
++			if (!indoors && day > 0.3) flakeGlint += pow(max(0.0, dot(flakeNormal, normalize(uSunDir + toEye))), MetalFlakeShine) * day * (1.0 - sunShadow / (3.0 * day));
++			flakeGlint += (lampLight + flare * 10.0) * pow(max(0.0, dot(flakeNormal, toEye)), MetalFlakeShine);
++			sheen += MetalFlake * flakeGlint;
++		}
 +		shade -= sheen;
 +	}
 +#endif
@@ -34829,16 +34896,16 @@ index 000000000..86736157d
 +		color = table(UnseenRow, color);
 +	}
 +#ifdef REFLECTIONS
-+	bool mirrors = uReflections != 0 && (onSea || onPond) && uUnderwater == 0;
++	bool mirrors = uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0;
 +#else
 +	bool mirrors = false;
 +#endif
 +#ifdef MIRROR_FLAGS
-+	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
++	if (uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 +#endif
 +#ifdef METAL
-+	// ("Mirror": the metal shows what its face mirrors, with the reflections)
-+	bool metalMirrors = metal && uMetal >= 2 && uReflections != 0 && !onPond;
++	// (the metal shows what its face mirrors, in full colour, "Reflections" on or off)
++	bool metalMirrors = metal && uReflections != 0 && !onPond;
 +#ifdef REFLECTIONS
 +	mirrors = mirrors || metalMirrors;
 +#endif
@@ -35135,10 +35202,10 @@ index 000000000..86736157d
 +		vec3 through = fullColor;
 +		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 +#ifdef MIRROR_FLAGS
-+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
++		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
 +#endif
 +#ifdef REFLECTIONS
-+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
++		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0)
 +		{
 +			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 +			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
@@ -37924,10 +37991,10 @@ index 000000000..1974311f2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..d5f65827d
+index 000000000..c1bf4e1ad
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3632 @@
+@@ -0,0 +1,3639 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -40349,6 +40416,13 @@ index 000000000..d5f65827d
 +		_game->getScreen()->resetDisplay();
 +	}
 +	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
++	// The hit log's pick ends with another soldier selected, or with its soldier on the move (on the map the aim is put
++	// down for either: see noteWeaponInHitLog).
++	if (_hitLogPick.open && (_save->getSelectedUnit() != _hitLogPick.unit
++		|| _hitLogPick.unit->getStatus() == STATUS_WALKING || _hitLogPick.unit->getStatus() == STATUS_FLYING))
++	{
++		endHitLogPick();
++	}
 +	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 +	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 +
@@ -41562,10 +41636,10 @@ index 000000000..d5f65827d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..1a986f7a6
+index 000000000..fcabbefcb
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1604 @@
+@@ -0,0 +1,1610 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42531,8 +42605,10 @@ index 000000000..1a986f7a6
 +	void fireTurnShot();
 +	/// Fires a shot or a throw at a tile through the game's own action, the other gun joining in (or not).
 +	void launchShot(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, Position targetTile, const Position &aimedVoxel, bool hitSomething, BattleItem *otherWeapon, BattleActionType otherMode);
-+	/// Notes the weapon about to be used in the game's hit log, as the map's weapon menu does.
-+	void noteWeaponInHitLog(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode);
++	/// Notes the weapon about to be used in the game's hit log where the map's weapon menu would: at a new pick.
++	void noteWeaponInHitLog(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, bool gamePick);
++	/// The pick the 3D view's shots stand for ends, as a map's pick does when it is put down.
++	void endHitLogPick() { _hitLogPick.open = false; }
 +	/// The fire modes the left mouse button can use with an item, in wheel order.
 +	std::vector<BattleActionType> fireModesFor(BattleUnit *unit, BattleItem *weapon) const;
 +	/// The mode an item starts on: a gun's snap shot where it has one, else the first (of the shots only, if asked).
@@ -42710,16 +42786,20 @@ index 000000000..1a986f7a6
 +	// a melee swing: wound up, struck in towards the crosshair, back; the view lunges with it
 +	Uint32 _swingStart = 0;
 +	bool _swingJolted = false; // the view has lunged for this swing already
-+	// What the hit log was last told a soldier uses from the 3D view (see noteWeaponInHitLog).
-+	struct HitLogNote
++	// The pick the 3D view's shots stand for, as the map's weapon menu makes one: its note heads the hit log, and the
++	// shots after it go under it while it lasts (see noteWeaponInHitLog).
++	struct HitLogPick
 +	{
 +		const BattleUnit *unit = nullptr;
 +		const BattleItem *weapon = nullptr;
 +		BattleActionType mode = BA_NONE;
 +		Position tile = Position(-1, -1, -1);
 +		int turn = -1;
++		unsigned callOffs = 0; // the game's aim called off so many times when it was made (FirstPerson::aimCallOffs)
++		bool open = false;
 +	};
-+	HitLogNote _hitLogNote;
++	HitLogPick _hitLogPick;
++	bool _pairTurnFiring = false; // akimbo in turn: the other gun's shot is being launched (it goes under the first gun's note)
 +	// dual wield (option): the gun in the other hand, drawn on the other side (its picture, shape
 +	// and voxels, swapped in while it's drawn), and its flash when its round leaves
 +	Surface *_offHandSprite = nullptr;
@@ -50369,10 +50449,10 @@ index 000000000..54d05d340
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a030031f7
+index 000000000..ff42cf7f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5642 @@
+@@ -0,0 +1,5667 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -51418,6 +51498,7 @@ index 000000000..a030031f7
 +		return;
 +	}
 +	_state->_battleGame->cancelCurrentAction();
++	endHitLogPick(); // (as going to the weapon's menu again on the map)
 +	updateFireMode(unit);
 +	const std::vector<BattleActionType> modes = fireModesFor(unit, activeWeapon(unit));
 +	if (modes.empty())
@@ -51449,6 +51530,7 @@ index 000000000..a030031f7
 +	if (std::find(modes.begin(), modes.end(), mode) != modes.end())
 +	{
 +		_state->_battleGame->cancelCurrentAction();
++		endHitLogPick(); // (as going to the weapon's menu again on the map)
 +		_fireMode = mode;
 +		_fireModeWeapon = activeWeapon(unit);
 +	}
@@ -51476,6 +51558,7 @@ index 000000000..a030031f7
 +		return;
 +	}
 +	_state->_battleGame->cancelCurrentAction();
++	endHitLogPick(); // (as going to the other hand's menu on the map)
 +	if (BattleUnit *unit = _save->getSelectedUnit())
 +	{
 +		const int current = std::max(0, activeHand(unit));
@@ -51542,6 +51625,7 @@ index 000000000..a030031f7
 +				return;
 +			}
 +			_state->_battleGame->cancelCurrentAction();
++			endHitLogPick(); // (as the inventory on the map)
 +			_save->getTileEngine()->itemMoveInventory(unit->getTile(), unit, item, hand, 0, 0);
 +			_state->updateSoldierInfo(false);
 +			const std::string name = _game->getSavedGame()->isResearched(item->getRules()->getRequirements())
@@ -52253,6 +52337,10 @@ index 000000000..a030031f7
 +		gameAction->type = BA_NONE;
 +	}
 +	battleGame->statePushBack(new FreeGrenadeFlight(battleGame, [this](Uint32 now) { return stepFreeGrenade(now); }));
++	// (in the hit log as the game's throw: the grenade's note and the arrow of a thing let fly; a throw ends the pick)
++	noteWeaponInHitLog(unit, grenade, BA_THROW, false);
++	_save->appendToHitLog(HITLOG_NEW_SHOT, unit->getFaction());
++	endHitLogPick();
 +	BattleAction throwAction;
 +	throwAction.type = BA_THROW;
 +	throwAction.actor = unit;
@@ -53411,7 +53499,7 @@ index 000000000..a030031f7
 +			action->targetVoxel = Position(-1, -1, -1);
 +			return;
 +		}
-+		if (timeUnitsEnough) noteWeaponInHitLog(unit, weapon, BA_HIT);
++		if (timeUnitsEnough) noteWeaponInHitLog(unit, weapon, BA_HIT, false);
 +		battleGame->handleNonTargetAction();
 +		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 +
@@ -53543,37 +53631,44 @@ index 000000000..a030031f7
 +}
 +
 +/**
-+ * Notes the weapon about to be used in the game's hit log (Ctrl+H; the turn diary, Ctrl+Alt+H). On the map the note
-+ * is written when a fire mode is picked from the weapon's menu (ActionMenuState), and shot after shot with that
-+ * choice goes under it; a shot or a blow from the 3D view has no menu, and its hits stood in the log under no weapon,
-+ * or under the one last picked on the map ("no note for what gun", a player, GitHub issue #251). So the same here:
-+ * a new note when the soldier, the weapon, the fire mode, the tile he stands on or the turn is another than at the
-+ * last one, or the log no longer begins with this weapon (a pick on the map, reaction fire, a new turn in between);
-+ * else the shots go on under the note there is.
++ * Notes the weapon about to be used in the game's hit log (Ctrl+H; the turn's diary, Ctrl+Alt+H), so that the log reads
++ * as it does for the same actions on the map (the owner: "Hit log scrutinize and compare to iso or game without 3d! It
++ * should behave the same"). On the map the note is written when a use is picked from the weapon's menu
++ * (ActionMenuState): for a shot, a throw or a psi attack whatever the time units, then the clicks fire under it while
++ * the aim lasts (the game keeps aiming after a shot, not after a throw or a launch, and the player puts it down with the
++ * right button, by selecting another soldier, opening the inventory, going to a weapon's menu again); a blow is no aim
++ * and every one is picked anew. A shot from the 3D view stands for a pick and its click, or for a click while that pick
++ * lasts: it lasts until the game's aim is called off (counted where the game does it, FirstPerson::aimCallOffs: after a
++ * throw or a launch, the map's own buttons), the soldier, the weapon or the fire mode is another (the mode or hand
++ * switched: endHitLogPick), the soldier moves (think, and his tile here), or a turn ends; for a blow it never lasts.
++ * Made on the map (the item's menu, or the map's aim the 3D view hands psi and launches to, startMapAim), the pick is
++ * the game's own, and the 3D view's shot goes under its note.
 + * @param unit The soldier.
 + * @param weapon The weapon used.
-+ * @param mode The fire mode (a shot, a throw, a blow).
++ * @param mode The use (a shot, a throw, a blow, psi).
++ * @param gamePick The game's own aim with this soldier, weapon and use was on when the 3D view used it.
 + */
-+void FirstPersonMode::noteWeaponInHitLog(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode)
++void FirstPersonMode::noteWeaponInHitLog(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, bool gamePick)
 +{
 +	if (!unit || !weapon || Options::oxceDisableHitLog || _save->getSide() != FACTION_PLAYER)
 +	{
 +		return;
 +	}
-+	const std::string name = _state->tr(weapon->getRules()->getType());
-+	const bool same = _hitLogNote.unit == unit && _hitLogNote.weapon == weapon && _hitLogNote.mode == mode
-+		&& _hitLogNote.tile == unit->getPosition() && _hitLogNote.turn == _save->getTurn()
-+		&& _save->getHitLog()->getHitLogText().compare(0, name.size() + 2, name + "\n\n") == 0; // (the note as the log writes it)
-+	if (same)
++	HitLogPick &pick = _hitLogPick;
++	const bool lasts = mode != BA_HIT;
++	const bool same = pick.open && pick.unit == unit && pick.weapon == weapon && pick.mode == mode && pick.tile == unit->getPosition()
++		&& pick.turn == _save->getTurn() && pick.callOffs == FirstPerson::aimCallOffs();
++	if (!gamePick && !(lasts && same))
 +	{
-+		return;
++		_save->appendToHitLog(HITLOG_PLAYER_FIRING, FACTION_PLAYER, _state->tr(weapon->getRules()->getType()));
 +	}
-+	_hitLogNote.unit = unit;
-+	_hitLogNote.weapon = weapon;
-+	_hitLogNote.mode = mode;
-+	_hitLogNote.tile = unit->getPosition();
-+	_hitLogNote.turn = _save->getTurn();
-+	_save->appendToHitLog(HITLOG_PLAYER_FIRING, FACTION_PLAYER, name);
++	pick.unit = unit;
++	pick.weapon = weapon;
++	pick.mode = mode;
++	pick.tile = unit->getPosition();
++	pick.turn = _save->getTurn();
++	pick.callOffs = FirstPerson::aimCallOffs();
++	pick.open = lasts;
 +}
 +
 +/**
@@ -53594,6 +53689,8 @@ index 000000000..a030031f7
 +{
 +	BattlescapeGame *battleGame = _state->_battleGame;
 +	BattleAction *action = battleGame->getCurrentAction();
++	// (the game's own aim with this soldier, weapon and use on already: picked from the item's menu or on the map)
++	const bool gamePick = action->targeting && action->actor == unit && action->weapon == weapon && action->type == mode;
 +
 +	// An arcing shot or a throw at the open sky (a player, GitHub issues #72 and #91: it went for
 +	// a corner of a tile of air and burst in the open air): through the point of air under the
@@ -53710,11 +53807,11 @@ index 000000000..a030031f7
 +	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
 +	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
 +	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
-+	// (No note in the hit log for a shot the game refuses at once, for want of time units or of a round, the first two
-+	// things it checks: the shots before it stay under their weapon there.)
-+	if (action->haveTU() && (mode == BA_THROW || weapon->getAmmoForAction(mode) != nullptr))
++	// (The hit log's note of the weapon where the map's menu would write it; the other gun's shot of a pair in turn goes
++	// under the first gun's, as a pair's shots on the map go under the clicked gun's.)
++	if (!_pairTurnFiring)
 +	{
-+		noteWeaponInHitLog(unit, weapon, mode);
++		noteWeaponInHitLog(unit, weapon, mode, gamePick);
 +	}
 +	battleGame->primaryAction(targetTile);
 +	if (action->sprayTargeting)
@@ -53783,7 +53880,9 @@ index 000000000..a030031f7
 +		return;
 +	}
 +	_view->setNextShotFromOffHand(true);
++	_pairTurnFiring = true;
 +	launchShot(unit, shot.weapon, shot.mode, shot.targetTile, shot.aimedVoxel, shot.hitSomething, nullptr, BA_NONE);
++	_pairTurnFiring = false;
 +	if (_state->_battleGame->isBusy())
 +	{
 +		_turnShotFired = shot.weapon;
@@ -55599,6 +55698,12 @@ index 000000000..a030031f7
 +	action->targeting = true;
 +	action->updateTU();
 +	battleGame->setupCursor();
++	// (the hit log's note, as the menu writes it at this pick: a launch only with the time units and a missile for it)
++	if (mode != BA_LAUNCH || (action->haveTU() && weapon->getAmmoForAction(BA_LAUNCH)))
++	{
++		endHitLogPick();
++		noteWeaponInHitLog(unit, weapon, mode, false);
++	}
 +
 +	// Remember what's being aimed, switch to the isometric map at once, and say what to do.
 +	_mapAimPhase = MAPAIM_AIMING;
@@ -68151,10 +68256,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..fed054457
+index 000000000..d4f4034c7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,826 @@
+@@ -0,0 +1,827 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68359,10 +68464,11 @@ index 000000000..fed054457
 +	frame.allLightShadows = Options::fpsAllLightShadows;
 +	frame.ambientOcclusion = Options::fpsAmbientOcclusion;
 +	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
-+	frame.metal = view._ufos.empty() ? 0 : std::clamp(Options::fpsMetallic, 0, 2); // (only where there is a UFO)
++	frame.metal = view._ufos.empty() || Options::fpsMetallic <= 0 ? 0 : 2; // (only where there is a UFO; an older profile's Sheen, 1, is on too)
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror)
++	frame.worldMirrors = Options::fpsReflections;
++	frame.reflections = view._wantsTrueColor && ((Options::fpsReflections && (view._waterColors[0] != 0 || view._anyGlass)) || frame.metal >= 2); // (only where there is a sea, window glass or still water to mirror, or a UFO's metal)
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
@@ -73420,10 +73526,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..3e34f687c
+index 000000000..8dcdd7764
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,773 @@
+@@ -0,0 +1,777 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73590,7 +73696,11 @@ index 000000000..3e34f687c
 +/// MetalBrightest shades brighter than its drawing has it, in its own colour group, and no more than MetalRoom of the
 +/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Mirror" the hull shows what
 +/// its face mirrors, tinted by its own colour, MetalMirror of it at most (seen along the face; a third of that head on).
++/// And it is speckled (the owner: "Finish with speckle also"): one voxel in MetalFlakeEvery is a flake turned up to
++/// MetalFlakeTilt its own way, glinting MetalFlake shades where the sun or a lamp catches it, as tight as MetalFlakeShine.
 +const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.8f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
++const float MetalFlakeTilt = 0.35f, MetalFlake = 3.0f, MetalFlakeShine = 40.0f;
++const int MetalFlakeEvery = 5;
 +/// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
 +/// many can burn at once.
 +const float FlareLife = 60.0f, FlareReach = 150.0f;
@@ -105011,10 +105121,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..9290201da
+index 000000000..eca575458
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1192 @@
+@@ -0,0 +1,1191 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -105442,11 +105552,10 @@ index 000000000..9290201da
 +			static const char *const reliefNames[] = { "STR_FPS_SURFACE_RELIEF_OFF", "STR_FPS_SURFACE_RELIEF_SUBTLE", "STR_FPS_SURFACE_RELIEF_STRONG" };
 +			return std::string(tr(reliefNames[std::clamp(*option.asInt(), 0, 2)]));
 +		}
-+		// Metallic surfaces: a choice of three, shown by name.
++		// Metallic surfaces: off or on (an older profile's Sheen, 1, and Mirror, 2, are both on).
 +		if (option.id() == "fpsMetallic")
 +		{
-+			static const char *const metalNames[] = { "STR_FPS_METALLIC_OFF", "STR_FPS_METALLIC_SHEEN", "STR_FPS_METALLIC_MIRROR" };
-+			return std::string(tr(metalNames[std::clamp(*option.asInt(), 0, 2)]));
++			return std::string(tr(*option.asInt() > 0 ? "STR_FPS_METALLIC_ON" : "STR_FPS_METALLIC_OFF"));
 +		}
 +		// The renderer is a choice of two, shown by name.
 +		if (option.id() == "fpsRenderer")
@@ -105826,10 +105935,10 @@ index 000000000..9290201da
 +		{
 +			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 +		}
-+		// Metallic surfaces (off, sheen, mirror): round and round.
++		// Metallic surfaces (off, on): either button switches.
 +		else if (value == &Options::fpsMetallic)
 +		{
-+			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
++			*value = *value > 0 ? 0 : 1;
 +		}
 +		// The renderer (CPU, GPU): either button switches.
 +		else if (value == &Options::fpsRenderer)

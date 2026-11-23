@@ -360,6 +360,12 @@ void mapAkimbo(BattlescapeState *state, BattleAction &action);
 /// A reaction shot, as it's launched, in either view: with the soldier's akimbo marked on the map,
 /// the other hand's gun fires along.
 void reactionAkimbo(BattlescapeState *state, BattleAction &action);
+/// The game's aim was called off (BattlescapeGame::cancelCurrentAction as it ends the aim, cancelAllActions): a weapon
+/// picked from its menu on the map is put down. The 3D view's shots go under the hit log's note of their weapon only
+/// while the pick it stands for lasts, as the map's do (see FirstPersonMode::noteWeaponInHitLog).
+void aimCalledOff();
+/// How many times the game's aim was called off so far.
+unsigned aimCallOffs();
 /// Reaction fire came at this unit (TileEngine::checkReactionFire: a reactor shot at it or struck
 /// it), in either view: as the game stops a walk on the map then, the 3D view stops the walk of the
 /// soldier it looks through (the movement keys are ignored until they're all let go).
@@ -460,6 +466,8 @@ inline void drawMapAkimbo(BattlescapeState *, BattleUnit *, Surface *, Surface *
 inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
+inline void aimCalledOff() { }
+inline unsigned aimCallOffs() { return 0; }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }

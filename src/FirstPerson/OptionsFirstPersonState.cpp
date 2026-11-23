@@ -425,11 +425,10 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 			static const char *const reliefNames[] = { "STR_FPS_SURFACE_RELIEF_OFF", "STR_FPS_SURFACE_RELIEF_SUBTLE", "STR_FPS_SURFACE_RELIEF_STRONG" };
 			return std::string(tr(reliefNames[std::clamp(*option.asInt(), 0, 2)]));
 		}
-		// Metallic surfaces: a choice of three, shown by name.
+		// Metallic surfaces: off or on (an older profile's Sheen, 1, and Mirror, 2, are both on).
 		if (option.id() == "fpsMetallic")
 		{
-			static const char *const metalNames[] = { "STR_FPS_METALLIC_OFF", "STR_FPS_METALLIC_SHEEN", "STR_FPS_METALLIC_MIRROR" };
-			return std::string(tr(metalNames[std::clamp(*option.asInt(), 0, 2)]));
+			return std::string(tr(*option.asInt() > 0 ? "STR_FPS_METALLIC_ON" : "STR_FPS_METALLIC_OFF"));
 		}
 		// The renderer is a choice of two, shown by name.
 		if (option.id() == "fpsRenderer")
@@ -809,10 +808,10 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
-		// Metallic surfaces (off, sheen, mirror): round and round.
+		// Metallic surfaces (off, on): either button switches.
 		else if (value == &Options::fpsMetallic)
 		{
-			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+			*value = *value > 0 ? 0 : 1;
 		}
 		// The renderer (CPU, GPU): either button switches.
 		else if (value == &Options::fpsRenderer)

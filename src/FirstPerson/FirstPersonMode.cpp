@@ -2419,6 +2419,13 @@ void FirstPersonMode::think()
 		_game->getScreen()->resetDisplay();
 	}
 	relayoutIfNeeded(); // (the setting "HUD scale" or "3D resolution" changed, or the display)
+	// The hit log's pick ends with another soldier selected, or with its soldier on the move (on the map the aim is put
+	// down for either: see noteWeaponInHitLog).
+	if (_hitLogPick.open && (_save->getSelectedUnit() != _hitLogPick.unit
+		|| _hitLogPick.unit->getStatus() == STATUS_WALKING || _hitLogPick.unit->getStatus() == STATUS_FLYING))
+	{
+		endHitLogPick();
+	}
 	_view->setWantsTrueColor(Options::fpsTrueColor && Options::fpsRenderer == 1 && _canvasOnDisplay); // (shown only where the mode lays the view into the display)
 	const double elapsedSeconds = _lastFrameTick ? std::min<Uint32>(100, now - _lastFrameTick) / 1000.0 : 0.0;
 

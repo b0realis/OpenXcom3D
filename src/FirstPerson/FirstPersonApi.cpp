@@ -1871,6 +1871,31 @@ void drawMapAkimbo(BattlescapeState *state, BattleUnit *unit, Surface *leftHand,
 	FirstPersonMode::drawMapAkimbo(state, unit, leftHand, rightHand);
 }
 
+namespace
+{
+unsigned &aimCallOffCount()
+{
+	static unsigned count = 0;
+	return count;
+}
+}
+
+/**
+ * The game's aim was called off (see FirstPersonApi.h).
+ */
+void aimCalledOff()
+{
+	++aimCallOffCount();
+}
+
+/**
+ * How many times the game's aim was called off (see FirstPersonApi.h).
+ */
+unsigned aimCallOffs()
+{
+	return aimCallOffCount();
+}
+
 /**
  * Called by the game as it launches a shot clicked on the map: akimbo on the map (see
  * FirstPersonMode::mapAkimbo).

@@ -1043,6 +1043,7 @@ void FirstPersonMode::cycleFireMode(int step)
 		return;
 	}
 	_state->_battleGame->cancelCurrentAction();
+	endHitLogPick(); // (as going to the weapon's menu again on the map)
 	updateFireMode(unit);
 	const std::vector<BattleActionType> modes = fireModesFor(unit, activeWeapon(unit));
 	if (modes.empty())
@@ -1074,6 +1075,7 @@ void FirstPersonMode::selectFireMode(BattleActionType mode)
 	if (std::find(modes.begin(), modes.end(), mode) != modes.end())
 	{
 		_state->_battleGame->cancelCurrentAction();
+		endHitLogPick(); // (as going to the weapon's menu again on the map)
 		_fireMode = mode;
 		_fireModeWeapon = activeWeapon(unit);
 	}
@@ -1101,6 +1103,7 @@ void FirstPersonMode::switchHand()
 		return;
 	}
 	_state->_battleGame->cancelCurrentAction();
+	endHitLogPick(); // (as going to the other hand's menu on the map)
 	if (BattleUnit *unit = _save->getSelectedUnit())
 	{
 		const int current = std::max(0, activeHand(unit));
@@ -1167,6 +1170,7 @@ void FirstPersonMode::grabItemUnderfoot(Action *action)
 				return;
 			}
 			_state->_battleGame->cancelCurrentAction();
+			endHitLogPick(); // (as the inventory on the map)
 			_save->getTileEngine()->itemMoveInventory(unit->getTile(), unit, item, hand, 0, 0);
 			_state->updateSoldierInfo(false);
 			const std::string name = _game->getSavedGame()->isResearched(item->getRules()->getRequirements())
@@ -1878,6 +1882,10 @@ void FirstPersonMode::throwFreeGrenade(BattleUnit *unit, BattleItem *grenade, co
 		gameAction->type = BA_NONE;
 	}
 	battleGame->statePushBack(new FreeGrenadeFlight(battleGame, [this](Uint32 now) { return stepFreeGrenade(now); }));
+	// (in the hit log as the game's throw: the grenade's note and the arrow of a thing let fly; a throw ends the pick)
+	noteWeaponInHitLog(unit, grenade, BA_THROW, false);
+	_save->appendToHitLog(HITLOG_NEW_SHOT, unit->getFaction());
+	endHitLogPick();
 	BattleAction throwAction;
 	throwAction.type = BA_THROW;
 	throwAction.actor = unit;
@@ -3036,7 +3044,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 			action->targetVoxel = Position(-1, -1, -1);
 			return;
 		}
-		if (timeUnitsEnough) noteWeaponInHitLog(unit, weapon, BA_HIT);
+		if (timeUnitsEnough) noteWeaponInHitLog(unit, weapon, BA_HIT, false);
 		battleGame->handleNonTargetAction();
 		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 
@@ -3168,37 +3176,44 @@ BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, Bat
 }
 
 /**
- * Notes the weapon about to be used in the game's hit log (Ctrl+H; the turn diary, Ctrl+Alt+H). On the map the note
- * is written when a fire mode is picked from the weapon's menu (ActionMenuState), and shot after shot with that
- * choice goes under it; a shot or a blow from the 3D view has no menu, and its hits stood in the log under no weapon,
- * or under the one last picked on the map ("no note for what gun", a player, GitHub issue #251). So the same here:
- * a new note when the soldier, the weapon, the fire mode, the tile he stands on or the turn is another than at the
- * last one, or the log no longer begins with this weapon (a pick on the map, reaction fire, a new turn in between);
- * else the shots go on under the note there is.
+ * Notes the weapon about to be used in the game's hit log (Ctrl+H; the turn's diary, Ctrl+Alt+H), so that the log reads
+ * as it does for the same actions on the map (the owner: "Hit log scrutinize and compare to iso or game without 3d! It
+ * should behave the same"). On the map the note is written when a use is picked from the weapon's menu
+ * (ActionMenuState): for a shot, a throw or a psi attack whatever the time units, then the clicks fire under it while
+ * the aim lasts (the game keeps aiming after a shot, not after a throw or a launch, and the player puts it down with the
+ * right button, by selecting another soldier, opening the inventory, going to a weapon's menu again); a blow is no aim
+ * and every one is picked anew. A shot from the 3D view stands for a pick and its click, or for a click while that pick
+ * lasts: it lasts until the game's aim is called off (counted where the game does it, FirstPerson::aimCallOffs: after a
+ * throw or a launch, the map's own buttons), the soldier, the weapon or the fire mode is another (the mode or hand
+ * switched: endHitLogPick), the soldier moves (think, and his tile here), or a turn ends; for a blow it never lasts.
+ * Made on the map (the item's menu, or the map's aim the 3D view hands psi and launches to, startMapAim), the pick is
+ * the game's own, and the 3D view's shot goes under its note.
  * @param unit The soldier.
  * @param weapon The weapon used.
- * @param mode The fire mode (a shot, a throw, a blow).
+ * @param mode The use (a shot, a throw, a blow, psi).
+ * @param gamePick The game's own aim with this soldier, weapon and use was on when the 3D view used it.
  */
-void FirstPersonMode::noteWeaponInHitLog(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode)
+void FirstPersonMode::noteWeaponInHitLog(BattleUnit *unit, BattleItem *weapon, BattleActionType mode, bool gamePick)
 {
 	if (!unit || !weapon || Options::oxceDisableHitLog || _save->getSide() != FACTION_PLAYER)
 	{
 		return;
 	}
-	const std::string name = _state->tr(weapon->getRules()->getType());
-	const bool same = _hitLogNote.unit == unit && _hitLogNote.weapon == weapon && _hitLogNote.mode == mode
-		&& _hitLogNote.tile == unit->getPosition() && _hitLogNote.turn == _save->getTurn()
-		&& _save->getHitLog()->getHitLogText().compare(0, name.size() + 2, name + "\n\n") == 0; // (the note as the log writes it)
-	if (same)
+	HitLogPick &pick = _hitLogPick;
+	const bool lasts = mode != BA_HIT;
+	const bool same = pick.open && pick.unit == unit && pick.weapon == weapon && pick.mode == mode && pick.tile == unit->getPosition()
+		&& pick.turn == _save->getTurn() && pick.callOffs == FirstPerson::aimCallOffs();
+	if (!gamePick && !(lasts && same))
 	{
-		return;
+		_save->appendToHitLog(HITLOG_PLAYER_FIRING, FACTION_PLAYER, _state->tr(weapon->getRules()->getType()));
 	}
-	_hitLogNote.unit = unit;
-	_hitLogNote.weapon = weapon;
-	_hitLogNote.mode = mode;
-	_hitLogNote.tile = unit->getPosition();
-	_hitLogNote.turn = _save->getTurn();
-	_save->appendToHitLog(HITLOG_PLAYER_FIRING, FACTION_PLAYER, name);
+	pick.unit = unit;
+	pick.weapon = weapon;
+	pick.mode = mode;
+	pick.tile = unit->getPosition();
+	pick.turn = _save->getTurn();
+	pick.callOffs = FirstPerson::aimCallOffs();
+	pick.open = lasts;
 }
 
 /**
@@ -3219,6 +3234,8 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 {
 	BattlescapeGame *battleGame = _state->_battleGame;
 	BattleAction *action = battleGame->getCurrentAction();
+	// (the game's own aim with this soldier, weapon and use on already: picked from the item's menu or on the map)
+	const bool gamePick = action->targeting && action->actor == unit && action->weapon == weapon && action->type == mode;
 
 	// An arcing shot or a throw at the open sky (a player, GitHub issues #72 and #91: it went for
 	// a corner of a tile of air and burst in the open air): through the point of air under the
@@ -3335,11 +3352,11 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
 	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
 	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
-	// (No note in the hit log for a shot the game refuses at once, for want of time units or of a round, the first two
-	// things it checks: the shots before it stay under their weapon there.)
-	if (action->haveTU() && (mode == BA_THROW || weapon->getAmmoForAction(mode) != nullptr))
+	// (The hit log's note of the weapon where the map's menu would write it; the other gun's shot of a pair in turn goes
+	// under the first gun's, as a pair's shots on the map go under the clicked gun's.)
+	if (!_pairTurnFiring)
 	{
-		noteWeaponInHitLog(unit, weapon, mode);
+		noteWeaponInHitLog(unit, weapon, mode, gamePick);
 	}
 	battleGame->primaryAction(targetTile);
 	if (action->sprayTargeting)
@@ -3408,7 +3425,9 @@ void FirstPersonMode::fireTurnShot()
 		return;
 	}
 	_view->setNextShotFromOffHand(true);
+	_pairTurnFiring = true;
 	launchShot(unit, shot.weapon, shot.mode, shot.targetTile, shot.aimedVoxel, shot.hitSomething, nullptr, BA_NONE);
+	_pairTurnFiring = false;
 	if (_state->_battleGame->isBusy())
 	{
 		_turnShotFired = shot.weapon;
@@ -5224,6 +5243,12 @@ void FirstPersonMode::startMapAim(BattleUnit *unit, BattleItem *weapon, BattleAc
 	action->targeting = true;
 	action->updateTU();
 	battleGame->setupCursor();
+	// (the hit log's note, as the menu writes it at this pick: a launch only with the time units and a missile for it)
+	if (mode != BA_LAUNCH || (action->haveTU() && weapon->getAmmoForAction(BA_LAUNCH)))
+	{
+		endHitLogPick();
+		noteWeaponInHitLog(unit, weapon, mode, false);
+	}
 
 	// Remember what's being aimed, switch to the isometric map at once, and say what to do.
 	_mapAimPhase = MAPAIM_AIMING;
