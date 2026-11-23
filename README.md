@@ -48,11 +48,11 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 
 - **The 3D VIEW settings redesigned:** a first page of eight rows, Controls, and Advanced by section; **Gameplay** in six presets (FAITHFUL, Extended+, TACTICUS, XMbl, FullQoL, FPS), **Graphics detail** Low, Medium or High, and **Recommended game options** on a click.
 - **Tactical map:** the map opened from the 3D view fills the screen, with soldiers' numbers, the enemies' classes and a view cone on every dot.
-- **On the graphics card:** *Surface relief* (walls and hulls catch the light by what is drawn on them), *Metallic surfaces* (a UFO's hull glints and mirrors), reflections on window glass and still water, and no freeze on a battle's first 3D frame.
+- **On the graphics card:** *Surface relief* (walls and hulls catch the light by what is drawn on them), *Metallic surfaces* (a UFO's hull glints, sparkles and mirrors), reflections on window glass and still water, and no freeze on a battle's first 3D frame.
 - **Flashlight** as a beam or a far light; the flashlight, flares, zoom (now up to 8 times) and night vision are always there.
 - **Emergency climb** (a key) for units stuck in a pit or a fenced yard, **a right click opens the door you point at**, **facing icons**, and **V** for the map / 3D switch.
 - **Fixed:** fire in great amounts no longer costs frames; every animated tile part moves in 3D; a unit killed in the air plummets; a melee blow at a wall no longer turns the soldier away; swamp water has no pits; smoke through night vision has no neon rings.
-- **Hot-fixed 2026-11-23:** voxel units hold their weapons properly across XPiratez's units, and the gals, spiders, turrets and frogs are shaped right; a shot at a wall beside you no longer spins the soldier round; the hit log names the weapon fired in 3D; glass walls are flat, scorch marks whole.
+- **Hot-fixed 2026-11-23:** voxel units hold their weapons properly across XPiratez's units and soldiers, and the gals, spiders, turrets and frogs are shaped right; the units stand in every mirror; the hit log reads in 3D as on the map, and a *Detailed hit log* names whom each hit hurt; a shot at a wall beside you no longer spins the soldier round; glass walls are flat, scorch marks whole.
 
 ## New in 1.14
 
