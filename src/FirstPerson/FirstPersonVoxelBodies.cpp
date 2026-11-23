@@ -2503,11 +2503,16 @@ int shouldersRow(const PartFrames &torso)
 /// The head and torso: each row of the frame a slice as wide as the frontal frame's row and as deep as the side
 /// frame's (bits beside the main run small round slices); with a chin (bodyTop >= 0), the chin's rows a shallow
 /// piece at the front of the face and a thin neck behind them from the head's underside to the torso.
-/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the shoulders (from the first
-/// row nearly as wide as the widest) a slice is at most that many times as deep as it is wide, cut at the front.
-/// XPiratez's gals' torsos are drawn from the side with the hips up to 10 pixels deep on 8 wide: that part of the
-/// drawing lies under the arm, hand on hip, and is never seen; as a body's depth it was a belly sticking out past
-/// the chest (a player, GitHub issue #184: "Gals got fat").
+/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the head (from the first row
+/// nearly as wide as the widest, and no higher than the chin where one is found) a slice is at most that many times as
+/// deep as it is wide, cut at the back: its front stays where the side drawing has it.
+/// XPiratez's gals' torsos are drawn from the side up to 10 pixels deep on 8 wide, most of it behind the body's
+/// middle (hair, a back plate, what lies under the arm and is never seen): as a body's depth it was a trunk deeper
+/// than wide (a player, GitHub issue #184: "Gals got fat"). The limit was first cut at the front, and took the chest
+/// off: the trunk stood behind the hips, which stuck out under it as a belly, and what was left behind looked like
+/// "large back muscles" (GitHub issue #248). The owner, of the gals: "bulge in the belly is the problem. Make
+/// emphasized back side and breasts and no bulge at the lower belly". Cut at the back, the chest is as far forward
+/// as drawn, ahead of the hips, and the seat, which the legs' drawings give, stands out behind the back.
 void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck, float depthMost)
 {
 	std::vector<float> torsoAhead;
@@ -2521,7 +2526,7 @@ void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cell
 		float back, fore;
 		sideExtent(side.front(), side.back(), RightSide, back, fore);
 		if (bodyTop >= 0 && row >= bodyTop - ChinRows && row < bodyTop) back = std::max(back, fore - ChinDepth);
-		if (depthMost > 0.0f && row >= shoulders) fore = std::min(fore, back + depthMost * 2.0f * halfRight);
+		if (depthMost > 0.0f && row >= std::max(shoulders, bodyTop)) back = std::max(back, fore - depthMost * 2.0f * halfRight);
 		if (bodyTop >= 0 && row >= bodyTop) torsoAhead.push_back((back + fore) * 0.5f);
 		fillSlice(cells, row, centreRight, halfRight, (back + fore) * 0.5f, (fore - back) * 0.5f);
 		for (const auto &run : front)
@@ -5777,7 +5782,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
 	// floating on top of legs"). The rows between the torso's fullest row near its foot and the legs' fullest near
 	// their top are filled out: the torso's section there, as far across as the legs reach.
-	if (!routine.whole && !routine.big)
+	// (Not a body the unit table names "waist: drawn": XPiratez's gals' trunks don't end in a point but in a waist that
+	// draws in under the chest, row by row, to hips narrower still; the fullest row near the trunk's foot is the one
+	// under the bust, and its section carried down to the hips was a block from chest to crotch: the same belly, see
+	// headAndTorso.)
+	if (!routine.whole && !routine.big && !(routine.traits & 65536))
 	{
 		std::vector<int> torsoCells(GridUp, 0), legCells(GridUp, 0);
 		for (int across = 0; across < GridAcross; ++across)

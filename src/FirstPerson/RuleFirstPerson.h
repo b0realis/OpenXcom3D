@@ -112,8 +112,8 @@ public:
 	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
 	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
 	/// general rules alone: what is done for one kind of unit touches no other.
-	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep, in hundredths of their width (0:
-	/// no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
+	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep below the head, in hundredths of their
+	/// width, cut at the back (0: no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
 	/// along the front or back drawing's slant (0); -1 for nothing said.
 	struct UnitLook
 	{
@@ -138,6 +138,7 @@ public:
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
 		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
+		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -367,7 +368,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -402,6 +403,7 @@ public:
 				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
 				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
+				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -521,6 +523,7 @@ public:
 			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
 			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
+			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 		}
 		return look;
 	}

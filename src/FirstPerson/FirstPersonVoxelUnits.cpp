@@ -790,6 +790,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 beat[2] = { 'p', 1 };
 		hashBytes(hash, beat, 2);
 	}
+	// (a waist as drawn, by the unit table: only said of a unit hashed in, as above)
+	if (look.waistDrawn == 1)
+	{
+		const Uint8 waist[2] = { 'w', 1 };
+		hashBytes(hash, waist, 2);
+	}
 	// (set down on the floor, by the unit table: only said of a unit hashed in, as above)
 	if (look.onFloor == 1)
 	{
@@ -859,6 +865,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.smoothBack == 1) job->traits |= 16384;
 		// (a small turret, by the unit table: see makeModel)
 		if (look.smallTurret == 1 && !unit->getArmor()->allowsMoving()) job->traits |= 32768;
+		// (a waist as drawn, by the unit table: see makeModel)
+		if (look.waistDrawn == 1) job->traits |= 65536;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

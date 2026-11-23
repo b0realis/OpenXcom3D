@@ -298,20 +298,19 @@ firstPerson:
     # the spiders (XPiratez's and The X-Com Files' giant spiders and their queens): a body on eight thin legs
     - names: [SPIDER, "*SPIDER"]
       legs: 8
-    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
-    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
-    # on the crown, painted along the slant)
+    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side up to ten
+    # pixels deep on eight wide, most of it behind the body's middle (hair, a back plate, what lies under the arm): the
+    # trunk is no deeper than 80 in 100 of its width below the head, trimmed at the back, so the chest stays as far
+    # forward as drawn and the seat stands out behind the back; the waist stays as drawn, drawing in under the chest (not
+    # filled out to the trunk's fullest row, which was a block from chest to crotch: a belly); and their faces are high
+    # on the head (skin on the crown, painted along the slant)
     # (and no hollow across the back under a head of hair standing out behind the neck)
     - names: [PIR]
       torsoDepth: 80
+      waist: drawn
       top: back
       sculpt: frontal
       back: smooth
-    # XPiratez's doll (the Aurora doll's sheet): a gal's sheet with hair down to the waist. The depth limit above is
-    # measured from the back, which is the hair there, and took the chest off instead of the hips: a flat chest over
-    # a belly, behind it a back as deep as the hair. Its hips are drawn no deeper than its waist: no limit
-    - names: [PIR_1111.PCK]
-      torsoDepth: 0
     # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
     # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
     # drawings

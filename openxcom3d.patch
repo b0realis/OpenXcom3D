@@ -1534,10 +1534,10 @@ index 000000000..1f2d96bbc
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..c929b0643
+index 000000000..b6263cf07
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,456 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1838,20 +1838,19 @@ index 000000000..c929b0643
 +    # the spiders (XPiratez's and The X-Com Files' giant spiders and their queens): a body on eight thin legs
 +    - names: [SPIDER, "*SPIDER"]
 +      legs: 8
-+    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side with the hips deeper
-+    # than the body is wide, under the arm where it is never seen (a belly, in 3D); and their faces high on the head (skin
-+    # on the crown, painted along the slant)
++    # XPiratez's gals and peasants (armors STR_PIR_..., sheets PIR_n): their torsos are drawn from the side up to ten
++    # pixels deep on eight wide, most of it behind the body's middle (hair, a back plate, what lies under the arm): the
++    # trunk is no deeper than 80 in 100 of its width below the head, trimmed at the back, so the chest stays as far
++    # forward as drawn and the seat stands out behind the back; the waist stays as drawn, drawing in under the chest (not
++    # filled out to the trunk's fullest row, which was a block from chest to crotch: a belly); and their faces are high
++    # on the head (skin on the crown, painted along the slant)
 +    # (and no hollow across the back under a head of hair standing out behind the neck)
 +    - names: [PIR]
 +      torsoDepth: 80
++      waist: drawn
 +      top: back
 +      sculpt: frontal
 +      back: smooth
-+    # XPiratez's doll (the Aurora doll's sheet): a gal's sheet with hair down to the waist. The depth limit above is
-+    # measured from the back, which is the hair there, and took the chest off instead of the hips: a flat chest over
-+    # a belly, behind it a back as deep as the hair. Its hips are drawn no deeper than its waist: no limit
-+    - names: [PIR_1111.PCK]
-+      torsoDepth: 0
 +    # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
 +    # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
 +    # drawings
@@ -89632,10 +89631,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..940b70e72
+index 000000000..ac66ae6f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6525 @@
+@@ -0,0 +1,6534 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -92141,11 +92140,16 @@ index 000000000..940b70e72
 +/// The head and torso: each row of the frame a slice as wide as the frontal frame's row and as deep as the side
 +/// frame's (bits beside the main run small round slices); with a chin (bodyTop >= 0), the chin's rows a shallow
 +/// piece at the front of the face and a thin neck behind them from the head's underside to the torso.
-+/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the shoulders (from the first
-+/// row nearly as wide as the widest) a slice is at most that many times as deep as it is wide, cut at the front.
-+/// XPiratez's gals' torsos are drawn from the side with the hips up to 10 pixels deep on 8 wide: that part of the
-+/// drawing lies under the arm, hand on hip, and is never seen; as a body's depth it was a belly sticking out past
-+/// the chest (a player, GitHub issue #184: "Gals got fat").
++/// DepthMost (the unit table's torsoDepth, for the units it names; 0: no limit): below the head (from the first row
++/// nearly as wide as the widest, and no higher than the chin where one is found) a slice is at most that many times as
++/// deep as it is wide, cut at the back: its front stays where the side drawing has it.
++/// XPiratez's gals' torsos are drawn from the side up to 10 pixels deep on 8 wide, most of it behind the body's
++/// middle (hair, a back plate, what lies under the arm and is never seen): as a body's depth it was a trunk deeper
++/// than wide (a player, GitHub issue #184: "Gals got fat"). The limit was first cut at the front, and took the chest
++/// off: the trunk stood behind the hips, which stuck out under it as a belly, and what was left behind looked like
++/// "large back muscles" (GitHub issue #248). The owner, of the gals: "bulge in the belly is the problem. Make
++/// emphasized back side and breasts and no bulge at the lower belly". Cut at the back, the chest is as far forward
++/// as drawn, ahead of the hips, and the seat, which the legs' drawings give, stands out behind the back.
 +void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cells, std::vector<Uint8> &neck, float depthMost)
 +{
 +	std::vector<float> torsoAhead;
@@ -92159,7 +92163,7 @@ index 000000000..940b70e72
 +		float back, fore;
 +		sideExtent(side.front(), side.back(), RightSide, back, fore);
 +		if (bodyTop >= 0 && row >= bodyTop - ChinRows && row < bodyTop) back = std::max(back, fore - ChinDepth);
-+		if (depthMost > 0.0f && row >= shoulders) fore = std::min(fore, back + depthMost * 2.0f * halfRight);
++		if (depthMost > 0.0f && row >= std::max(shoulders, bodyTop)) back = std::max(back, fore - depthMost * 2.0f * halfRight);
 +		if (bodyTop >= 0 && row >= bodyTop) torsoAhead.push_back((back + fore) * 0.5f);
 +		fillSlice(cells, row, centreRight, halfRight, (back + fore) * 0.5f, (fore - back) * 0.5f);
 +		for (const auto &run : front)
@@ -95415,7 +95419,11 @@ index 000000000..940b70e72
 +	// the body pinched to a point (the owner on a Sectoid: "legs and torso join is too small. It looks like body is
 +	// floating on top of legs"). The rows between the torso's fullest row near its foot and the legs' fullest near
 +	// their top are filled out: the torso's section there, as far across as the legs reach.
-+	if (!routine.whole && !routine.big)
++	// (Not a body the unit table names "waist: drawn": XPiratez's gals' trunks don't end in a point but in a waist that
++	// draws in under the chest, row by row, to hips narrower still; the fullest row near the trunk's foot is the one
++	// under the bust, and its section carried down to the hips was a block from chest to crotch: the same belly, see
++	// headAndTorso.)
++	if (!routine.whole && !routine.big && !(routine.traits & 65536))
 +	{
 +		std::vector<int> torsoCells(GridUp, 0), legCells(GridUp, 0);
 +		for (int across = 0; across < GridAcross; ++across)
@@ -96991,10 +96999,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..02d012b9e
+index 000000000..fe33340b3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1390 @@
+@@ -0,0 +1,1398 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -97787,6 +97795,12 @@ index 000000000..02d012b9e
 +		const Uint8 beat[2] = { 'p', 1 };
 +		hashBytes(hash, beat, 2);
 +	}
++	// (a waist as drawn, by the unit table: only said of a unit hashed in, as above)
++	if (look.waistDrawn == 1)
++	{
++		const Uint8 waist[2] = { 'w', 1 };
++		hashBytes(hash, waist, 2);
++	}
 +	// (set down on the floor, by the unit table: only said of a unit hashed in, as above)
 +	if (look.onFloor == 1)
 +	{
@@ -97856,6 +97870,8 @@ index 000000000..02d012b9e
 +		if (look.smoothBack == 1) job->traits |= 16384;
 +		// (a small turret, by the unit table: see makeModel)
 +		if (look.smallTurret == 1 && !unit->getArmor()->allowsMoving()) job->traits |= 32768;
++		// (a waist as drawn, by the unit table: see makeModel)
++		if (look.waistDrawn == 1) job->traits |= 65536;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -105864,10 +105880,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..3117985d2
+index 000000000..2b24f7634
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,590 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -105982,8 +105998,8 @@ index 000000000..3117985d2
 +	/// four legs (1), or as ever (0; -1: nothing said, the same); and how much of the body shows, in hundredths (100
 +	/// all of it; less: see-through, a ghost), or -1 for nothing said. A unit the table doesn't name is made by the
 +	/// general rules alone: what is done for one kind of unit touches no other.
-+	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep, in hundredths of their width (0:
-+	/// no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
++	/// And for a named unit's body: torsoDepth, the most its torso's slices are deep below the head, in hundredths of their
++	/// width, cut at the back (0: no limit); backTop, whether what faces up is painted by the back drawing (1: the top of a head is hair) or as ever,
 +	/// along the front or back drawing's slant (0); -1 for nothing said.
 +	struct UnitLook
 +	{
@@ -106008,6 +106024,7 @@ index 000000000..3117985d2
 +		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 +		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
 +		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
++		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -106237,7 +106254,7 @@ index 000000000..3117985d2
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist;
 +				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -106272,6 +106289,7 @@ index 000000000..3117985d2
 +				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
 +				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 +				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
++				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
 +				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -106391,6 +106409,7 @@ index 000000000..3117985d2
 +			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 +			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
 +			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
++			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 +		}
 +		return look;
 +	}
