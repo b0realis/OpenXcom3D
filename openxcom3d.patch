@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..35245be99
+index 000000000..9d63b493f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,698 @@
@@ -168,7 +168,7 @@ index 000000000..35245be99
 +  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
-+  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution, pixels twice as big, in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
 +  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
@@ -341,13 +341,13 @@ index 000000000..35245be99
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it. Units too."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. Water mirrors the sky and what stands by it, glass what is before it, UFO metal its surroundings. Units too."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_METALLIC: "Metallic surfaces"
-+  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and in True colour mirrors what is before it."
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and with Reflections mirrors what is before it."
 +  STR_FPS_METALLIC_OFF: "Off"
 +  STR_FPS_METALLIC_ON: "On"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
@@ -828,7 +828,7 @@ index 000000000..35245be99
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c3a427402
+index 000000000..73bf12f8c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,698 @@
@@ -872,7 +872,7 @@ index 000000000..c3a427402
 +  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
-+  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution, pixels twice as big, in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
 +  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
@@ -1045,13 +1045,13 @@ index 000000000..c3a427402
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it. Units too."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. Water mirrors the sky and what stands by it, glass what is before it, UFO metal its surroundings. Units too."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
 +  STR_FPS_SURFACE_RELIEF_DESC: "Renderer GPU only. Walls, floors and hulls show a little relief, read from their own drawings; lights bring it out. {ALT}Takes some time!"
 +  STR_FPS_METALLIC: "Metallic surfaces"
-+  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and in True colour mirrors what is before it."
++  STR_FPS_METALLIC_DESC: "Renderer GPU only. A UFO's hull is metal: it glints and sparkles in the sun and under lamps, and with Reflections mirrors what is before it."
 +  STR_FPS_METALLIC_OFF: "Off"
 +  STR_FPS_METALLIC_ON: "On"
 +  STR_FPS_SURFACE_RELIEF_OFF: "Off"
@@ -24286,10 +24286,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..a6214c5f1
+index 000000000..5a76988f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2067 @@
+@@ -0,0 +1,2059 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24779,8 +24779,8 @@ index 000000000..a6214c5f1
 +{
 +
 +/// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
-+/// settlePresets); 2 since Graphics detail Low on the card draws pixels twice as big (graphicsSwitches).
-+constexpr int PresetTables = 2;
++/// settlePresets).
++constexpr int PresetTables = 1;
 +
 +/// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
 +constexpr int Kept = -9999;
@@ -24916,10 +24916,9 @@ index 000000000..a6214c5f1
 + * The settings "Graphics detail" sets (the first page of the 3D VIEW tab): how fine the 3D
 + * world is drawn and what the graphics card adds, at Low, Medium and High. What a level means
 + * goes by the setting "Renderer", so there are two tables. A ray colours one pixel at every
-+ * level but Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
++ * level but the CPU's Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
 + * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
-+ * HUD's resolution in blocks of two (the owner: "Yes", asked whether the card's Low should have
-+ * Pixel size 2 as the CPU's has), Medium the display's own resolution with "Render scale" on
++ * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
 + * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
 + * shadows, ambient occlusion and the lights' effects. Supersampling and Surface relief are Off
 + * at every level.
@@ -24948,7 +24947,7 @@ index 000000000..a6214c5f1
 +	static const std::vector<PresetSwitch> onCard = {
 +		//                                                       Low   Med   High
 +		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    2,    2 } },
-+		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 2,    1,    1 }, { 1,    1,    1 } }, // (Low 2: the owner, 2026-11-23)
++		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 1,    1,    1 } },
 +		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  0,    0 } },
 +		{ "fpsShadows",         &fpsShadows,         nullptr,  { 1,    1,    1 } },
 +		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
@@ -25194,15 +25193,13 @@ index 000000000..a6214c5f1
 + */
 +void settlePresets()
 +{
-+	// (Once for each change of the tables a profile hasn't seen: the Gameplay presets' of tables 1, Graphics detail's
-+	// of tables 2; Graphics detail by the table of the renderer the profile has.)
-+	auto carryOver = [](PresetGroup group, const char *name)
++	if (Options::fpsPresetTables < PresetTables)
 +	{
-+		const Presets &presets = presetsOf(group);
-+		for (int preset = 0; preset < presets.count; ++preset)
++		const Presets &gameplay = presetsOf(PRESET_GAMEPLAY);
++		for (int preset = 0; preset < gameplay.count; ++preset)
 +		{
 +			bool all = true, changes = false;
-+			for (const PresetSwitch &presetSwitch : presets.switches())
++			for (const PresetSwitch &presetSwitch : gameplay.switches())
 +			{
 +				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
 +				if (presetSwitch.onChoice) continue;
@@ -25213,19 +25210,14 @@ index 000000000..a6214c5f1
 +			if (!all) continue;
 +			if (changes)
 +			{
-+				for (const PresetSwitch &presetSwitch : presets.switches())
++				for (const PresetSwitch &presetSwitch : gameplay.switches())
 +				{
 +					if (!presetSwitch.onChoice && presetSwitch.values[preset] != Kept) setSwitch(presetSwitch, presetSwitch.values[preset]);
 +				}
-+				Log(LOG_INFO) << "OpenXcom3D: the " << name << " preset " << preset << " as it is now (its settings were as it had them before)";
++				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
 +			}
 +			break;
 +		}
-+	};
-+	if (Options::fpsPresetTables < PresetTables)
-+	{
-+		if (Options::fpsPresetTables < 1) carryOver(PRESET_GAMEPLAY, "Gameplay");
-+		if (Options::fpsPresetTables < 2) carryOver(PRESET_GRAPHICS, "Graphics detail");
 +		Options::fpsPresetTables = PresetTables;
 +	}
 +	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
@@ -28458,10 +28450,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..b35c81bda
+index 000000000..b18c460dd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3871 @@
+@@ -0,0 +1,3870 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -30170,7 +30162,6 @@ index 000000000..b35c81bda
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 +	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 +	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
-+	Gl::Uniform1i(location("uWorldMirrors"), frame.worldMirrors ? 1 : 0);
 +	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 +	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 +	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
@@ -32335,10 +32326,10 @@ index 000000000..b35c81bda
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..5401cd282
+index 000000000..28806992a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,328 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32441,8 +32432,7 @@ index 000000000..5401cd282
 +		float colorLights[16][8];                 // setting "Coloured lights": each light's place (voxels), its reach, its colour (0..1 each) and strength
 +		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 +		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
-+		bool reflections;                         // the mirrors are drawn (in full colour): those of the setting "Reflections", or a UFO's metal's
-+		bool worldMirrors;                        // setting "Reflections": the sea and still water mirror the sky and what stands by them, window glass what is in front of it
++		bool reflections;                         // setting "Reflections" (in full colour): the sea and still water mirror the sky and what stands by them, window glass what is in front of it, a UFO's metal (setting "Metallic surfaces") its surroundings
 +		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 +		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
@@ -32882,10 +32872,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..0fe32297d
+index 000000000..59dcb0e29
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3399 @@
+@@ -0,0 +1,3398 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33339,8 +33329,7 @@ index 000000000..0fe32297d
 +uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the map (else only the sea's water scatters light)
 +uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 +#endif
-+uniform int uReflections;       // the mirrors are drawn (in full colour): those of "Reflections" and the metal's
-+uniform int uWorldMirrors;      // setting "Reflections": the sea, still water and window glass mirror what stands by them
++uniform int uReflections;       // setting "Reflections" (in full colour): the sea, still water and window glass mirror what stands by them, and a UFO's metal its surroundings
 +uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 +uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 +// (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
@@ -33364,7 +33353,7 @@ index 000000000..0fe32297d
 +const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 +const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
 +#ifdef METAL
-+uniform int uMetal;          // setting "Metallic surfaces": a UFO's parts are metal: they glint, sparkle and mirror faintly (in full colour)
++uniform int uMetal;          // setting "Metallic surfaces": a UFO's parts are metal: they glint and sparkle, and mirror faintly with "Reflections"
 +#endif
 +#ifdef RELIEF
 +// Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
@@ -34104,12 +34093,12 @@ index 000000000..0fe32297d
 +			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 +				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
 +#ifdef REFLECTIONS
-+			bool mirrors = uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0;
++			bool mirrors = uReflections != 0 && groundIsWater && uUnderwater == 0;
 +#else
 +			bool mirrors = false;
 +#endif
 +#ifdef MIRROR_FLAGS
-+			if (uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
++			if (uReflections != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
 +#endif
 +			if (uSmoothLight != 0 || mirrors)
 +			{
@@ -34827,15 +34816,15 @@ index 000000000..0fe32297d
 +		color = table(UnseenRow, color);
 +	}
 +#ifdef REFLECTIONS
-+	bool mirrors = uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0;
++	bool mirrors = uReflections != 0 && (onSea || onPond) && uUnderwater == 0;
 +#else
 +	bool mirrors = false;
 +#endif
 +#ifdef MIRROR_FLAGS
-+	if (uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
++	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 +#endif
 +#ifdef METAL
-+	// (the metal shows what its face mirrors, in full colour, "Reflections" on or off)
++	// (with "Reflections" the metal shows what its face mirrors: that setting is every mirror's, the owner's word)
 +	bool metalMirrors = metal && uReflections != 0 && !onPond;
 +#ifdef REFLECTIONS
 +	mirrors = mirrors || metalMirrors;
@@ -35133,10 +35122,10 @@ index 000000000..0fe32297d
 +		vec3 through = fullColor;
 +		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 +#ifdef MIRROR_FLAGS
-+		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
++		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
 +#endif
 +#ifdef REFLECTIONS
-+		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0)
++		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
 +		{
 +			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 +			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
@@ -68187,10 +68176,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..d4f4034c7
+index 000000000..0c02ac39e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,827 @@
+@@ -0,0 +1,826 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68398,8 +68387,7 @@ index 000000000..d4f4034c7
 +	frame.metal = view._ufos.empty() || Options::fpsMetallic <= 0 ? 0 : 2; // (only where there is a UFO; an older profile's Sheen, 1, is on too)
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-+	frame.worldMirrors = Options::fpsReflections;
-+	frame.reflections = view._wantsTrueColor && ((Options::fpsReflections && (view._waterColors[0] != 0 || view._anyGlass)) || frame.metal >= 2); // (only where there is a sea, window glass or still water to mirror, or a UFO's metal)
++	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror: "Reflections" is every mirror's switch)
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;

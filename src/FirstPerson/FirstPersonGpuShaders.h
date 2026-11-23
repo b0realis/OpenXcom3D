@@ -451,8 +451,7 @@ uniform int uColorLightCount;
 uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the map (else only the sea's water scatters light)
 uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 #endif
-uniform int uReflections;       // the mirrors are drawn (in full colour): those of "Reflections" and the metal's
-uniform int uWorldMirrors;      // setting "Reflections": the sea, still water and window glass mirror what stands by them
+uniform int uReflections;       // setting "Reflections" (in full colour): the sea, still water and window glass mirror what stands by them, and a UFO's metal its surroundings
 uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 // (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
@@ -476,7 +475,7 @@ const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent o
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
 #ifdef METAL
-uniform int uMetal;          // setting "Metallic surfaces": a UFO's parts are metal: they glint, sparkle and mirror faintly (in full colour)
+uniform int uMetal;          // setting "Metallic surfaces": a UFO's parts are metal: they glint and sparkle, and mirror faintly with "Reflections"
 #endif
 #ifdef RELIEF
 // Setting "Surface relief": a face's drawing read as a little relief. A colour's brightness is its height (a row of
@@ -1216,12 +1215,12 @@ uint colorOutsideMap(vec3 rayOrigin, vec3 rayDirection, float tExit, int exitAxi
 			float haze = uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, groundDistance)
 				: smoothStep(uMaxDistance * hazeStart() * 0.67, uMaxDistance * 1.6, groundDistance);
 #ifdef REFLECTIONS
-			bool mirrors = uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0;
+			bool mirrors = uReflections != 0 && groundIsWater && uUnderwater == 0;
 #else
 			bool mirrors = false;
 #endif
 #ifdef MIRROR_FLAGS
-			if (uReflections != 0 && uWorldMirrors != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
+			if (uReflections != 0 && groundIsWater && uUnderwater == 0) mirrorWanted = true;
 #endif
 			if (uSmoothLight != 0 || mirrors)
 			{
@@ -1939,15 +1938,15 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		color = table(UnseenRow, color);
 	}
 #ifdef REFLECTIONS
-	bool mirrors = uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0;
+	bool mirrors = uReflections != 0 && (onSea || onPond) && uUnderwater == 0;
 #else
 	bool mirrors = false;
 #endif
 #ifdef MIRROR_FLAGS
-	if (uReflections != 0 && uWorldMirrors != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
+	if (uReflections != 0 && (onSea || onPond) && uUnderwater == 0) mirrorWanted = true;
 #endif
 #ifdef METAL
-	// (the metal shows what its face mirrors, in full colour, "Reflections" on or off)
+	// (with "Reflections" the metal shows what its face mirrors: that setting is every mirror's, the owner's word)
 	bool metalMirrors = metal && uReflections != 0 && !onPond;
 #ifdef REFLECTIONS
 	mirrors = mirrors || metalMirrors;
@@ -2245,10 +2244,10 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		vec3 through = fullColor;
 		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 #ifdef MIRROR_FLAGS
-		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
 #endif
 #ifdef REFLECTIONS
-		if (uReflections != 0 && uWorldMirrors != 0 && fullColorSet && hit.glassAxis >= 0)
+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
 		{
 			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.

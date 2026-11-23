@@ -1706,7 +1706,6 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
-	Gl::Uniform1i(location("uWorldMirrors"), frame.worldMirrors ? 1 : 0);
 	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);

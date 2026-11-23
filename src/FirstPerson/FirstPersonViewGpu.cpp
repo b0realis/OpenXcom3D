@@ -205,8 +205,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.metal = view._ufos.empty() || Options::fpsMetallic <= 0 ? 0 : 2; // (only where there is a UFO; an older profile's Sheen, 1, is on too)
 	frame.palette = view.getPalette();
 	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
-	frame.worldMirrors = Options::fpsReflections;
-	frame.reflections = view._wantsTrueColor && ((Options::fpsReflections && (view._waterColors[0] != 0 || view._anyGlass)) || frame.metal >= 2); // (only where there is a sea, window glass or still water to mirror, or a UFO's metal)
+	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror: "Reflections" is every mirror's switch)
 	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 	frame.colorLightCount = 0;
