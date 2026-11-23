@@ -1534,10 +1534,10 @@ index 000000000..07f96dd15
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..b6263cf07
+index 000000000..88326e006
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,456 @@
+@@ -0,0 +1,492 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1904,6 +1904,37 @@ index 000000000..b6263cf07
 +              RDR_11.PCK, RDR_6.PCK, RDR_7.PCK, REB_5.PCK, RET_2.PCK, RET_3.PCK, SMU_3.PCK,
 +              SOL_3.PCK, SPT_4.PCK, STYGIAN_GUARD.PCK, ZBOSS.PCK, ZOMBIE_BUSTER.PCK]
 +      arms: posed reach
++    # XPiratez's own soldiers in their armours (the Warrior, Hand, Veteran, Freak, Weirdgal and Repentia gals, heroes,
++    # slaves, purebloods, peasants, damsels, Syns, Shades): the same second forearm at the hip, on the sheets where it
++    # shows and posing keeps seven tenths or more of each arm, standing and kneeling. The gals proper are people (made
++    # the standard humanoid above): their arms are on their bones already and stay as they are. Left out: every sheet a
++    # Lamia or an Ogre wears (a Lamia with a pistol loses her upper body posed, an Ogre's arms are trimmed), the sheets
++    # other units or other games' units wear too, and those on which an arm would lose more
++    - names: [FLASHBANG.PCK, LIGHTER.PCK, PIR_0.PCK, PIR_1.PCK, PIR_101.PCK, PIR_102.PCK, PIR_104.PCK,
++              PIR_105.PCK, PIR_106.PCK, PIR_108.PCK, PIR_109.PCK, PIR_11.PCK, PIR_111.PCK, PIR_113.PCK,
++              PIR_114.PCK, PIR_115.PCK, PIR_119.PCK, PIR_12.PCK, PIR_120.PCK, PIR_13.PCK, PIR_133.PCK,
++              PIR_139.PCK, PIR_14.PCK, PIR_141.PCK, PIR_15.PCK, PIR_150.PCK, PIR_156.PCK, PIR_16.PCK,
++              PIR_160.PCK, PIR_161.PCK, PIR_162.PCK, PIR_163.PCK, PIR_169.PCK, PIR_17.PCK, PIR_18.PCK,
++              PIR_180.PCK, PIR_185.PCK, PIR_186.PCK, PIR_19.PCK, PIR_199.PCK, PIR_2.PCK, PIR_200.PCK,
++              PIR_208.PCK, PIR_22.PCK, PIR_24.PCK, PIR_240.PCK, PIR_25.PCK, PIR_250.PCK, PIR_26.PCK,
++              PIR_260.PCK, PIR_27.PCK, PIR_28.PCK, PIR_280.PCK, PIR_281.PCK, PIR_29.PCK, PIR_3.PCK,
++              PIR_30.PCK, PIR_301.PCK, PIR_303.PCK, PIR_313.PCK, PIR_32.PCK, PIR_33.PCK, PIR_34.PCK,
++              PIR_35.PCK, PIR_36.PCK, PIR_37.PCK, PIR_371.PCK, PIR_373.PCK, PIR_379.PCK, PIR_38.PCK,
++              PIR_39.PCK, PIR_390.PCK, PIR_391.PCK, PIR_4.PCK, PIR_40.PCK, PIR_400.PCK, PIR_41.PCK,
++              PIR_410.PCK, PIR_411.PCK, PIR_43.PCK, PIR_44.PCK, PIR_441.PCK, PIR_444.PCK, PIR_45.PCK,
++              PIR_450.PCK, PIR_451.PCK, PIR_452.PCK, PIR_454.PCK, PIR_455.PCK, PIR_460.PCK, PIR_47.PCK,
++              PIR_480.PCK, PIR_481.PCK, PIR_482.PCK, PIR_484.PCK, PIR_49.PCK, PIR_493.PCK, PIR_494.PCK,
++              PIR_5.PCK, PIR_500.PCK, PIR_505.PCK, PIR_509.PCK, PIR_511.PCK, PIR_514.PCK, PIR_515.PCK,
++              PIR_516.PCK, PIR_519.PCK, PIR_520.PCK, PIR_522.PCK, PIR_523.PCK, PIR_524.PCK, PIR_525.PCK,
++              PIR_526.PCK, PIR_527.PCK, PIR_528.PCK, PIR_529.PCK, PIR_532.PCK, PIR_533.PCK, PIR_534.PCK,
++              PIR_537.PCK, PIR_540.PCK, PIR_541.PCK, PIR_543.PCK, PIR_545.PCK, PIR_548.PCK, PIR_554.PCK,
++              PIR_555.PCK, PIR_556.PCK, PIR_559.PCK, PIR_561.PCK, PIR_562.PCK, PIR_565.PCK, PIR_566.PCK,
++              PIR_570.PCK, PIR_571.PCK, PIR_573.PCK, PIR_575.PCK, PIR_578.PCK, PIR_579.PCK, PIR_581.PCK,
++              PIR_583.PCK, PIR_595.PCK, PIR_6.PCK, PIR_662.PCK, PIR_663.PCK, PIR_664.PCK, PIR_665.PCK,
++              PIR_666.PCK, PIR_667.PCK, PIR_668.PCK, PIR_669.PCK, PIR_670.PCK, PIR_672.PCK, PIR_673.PCK,
++              PIR_674.PCK, PIR_675.PCK, PIR_676.PCK, PIR_677.PCK, PIR_682.PCK, PIR_7.PCK, PIR_8.PCK,
++              PIR_9.PCK, PIR_944.PCK, SUPER.PCK]
++      arms: posed
 +    # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
 +    # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
 +    # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
@@ -1951,6 +1982,11 @@ index 000000000..b6263cf07
 +    # a turret one tile big that cannot move, a gun on a post over a ring of wire (XPiratez's minigun turret): a plain
 +    # block standing on the floor, with its gun, as the big turrets are
 +    - names: [TURRET_MINIGUN.PCK]
++      shape: turret
++    # (and two more that cannot move and came out wrong on the general carving: The X-Com Files' Wizkid turret, a drum
++    # too tall with its barrel lost, and the 40k mod's Tauros small turret, a gun carved flat as paper. The other
++    # one-tile turrets of the three mods were built both ways and are better as they are)
++    - names: [WIZKID_TURRET.PCK, TAUROS_SMALL_TURRET.PCK]
 +      shape: turret
 +    # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
 +    # arms posed on their guns (arms outside the body, coloured along their length)
