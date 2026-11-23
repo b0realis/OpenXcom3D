@@ -38,7 +38,7 @@ en-GB:
   STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
   STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
   STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
-  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
+  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution, pixels twice as big, in the palette's colours. The fastest."
   STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
   STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
   STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."

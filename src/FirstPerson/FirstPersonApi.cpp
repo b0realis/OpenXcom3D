@@ -487,8 +487,8 @@ namespace
 {
 
 /// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
-/// settlePresets).
-constexpr int PresetTables = 1;
+/// settlePresets); 2 since Graphics detail Low on the card draws pixels twice as big (graphicsSwitches).
+constexpr int PresetTables = 2;
 
 /// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
 constexpr int Kept = -9999;
@@ -624,9 +624,10 @@ const std::vector<PresetSwitch> &gameplaySwitches()
  * The settings "Graphics detail" sets (the first page of the 3D VIEW tab): how fine the 3D
  * world is drawn and what the graphics card adds, at Low, Medium and High. What a level means
  * goes by the setting "Renderer", so there are two tables. A ray colours one pixel at every
- * level but the CPU's Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
+ * level but Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
  * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
- * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
+ * HUD's resolution in blocks of two (the owner: "Yes", asked whether the card's Low should have
+ * Pixel size 2 as the CPU's has), Medium the display's own resolution with "Render scale" on
  * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
  * shadows, ambient occlusion and the lights' effects. Supersampling and Surface relief are Off
  * at every level.
@@ -655,7 +656,7 @@ const std::vector<PresetSwitch> &graphicsSwitches()
 	static const std::vector<PresetSwitch> onCard = {
 		//                                                       Low   Med   High
 		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    2,    2 } },
-		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 1,    1,    1 } },
+		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 2,    1,    1 }, { 1,    1,    1 } }, // (Low 2: the owner, 2026-11-23)
 		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  0,    0 } },
 		{ "fpsShadows",         &fpsShadows,         nullptr,  { 1,    1,    1 } },
 		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
@@ -901,13 +902,15 @@ void optionsLoaded()
  */
 void settlePresets()
 {
-	if (Options::fpsPresetTables < PresetTables)
+	// (Once for each change of the tables a profile hasn't seen: the Gameplay presets' of tables 1, Graphics detail's
+	// of tables 2; Graphics detail by the table of the renderer the profile has.)
+	auto carryOver = [](PresetGroup group, const char *name)
 	{
-		const Presets &gameplay = presetsOf(PRESET_GAMEPLAY);
-		for (int preset = 0; preset < gameplay.count; ++preset)
+		const Presets &presets = presetsOf(group);
+		for (int preset = 0; preset < presets.count; ++preset)
 		{
 			bool all = true, changes = false;
-			for (const PresetSwitch &presetSwitch : gameplay.switches())
+			for (const PresetSwitch &presetSwitch : presets.switches())
 			{
 				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
 				if (presetSwitch.onChoice) continue;
@@ -918,14 +921,19 @@ void settlePresets()
 			if (!all) continue;
 			if (changes)
 			{
-				for (const PresetSwitch &presetSwitch : gameplay.switches())
+				for (const PresetSwitch &presetSwitch : presets.switches())
 				{
 					if (!presetSwitch.onChoice && presetSwitch.values[preset] != Kept) setSwitch(presetSwitch, presetSwitch.values[preset]);
 				}
-				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
+				Log(LOG_INFO) << "OpenXcom3D: the " << name << " preset " << preset << " as it is now (its settings were as it had them before)";
 			}
 			break;
 		}
+	};
+	if (Options::fpsPresetTables < PresetTables)
+	{
+		if (Options::fpsPresetTables < 1) carryOver(PRESET_GAMEPLAY, "Gameplay");
+		if (Options::fpsPresetTables < 2) carryOver(PRESET_GRAPHICS, "Graphics detail");
 		Options::fpsPresetTables = PresetTables;
 	}
 	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })

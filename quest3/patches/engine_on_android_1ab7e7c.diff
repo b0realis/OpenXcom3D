@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..d763e214b
+index 000000000..35245be99
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,698 @@
@@ -206,7 +206,7 @@ index 000000000..d763e214b
 +  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
-+  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution, pixels twice as big, in the palette's colours. The fastest."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
 +  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
@@ -866,7 +866,7 @@ index 000000000..d763e214b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..44ec3773a
+index 000000000..c3a427402
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,698 @@
@@ -910,7 +910,7 @@ index 000000000..44ec3773a
 +  STR_FPS_GRAPHICS_DETAIL_LOW_CPU_DESC: "Renderer CPU, Low: pixels twice as big and no sun shadows, about twice the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_CPU_DESC: "Renderer CPU, Medium: the 3D world as fine as its HUD, a ray for every pixel, sun shadows. The default."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_CPU_DESC: "Renderer CPU, High: the 3D world as fine as the battlescape, a ray for every pixel. Heavy on a big screen."
-+  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution in the palette's colours. The fastest."
++  STR_FPS_GRAPHICS_DETAIL_LOW_GPU_DESC: "Renderer GPU, Low: the 3D world at the HUD's resolution, pixels twice as big, in the palette's colours. The fastest."
 +  STR_FPS_GRAPHICS_DETAIL_MEDIUM_GPU_DESC: "Renderer GPU, Medium: the display's own resolution; Render scale on Auto keeps the frame rate."
 +  STR_FPS_GRAPHICS_DETAIL_HIGH_GPU_DESC: "Renderer GPU, High: Medium with true colour, smooth light, soft shadows, ambient occlusion and the lights' effects."
 +  STR_FPS_GRAPHICS_DETAIL_CUSTOM_DESC: "Your own mix of the SCREEN settings under Advanced. Kept while you try the levels."
@@ -24363,10 +24363,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..5a76988f5
+index 000000000..a6214c5f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2059 @@
+@@ -0,0 +1,2067 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24856,8 +24856,8 @@ index 000000000..5a76988f5
 +{
 +
 +/// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
-+/// settlePresets).
-+constexpr int PresetTables = 1;
++/// settlePresets); 2 since Graphics detail Low on the card draws pixels twice as big (graphicsSwitches).
++constexpr int PresetTables = 2;
 +
 +/// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
 +constexpr int Kept = -9999;
@@ -24993,9 +24993,10 @@ index 000000000..5a76988f5
 + * The settings "Graphics detail" sets (the first page of the 3D VIEW tab): how fine the 3D
 + * world is drawn and what the graphics card adds, at Low, Medium and High. What a level means
 + * goes by the setting "Renderer", so there are two tables. A ray colours one pixel at every
-+ * level but the CPU's Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
++ * level but Low (blocks of two). On the CPU: Low has those blocks and no sun shadows,
 + * Medium the HUD's resolution (the defaults), High the battlescape's. On the card: Low is the
-+ * CPU's Medium picture drawn fast, Medium the display's own resolution with "Render scale" on
++ * HUD's resolution in blocks of two (the owner: "Yes", asked whether the card's Low should have
++ * Pixel size 2 as the CPU's has), Medium the display's own resolution with "Render scale" on
 + * Auto (as fine as the frame rate allows), High that with full colour, smooth light, soft
 + * shadows, ambient occlusion and the lights' effects. Supersampling and Surface relief are Off
 + * at every level.
@@ -25024,7 +25025,7 @@ index 000000000..5a76988f5
 +	static const std::vector<PresetSwitch> onCard = {
 +		//                                                       Low   Med   High
 +		{ "fpsViewResolution",  nullptr, &fpsViewResolution,   { 0,    2,    2 } },
-+		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 1,    1,    1 } },
++		{ "fpsPixelSize",       nullptr, &fpsPixelSize,        { 2,    1,    1 }, { 1,    1,    1 } }, // (Low 2: the owner, 2026-11-23)
 +		{ "fpsRenderScale",     nullptr, &fpsRenderScale,      { 100,  0,    0 } },
 +		{ "fpsShadows",         &fpsShadows,         nullptr,  { 1,    1,    1 } },
 +		{ "fpsSupersampling",   nullptr, &fpsSupersampling,    { 0,    0,    0 } },
@@ -25270,13 +25271,15 @@ index 000000000..5a76988f5
 + */
 +void settlePresets()
 +{
-+	if (Options::fpsPresetTables < PresetTables)
++	// (Once for each change of the tables a profile hasn't seen: the Gameplay presets' of tables 1, Graphics detail's
++	// of tables 2; Graphics detail by the table of the renderer the profile has.)
++	auto carryOver = [](PresetGroup group, const char *name)
 +	{
-+		const Presets &gameplay = presetsOf(PRESET_GAMEPLAY);
-+		for (int preset = 0; preset < gameplay.count; ++preset)
++		const Presets &presets = presetsOf(group);
++		for (int preset = 0; preset < presets.count; ++preset)
 +		{
 +			bool all = true, changes = false;
-+			for (const PresetSwitch &presetSwitch : gameplay.switches())
++			for (const PresetSwitch &presetSwitch : presets.switches())
 +			{
 +				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
 +				if (presetSwitch.onChoice) continue;
@@ -25287,14 +25290,19 @@ index 000000000..5a76988f5
 +			if (!all) continue;
 +			if (changes)
 +			{
-+				for (const PresetSwitch &presetSwitch : gameplay.switches())
++				for (const PresetSwitch &presetSwitch : presets.switches())
 +				{
 +					if (!presetSwitch.onChoice && presetSwitch.values[preset] != Kept) setSwitch(presetSwitch, presetSwitch.values[preset]);
 +				}
-+				Log(LOG_INFO) << "OpenXcom3D: the Gameplay preset " << preset << " as it is now (its settings were as it had them before)";
++				Log(LOG_INFO) << "OpenXcom3D: the " << name << " preset " << preset << " as it is now (its settings were as it had them before)";
 +			}
 +			break;
 +		}
++	};
++	if (Options::fpsPresetTables < PresetTables)
++	{
++		if (Options::fpsPresetTables < 1) carryOver(PRESET_GAMEPLAY, "Gameplay");
++		if (Options::fpsPresetTables < 2) carryOver(PRESET_GRAPHICS, "Graphics detail");
 +		Options::fpsPresetTables = PresetTables;
 +	}
 +	for (PresetGroup group : { PRESET_GAMEPLAY, PRESET_GRAPHICS })
