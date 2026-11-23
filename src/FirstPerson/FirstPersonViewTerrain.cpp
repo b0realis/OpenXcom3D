@@ -2253,10 +2253,11 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
  *   between rooms of the room it faces;
  * - a donor is a plain wall: no door, no glass, no holes in its art, nearly full height; of the
  *   same kind (west or north: the art shades the two sides differently) first, on the same level,
- *   the nearest. Only the voxels of the wall's own paint take its colours: the colour group most
- *   of the nearest plain wall on the same side shows (a window's frame, its glass and curtains,
- *   painted panes, trims keep theirs). Doors keep theirs whole, and so do fences, ghosts, the
- *   walls of crafts and UFOs (mirrored, see mirroredColor) and walls with no donor.
+ *   the nearest. A wall with nothing to see through takes its colours on all of that face. Of a
+ *   wall with a window, only the voxels of its own paint do: the colour group most of the nearest
+ *   plain wall on the same side shows (the window's frame, its glass and curtains, painted panes
+ *   keep theirs). Doors keep theirs whole, and so do fences, ghosts, the walls of crafts and UFOs
+ *   (mirrored, see mirroredColor) and walls with no donor.
  * Coordinates are tiles. A wall blown away later leaves its rubble as the art has it (see
  * wallPaintColor), and the rest keep theirs: the regions stay as they were found (a saved battle
  * loaded finds them anew, from the map as it is then: a room blown open is the outdoors then).
@@ -2531,8 +2532,12 @@ void FirstPersonView::findWallPaints()
 		const int x = side.tile % mapSizeX, y = (side.tile / mapSizeX) % mapSizeY, z = side.tile / tilesPerLevel;
 		const int endX = side.part == O_NORTHWALL ? x - 1 : x, endY = side.part == O_WESTWALL ? y - 1 : y;
 		const bool openEnd = endX < 0 || endY < 0 || !_save->getTile(indexOf(endX, endY, z))->getMapData((TilePart)side.part);
-		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind,
-			(Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts) });
+		// (A wall with nothing to see through, no glass and no holes in its art, takes the paint on all of that face,
+		// whatever its colours: WallPaintWhole. Its own paint may be of two colour groups, a mirror wall's steel with its
+		// glints in plain grey: only the steel took the outside's plaster, and the glints stood on it as grey blocks, a
+		// player, GitHub issue #255, "smeared wall". What keeps its own on both faces is a window's: its frame, its glass.)
+		const Uint8 paintGroup = wallKind(side.data) != 3 ? WallPaintWhole : (Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts);
+		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind, paintGroup });
 		_wallPaintOf[side.tile * 2 + side.part - O_WESTWALL] = (Uint16)_wallPaints.size();
 		if (kind == 1) ++outerCount;
 		else ++betweenCount;
@@ -2547,7 +2552,8 @@ void FirstPersonView::findWallPaints()
  * standing before it sees it (its left end on the left), the nearest column of it where it has
  * nothing there. Only on the wall's back plane (its westmost or northmost voxels: the faces inside
  * its thickness, a window opening's jambs, are seen alike from both sides), on the voxels of its
- * own side's paint, and on the wall as the map was built (its rubble keeps its own). A wall's end
+ * own side's paint (all of them, of a wall without a window: see findWallPaints), and on the wall
+ * as the map was built (its rubble keeps its own). A wall's end
  * standing in the other wall's plane (a west wall's north end inside the tile's north wall) is
  * that wall's face; any other end takes the paint at a corner only (the wall's line ends there).
  * @param hit A hit on a face looking west or north.
@@ -2580,7 +2586,7 @@ Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, 
 		return 0;
 	}
 	const WallPaint &paint = _wallPaints[paintIndex - 1];
-	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (ownColor >> 4) != paint.paintGroup)
+	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
 	{
 		return 0;
 	}
@@ -3618,9 +3624,10 @@ const FirstPersonView::VoxelModel *FirstPersonView::openedModel(const VoxelModel
 
 /**
  * Fills a pane of glass's openings with glass: where the game's shape has no voxel across the
- * wall (a house's window, whose glass the game leaves open, so sight and shots go through) and
- * the art there is inside the pane (see paneOfGlass), glass voxels in the wall's own rows, so the
- * window shows a pane, not a hole; none in a wall thicker than GlassThinRowsMax rows (a plane's
+ * wall (a house's window, whose glass the game leaves open, so sight and shots go through), or
+ * glass in some of the wall's rows only, and the art there is inside the pane (see paneOfGlass),
+ * glass voxels in the wall's own rows, so the window shows a pane, not a hole, as thick as the
+ * wall and flat; none in a wall thicker than GlassThinRowsMax rows (a plane's
  * fuselage, whose rows would fill into a block) (the owner, after GitHub issue #75: "glass by the game's
  * rules"). They're a look only (VoxelModel::lookOnly): the aim goes through them as the game's
  * rounds do, and they don't break into shards (see addBrokenPaneEdges); a round going through
@@ -3655,17 +3662,24 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
 	{
 		for (int along = 0; along < Position::TileXY; ++along)
 		{
-			// Only where the wall has no voxel at all across it.
+			// Only where the wall has no voxel at all across it, or none but glass: there the rows it has no voxel in
+			// are filled, so the pane is as thick as the wall all over, flat on both faces. (A glass wall the game
+			// shapes as a grid, whole slabs two voxels thick on every other layer and posts one voxel thick between
+			// them: the openings were filled two thick, the posts stayed one, and the pane's face had a pocket a voxel
+			// deep at every post: "glass ... recessed slightly into the wall, looks ugly. Should ATTEMPT to keep flat
+			// glass", a player, GitHub issue #255.)
 			bool solid = false;
 			for (int across = 0; across < Position::TileXY && !solid; ++across)
 			{
-				solid = model.color[z][westWall ? along : across][westWall ? across : along] != 0;
+				const int x = westWall ? across : along, y = westWall ? along : across;
+				solid = model.color[z][y][x] != 0 && !((model.glass[z][y] >> x) & 1);
 			}
 			if (solid) continue;
 			for (int across = 0; across < Position::TileXY; ++across)
 			{
 				if (!((rows >> across) & 1)) continue;
 				const int x = westWall ? across : along, y = westWall ? along : across;
+				if (model.color[z][y][x]) continue; // (the game's own glass there)
 				// Where the voxel lands in the art (as in buildModel): inside the pane?
 				const int spriteX = std::clamp(16 + x - y, 0, width - 1);
 				const int spriteY = 24 + (x + y) / 2 - z + yOffset;
@@ -3681,6 +3695,58 @@ void FirstPersonView::fillPaneOpenings(const MapData *mapData, const Surface *sp
 					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
 					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
 				}
+			}
+		}
+	}
+	// A bar of the frame goes on through a slot. The glass filled in above is glass wherever the art is inside the
+	// pane, a bar the art draws there too; the wall's own voxels show such a bar solid (see paneHoleSpans). So where
+	// the game's shape has a slot, a layer with posts only between whole slabs, a mullion was solid on the slabs and
+	// glass in the slots: a stack of dark boxes on the pane (the same issue's picture). A cell between two of the
+	// wall's own solid voxels of its own row and column, GlassSlotMost voxels apart at most, where the art draws a
+	// pixel, is solid in that pixel's colour, glass filled in or empty as it was (the frame's own art is outside the
+	// pane, and was not filled): still a look only, and gone with the opening's glass when it breaks. An empty cell
+	// of such a slot between two of the wall's own voxels of which one is glass is glass: no pocket in the pane. A
+	// window's own opening is taller than a slot: its bars stay under the smooth pane (the owner: "just a smooth
+	// see-through pane").
+	for (int along = 0; along < Position::TileXY; ++along)
+	{
+		for (int across = 0; across < Position::TileXY; ++across)
+		{
+			if (!((rows >> across) & 1)) continue;
+			const int x = westWall ? across : along, y = westWall ? along : across;
+			auto own = [&](int z) { return z >= 0 && z < Position::TileZ && model.color[z][y][x] && !((model.lookOnly[z][y] >> x) & 1); };
+			auto ownSolid = [&](int z) { return own(z) && !((model.glass[z][y] >> x) & 1) && !((model.clear[z][y] >> x) & 1); };
+			// (the slot's cells: the glass filled in, or nothing at all where the art is the frame's own, outside the pane)
+			auto inSlot = [&](int z) { return z < Position::TileZ && (!model.color[z][y][x] || ((model.lookOnly[z][y] >> x) & 1)); };
+			for (int z = 1; z < Position::TileZ - 1; ++z)
+			{
+				if (!inSlot(z) || !own(z - 1)) continue;
+				int top = z;
+				while (inSlot(top)) ++top;
+				if (top - z <= GlassSlotMost && own(top))
+				{
+					const bool bar = ownSolid(z - 1) && ownSolid(top);
+					for (int slot = z; slot < top; ++slot)
+					{
+						const int spriteX = std::clamp(16 + x - y, 0, width - 1), spriteY = 24 + (x + y) / 2 - slot + yOffset;
+						const Uint8 color = spriteY >= 0 && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
+						if (bar && color)
+						{
+							model.color[slot][y][x] = color;
+							model.glass[slot][y] &= (Uint16)~(1 << x);
+						}
+						else if (!model.color[slot][y][x])
+						{
+							// (glass above it and below it, or a bar the art has a hole in there: the pane's glass)
+							model.color[slot][y][x] = color ? color : fallbackColor;
+							model.glass[slot][y] |= (Uint16)(1 << x), _anyGlass = true;
+						}
+						else continue;
+						model.lookOnly[slot][y] |= (Uint16)(1 << x);
+						model.openingGlass = true;
+					}
+				}
+				z = top;
 			}
 		}
 	}

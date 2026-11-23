@@ -1344,7 +1344,8 @@ uint wallPaintColor(Hit hit, int hitTile, uint parts[4], uint ownColor)
 	// The paint: the wall's model, the donor's, donorWest | openEnd << 1 | kind << 8 | paintGroup << 16, the wall's min x | min y << 8.
 	uvec4 paint = texelFetch(uWallPaints, int(paintIndex) - 1);
 	bool donorWest = (paint.z & 1u) != 0u, openEnd = (paint.z & 2u) != 0u;
-	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x || (ownColor >> 4) != ((paint.z >> 16) & 0xFFu))
+	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x
+		|| (((paint.z >> 16) & 0xFFu) != uint(WallPaintWhole) && (ownColor >> 4) != ((paint.z >> 16) & 0xFFu)))
 	{
 		return 0u;
 	}

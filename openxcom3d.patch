@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..1a2910d23
+index 000000000..3c161e9bd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,699 @@
@@ -357,7 +357,7 @@ index 000000000..1a2910d23
 +  STR_FPS_VR_CARD_EYES: "VR eyes kept on the card"
 +  STR_FPS_VR_CARD_EYES_DESC: "VR with Renderer GPU. YES: each eye's picture goes to the headset straight from the graphics chip. NO: it is read back first."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
-+  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
++  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, the battlescape or the display itself. The game's Display Filter does not reach it at Display."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
 +  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
 +  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
@@ -829,7 +829,7 @@ index 000000000..1a2910d23
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1f2d96bbc
+index 000000000..07f96dd15
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,699 @@
@@ -1062,7 +1062,7 @@ index 000000000..1f2d96bbc
 +  STR_FPS_VR_CARD_EYES: "VR eyes kept on the card"
 +  STR_FPS_VR_CARD_EYES_DESC: "VR with Renderer GPU. YES: each eye's picture goes to the headset straight from the graphics chip. NO: it is read back first."
 +  STR_FPS_VIEW_RESOLUTION: "3D resolution"
-+  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
++  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, the battlescape or the display itself. The game's Display Filter does not reach it at Display."
 +  STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
 +  STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
 +  STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"
@@ -24236,10 +24236,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..912b62270
+index 000000000..4e463d0a0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2029 @@
+@@ -0,0 +1,2034 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24332,15 +24332,20 @@ index 000000000..912b62270
 +const int QuestDefaultsVersion = 124;
 +
 +/**
-+ * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
-+ * destroyed. For the rule fixes that come with the mod (see keepsFacingOnOwnTile), which units
-+ * ask without a way to the battle's screen.
-+ * @return The flag.
++ * How many of the mod's 3D views there are: modes made (see create) and not yet destroyed; one
++ * or more, a battle with the mod's view is on. For the rule fixes that come with the mod (see
++ * keepsFacingOnOwnTile), which units ask without a way to the battle's screen.
++ * (A count, not a switch. A save loaded during a battle makes the new battle's screen, and its
++ * mode, before the old one closes: a switch set by the new one was cleared by the old one a frame
++ * later, and for the rest of that battle the rule fixes were off: a shot at a wall the soldier
++ * stood against turned him south again, the view with him: "Shoot this wall (spoiler, it spins
++ * you around)", a player, GitHub issue #255.)
++ * @return The count.
 + */
-+bool &battleWithView()
++int &viewsAlive()
 +{
-+	static bool on = false;
-+	return on;
++	static int count = 0;
++	return count;
 +}
 +
 +/**
@@ -24382,7 +24387,7 @@ index 000000000..912b62270
 +	{
 +		return nullptr;
 +	}
-+	battleWithView() = true;
++	++viewsAlive();
 +	return new FirstPersonMode(game, state);
 +}
 +
@@ -24394,7 +24399,7 @@ index 000000000..912b62270
 +{
 +	if (mode)
 +	{
-+		battleWithView() = false;
++		viewsAlive() = std::max(0, viewsAlive() - 1);
 +	}
 +	delete mode;
 +}
@@ -24408,7 +24413,7 @@ index 000000000..912b62270
 + */
 +bool keepsFacingOnOwnTile()
 +{
-+	return battleWithView();
++	return viewsAlive() > 0;
 +}
 +
 +/**
@@ -28362,10 +28367,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..376fbc399
+index 000000000..dde054699
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3853 @@
+@@ -0,0 +1,3854 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28864,6 +28869,7 @@ index 000000000..376fbc399
 +	number("DarkOverflowFrom", DarkOverflowFrom);
 +	number("DarkOverflowTo", DarkOverflowTo);
 +	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
++	whole("WallPaintWhole", WallPaintWhole);
 +	number("UnseenFogDarkening", UnseenFogDarkening);
 +	number("UnseenFogFromMax", UnseenFogFromMax);
 +	number("UnseenFogNormal", UnseenFogNormal);
@@ -32765,10 +32771,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..e29f7d625
+index 000000000..64c0bca16
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3326 @@
+@@ -0,0 +1,3327 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -34115,7 +34121,8 @@ index 000000000..e29f7d625
 +	// The paint: the wall's model, the donor's, donorWest | openEnd << 1 | kind << 8 | paintGroup << 16, the wall's min x | min y << 8.
 +	uvec4 paint = texelFetch(uWallPaints, int(paintIndex) - 1);
 +	bool donorWest = (paint.z & 1u) != 0u, openEnd = (paint.z & 2u) != 0u;
-+	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x || (ownColor >> 4) != ((paint.z >> 16) & 0xFFu))
++	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x
++		|| (((paint.z >> 16) & 0xFFu) != uint(WallPaintWhole) && (ownColor >> 4) != ((paint.z >> 16) & 0xFFu)))
 +	{
 +		return 0u;
 +	}
@@ -64025,7 +64032,7 @@ index 000000000..aa66e4f77
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..81a119d33
+index 000000000..52c949fb4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
 @@ -0,0 +1,1942 @@
@@ -64994,7 +65001,7 @@ index 000000000..81a119d33
 +		bool donorWest;          // the donor is a west wall (its east face lends), else a north wall (its south face)
 +		bool openEnd;            // the wall's line ends at its north (a west wall) or west (a north wall) end, a corner: that end is repainted too
 +		Uint8 kind;              // 1 a building's outer wall (Each side), 2 a wall between two of its rooms (All rooms)
-+		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours
++		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours; WallPaintWhole: all of them
 +	};
 +	std::vector<WallPaint> _wallPaints; // the walls whose hidden face takes another paint
 +	std::vector<Uint16> _wallPaintOf;   // per tile, two (its west wall, its north wall): 1 + the wall's index in _wallPaints, 0 none
@@ -73127,10 +73134,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..8ebc7619b
+index 000000000..78af94e34
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,761 @@
+@@ -0,0 +1,767 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73419,6 +73426,9 @@ index 000000000..8ebc7619b
 +/// plane's fuselage more).
 +const float GlassBigPaneCoverMin = 0.3f;
 +const int GlassWallTopMin = 20, GlassThinRowsMax = 3;
++/// A slot in a pane's wall (see FirstPersonView::fillPaneOpenings): the game's shape without a voxel for this many voxels
++/// up at most, between its own solid voxels: a bar of the frame goes on through it.
++const int GlassSlotMost = 2;
 +/// Window glass breaking (FirstPersonView::spawnGlassShards; the owner: "glass shatters (by the travelling bullets)
 +/// ... only visual and for visceral feel"): shards from GlassShardsAcross voxels of the pane at most, falling, and,
 +/// where a round went through, GlassShardsAtHit flying on with it and GlassGlints glints; none from a pane further
@@ -73533,6 +73543,9 @@ index 000000000..8ebc7619b
 +/// An object's upright ghost on the tile's west or north edge stands this many voxels into the tile, clear of the
 +/// wall there (a wall is two voxels thick; see buildGhost).
 +const int GhostWallClearance = 2;
++/// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
++/// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
++const int WallPaintWhole = 255;
 +/// An object with voxels is a flat picture on an edge (a poster, moved clear of the wall likewise, see buildModel)
 +/// when it is thinner than that and at least this many voxels high and wide.
 +const int PosterMinExtent = 6;
@@ -81768,10 +81781,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..82d81c926
+index 000000000..56a5703b5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,5939 @@
+@@ -0,0 +1,6005 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -84027,10 +84040,11 @@ index 000000000..82d81c926
 + *   between rooms of the room it faces;
 + * - a donor is a plain wall: no door, no glass, no holes in its art, nearly full height; of the
 + *   same kind (west or north: the art shades the two sides differently) first, on the same level,
-+ *   the nearest. Only the voxels of the wall's own paint take its colours: the colour group most
-+ *   of the nearest plain wall on the same side shows (a window's frame, its glass and curtains,
-+ *   painted panes, trims keep theirs). Doors keep theirs whole, and so do fences, ghosts, the
-+ *   walls of crafts and UFOs (mirrored, see mirroredColor) and walls with no donor.
++ *   the nearest. A wall with nothing to see through takes its colours on all of that face. Of a
++ *   wall with a window, only the voxels of its own paint do: the colour group most of the nearest
++ *   plain wall on the same side shows (the window's frame, its glass and curtains, painted panes
++ *   keep theirs). Doors keep theirs whole, and so do fences, ghosts, the walls of crafts and UFOs
++ *   (mirrored, see mirroredColor) and walls with no donor.
 + * Coordinates are tiles. A wall blown away later leaves its rubble as the art has it (see
 + * wallPaintColor), and the rest keep theirs: the regions stay as they were found (a saved battle
 + * loaded finds them anew, from the map as it is then: a room blown open is the outdoors then).
@@ -84305,8 +84319,12 @@ index 000000000..82d81c926
 +		const int x = side.tile % mapSizeX, y = (side.tile / mapSizeX) % mapSizeY, z = side.tile / tilesPerLevel;
 +		const int endX = side.part == O_NORTHWALL ? x - 1 : x, endY = side.part == O_WESTWALL ? y - 1 : y;
 +		const bool openEnd = endX < 0 || endY < 0 || !_save->getTile(indexOf(endX, endY, z))->getMapData((TilePart)side.part);
-+		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind,
-+			(Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts) });
++		// (A wall with nothing to see through, no glass and no holes in its art, takes the paint on all of that face,
++		// whatever its colours: WallPaintWhole. Its own paint may be of two colour groups, a mirror wall's steel with its
++		// glints in plain grey: only the steel took the outside's plaster, and the glints stood on it as grey blocks, a
++		// player, GitHub issue #255, "smeared wall". What keeps its own on both faces is a window's: its frame, its glass.)
++		const Uint8 paintGroup = wallKind(side.data) != 3 ? WallPaintWhole : (Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts);
++		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind, paintGroup });
 +		_wallPaintOf[side.tile * 2 + side.part - O_WESTWALL] = (Uint16)_wallPaints.size();
 +		if (kind == 1) ++outerCount;
 +		else ++betweenCount;
@@ -84321,7 +84339,8 @@ index 000000000..82d81c926
 + * standing before it sees it (its left end on the left), the nearest column of it where it has
 + * nothing there. Only on the wall's back plane (its westmost or northmost voxels: the faces inside
 + * its thickness, a window opening's jambs, are seen alike from both sides), on the voxels of its
-+ * own side's paint, and on the wall as the map was built (its rubble keeps its own). A wall's end
++ * own side's paint (all of them, of a wall without a window: see findWallPaints), and on the wall
++ * as the map was built (its rubble keeps its own). A wall's end
 + * standing in the other wall's plane (a west wall's north end inside the tile's north wall) is
 + * that wall's face; any other end takes the paint at a corner only (the wall's line ends there).
 + * @param hit A hit on a face looking west or north.
@@ -84354,7 +84373,7 @@ index 000000000..82d81c926
 +		return 0;
 +	}
 +	const WallPaint &paint = _wallPaints[paintIndex - 1];
-+	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (ownColor >> 4) != paint.paintGroup)
++	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
 +	{
 +		return 0;
 +	}
@@ -85392,9 +85411,10 @@ index 000000000..82d81c926
 +
 +/**
 + * Fills a pane of glass's openings with glass: where the game's shape has no voxel across the
-+ * wall (a house's window, whose glass the game leaves open, so sight and shots go through) and
-+ * the art there is inside the pane (see paneOfGlass), glass voxels in the wall's own rows, so the
-+ * window shows a pane, not a hole; none in a wall thicker than GlassThinRowsMax rows (a plane's
++ * wall (a house's window, whose glass the game leaves open, so sight and shots go through), or
++ * glass in some of the wall's rows only, and the art there is inside the pane (see paneOfGlass),
++ * glass voxels in the wall's own rows, so the window shows a pane, not a hole, as thick as the
++ * wall and flat; none in a wall thicker than GlassThinRowsMax rows (a plane's
 + * fuselage, whose rows would fill into a block) (the owner, after GitHub issue #75: "glass by the game's
 + * rules"). They're a look only (VoxelModel::lookOnly): the aim goes through them as the game's
 + * rounds do, and they don't break into shards (see addBrokenPaneEdges); a round going through
@@ -85429,17 +85449,24 @@ index 000000000..82d81c926
 +	{
 +		for (int along = 0; along < Position::TileXY; ++along)
 +		{
-+			// Only where the wall has no voxel at all across it.
++			// Only where the wall has no voxel at all across it, or none but glass: there the rows it has no voxel in
++			// are filled, so the pane is as thick as the wall all over, flat on both faces. (A glass wall the game
++			// shapes as a grid, whole slabs two voxels thick on every other layer and posts one voxel thick between
++			// them: the openings were filled two thick, the posts stayed one, and the pane's face had a pocket a voxel
++			// deep at every post: "glass ... recessed slightly into the wall, looks ugly. Should ATTEMPT to keep flat
++			// glass", a player, GitHub issue #255.)
 +			bool solid = false;
 +			for (int across = 0; across < Position::TileXY && !solid; ++across)
 +			{
-+				solid = model.color[z][westWall ? along : across][westWall ? across : along] != 0;
++				const int x = westWall ? across : along, y = westWall ? along : across;
++				solid = model.color[z][y][x] != 0 && !((model.glass[z][y] >> x) & 1);
 +			}
 +			if (solid) continue;
 +			for (int across = 0; across < Position::TileXY; ++across)
 +			{
 +				if (!((rows >> across) & 1)) continue;
 +				const int x = westWall ? across : along, y = westWall ? along : across;
++				if (model.color[z][y][x]) continue; // (the game's own glass there)
 +				// Where the voxel lands in the art (as in buildModel): inside the pane?
 +				const int spriteX = std::clamp(16 + x - y, 0, width - 1);
 +				const int spriteY = 24 + (x + y) / 2 - z + yOffset;
@@ -85455,6 +85482,58 @@ index 000000000..82d81c926
 +					model.min[axis] = std::min<int>(model.min[axis], voxel[axis]);
 +					model.max[axis] = std::max<int>(model.max[axis], voxel[axis]);
 +				}
++			}
++		}
++	}
++	// A bar of the frame goes on through a slot. The glass filled in above is glass wherever the art is inside the
++	// pane, a bar the art draws there too; the wall's own voxels show such a bar solid (see paneHoleSpans). So where
++	// the game's shape has a slot, a layer with posts only between whole slabs, a mullion was solid on the slabs and
++	// glass in the slots: a stack of dark boxes on the pane (the same issue's picture). A cell between two of the
++	// wall's own solid voxels of its own row and column, GlassSlotMost voxels apart at most, where the art draws a
++	// pixel, is solid in that pixel's colour, glass filled in or empty as it was (the frame's own art is outside the
++	// pane, and was not filled): still a look only, and gone with the opening's glass when it breaks. An empty cell
++	// of such a slot between two of the wall's own voxels of which one is glass is glass: no pocket in the pane. A
++	// window's own opening is taller than a slot: its bars stay under the smooth pane (the owner: "just a smooth
++	// see-through pane").
++	for (int along = 0; along < Position::TileXY; ++along)
++	{
++		for (int across = 0; across < Position::TileXY; ++across)
++		{
++			if (!((rows >> across) & 1)) continue;
++			const int x = westWall ? across : along, y = westWall ? along : across;
++			auto own = [&](int z) { return z >= 0 && z < Position::TileZ && model.color[z][y][x] && !((model.lookOnly[z][y] >> x) & 1); };
++			auto ownSolid = [&](int z) { return own(z) && !((model.glass[z][y] >> x) & 1) && !((model.clear[z][y] >> x) & 1); };
++			// (the slot's cells: the glass filled in, or nothing at all where the art is the frame's own, outside the pane)
++			auto inSlot = [&](int z) { return z < Position::TileZ && (!model.color[z][y][x] || ((model.lookOnly[z][y] >> x) & 1)); };
++			for (int z = 1; z < Position::TileZ - 1; ++z)
++			{
++				if (!inSlot(z) || !own(z - 1)) continue;
++				int top = z;
++				while (inSlot(top)) ++top;
++				if (top - z <= GlassSlotMost && own(top))
++				{
++					const bool bar = ownSolid(z - 1) && ownSolid(top);
++					for (int slot = z; slot < top; ++slot)
++					{
++						const int spriteX = std::clamp(16 + x - y, 0, width - 1), spriteY = 24 + (x + y) / 2 - slot + yOffset;
++						const Uint8 color = spriteY >= 0 && spriteY < height ? sprite->getPixel(spriteX, spriteY) : 0;
++						if (bar && color)
++						{
++							model.color[slot][y][x] = color;
++							model.glass[slot][y] &= (Uint16)~(1 << x);
++						}
++						else if (!model.color[slot][y][x])
++						{
++							// (glass above it and below it, or a bar the art has a hole in there: the pane's glass)
++							model.color[slot][y][x] = color ? color : fallbackColor;
++							model.glass[slot][y] |= (Uint16)(1 << x), _anyGlass = true;
++						}
++						else continue;
++						model.lookOnly[slot][y] |= (Uint16)(1 << x);
++						model.openingGlass = true;
++					}
++				}
++				z = top;
 +			}
 +		}
 +	}

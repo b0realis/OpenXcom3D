@@ -227,7 +227,7 @@ en-GB:
   STR_FPS_VR_CARD_EYES: "VR eyes kept on the card"
   STR_FPS_VR_CARD_EYES_DESC: "VR with Renderer GPU. YES: each eye's picture goes to the headset straight from the graphics chip. NO: it is read back first."
   STR_FPS_VIEW_RESOLUTION: "3D resolution"
-  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, as the battlescape, or as the display itself, whatever the battlescape's scale."
+  STR_FPS_VIEW_RESOLUTION_DESC: "The 3D world as fine as its HUD, the battlescape or the display itself. The game's Display Filter does not reach it at Display."
   STR_FPS_VIEW_RESOLUTION_HUD: "HUD"
   STR_FPS_VIEW_RESOLUTION_BATTLESCAPE: "Battle"
   STR_FPS_VIEW_RESOLUTION_DISPLAY: "Display"

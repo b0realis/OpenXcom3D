@@ -90,15 +90,20 @@ const bool QuestBuild = false;
 const int QuestDefaultsVersion = 124;
 
 /**
- * Whether a battle with the mod's 3D view is on: its mode made (see create) and not yet
- * destroyed. For the rule fixes that come with the mod (see keepsFacingOnOwnTile), which units
- * ask without a way to the battle's screen.
- * @return The flag.
+ * How many of the mod's 3D views there are: modes made (see create) and not yet destroyed; one
+ * or more, a battle with the mod's view is on. For the rule fixes that come with the mod (see
+ * keepsFacingOnOwnTile), which units ask without a way to the battle's screen.
+ * (A count, not a switch. A save loaded during a battle makes the new battle's screen, and its
+ * mode, before the old one closes: a switch set by the new one was cleared by the old one a frame
+ * later, and for the rest of that battle the rule fixes were off: a shot at a wall the soldier
+ * stood against turned him south again, the view with him: "Shoot this wall (spoiler, it spins
+ * you around)", a player, GitHub issue #255.)
+ * @return The count.
  */
-bool &battleWithView()
+int &viewsAlive()
 {
-	static bool on = false;
-	return on;
+	static int count = 0;
+	return count;
 }
 
 /**
@@ -140,7 +145,7 @@ FirstPersonMode *create(Game *game, BattlescapeState *state)
 	{
 		return nullptr;
 	}
-	battleWithView() = true;
+	++viewsAlive();
 	return new FirstPersonMode(game, state);
 }
 
@@ -152,7 +157,7 @@ void destroy(FirstPersonMode *mode)
 {
 	if (mode)
 	{
-		battleWithView() = false;
+		viewsAlive() = std::max(0, viewsAlive() - 1);
 	}
 	delete mode;
 }
@@ -166,7 +171,7 @@ void destroy(FirstPersonMode *mode)
  */
 bool keepsFacingOnOwnTile()
 {
-	return battleWithView();
+	return viewsAlive() > 0;
 }
 
 /**

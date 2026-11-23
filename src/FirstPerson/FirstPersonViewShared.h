@@ -286,6 +286,9 @@ const int GlassPaleMinChannel = 150, GlassPaleBlueSlack = 8, GlassPaleSpread = 7
 /// plane's fuselage more).
 const float GlassBigPaneCoverMin = 0.3f;
 const int GlassWallTopMin = 20, GlassThinRowsMax = 3;
+/// A slot in a pane's wall (see FirstPersonView::fillPaneOpenings): the game's shape without a voxel for this many voxels
+/// up at most, between its own solid voxels: a bar of the frame goes on through it.
+const int GlassSlotMost = 2;
 /// Window glass breaking (FirstPersonView::spawnGlassShards; the owner: "glass shatters (by the travelling bullets)
 /// ... only visual and for visceral feel"): shards from GlassShardsAcross voxels of the pane at most, falling, and,
 /// where a round went through, GlassShardsAtHit flying on with it and GlassGlints glints; none from a pane further
@@ -400,6 +403,9 @@ const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
 /// An object's upright ghost on the tile's west or north edge stands this many voxels into the tile, clear of the
 /// wall there (a wall is two voxels thick; see buildGhost).
 const int GhostWallClearance = 2;
+/// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
+/// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
+const int WallPaintWhole = 255;
 /// An object with voxels is a flat picture on an edge (a poster, moved clear of the wall likewise, see buildModel)
 /// when it is thinner than that and at least this many voxels high and wide.
 const int PosterMinExtent = 6;

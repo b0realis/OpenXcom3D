@@ -963,7 +963,7 @@ private:
 		bool donorWest;          // the donor is a west wall (its east face lends), else a north wall (its south face)
 		bool openEnd;            // the wall's line ends at its north (a west wall) or west (a north wall) end, a corner: that end is repainted too
 		Uint8 kind;              // 1 a building's outer wall (Each side), 2 a wall between two of its rooms (All rooms)
-		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours
+		Uint8 paintGroup;        // only the wall's voxels of this colour group, the paint of its own side, take the donor's colours; WallPaintWhole: all of them
 	};
 	std::vector<WallPaint> _wallPaints; // the walls whose hidden face takes another paint
 	std::vector<Uint16> _wallPaintOf;   // per tile, two (its west wall, its north wall): 1 + the wall's index in _wallPaints, 0 none

@@ -496,6 +496,7 @@ std::string shaderConstants()
 	number("DarkOverflowFrom", DarkOverflowFrom);
 	number("DarkOverflowTo", DarkOverflowTo);
 	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
+	whole("WallPaintWhole", WallPaintWhole);
 	number("UnseenFogDarkening", UnseenFogDarkening);
 	number("UnseenFogFromMax", UnseenFogFromMax);
 	number("UnseenFogNormal", UnseenFogNormal);
