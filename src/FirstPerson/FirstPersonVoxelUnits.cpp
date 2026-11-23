@@ -193,6 +193,7 @@ struct VoxelUnits::Job
 	float shows = 1.0f; // (how much of the body shows: see VoxelUnitModel::opacity)
 	bool sparks = false; // (it hovers on sparks, by the unit table: see VoxelUnitModel::sparks)
 	bool pulse = false; // (it beats as a jellyfish does, by the unit table: see VoxelUnitModel::pulse)
+	bool onFloor = false; // (set down on the floor, by the unit table: see VoxelUnitModel::onFloor)
 	/// The unit's 8 standing drawings at each frame of the battle's animation (AnimFrames x 8, frame by frame), for a unit
 	/// whose sprite changes shape with it (see modelFor); empty for any other.
 	std::vector<std::vector<Uint8>> anim;
@@ -777,11 +778,23 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 barrels[2] = { 'b', (Uint8)look.barrels };
 		hashBytes(hash, barrels, 2);
 	}
+	// (a small turret, by the unit table: only said of a unit hashed in, as above)
+	if (look.smallTurret == 1)
+	{
+		const Uint8 turret[2] = { 't', 1 };
+		hashBytes(hash, turret, 2);
+	}
 	// (beating, by the unit table: only said of a unit hashed in, as above)
 	if (look.animated == 2)
 	{
 		const Uint8 beat[2] = { 'p', 1 };
 		hashBytes(hash, beat, 2);
+	}
+	// (set down on the floor, by the unit table: only said of a unit hashed in, as above)
+	if (look.onFloor == 1)
+	{
+		const Uint8 setDown[2] = { 'f', 1 };
+		hashBytes(hash, setDown, 2);
 	}
 	// (hovering on sparks, by the unit table: only said of a unit hashed in, as above; units alike share a body)
 	if (look.sparks == 1)
@@ -826,6 +839,7 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		job->shows = shows;
 		job->sparks = look.sparks == 1;
 		job->pulse = look.animated == 2;
+		job->onFloor = look.onFloor == 1;
 		job->beast = look.beast == 1;
 		job->anim = std::move(anim);
 		job->torsoDepth = look.torsoDepth > 0 ? look.torsoDepth / 100.0f : 0.0f;
@@ -843,6 +857,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.kneelLow == 1 && unit->isKneeled()) job->traits |= 128;
 		// (a smooth back, by the unit table: see makeModel)
 		if (look.smoothBack == 1) job->traits |= 16384;
+		// (a small turret, by the unit table: see makeModel)
+		if (look.smallTurret == 1 && !unit->getArmor()->allowsMoving()) job->traits |= 32768;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;
@@ -1196,6 +1212,7 @@ void VoxelUnits::build()
 			model->opacity = job->shows;
 			model->sparks = job->sparks;
 			model->pulse = job->pulse;
+			model->onFloor = job->onFloor;
 			float lowest = 1e9f;
 			for (size_t voxel = 0; voxel < model->up.size(); ++voxel)
 			{

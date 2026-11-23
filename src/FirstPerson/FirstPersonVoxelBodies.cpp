@@ -138,6 +138,10 @@ constexpr float FallUpright = 0.85f, FallFlat = 0.4f;
 constexpr float FallLastLean = 50.0f, FallMostLean = 65.0f;
 /// A big unit's wreck (see makeFalls) is never pressed lower than this much of its body's height.
 constexpr float WreckLowest = 0.35f;
+/// A big animal's wreck (a unit the table names a beast or gives legs) is this much of its body's height at most: its
+/// wreck's picture stands as tall as its own, and dead on its feet at seven tenths of its height a spider queen looked
+/// alive ("bigspiders on the map don't QUITE look dead enough", a player, GitHub issue #250).
+constexpr float AnimalWreckMost = 0.4f;
 /// A piece added for a view (see matchViews) keeps to the body's own surface: a depth's agreement with the other views
 /// counts BodyPull less for each voxel it lies from it (up to FarSteps half voxels: farther counts as that far).
 constexpr float BodyPull = 1.0f;
@@ -1542,6 +1546,9 @@ const float BackSlot = 4.0f * VOXELSCALE;
 /// A posed arm whose hand is on an item and whose drawing ends this much lower than that hand holds the item up: the
 /// drawing's lower end is its elbow (the unit table's "arms: elbow", see makeModel).
 const float PosedElbowUnder = 2.0f * VOXELSCALE;
+/// A reaching arm (the unit table's "arms: reach", see makeModel): its hand at least this far under its shoulder, and its
+/// elbow this far under its hand, voxels.
+const float ReachUnder = 2.0f * VOXELSCALE, ReachElbowLower = 0.5f * VOXELSCALE;
 const float FeetZone = 2.0f * VOXELSCALE, FootUnder = 1.0f * VOXELSCALE;
 const int FootReach = (int)(2.5f * VOXELSCALE * PixelsAcross);
 void continueFeet(const PartFrames &part, Uint8 code, std::vector<Uint8> &owner)
@@ -3912,7 +3919,7 @@ void makeFalls(VoxelUnitModel &model, const std::vector<std::vector<Uint8>> &dea
 		int wreckFrom = FrameSize;
 		for (int i = 0; i < FrameSize * FrameSize && wreckFrom == FrameSize; ++i) if (corpse[i]) wreckFrom = i / FrameSize;
 		const float tall = std::max(1.0f, highest - drop), lost = std::max(0.0f, wreckFrom - standsFrom - drop);
-		const float squash = std::clamp((tall - lost) / tall, WreckLowest, 1.0f);
+		const float squash = std::clamp((tall - lost) / tall, WreckLowest, animal ? AnimalWreckMost : 1.0f);
 		std::unordered_set<long long> taken; // (two cubes pressed into one cell are one)
 		for (size_t k = 0; k < own; ++k)
 		{
@@ -5285,7 +5292,12 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// from all eight drawings (see levelOff): the owner, "leave all units as before only the turrets (2x2) that cant
 	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
 	// tanks and the Cyberdisc keep the shape their eight drawings leave.)
-	const bool turret = routine.big && routine.still;
+	// (And a turret one tile big that the unit table names "shape: turret", a gun on a mount standing on a ring of
+	// wire: carved from its eight drawings its ring and post went, thin as they are, and what was left of the gun hung
+	// in the air, a lump: "turret hovers, when it shouldn't. Also, could use barrel definition", a player, GitHub issue
+	// #250. The same block, standing on the floor, with its gun.)
+	const bool smallTurret = routine.whole && !routine.big && (routine.traits & 32768) != 0;
+	const bool turret = (routine.big && routine.still) || smallTurret;
 	// (A tank: a hull with a turret of its own, whose drawings are on the left arm's frames, see VoxelUnits::modelFor.
 	// Each is made a plain block as a turret is, the hull's and on it the turret's with its barrel, and painted from all
 	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
@@ -5307,7 +5319,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// body, whatever else the table calls it.)
 	const int legsASide = routine.whole && !turret && !tank ? (routine.traits >> 4) & 7 : 0;
 	LegThinNow = legsASide ? legThin(parts[0]) : LegThin;
-	const bool beast = routine.whole && !routine.big && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
+	const bool beast = routine.whole && !routine.big && !smallTurret && !legsASide && longBody(parts[0]) && (routine.beast || thinDrawing(parts[0]));
 	LongReading longReading = beast ? readLong(parts[0], routine.beast) : LongReading(); // (its length is found with its shape: see longShape)
 	float beastLegsTop = 0.0f;
 	std::vector<int> onTop[8], solidOnTop[8];
@@ -5354,10 +5366,10 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		// shape is the 8 views' alone, strictly, but for a big walker's: its frames, as a one-tile unit's, don't quite
 		// agree, and a strict hull of them lost its shell and horns)
 		// (a long body, a beast on four legs: its side drawings' outline, see profile)
-		const std::vector<Uint8> shape = routine.big ? std::vector<Uint8>(GridCells, 1) : beast ? longShape(solid, beastLegsTop, routine.beast, longReading) : limb(solid, RightSide);
+		const std::vector<Uint8> shape = routine.big || smallTurret ? std::vector<Uint8>(GridCells, 1) : beast ? longShape(solid, beastLegsTop, routine.beast, longReading) : limb(solid, RightSide);
 		// (a thin thing drawn on one frame, a snake, a spider on long legs: carved as a limb is, see LimbCarveReach)
 		// (a long body has its width from its own side drawing, see profile: the other drawings don't cut it)
-		const bool thin = !routine.big && thinDrawing(solid);
+		const bool thin = !routine.big && !smallTurret && thinDrawing(solid);
 		// (A humanoid's shape is its frontal and side drawings' and no more: the owner, of a civilian cut by all eight,
 		// "Just create a model from frontal and side and that is it. You can ignore the other positioning!", "use only
 		// frontal sprite and back look and the front and left for side depth / profile. Diagonal only for colouring and
@@ -5371,7 +5383,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 		const int lowCardinals = Cardinals & ~(1 << ((Front + 4) % 8));
 		std::vector<Uint8> hull = beast ? std::vector<Uint8>(GridCells, 1) : humanoid ? carve(solid, 0, shape, 0, false, Cardinals, lowCardinals, FeetZone)
 			: fourSided ? carve(solid, 0, shape, 0, false, Cardinals)
-			: carve(solid, bigHull ? 0 : 1, shape, thin ? LimbCarveReach : 0);
+			: carve(solid, bigHull || smallTurret ? 0 : 1, shape, thin ? LimbCarveReach : 0);
 		// (An upright creature that the cut leaves headless: its drawings are read level as well. Some are drawn as a
 		// thing standing is looked at, not as the views' slant would show it: a head held forward no lower from the
 		// front than from behind. Cut along the slant alone, what stands off such a body's middle goes wherever two
@@ -5555,6 +5567,18 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			{
 				std::copy(drawnEnd, drawnEnd + 3, elbow);
 				elbow[1] = std::min(elbow[1], shoulder[1]);
+			}
+			// (The unit table's "arms: reach", for the units it names: an arm whose hand holds its item well under the
+			// shoulder hangs from the shoulder to the hand's height and reaches from there to the item, an upper arm down
+			// and a forearm across, each as long as that makes it. XPiratez's Brutes are drawn with arms that hang to the
+			// knee, and the arm on a pistol at the waist bent short from the front, hanging from the side: on two bones
+			// of the free arm's length the elbow went down to the thigh and the forearm came back up to the pistol, an
+			// arm hanging under a gun in the air: "Arm jank", a player, GitHub issue #249.)
+			if ((routine.arms & 32) && arm.holds && hand[2] < shoulder[2] - ReachUnder)
+			{
+				elbow[0] = shoulder[0];
+				elbow[1] = std::min(shoulder[1], hand[1]);
+				elbow[2] = hand[2] - ReachElbowLower;
 			}
 			armRadii(frames, shoulder, elbow, hand, radius);
 			// Arms outside the body (the unit table's "arms: outside", for the units it names): a body drawn in a robe
@@ -6410,7 +6434,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
 	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
-	makeFalls(*model, deaths, corpse, lying, palette, routine.big, bigHull, routine.beast || legsASide);
+	// (a small turret's wreck is its own block too, as a big turret's: its corpse's picture laid flat on the floor as a
+	// body's is was "a big metal smear", the same issue)
+	makeFalls(*model, deaths, corpse, lying, palette, routine.big || smallTurret, bigHull || smallTurret, routine.beast || legsASide);
 	return model;
 }
 

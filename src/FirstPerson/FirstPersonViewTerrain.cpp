@@ -3263,6 +3263,29 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// A ghost shape from the mod's table (the shops' racks, see buildShape) is built instead, with
 	// the setting on at all. Walkable or not, every ghost shows at the setting "Ghost opacity" (the
 	// owner took back a fainter ghost where no one can walk: the racks looked far too ghostly).
+	// Still water by the mod's table (`stillWater:`, see below): the palette's colour groups that are water on this
+	// floor, a bit each, or 0: a floor, no sea's, on which StillWaterLeast of the art's pixels or more are of the groups
+	// the table names for its record.
+	// (A floor that animates is in every frame what its first frame is: water in all of them or in none, and its face
+	// filled in in all of them. Each frame was asked by its own art, and the first frame's filling took the later
+	// frames' with it: a swamp's deep water was a pit of five columns in some frames of its ripples, a player, GitHub
+	// issue #238, "some frames of animations remove tiles".)
+	auto stillWaterOn = [&](const VoxelModel *first) -> Uint16 {
+		if (mapData->getObjectType() != O_FLOOR || waterFloor || cutout) return 0;
+		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
+		if (!groups) return 0;
+		if (first) return first->stillWater != 0 ? groups : (Uint16)0;
+		int drawn = 0, wet = 0;
+		for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
+			for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
+			{
+				const Uint8 color = sprite->getPixel(spriteX, spriteY);
+				if (!color) continue;
+				++drawn;
+				wet += (groups >> (color >> 4)) & 1;
+			}
+		return drawn > 0 && wet >= StillWaterLeast * drawn ? groups : (Uint16)0;
+	};
 	if (model.empty)
 	{
 		const bool ghostShape = shape && shape->ghost;
@@ -3340,6 +3363,14 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 				model.ghostKind = flatFloor ? 6 : 4;
 				buildGhost(model, sprite, mapData->getObjectType(), yOffset);
 				if (flatFloor) model.solidGhost = !model.empty;
+				// (Still water the game gives no voxels at all, a swimming pool's: its flat face, filled in above, mirrors as
+				// a pond's does (the mod's table `stillWater:`, see below, where a floor with voxels is asked): "pool ...
+				// could use reflective water effect", a player, GitHub issue #253.)
+				if (flatFloor && !model.empty)
+				{
+					model.stillWater = stillWaterOn(firstFrame);
+					if (model.stillWater) _anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
+				}
 			}
 			if (!model.empty) colorHiddenSides(model, sprite);
 		}
@@ -3456,28 +3487,9 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	// reeds and the lilies beside them stay what they are. Where the game gives such a floor only a few voxels (the
 	// deep water of the big mods' swamps and beaches: five of its tile's 256 columns), the rest of its art is filled
 	// in solid, not as a ghost seen through: it is the water's face.
-	if (mapData->getObjectType() == O_FLOOR && !waterFloor && !model.empty && !cutout)
+	if (!model.empty)
 	{
-		const Uint16 groups = firstPerson.getStillWater(dataSet->getName(), record);
-		// (A floor that animates is in every frame what its first frame is, as above: water in all of them or in none,
-		// and its face filled in in all of them. Each frame was asked by its own art, and the first frame's filling
-		// took the later frames' with it: a swamp's deep water was a pit of five columns in some frames of its ripples,
-		// a player, GitHub issue #238, "some frames of animations remove tiles".)
-		bool still = firstFrame && firstFrame->stillWater != 0;
-		if (groups && !firstFrame)
-		{
-			int drawn = 0, wet = 0;
-			for (int spriteY = 0; spriteY < sprite->getHeight(); ++spriteY)
-				for (int spriteX = 0; spriteX < sprite->getWidth(); ++spriteX)
-				{
-					const Uint8 color = sprite->getPixel(spriteX, spriteY);
-					if (!color) continue;
-					++drawn;
-					wet += (groups >> (color >> 4)) & 1;
-				}
-			still = drawn > 0 && wet >= StillWaterLeast * drawn;
-		}
-		if (groups && still)
+		if (const Uint16 groups = stillWaterOn(firstFrame))
 		{
 			model.stillWater = groups;
 			_anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
@@ -5648,7 +5660,7 @@ void FirstPersonView::arenaStep()
 		}
 		for (BattleUnit *unit : *_save->getUnits())
 		{
-			if (unit->getId() != id || unit->isOut()) continue;
+			if (unit->getId() != id || unit->getPosition().x < 0) continue; // (a dead unit too: the camera on where it lies)
 			const int size = unit->getArmor()->getSize();
 			const Tile *tile = _save->getTile(unit->getPosition());
 			const double feet[3] = { unit->getPosition().x * 16.0 + 8.0 * size, unit->getPosition().y * 16.0 + 8.0 * size,

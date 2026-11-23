@@ -91,6 +91,7 @@
 #include "../Mod/Unit.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
+#include "../Savegame/HitLog.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/SavedGame.h"
 #include "../Ufopaedia/Ufopaedia.h"
@@ -3035,6 +3036,7 @@ void FirstPersonMode::fire(int pixelX, int pixelY)
 			action->targetVoxel = Position(-1, -1, -1);
 			return;
 		}
+		if (timeUnitsEnough) noteWeaponInHitLog(unit, weapon, BA_HIT);
 		battleGame->handleNonTargetAction();
 		action->targetVoxel = Position(-1, -1, -1); // (taken by the game's melee, if it went ahead)
 
@@ -3163,6 +3165,40 @@ BattleItem *FirstPersonMode::pairedGun(BattleUnit *unit, BattleItem *weapon, Bat
 		}
 	}
 	return otherWeapon;
+}
+
+/**
+ * Notes the weapon about to be used in the game's hit log (Ctrl+H; the turn diary, Ctrl+Alt+H). On the map the note
+ * is written when a fire mode is picked from the weapon's menu (ActionMenuState), and shot after shot with that
+ * choice goes under it; a shot or a blow from the 3D view has no menu, and its hits stood in the log under no weapon,
+ * or under the one last picked on the map ("no note for what gun", a player, GitHub issue #251). So the same here:
+ * a new note when the soldier, the weapon, the fire mode, the tile he stands on or the turn is another than at the
+ * last one, or the log no longer begins with this weapon (a pick on the map, reaction fire, a new turn in between);
+ * else the shots go on under the note there is.
+ * @param unit The soldier.
+ * @param weapon The weapon used.
+ * @param mode The fire mode (a shot, a throw, a blow).
+ */
+void FirstPersonMode::noteWeaponInHitLog(const BattleUnit *unit, const BattleItem *weapon, BattleActionType mode)
+{
+	if (!unit || !weapon || Options::oxceDisableHitLog || _save->getSide() != FACTION_PLAYER)
+	{
+		return;
+	}
+	const std::string name = _state->tr(weapon->getRules()->getType());
+	const bool same = _hitLogNote.unit == unit && _hitLogNote.weapon == weapon && _hitLogNote.mode == mode
+		&& _hitLogNote.tile == unit->getPosition() && _hitLogNote.turn == _save->getTurn()
+		&& _save->getHitLog()->getHitLogText().compare(0, name.size(), name) == 0;
+	if (same)
+	{
+		return;
+	}
+	_hitLogNote.unit = unit;
+	_hitLogNote.weapon = weapon;
+	_hitLogNote.mode = mode;
+	_hitLogNote.tile = unit->getPosition();
+	_hitLogNote.turn = _save->getTurn();
+	_save->appendToHitLog(HITLOG_PLAYER_FIRING, FACTION_PLAYER, name);
 }
 
 /**
@@ -3299,6 +3335,7 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
 	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
 	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
+	noteWeaponInHitLog(unit, weapon, mode);
 	battleGame->primaryAction(targetTile);
 	if (action->sprayTargeting)
 	{

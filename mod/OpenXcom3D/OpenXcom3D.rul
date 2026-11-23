@@ -135,6 +135,14 @@ firstPerson:
     - { dataSet: POLAR, groups: [8], records: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80] }
     - { dataSet: LAVA_SWAMP, groups: [8] }
     - { dataSet: SEABITS, groups: [8] }
+    # XPiratez's swimming pool (four floors of its city decor: lit water in a tiled basin), and the same four pictures
+    # in other sets of XPiratez's and The X-Com Files' (the scan above)
+    - { dataSet: COMDECOR, groups: [8, 13], records: [61, 62, 63, 64] }
+    - { dataSet: ARENA, groups: [8, 13], records: [1, 2, 3, 4] }
+    - { dataSet: DECORLUX, groups: [8, 13], records: [54, 59, 65, 67] }
+    - { dataSet: MADDECOR, groups: [8, 13], records: [54, 59, 65, 67] }
+    - { dataSet: XB3BITZ3, groups: [8, 13], records: [10, 11, 12, 13] }
+    - { dataSet: HAVIRABASE, groups: [8, 13], records: [0, 1, 2, 3] }
   # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
   # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
   # A list replaces the earlier one.
@@ -299,6 +307,11 @@ firstPerson:
       top: back
       sculpt: frontal
       back: smooth
+    # XPiratez's doll (the Aurora doll's sheet): a gal's sheet with hair down to the waist. The depth limit above is
+    # measured from the back, which is the hair there, and took the chest off instead of the hips: a flat chest over
+    # a belly, behind it a back as deep as the hair. Its hips are drawn no deeper than its waist: no limit
+    - names: [PIR_1111.PCK]
+      torsoDepth: 0
     # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
     # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
     # drawings
@@ -318,6 +331,40 @@ firstPerson:
       animation: sprite
     - names: [HALLUCINOID]
       animation: pulse
+    # XPiratez's people and mutants who hold their weapons at the waist (its bandits, traders, soldiers of every army,
+    # Humanists, government men, raiders, scientists, zombies: sprite sheets that only XPiratez's own units wear): the
+    # arm that holds is on its bones, from the shoulder to the hand on the weapon; as drawn it stayed beside that one, a
+    # second forearm and hand at the hip under the gun. Every unit of XPiratez's with arms was made holding a pistol, a
+    # two-handed gun and a blade, and measured: named here are the sheets on which that leftover shows and posing it
+    # keeps seven tenths or more of each arm
+    - names: [APO_1.PCK, APO_2.PCK, ARMY_AIRBORNE.PCK, ARMY_BAMBOO.PCK, ARMY_BUSH.PCK,
+              ARMY_CHEM.PCK, ARMY_DARK.PCK, ARMY_EMPIRE.PCK, ARMY_ES.PCK, ARMY_HUBB.PCK,
+              ARMY_NORD.PCK, ARMY_REDCOAT.PCK, ARMY_REDREV.PCK, ARMY_RUS.PCK, ARMY_STEEL.PCK,
+              AUR_01.PCK, BAN_11.PCK, BAN_13.PCK, BAN_14.PCK, CLICKOR.PCK, COS_0.PCK, COS_10.PCK,
+              COS_11.PCK, COS_6.PCK, COS_9.PCK, CYCLOPS.PCK, DEEP_9.PCK, DREADKNIGHT.PCK,
+              GOV_10.PCK, GOV_11.PCK, GOV_2.PCK, GOV_3.PCK, GOV_4.PCK, GOV_5.PCK, GOV_7.PCK,
+              GOV_9.PCK, HYBB_00.PCK, HYBB_01.PCK, LAM_M.PCK, MAR_0.PCK, MPO_0.PCK, MPO_2.PCK,
+              MUT_4.PCK, MUT_6.PCK, NAZ_1.PCK, NAZ_2.PCK, NAZ_4.PCK, NAZ_5.PCK, NAZ_6.PCK,
+              NUB_7.PCK, RCF.PCK, RDR_1.PCK, RDR_2.PCK, RDR_3.PCK, RDR_4.PCK, RDR_5.PCK, RDR_8.PCK,
+              RDR_9.PCK, REB_4.PCK, RET_1.PCK, ROBOMAID.PCK, SCI_0.PCK, SCI_1.PCK, SCI_10.PCK,
+              SCI_11.PCK, SCI_12.PCK, SCI_13.PCK, SCI_14.PCK, SCI_2.PCK, SCI_3.PCK, SCI_4.PCK,
+              SCI_5.PCK, SCI_7.PCK, SKELETON_CIV.PCK, SKELETON_SWAT.PCK, SLAVE_GOPHER.PCK,
+              SLAVE_M.PCK, SMU_4.PCK, SMU_5.PCK, SNK_3.PCK, SPIDERGIRL.PCK, SPT_0.PCK, SPT_1.PCK,
+              SPT_2.PCK, SPT_3.PCK, STYGIAN_SERF.PCK, TEC_0.PCK, TEC_0A.PCK, TRD_10.PCK, TRD_11.PCK,
+              TRD_12.PCK, TRD_13.PCK, TRD_14.PCK, TRD_15.PCK, TRD_3.PCK, TRD_4.PCK, TRD_5.PCK,
+              TRD_8.PCK, TRD_9.PCK, UBR_BLT.PCK, UBR_CBY.PCK, VAMP.PCK, VAU_2.PCK,
+              WORKER_HAZMAT.PCK, WRAITH.PCK, WRAITH_ELITE.PCK, WRAITH_GUARD.PCK, XENO_2.PCK,
+              ZOMBIE_SADAKO.PCK]
+      arms: posed
+    # and those among them whose pistol arm still hung three pixels or more under the pistol, with the Brutes and all
+    # who share their build (arms drawn long as an ape's, the one on a pistol bent short): the arm reaches too, an
+    # upper arm down to the hand's height and a forearm across to the weapon
+    - names: [APO_0.PCK, ARMY_RUS_BOLSHOY.PCK, BAN_15.PCK, BSAILOR.PCK, BUTCH.PCK, BUTCH2.PCK,
+              CYBORG.PCK, GOV_1.PCK, GOV_6.PCK, GOV_8.PCK, MPO_1.PCK, MPO_3.PCK, MRC_0.PCK,
+              MRC_1.PCK, MRC_3.PCK, MRC_5.PCK, MRC_6.PCK, MTN_1.PCK, MUT_5.PCK, NAZ_9.PCK,
+              RDR_11.PCK, RDR_6.PCK, RDR_7.PCK, REB_5.PCK, RET_2.PCK, RET_3.PCK, SMU_3.PCK,
+              SOL_3.PCK, SPT_4.PCK, STYGIAN_GUARD.PCK, ZBOSS.PCK, ZOMBIE_BUSTER.PCK]
+      arms: posed reach
     # People of the human race (The X-Com Files' civilians of every trade, police, gangers, hunters; XPiratez's humans
     # and its Doom soldiers): an arm is painted by its own drawing, not the body's drawn over it (hands on a shirt), and
     # is where its bones are (a pistol held out, and no second forearm left at the hip), its elbow down under a hand
@@ -336,8 +383,12 @@ firstPerson:
     - names: [GILLDOG, BLOODHOUND, SLIMEDOGE.PCK, BAN_6.PCK, BH_ARMORED.PCK]
       trunk: round
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
+    # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
+    # pressed lower: the four drawings, all made from above, leave a point on it)
     - names: [FROG, "*FROG", TOAD, "*TOAD"]
       sculpt: sides
+      stands: floor
+      flat: 60
     # flat things that came out pointed: X-COM's Cyberdisc, a saucer (a cone on its top and one under it: a low dome
     # each, still a bulge); TFTD's Hallucinoid, a jellyfish's bell; XPiratez's Academy drone, a small saucer with a
     # visor in its rim (painted as a hull: the visor on its front, not under it)
@@ -354,6 +405,14 @@ firstPerson:
     # (a launcher's tube of a plain size on the turret's front)
     - names: [STR_HOVERTANK_LAUNCHER]
       barrels: 1
+    # turrets whose one barrel the drawings show between two struts of the mount, read as two barrels: XPiratez's
+    # gun turrets (sheet XTURRET) and The X-Com Files' UAC turret, the same drawings
+    - names: [XTURRET.PCK, UAC_TURRET.PCK]
+      barrels: 1
+    # a turret one tile big that cannot move, a gun on a post over a ring of wire (XPiratez's minigun turret): a plain
+    # block standing on the floor, with its gun, as the big turrets are
+    - names: [TURRET_MINIGUN.PCK]
+      shape: turret
     # The X-Com Files' Church of Dagon: robes carved as wide as they hang, with the arms inside them; long sleeves on
     # arms posed on their guns (arms outside the body, coloured along their length)
     # (and posed on their bones, the elbow down under a hand that holds a gun up: a disciple's pistol arm stood

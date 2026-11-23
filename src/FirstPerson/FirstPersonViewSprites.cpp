@@ -1832,7 +1832,11 @@ void FirstPersonView::drawUnits()
 			// XPiratez's Cacodemon "right against the floor when hitbox (and doom behavior) should indicate it hovering
 			// slightly"). One whose drawings hold it up already, a Floater, stays as drawn.
 			{
-				const double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
+				double lift = fall <= 0.0 && unit->getFloatHeight() > 0 ? std::max(0.0, unit->getFloatHeight() - body->lowest * unitScale) : 0.0;
+				// (And the other way, for a unit the table names "stands: floor": one the game stands on the ground whose
+				// body, by its drawings, ends above it is set down until its lowest cube is on the floor: XPiratez's
+				// Bullfrog, "slightly off ground", a player, GitHub issue #252.)
+				if (body->onFloor && fall <= 0.0 && unit->getFloatHeight() <= 0) lift = -std::max(0.0, body->lowest * unitScale);
 				standing[2] += lift;
 				glide.lift = lift;
 			}

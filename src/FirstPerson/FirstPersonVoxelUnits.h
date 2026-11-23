@@ -107,6 +107,10 @@ struct VoxelUnitModel
 	/// How high over the middle of its feet the body's lowest voxel is (voxels; what it holds apart): a unit the game
 	/// holds off the ground is lifted until that is at its float height (see FirstPersonView::drawUnits).
 	float lowest = 0.0f;
+	/// A body set down (the unit table's "stands: floor", for the units it names): standing, it is drawn that much lower,
+	/// its lowest voxel on the floor (see FirstPersonView::drawUnits). A creature whose feet the carving lost, a frog on
+	/// the tips of its toes, sat in the air over its tile.
+	bool onFloor = false;
 	/// Which part of the unit a voxel is.
 	enum Part : Uint8 { Torso = 1, LeftArm, RightArm, Legs, Item };
 	/// Each surface voxel's place from the middle of the unit's feet: to its right, ahead and up, in voxels.

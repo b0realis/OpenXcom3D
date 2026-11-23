@@ -124,7 +124,7 @@ public:
 		int frontal = -1; // (the body kept to its front and back drawings' outlines: 1; a big walker cut by its four drawings from front, back and sides: 2; as ever: 0)
 		int animated = -1; // (a body for each frame of the sprite's own animation, if it has one: 1 or nothing said; one body: 0; one body that rises, sinks and swells in a slow beat: 2)
 		int relief = -1; // (the body is its one drawing given volume: 1; carved from its drawings: 0; nothing said: by what its drawings are)
-		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends; 0 as drawn)
+		int arms = -1; // (a bit each: 1 its arms outside the body, 2 coloured along their length, 4 painted by their own drawing alone, 8 posed on their bones, 16 the elbow of an arm that holds its item up where its drawing ends, 32 an arm that holds an item as long as its own drawing is; 0 as drawn)
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
@@ -136,6 +136,8 @@ public:
 		int sparks = -1; // (big and flying, it hovers on a rain of sparks: 1; nothing under it, as every other unit: 0)
 		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
+		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
+		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -355,7 +357,8 @@ public:
 
 		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
-		// relief: its one drawing given volume, see VoxelBodies::Routine; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
+		// relief: its one drawing given volume, see VoxelBodies::Routine; turret: one tile big and unable to move, made a plain
+		// block with its gun as the big turrets are; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
 		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
 		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
 		// we dont have unit name in table we will apply some general rules").
@@ -364,7 +367,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -372,6 +375,7 @@ public:
 				{
 					look.beast = shape == "beast" ? 1 : 0;
 					look.relief = shape == "relief" ? 1 : 0;
+					look.smallTurret = shape == "turret" ? 1 : 0;
 				}
 				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
@@ -386,7 +390,7 @@ public:
 					{
 						const size_t end = std::min(arms.find_first_of(" ,", at), arms.size());
 						const std::string word = arms.substr(at, end - at);
-						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : word == "elbow" ? 16 : 0;
+						look.arms |= word == "outside" ? 1 : word == "along" ? 2 : word == "both" ? 3 : word == "own" ? 4 : word == "posed" ? 8 : word == "elbow" ? 16 : word == "reach" ? 32 : 0;
 						at = end + 1;
 					}
 				}
@@ -397,6 +401,7 @@ public:
 				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
 				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
 				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
+				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -514,6 +519,8 @@ public:
 			if (entry.second.barrels != -1) look.barrels = entry.second.barrels;
 			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
 			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
+			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
+			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 		}
 		return look;
 	}
