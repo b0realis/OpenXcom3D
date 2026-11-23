@@ -378,6 +378,10 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 /// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
 /// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
 void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
+/// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
+/// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
+std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut);
+
 /// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 /// it before and after a hit: what the hit took off the side it struck).
 int armorPoints(const BattleUnit *unit);
@@ -471,6 +475,7 @@ inline unsigned aimCallOffs() { return 0; }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
+inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
 inline int armorPoints(const BattleUnit *) { return 0; }
 inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }
 inline void drawMapDamageNumbers(BattlescapeState *, Surface *, const Camera *) { }

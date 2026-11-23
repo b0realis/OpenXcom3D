@@ -70,6 +70,9 @@
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
+#include "../Savegame/SavedBattleGame.h"
+#include "../Savegame/SavedGame.h"
+#include "../Engine/Language.h"
 
 namespace OpenXcom
 {
@@ -1431,6 +1434,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls
 	// hidden) and on the map (see FirstPersonDamageNumbers.cpp). Off: none.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageNumbers", &fpsDamageNumbers, false, "STR_FPS_DAMAGE_NUMBERS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitLogDetail", &fpsHitLogDetail, false, "STR_FPS_HIT_LOG_DETAIL", category)); // (the owner: whom, how much, who fell)
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
 	// more: IDKFA (endless ammo) and IDDQD (invincible soldiers); in doom mode grenades go off in
@@ -1797,6 +1801,48 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
 {
 	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
+}
+
+/**
+ * What the hit log adds after a hit's word with the setting "Detailed hit log" (see FirstPersonApi.h; the owner: the
+ * original log "in 3D window exactly", enhanced inside its window, with who was hit, the damage numbers, and kills and
+ * knock-outs). The game's own log says only 0, hit (up to a fifth of the unit's full health) or HIT for each unit a
+ * hit hurts; this names the unit as the game names it (a soldier's name, an alien's race), the health it lost and the
+ * stun it took, and "killed" or "down" when that hit put it out. A unit the squad doesn't see stays unnamed, with no
+ * numbers ("unseen"): the log tells no more than the player could know (in the game's debug mode, everything).
+ * @param state The battlescape screen.
+ * @param target The unit hit.
+ * @param healthDamage The health it lost.
+ * @param stunDamage The stun it took.
+ * @param wasOut It was down or dead already before the hit.
+ * @return The text, ending in a space; empty with the setting off.
+ */
+std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut)
+{
+	if (!state || !target || !Options::fpsHitLogDetail)
+	{
+		return std::string();
+	}
+	Language *lang = state->getGame()->getLanguage();
+	const SavedBattleGame *save = state->getGame()->getSavedGame() ? state->getGame()->getSavedGame()->getSavedBattle() : nullptr;
+	const bool known = target->getOriginalFaction() == FACTION_PLAYER || target->getFaction() == FACTION_PLAYER || target->getVisible()
+		|| (save && save->getDebugMode());
+	std::string text = "(";
+	if (!known)
+	{
+		text += std::string(lang->getString("STR_FPS_HIT_LOG_UNSEEN"));
+	}
+	else
+	{
+		text += target->getName(lang);
+		if (healthDamage > 0) text += " " + std::to_string(healthDamage);
+		if (stunDamage > 0) text += std::string(healthDamage > 0 ? ", " : " ") + std::string(lang->getString("STR_FPS_HIT_LOG_STUN")) + " " + std::to_string(stunDamage);
+		if (!wasOut && target->isOutThresholdExceed())
+		{
+			text += ", " + std::string(lang->getString(target->getHealth() <= 0 ? "STR_FPS_HIT_LOG_KILLED" : "STR_FPS_HIT_LOG_DOWN"));
+		}
+	}
+	return text + ") ";
 }
 
 /**
