@@ -167,6 +167,7 @@ struct Picture
 {
 	Pose pose;
 	std::vector<Uint8> pixels; // SpriteBufferSize square, 1 for a solid pixel
+	std::vector<Uint8> colors; // the same picture's palette colours, unlit (0: nothing there): what a mirror shows (see spriteColorsOf)
 };
 struct SpriteCache
 {
@@ -231,10 +232,16 @@ const std::vector<Uint8> &spriteOf(SavedBattleGame *save, const BattleUnit *unit
 	}
 	picture.pose = pose;
 	picture.pixels.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
+	picture.colors.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
 	cache.buffer->lock();
 	for (int y = 0; y < SpriteBufferSize; ++y)
 	{
-		for (int x = 0; x < SpriteBufferSize; ++x) picture.pixels[(size_t)y * SpriteBufferSize + x] = cache.buffer->getPixel(x, y) != 0;
+		for (int x = 0; x < SpriteBufferSize; ++x)
+		{
+			const Uint8 color = cache.buffer->getPixel(x, y);
+			picture.colors[(size_t)y * SpriteBufferSize + x] = color;
+			picture.pixels[(size_t)y * SpriteBufferSize + x] = color != 0;
+		}
 	}
 	cache.buffer->unlock();
 	return picture.pixels;
@@ -948,6 +955,63 @@ double hullLayBack(const BattleUnit *unit)
 	const int routine = unit->getArmor()->getDrawingRoutine();
 	const bool vehicle = routine == 2 || routine == 3 || routine == 11 || !unit->getArmor()->allowsMoving();
 	return vehicle ? HullLayBack * Pi / 180.0 : 0.0;
+}
+
+/**
+ * A unit's upright card for a mirror (see FirstPersonSpriteHits.h).
+ */
+bool mirrorCard(SavedBattleGame *save, const BattleUnit *unit, MirrorCard &card)
+{
+	if (!save || !unit || unit->isOut() || !unit->getTile())
+	{
+		return false;
+	}
+	SpriteCard standing;
+	card.scale = startCard(save, unit, standing);
+	std::copy(standing.anchor, standing.anchor + 3, card.anchor);
+	card.anchorX = standing.anchorX;
+	card.anchorY = standing.anchorY;
+	card.rowsBelow = standing.rowsBelow;
+	return true;
+}
+
+/**
+ * A unit's picture from one of its eight sides, in its colours (see FirstPersonSpriteHits.h).
+ */
+const std::vector<Uint8> &spriteColorsOf(SavedBattleGame *save, const BattleUnit *unit, int side)
+{
+	// Kept apart from the lines' pictures, which are made anew every animation frame: a mirror asks for all eight
+	// sides of a dozen units every frame drawn, and composing those ten times a second cost half a millisecond a
+	// frame. A side is made again when the unit's pose changes (it turns, kneels, takes aim, steps on), and else
+	// every MirrorPictureLasts ms, each unit and side at its own moment (what only the animation moves, a flame, a
+	// floater's sway, is a little late in a mirror).
+	const Uint32 MirrorPictureLasts = 400;
+	struct Kept
+	{
+		Pose pose;
+		Uint32 made = 0;
+		std::vector<Uint8> colors;
+	};
+	static const SavedBattleGame *keptFor = nullptr;
+	static std::map<std::pair<const BattleUnit*, int>, Kept> keptPictures;
+	if (keptFor != save)
+	{
+		keptFor = save;
+		keptPictures.clear();
+	}
+	Kept &kept = keptPictures[{ unit, side }];
+	const Pose pose(unit);
+	const Uint32 now = SDL_GetTicks();
+	if (kept.colors.empty() || !(kept.pose == pose) || now - kept.made >= MirrorPictureLasts)
+	{
+		const int rotation = 3 - side;
+		spriteOf(save, unit, rotation); // (made now, or kept from a line's test of it)
+		if (kept.colors.empty()) kept.made = now - (Uint32)((unit->getId() * 37 + side * 53) % (int)MirrorPictureLasts); // (its own moment)
+		else kept.made = now;
+		kept.pose = pose;
+		kept.colors = spriteCache().pictures[{ unit, rotation }].colors;
+	}
+	return kept.colors;
 }
 
 /**

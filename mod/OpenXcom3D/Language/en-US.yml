@@ -211,7 +211,7 @@ en-US:
   STR_FPS_COLORED_LIGHTS: "Coloured lights"
   STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
   STR_FPS_REFLECTIONS: "Reflections"
-  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it."
+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it. Units too."
   STR_FPS_LIGHT_SHAFTS: "Light shafts"
   STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
   STR_FPS_SURFACE_RELIEF: "Surface relief"

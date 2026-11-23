@@ -127,6 +127,8 @@ public:
 		const Sint16 *mirrorOfTile;               // per tile: its craft's mirror, -1 none; or null
 		const Mirror *mirrors;
 		int mirrorCount;
+		const Sint32 *mirrorUnits;                // setting "Reflections": the units a mirror shows (see FirstPersonView::mirrorUnits), or null
+		int mirrorUnitNumbers;                    // how many numbers that is
 	};
 	/// What a ray met, as it comes back from the card (four numbers a ray).
 	struct RayResult

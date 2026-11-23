@@ -452,6 +452,7 @@ uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the
 uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 #endif
 uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
+uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 // (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
 // (COLORED_LIGHTS, REFLECTIONS, LIGHT_SHAFTS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
@@ -1087,6 +1088,53 @@ vec3 seaMirror(vec3 rayDirection, float x, float y, float span, float swell, out
 	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
 	share = 0.1 + 0.65 * glancing * glancing * glancing;
 	return normalize(mirrored);
+}
+
+/**
+ * A unit in a mirror (setting "Reflections": window glass, still water and metal mirror the units as well as the world):
+ * the nearest unit a mirrored ray meets before what it met of the world. Each unit is an upright card through the middle
+ * of where it stands, turned square to where the ray comes from across the map, with the unit's own drawing of the side
+ * seen from there, of its eight (see FirstPersonView::mirrorUnits for the numbers; FirstPerson::cardRay for the same
+ * test on the CPU, which the lines of fire use). Lit as the unit is where it stands, a little darker with the way.
+ */
+bool mirrorUnit(vec3 origin, vec3 direction, float reach, out vec3 rgb)
+{
+	rgb = vec3(0.0);
+	if (uMirrorUnits < 0) return false;
+	bool shown = false;
+	int count = texelFetch(uMirrors, uMirrorUnits).r;
+	for (int index = 0; index < count; ++index)
+	{
+		int record = uMirrorUnits + 1 + index * MirrorUnitNumbers;
+		// (one number for where it stands: most units are nowhere near the ray, and are done with here)
+		int place = texelFetch(uMirrors, record).r;
+		vec2 towards = origin.xy - vec2(float(place & 65535), float((place >> 16) & 65535)) / 16.0;
+		float away = length(towards);
+		if (away < 1.0) continue;
+		towards /= away;
+		float closing = -dot(direction.xy, towards);
+		if (closing < 0.0001) continue;
+		float along = away / closing;
+		if (along >= reach) continue;
+		float across = along * dot(direction.xy, vec2(towards.y, -towards.x));
+		if (abs(across) > float(SpriteBufferSize / 2) * SpritePixelX) continue;
+		float rowHeight = float(texelFetch(uMirrors, record + 3).r) / 1024.0;
+		int marks = texelFetch(uMirrors, record + 4).r;
+		int anchorRow = (marks >> 8) & 255;
+		int column = int(floor(float(marks & 255) + across / (SpritePixelX * rowHeight)));
+		int row = int(floor(float(anchorRow) - (origin.z + direction.z * along - float(texelFetch(uMirrors, record + 1).r) / 16.0) / rowHeight));
+		if (column < 0 || row < 0 || column >= SpriteBufferSize || row >= SpriteBufferSize || (row >= anchorRow && (marks & 65536) == 0)) continue;
+		int side = int(mod(floor((atan(towards.y, towards.x) * 57.29577951 + 90.0) / 45.0 + 0.5), 8.0));
+		int four = texelFetch(uMirrors, uMirrorUnits + texelFetch(uMirrors, record + 5).r + (side * SpriteBufferSize + row) * (SpriteBufferSize / 4) + (column >> 2)).r;
+		int color = (four >> ((column & 3) * 8)) & 255;
+		if (color == 0) continue;
+		float unitShade = max(0.0, float((marks >> 20) & 15) + distanceShade(along) + 1.5);
+		rgb = mix(paletteRgb(uint((color & 240) | min(15, (color & 15) + int(unitShade)))),
+			paletteRgb(uint((color & 240) | min(15, (color & 15) + int(unitShade) + 1))), unitShade - floor(unitShade));
+		reach = along;
+		shown = true;
+	}
+	return shown;
 }
 
 #endif
@@ -1966,17 +2014,22 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			int metTile, metAxis;
 			float metDistance;
 			vec3 seen;
-			if (castRay(surfacePoint, mirrored, min(uMaxDistance, 640.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
+			float unitReach = min(uMaxDistance, 640.0);
+			if (castRay(surfacePoint, mirrored, unitReach, 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
 			{
 				float metGlow;
 				float metShade = max(0.0, lightAt(surfacePoint + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
 				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
 					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
+				unitReach = met.t;
 			}
 			else
 			{
 				seen = skyRgbTowards(mirrored, pixelX, pixelY);
 			}
+			// (a unit standing before what the ray met: it is what the mirror shows there)
+			vec3 unitSeen;
+			if (mirrorUnit(surfacePoint, mirrored, unitReach, unitSeen)) seen = unitSeen;
 #ifdef METAL
 			if (metalMirrors)
 			{
@@ -2200,8 +2253,10 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 			int metTile, metAxis;
 			float metDistance;
 			vec3 seen;
-			if (castRay(pane + mirrored * 0.5, mirrored, min(uMaxDistance, 480.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
+			float unitReach = min(uMaxDistance, 480.0);
+			if (castRay(pane + mirrored * 0.5, mirrored, unitReach, 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
 			{
+				unitReach = met.t;
 				float metGlow;
 				// (the light before the face met, on the side it is seen from, as a face seen straight has it: at the face
 				// itself a room's far wall took the light of the tile behind it, the night outside)
@@ -2217,6 +2272,9 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 				seen = skyRgbTowards(mirrored, blockColumn, blockRow);
 				fullColor = kept;
 			}
+			// (a unit standing before what the ray met: it is what the pane shows there)
+			vec3 unitSeen;
+			if (mirrorUnit(pane + mirrored * 0.5, mirrored, unitReach, unitSeen)) seen = unitSeen;
 			fullColor = mix(fullColor, seen, share);
 		}
 #endif

@@ -51,6 +51,7 @@
  */
 #include "FirstPersonView.h"
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 #include <map>
 #include <unordered_set>
@@ -2143,6 +2144,84 @@ void FirstPersonView::testedPictureBands()
 			}
 		}
 	}
+}
+
+/**
+ * The units a mirror can show (setting "Reflections", the owner: "Windows and metals should also have unit and enemy
+ * reflections besides the world"): everyone standing whom the squad sees, the soldier looked through too (who sees
+ * himself in a window), the nearest MirrorUnitsMost within MirrorUnitReach of the eye. Each as an upright card with its
+ * own drawings from all eight sides (see FirstPerson::mirrorCard, spriteColorsOf): the mirrored ray meets the card
+ * turned square to where the ray comes from and takes the drawing of the side seen from there, so a mirror shows the
+ * side of a unit turned to it. The drawings, not the cube bodies of "Voxel units": the bodies are made from them, and
+ * no ray can walk a body's cubes on the card.
+ * As numbers for the graphics card: how many; then for each MirrorUnitNumbers (where the anchor is across the map, in
+ * sixteenths of a voxel, x and y in one number; its height; a spare; a picture row's height in 1024ths; the anchor pixel
+ * with whether the art below it shows and the light on the unit; where its pictures begin, counted from the first
+ * number); then each unit's eight pictures, four pixels a number.
+ * @param numbers Set to the numbers (one number, 0, with nobody to show).
+ */
+void FirstPersonView::mirrorUnits(std::vector<Sint32> &numbers) const
+{
+	numbers.assign(1, 0);
+	std::vector<std::pair<double, BattleUnit*>> near;
+	const bool debug = _save->getDebugMode();
+	for (BattleUnit *unit : *_save->getUnits())
+	{
+		if (unit->isOut() || !unit->getTile() || (!debug && !unit->getVisible()))
+		{
+			continue;
+		}
+		const int unitSize = unit->getArmor()->getSize();
+		const double away = std::hypot(unit->getPosition().x * 16.0 + 8.0 * unitSize - _steadyEye[0], unit->getPosition().y * 16.0 + 8.0 * unitSize - _steadyEye[1]);
+		if (away <= MirrorUnitReach) near.push_back({ away, unit });
+	}
+	std::sort(near.begin(), near.end(), [](const std::pair<double, BattleUnit*> &a, const std::pair<double, BattleUnit*> &b) {
+		return a.first != b.first ? a.first < b.first : a.second->getId() < b.second->getId();
+	});
+	if ((int)near.size() > MirrorUnitsMost) near.resize(MirrorUnitsMost);
+	const size_t pictureNumbers = (size_t)SpriteBufferSize * SpriteBufferSize / 4;
+	numbers.reserve(1 + near.size() * (MirrorUnitNumbers + 8 * pictureNumbers));
+	numbers.resize(1 + near.size() * MirrorUnitNumbers, 0);
+	int count = 0;
+	for (const auto &seen : near)
+	{
+		BattleUnit *unit = seen.second;
+		FirstPerson::MirrorCard card;
+		if (!FirstPerson::mirrorCard(_save, unit, card))
+		{
+			continue;
+		}
+		// (the light on it as on its picture in the view, at its chest: see drawUnits)
+		const float chest[3] = { (float)card.anchor[0], (float)card.anchor[1], (float)card.anchor[2] + 12.0f };
+		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false) - flareLight(chest, nullptr, false) * 8.0f, 0.0f, 15.0f));
+		Sint32 *record = &numbers[1 + (size_t)count * MirrorUnitNumbers];
+		record[0] = std::clamp((Sint32)std::lround(card.anchor[0] * 16.0), 0, 65535) | (std::clamp((Sint32)std::lround(card.anchor[1] * 16.0), 0, 65535) << 16);
+		record[1] = (Sint32)std::lround(card.anchor[2] * 16.0);
+		record[3] = (Sint32)std::lround(card.scale * 1024.0);
+		record[4] = card.anchorX | (card.anchorY << 8) | (card.rowsBelow ? 1 << 16 : 0) | (shade << 20);
+		record[5] = (Sint32)numbers.size(); // (counted from the first number, the count)
+		for (int side = 0; side < 8; ++side)
+		{
+			const std::vector<Uint8> &colors = FirstPerson::spriteColorsOf(_save, unit, side);
+			const size_t at = numbers.size();
+			numbers.resize(at + pictureNumbers, 0);
+			if (colors.size() == pictureNumbers * 4)
+			{
+				// (four pixels a number, the first in its lowest byte, whatever the machine's byte order)
+#if SDL_BYTEORDER == SDL_LIL_ENDIAN
+				std::memcpy(&numbers[at], colors.data(), pictureNumbers * 4);
+#else
+				for (size_t number = 0; number < pictureNumbers; ++number)
+				{
+					const Uint8 *four = &colors[number * 4];
+					numbers[at + number] = (Sint32)((Uint32)four[0] | ((Uint32)four[1] << 8) | ((Uint32)four[2] << 16) | ((Uint32)four[3] << 24));
+				}
+#endif
+			}
+		}
+		++count;
+	}
+	numbers[0] = count; // (a unit left out leaves a record unused behind the last one: the pictures' places stay)
 }
 
 /**

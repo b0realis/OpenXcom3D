@@ -124,7 +124,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3c161e9bd
+index 000000000..4d6612347
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,699 @@
@@ -341,7 +341,7 @@ index 000000000..3c161e9bd
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it. Units too."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -829,7 +829,7 @@ index 000000000..3c161e9bd
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..07f96dd15
+index 000000000..224659ea3
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,699 @@
@@ -1046,7 +1046,7 @@ index 000000000..07f96dd15
 +  STR_FPS_COLORED_LIGHTS: "Coloured lights"
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
-+  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it."
++  STR_FPS_REFLECTIONS_DESC: "With True colour. The sea and still water mirror the sky and what stands by them; window glass what is in front of it. Units too."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -28403,10 +28403,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..dde054699
+index 000000000..1473ada08
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3854 @@
+@@ -0,0 +1,3866 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28906,6 +28906,9 @@ index 000000000..dde054699
 +	number("DarkOverflowTo", DarkOverflowTo);
 +	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
 +	whole("WallPaintWhole", WallPaintWhole);
++	whole("MirrorUnitNumbers", MirrorUnitNumbers);
++	whole("SpriteBufferSize", SpriteBufferSize);
++	number("SpritePixelX", SpritePixelX);
 +	number("UnseenFogDarkening", UnseenFogDarkening);
 +	number("UnseenFogFromMax", UnseenFogFromMax);
 +	number("UnseenFogNormal", UnseenFogNormal);
@@ -29336,6 +29339,7 @@ index 000000000..dde054699
 +	std::vector<Uint8> blendSent; // the palette the blending table was last made for (see sendBlend)
 +	std::vector<Uint32> wallPaintTexels;
 +	std::vector<Sint32> mirrorNumbers, mirrorScratch; // the mirrors as the card has them (see sendMirrors), and this frame's, put together to compare
++	int mirrorUnitsAt = -1;                           // where the units a mirror shows begin in those numbers (setting "Reflections"); -1: none
 +
 +	void threadLoop();
 +	void run(const std::function<void()> &work);
@@ -30031,6 +30035,13 @@ index 000000000..dde054699
 +		}
 +		std::copy(header, header + 16, numbers.begin() + (size_t)index * 16);
 +	}
++	// (Setting "Reflections": behind them the units a mirror shows, in the same row: no buffer more for the shader.)
++	mirrorUnitsAt = -1;
++	if (frame.mirrorUnits && frame.mirrorUnitNumbers > 0 && numbers.size() + (size_t)frame.mirrorUnitNumbers <= (size_t)maxBufferTexels)
++	{
++		mirrorUnitsAt = (int)numbers.size();
++		numbers.insert(numbers.end(), frame.mirrorUnits, frame.mirrorUnits + frame.mirrorUnitNumbers);
++	}
 +	if (numbers == mirrorNumbers)
 +	{
 +		return;
@@ -30100,6 +30111,7 @@ index 000000000..dde054699
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 +	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 +	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
++	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 +	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 +	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
 +	const int colorLightCount = frame.palette ? std::clamp(frame.colorLightCount, 0, 16) : 0;
@@ -30407,9 +30419,9 @@ index 000000000..dde054699
 +	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 +	encodeTiles(frame);
 +	encodeTables(frame);
++	sendMirrors(frame); // (before the scene's numbers: it finds where the units a mirror shows begin)
 +	setScene(rays);
 +	sendWallPaints(frame);
-+	sendMirrors(frame);
 +	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
 +	{
 +		Log(LOG_WARNING) << "OpenXcom3D GPU: the world is bigger than this card's buffers take";
@@ -32263,10 +32275,10 @@ index 000000000..dde054699
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..b5263bf88
+index 000000000..58bdc9374
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,328 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32396,6 +32408,8 @@ index 000000000..b5263bf88
 +		const Sint16 *mirrorOfTile;               // per tile: its craft's mirror, -1 none; or null
 +		const Mirror *mirrors;
 +		int mirrorCount;
++		const Sint32 *mirrorUnits;                // setting "Reflections": the units a mirror shows (see FirstPersonView::mirrorUnits), or null
++		int mirrorUnitNumbers;                    // how many numbers that is
 +	};
 +	/// What a ray met, as it comes back from the card (four numbers a ray).
 +	struct RayResult
@@ -32807,10 +32821,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..64c0bca16
+index 000000000..86736157d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3327 @@
+@@ -0,0 +1,3385 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33265,6 +33279,7 @@ index 000000000..64c0bca16
 +uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 +#endif
 +uniform int uReflections;       // setting "Reflections": the sea mirrors the sky and what stands in it
++uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 +uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 +// (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
 +// (COLORED_LIGHTS, REFLECTIONS, LIGHT_SHAFTS; see FirstPersonGpu.cpp, programFor): with their code merely present, one driver's program ran at half
@@ -33900,6 +33915,53 @@ index 000000000..64c0bca16
 +	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
 +	share = 0.1 + 0.65 * glancing * glancing * glancing;
 +	return normalize(mirrored);
++}
++
++/**
++ * A unit in a mirror (setting "Reflections": window glass, still water and metal mirror the units as well as the world):
++ * the nearest unit a mirrored ray meets before what it met of the world. Each unit is an upright card through the middle
++ * of where it stands, turned square to where the ray comes from across the map, with the unit's own drawing of the side
++ * seen from there, of its eight (see FirstPersonView::mirrorUnits for the numbers; FirstPerson::cardRay for the same
++ * test on the CPU, which the lines of fire use). Lit as the unit is where it stands, a little darker with the way.
++ */
++bool mirrorUnit(vec3 origin, vec3 direction, float reach, out vec3 rgb)
++{
++	rgb = vec3(0.0);
++	if (uMirrorUnits < 0) return false;
++	bool shown = false;
++	int count = texelFetch(uMirrors, uMirrorUnits).r;
++	for (int index = 0; index < count; ++index)
++	{
++		int record = uMirrorUnits + 1 + index * MirrorUnitNumbers;
++		// (one number for where it stands: most units are nowhere near the ray, and are done with here)
++		int place = texelFetch(uMirrors, record).r;
++		vec2 towards = origin.xy - vec2(float(place & 65535), float((place >> 16) & 65535)) / 16.0;
++		float away = length(towards);
++		if (away < 1.0) continue;
++		towards /= away;
++		float closing = -dot(direction.xy, towards);
++		if (closing < 0.0001) continue;
++		float along = away / closing;
++		if (along >= reach) continue;
++		float across = along * dot(direction.xy, vec2(towards.y, -towards.x));
++		if (abs(across) > float(SpriteBufferSize / 2) * SpritePixelX) continue;
++		float rowHeight = float(texelFetch(uMirrors, record + 3).r) / 1024.0;
++		int marks = texelFetch(uMirrors, record + 4).r;
++		int anchorRow = (marks >> 8) & 255;
++		int column = int(floor(float(marks & 255) + across / (SpritePixelX * rowHeight)));
++		int row = int(floor(float(anchorRow) - (origin.z + direction.z * along - float(texelFetch(uMirrors, record + 1).r) / 16.0) / rowHeight));
++		if (column < 0 || row < 0 || column >= SpriteBufferSize || row >= SpriteBufferSize || (row >= anchorRow && (marks & 65536) == 0)) continue;
++		int side = int(mod(floor((atan(towards.y, towards.x) * 57.29577951 + 90.0) / 45.0 + 0.5), 8.0));
++		int four = texelFetch(uMirrors, uMirrorUnits + texelFetch(uMirrors, record + 5).r + (side * SpriteBufferSize + row) * (SpriteBufferSize / 4) + (column >> 2)).r;
++		int color = (four >> ((column & 3) * 8)) & 255;
++		if (color == 0) continue;
++		float unitShade = max(0.0, float((marks >> 20) & 15) + distanceShade(along) + 1.5);
++		rgb = mix(paletteRgb(uint((color & 240) | min(15, (color & 15) + int(unitShade)))),
++			paletteRgb(uint((color & 240) | min(15, (color & 15) + int(unitShade) + 1))), unitShade - floor(unitShade));
++		reach = along;
++		shown = true;
++	}
++	return shown;
 +}
 +
 +#endif
@@ -34779,17 +34841,22 @@ index 000000000..64c0bca16
 +			int metTile, metAxis;
 +			float metDistance;
 +			vec3 seen;
-+			if (castRay(surfacePoint, mirrored, min(uMaxDistance, 640.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
++			float unitReach = min(uMaxDistance, 640.0);
++			if (castRay(surfacePoint, mirrored, unitReach, 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
 +			{
 +				float metGlow;
 +				float metShade = max(0.0, lightAt(surfacePoint + mirrored * met.t, metGlow) + distanceShade(met.t) + 1.5);
 +				seen = mix(paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade)))),
 +					paletteRgb((met.color & 0xF0u) | uint(min(15, int(met.color & 15u) + int(metShade) + 1))), metShade - floor(metShade));
++				unitReach = met.t;
 +			}
 +			else
 +			{
 +				seen = skyRgbTowards(mirrored, pixelX, pixelY);
 +			}
++			// (a unit standing before what the ray met: it is what the mirror shows there)
++			vec3 unitSeen;
++			if (mirrorUnit(surfacePoint, mirrored, unitReach, unitSeen)) seen = unitSeen;
 +#ifdef METAL
 +			if (metalMirrors)
 +			{
@@ -35013,8 +35080,10 @@ index 000000000..64c0bca16
 +			int metTile, metAxis;
 +			float metDistance;
 +			vec3 seen;
-+			if (castRay(pane + mirrored * 0.5, mirrored, min(uMaxDistance, 480.0), 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
++			float unitReach = min(uMaxDistance, 480.0);
++			if (castRay(pane + mirrored * 0.5, mirrored, unitReach, 2.0, 2.0, met, metTile, metDistance, metAxis) == RAY_HIT)
 +			{
++				unitReach = met.t;
 +				float metGlow;
 +				// (the light before the face met, on the side it is seen from, as a face seen straight has it: at the face
 +				// itself a room's far wall took the light of the tile behind it, the night outside)
@@ -35030,6 +35099,9 @@ index 000000000..64c0bca16
 +				seen = skyRgbTowards(mirrored, blockColumn, blockRow);
 +				fullColor = kept;
 +			}
++			// (a unit standing before what the ray met: it is what the pane shows there)
++			vec3 unitSeen;
++			if (mirrorUnit(pane + mirrored * 0.5, mirrored, unitReach, unitSeen)) seen = unitSeen;
 +			fullColor = mix(fullColor, seen, share);
 +		}
 +#endif
@@ -50220,10 +50292,10 @@ index 000000000..54d05d340
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..a2c1fb6f2
+index 000000000..a030031f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5637 @@
+@@ -0,0 +1,5642 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -53414,7 +53486,7 @@ index 000000000..a2c1fb6f2
 +	const std::string name = _state->tr(weapon->getRules()->getType());
 +	const bool same = _hitLogNote.unit == unit && _hitLogNote.weapon == weapon && _hitLogNote.mode == mode
 +		&& _hitLogNote.tile == unit->getPosition() && _hitLogNote.turn == _save->getTurn()
-+		&& _save->getHitLog()->getHitLogText().compare(0, name.size(), name) == 0;
++		&& _save->getHitLog()->getHitLogText().compare(0, name.size() + 2, name + "\n\n") == 0; // (the note as the log writes it)
 +	if (same)
 +	{
 +		return;
@@ -53561,7 +53633,12 @@ index 000000000..a2c1fb6f2
 +	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
 +	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
 +	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
-+	noteWeaponInHitLog(unit, weapon, mode);
++	// (No note in the hit log for a shot the game refuses at once, for want of time units or of a round, the first two
++	// things it checks: the shots before it stay under their weapon there.)
++	if (action->haveTU() && (mode == BA_THROW || weapon->getAmmoForAction(mode) != nullptr))
++	{
++		noteWeaponInHitLog(unit, weapon, mode);
++	}
 +	battleGame->primaryAction(targetTile);
 +	if (action->sprayTargeting)
 +	{
@@ -61877,10 +61954,10 @@ index 000000000..44a6559e0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.cpp b/src/FirstPerson/FirstPersonSpriteHits.cpp
 new file mode 100644
-index 000000000..5ccebc4fe
+index 000000000..bddcbb05e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.cpp
-@@ -0,0 +1,1087 @@
+@@ -0,0 +1,1151 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -62050,6 +62127,7 @@ index 000000000..5ccebc4fe
 +{
 +	Pose pose;
 +	std::vector<Uint8> pixels; // SpriteBufferSize square, 1 for a solid pixel
++	std::vector<Uint8> colors; // the same picture's palette colours, unlit (0: nothing there): what a mirror shows (see spriteColorsOf)
 +};
 +struct SpriteCache
 +{
@@ -62114,10 +62192,16 @@ index 000000000..5ccebc4fe
 +	}
 +	picture.pose = pose;
 +	picture.pixels.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
++	picture.colors.assign((size_t)SpriteBufferSize * SpriteBufferSize, 0);
 +	cache.buffer->lock();
 +	for (int y = 0; y < SpriteBufferSize; ++y)
 +	{
-+		for (int x = 0; x < SpriteBufferSize; ++x) picture.pixels[(size_t)y * SpriteBufferSize + x] = cache.buffer->getPixel(x, y) != 0;
++		for (int x = 0; x < SpriteBufferSize; ++x)
++		{
++			const Uint8 color = cache.buffer->getPixel(x, y);
++			picture.colors[(size_t)y * SpriteBufferSize + x] = color;
++			picture.pixels[(size_t)y * SpriteBufferSize + x] = color != 0;
++		}
 +	}
 +	cache.buffer->unlock();
 +	return picture.pixels;
@@ -62834,6 +62918,63 @@ index 000000000..5ccebc4fe
 +}
 +
 +/**
++ * A unit's upright card for a mirror (see FirstPersonSpriteHits.h).
++ */
++bool mirrorCard(SavedBattleGame *save, const BattleUnit *unit, MirrorCard &card)
++{
++	if (!save || !unit || unit->isOut() || !unit->getTile())
++	{
++		return false;
++	}
++	SpriteCard standing;
++	card.scale = startCard(save, unit, standing);
++	std::copy(standing.anchor, standing.anchor + 3, card.anchor);
++	card.anchorX = standing.anchorX;
++	card.anchorY = standing.anchorY;
++	card.rowsBelow = standing.rowsBelow;
++	return true;
++}
++
++/**
++ * A unit's picture from one of its eight sides, in its colours (see FirstPersonSpriteHits.h).
++ */
++const std::vector<Uint8> &spriteColorsOf(SavedBattleGame *save, const BattleUnit *unit, int side)
++{
++	// Kept apart from the lines' pictures, which are made anew every animation frame: a mirror asks for all eight
++	// sides of a dozen units every frame drawn, and composing those ten times a second cost half a millisecond a
++	// frame. A side is made again when the unit's pose changes (it turns, kneels, takes aim, steps on), and else
++	// every MirrorPictureLasts ms, each unit and side at its own moment (what only the animation moves, a flame, a
++	// floater's sway, is a little late in a mirror).
++	const Uint32 MirrorPictureLasts = 400;
++	struct Kept
++	{
++		Pose pose;
++		Uint32 made = 0;
++		std::vector<Uint8> colors;
++	};
++	static const SavedBattleGame *keptFor = nullptr;
++	static std::map<std::pair<const BattleUnit*, int>, Kept> keptPictures;
++	if (keptFor != save)
++	{
++		keptFor = save;
++		keptPictures.clear();
++	}
++	Kept &kept = keptPictures[{ unit, side }];
++	const Pose pose(unit);
++	const Uint32 now = SDL_GetTicks();
++	if (kept.colors.empty() || !(kept.pose == pose) || now - kept.made >= MirrorPictureLasts)
++	{
++		const int rotation = 3 - side;
++		spriteOf(save, unit, rotation); // (made now, or kept from a line's test of it)
++		if (kept.colors.empty()) kept.made = now - (Uint32)((unit->getId() * 37 + side * 53) % (int)MirrorPictureLasts); // (its own moment)
++		else kept.made = now;
++		kept.pose = pose;
++		kept.colors = spriteCache().pictures[{ unit, rotation }].colors;
++	}
++	return kept.colors;
++}
++
++/**
 + * The side a unit's frame is drawn from in a 3D view (see FirstPersonSpriteHits.h).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3])
@@ -62970,10 +63111,10 @@ index 000000000..5ccebc4fe
 +}
 diff --git a/src/FirstPerson/FirstPersonSpriteHits.h b/src/FirstPerson/FirstPersonSpriteHits.h
 new file mode 100644
-index 000000000..ad9454552
+index 000000000..d43f8ffe8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonSpriteHits.h
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,177 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -63088,6 +63229,30 @@ index 000000000..ad9454552
 + * @return The view rotation (3 minus the direction from the unit to the eye).
 + */
 +int unitViewRotation(const double eye[3], const double feet[3]);
++/**
++ * A unit's upright card as a mirror shows it (setting "Reflections": window glass, still water and a UFO's metal mirror
++ * the units too): where the lines of fire of anyone but the soldier looked through find its picture (see SpriteCard),
++ * turned square, across the map, to wherever it is looked at from.
++ */
++struct MirrorCard
++{
++	double anchor[3] = {};          // the picture's anchor pixel in the world, in voxels
++	double scale = 1.0;             // a picture row's height in voxels (setting "Unit size"); a column is SpritePixelX of that
++	int anchorX = 32, anchorY = 40; // the anchor pixel in the picture
++	bool rowsBelow = false;         // its art below the feet shows too (a unit in the air)
++};
++/// Sets a unit's card for a mirror; false for a unit that is down or nowhere.
++bool mirrorCard(SavedBattleGame *save, const BattleUnit *unit, MirrorCard &card);
++/**
++ * A unit's picture seen from one of its eight sides in its own colours, unlit, as the 3D view composes it (the game's
++ * animation frame, a big unit's four parts together): kept while the unit keeps its pose, and made again a few times a
++ * second.
++ * @param save The battle.
++ * @param unit The unit.
++ * @param side The side it is seen from: the game's direction from the unit to the one looking (0 north ... 7).
++ * @return SpriteBufferSize square of palette colours, row by row; 0 where there is nothing.
++ */
++const std::vector<Uint8> &spriteColorsOf(SavedBattleGame *save, const BattleUnit *unit, int side);
 +/// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, a vehicle or a
 +/// turret) HullLayBack, any other unit's 0.
 +double hullLayBack(const BattleUnit *unit);
@@ -64068,10 +64233,10 @@ index 000000000..aa66e4f77
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..52c949fb4
+index 000000000..95fc848cf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1942 @@
+@@ -0,0 +1,1944 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -65509,6 +65674,8 @@ index 000000000..52c949fb4
 +	void watchUnits();
 +	/// Draws the visible units as their sprites, turned to face the camera.
 +	void drawUnits();
++	/// The units a mirror can show, as the numbers the graphics card takes (setting "Reflections").
++	void mirrorUnits(std::vector<Sint32> &numbers) const;
 +	/// After the frame's sprites: the unit whose picture is where the player points (see getUnitAtPointer).
 +	void findUnitAtPointer();
 +	/// Records a soft shadow under a unit, to be drawn with the units (see replayDrawList).
@@ -67907,10 +68074,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..85eeebdd0
+index 000000000..fed054457
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,820 @@
+@@ -0,0 +1,826 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68297,6 +68464,12 @@ index 000000000..85eeebdd0
 +	frame.mirrorOfTile = view._mirrorOfTile.size() == tileCount ? view._mirrorOfTile.data() : nullptr;
 +	frame.mirrors = mirrors.data();
 +	frame.mirrorCount = (int)mirrors.size();
++	// (Setting "Reflections": the units the mirrors show. Not for a headset's eyes, drawn in one go.)
++	static std::vector<Sint32> mirrorUnits;
++	mirrorUnits.clear();
++	if (frame.reflections && frame.palette && !view._eyePass) view.mirrorUnits(mirrorUnits);
++	frame.mirrorUnits = mirrorUnits.size() > 1 && mirrorUnits[0] > 0 ? mirrorUnits.data() : nullptr;
++	frame.mirrorUnitNumbers = (int)mirrorUnits.size();
 +}
 +
 +void FirstPersonView::gpuWarmUp()
@@ -73170,10 +73343,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..78af94e34
+index 000000000..3e34f687c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,767 @@
+@@ -0,0 +1,773 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73582,6 +73755,12 @@ index 000000000..78af94e34
 +/// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
 +/// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
 +const int WallPaintWhole = 255;
++// Setting "Reflections": the units a mirror shows (window glass, still water, a UFO's metal): the nearest MirrorUnitsMost
++// within MirrorUnitReach voxels of the eye across the map, each MirrorUnitNumbers numbers and its eight pictures
++// (see FirstPersonView::mirrorUnits, and mirrorUnit in the shader).
++const int MirrorUnitsMost = 12;
++const double MirrorUnitReach = 20 * 16.0;
++const int MirrorUnitNumbers = 8;
 +/// An object with voxels is a flat picture on an edge (a poster, moved clear of the wall likewise, see buildModel)
 +/// when it is thinner than that and at least this many voxels high and wide.
 +const int PosterMinExtent = 6;
@@ -76283,10 +76462,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..a52c407c2
+index 000000000..1f27da62e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4537 @@
+@@ -0,0 +1,4616 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -76340,6 +76519,7 @@ index 000000000..a52c407c2
 + */
 +#include "FirstPersonView.h"
 +#include <algorithm>
++#include <cstring>
 +#include <cmath>
 +#include <map>
 +#include <unordered_set>
@@ -78432,6 +78612,84 @@ index 000000000..a52c407c2
 +			}
 +		}
 +	}
++}
++
++/**
++ * The units a mirror can show (setting "Reflections", the owner: "Windows and metals should also have unit and enemy
++ * reflections besides the world"): everyone standing whom the squad sees, the soldier looked through too (who sees
++ * himself in a window), the nearest MirrorUnitsMost within MirrorUnitReach of the eye. Each as an upright card with its
++ * own drawings from all eight sides (see FirstPerson::mirrorCard, spriteColorsOf): the mirrored ray meets the card
++ * turned square to where the ray comes from and takes the drawing of the side seen from there, so a mirror shows the
++ * side of a unit turned to it. The drawings, not the cube bodies of "Voxel units": the bodies are made from them, and
++ * no ray can walk a body's cubes on the card.
++ * As numbers for the graphics card: how many; then for each MirrorUnitNumbers (where the anchor is across the map, in
++ * sixteenths of a voxel, x and y in one number; its height; a spare; a picture row's height in 1024ths; the anchor pixel
++ * with whether the art below it shows and the light on the unit; where its pictures begin, counted from the first
++ * number); then each unit's eight pictures, four pixels a number.
++ * @param numbers Set to the numbers (one number, 0, with nobody to show).
++ */
++void FirstPersonView::mirrorUnits(std::vector<Sint32> &numbers) const
++{
++	numbers.assign(1, 0);
++	std::vector<std::pair<double, BattleUnit*>> near;
++	const bool debug = _save->getDebugMode();
++	for (BattleUnit *unit : *_save->getUnits())
++	{
++		if (unit->isOut() || !unit->getTile() || (!debug && !unit->getVisible()))
++		{
++			continue;
++		}
++		const int unitSize = unit->getArmor()->getSize();
++		const double away = std::hypot(unit->getPosition().x * 16.0 + 8.0 * unitSize - _steadyEye[0], unit->getPosition().y * 16.0 + 8.0 * unitSize - _steadyEye[1]);
++		if (away <= MirrorUnitReach) near.push_back({ away, unit });
++	}
++	std::sort(near.begin(), near.end(), [](const std::pair<double, BattleUnit*> &a, const std::pair<double, BattleUnit*> &b) {
++		return a.first != b.first ? a.first < b.first : a.second->getId() < b.second->getId();
++	});
++	if ((int)near.size() > MirrorUnitsMost) near.resize(MirrorUnitsMost);
++	const size_t pictureNumbers = (size_t)SpriteBufferSize * SpriteBufferSize / 4;
++	numbers.reserve(1 + near.size() * (MirrorUnitNumbers + 8 * pictureNumbers));
++	numbers.resize(1 + near.size() * MirrorUnitNumbers, 0);
++	int count = 0;
++	for (const auto &seen : near)
++	{
++		BattleUnit *unit = seen.second;
++		FirstPerson::MirrorCard card;
++		if (!FirstPerson::mirrorCard(_save, unit, card))
++		{
++			continue;
++		}
++		// (the light on it as on its picture in the view, at its chest: see drawUnits)
++		const float chest[3] = { (float)card.anchor[0], (float)card.anchor[1], (float)card.anchor[2] + 12.0f };
++		const int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false) - flareLight(chest, nullptr, false) * 8.0f, 0.0f, 15.0f));
++		Sint32 *record = &numbers[1 + (size_t)count * MirrorUnitNumbers];
++		record[0] = std::clamp((Sint32)std::lround(card.anchor[0] * 16.0), 0, 65535) | (std::clamp((Sint32)std::lround(card.anchor[1] * 16.0), 0, 65535) << 16);
++		record[1] = (Sint32)std::lround(card.anchor[2] * 16.0);
++		record[3] = (Sint32)std::lround(card.scale * 1024.0);
++		record[4] = card.anchorX | (card.anchorY << 8) | (card.rowsBelow ? 1 << 16 : 0) | (shade << 20);
++		record[5] = (Sint32)numbers.size(); // (counted from the first number, the count)
++		for (int side = 0; side < 8; ++side)
++		{
++			const std::vector<Uint8> &colors = FirstPerson::spriteColorsOf(_save, unit, side);
++			const size_t at = numbers.size();
++			numbers.resize(at + pictureNumbers, 0);
++			if (colors.size() == pictureNumbers * 4)
++			{
++				// (four pixels a number, the first in its lowest byte, whatever the machine's byte order)
++#if SDL_BYTEORDER == SDL_LIL_ENDIAN
++				std::memcpy(&numbers[at], colors.data(), pictureNumbers * 4);
++#else
++				for (size_t number = 0; number < pictureNumbers; ++number)
++				{
++					const Uint8 *four = &colors[number * 4];
++					numbers[at + number] = (Sint32)((Uint32)four[0] | ((Uint32)four[1] << 8) | ((Uint32)four[2] << 16) | ((Uint32)four[3] << 24));
++				}
++#endif
++			}
++		}
++		++count;
++	}
++	numbers[0] = count; // (a unit left out leaves a record unused behind the last one: the pictures' places stay)
 +}
 +
 +/**

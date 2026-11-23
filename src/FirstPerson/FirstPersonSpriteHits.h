@@ -112,6 +112,30 @@ bool viewCard(SavedBattleGame *save, const BattleUnit *unit, const FirstPersonVi
  * @return The view rotation (3 minus the direction from the unit to the eye).
  */
 int unitViewRotation(const double eye[3], const double feet[3]);
+/**
+ * A unit's upright card as a mirror shows it (setting "Reflections": window glass, still water and a UFO's metal mirror
+ * the units too): where the lines of fire of anyone but the soldier looked through find its picture (see SpriteCard),
+ * turned square, across the map, to wherever it is looked at from.
+ */
+struct MirrorCard
+{
+	double anchor[3] = {};          // the picture's anchor pixel in the world, in voxels
+	double scale = 1.0;             // a picture row's height in voxels (setting "Unit size"); a column is SpritePixelX of that
+	int anchorX = 32, anchorY = 40; // the anchor pixel in the picture
+	bool rowsBelow = false;         // its art below the feet shows too (a unit in the air)
+};
+/// Sets a unit's card for a mirror; false for a unit that is down or nowhere.
+bool mirrorCard(SavedBattleGame *save, const BattleUnit *unit, MirrorCard &card);
+/**
+ * A unit's picture seen from one of its eight sides in its own colours, unlit, as the 3D view composes it (the game's
+ * animation frame, a big unit's four parts together): kept while the unit keeps its pose, and made again a few times a
+ * second.
+ * @param save The battle.
+ * @param unit The unit.
+ * @param side The side it is seen from: the game's direction from the unit to the one looking (0 north ... 7).
+ * @return SpriteBufferSize square of palette colours, row by row; 0 where there is nothing.
+ */
+const std::vector<Uint8> &spriteColorsOf(SavedBattleGame *save, const BattleUnit *unit, int side);
 /// How far a unit's card lies back whatever the view's pitch, in radians: a hull's (two tiles by two, a vehicle or a
 /// turret) HullLayBack, any other unit's 0.
 double hullLayBack(const BattleUnit *unit);

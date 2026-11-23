@@ -497,6 +497,9 @@ std::string shaderConstants()
 	number("DarkOverflowTo", DarkOverflowTo);
 	whole("DarkFadeSteps", FirstPersonView::DarkFadeSteps);
 	whole("WallPaintWhole", WallPaintWhole);
+	whole("MirrorUnitNumbers", MirrorUnitNumbers);
+	whole("SpriteBufferSize", SpriteBufferSize);
+	number("SpritePixelX", SpritePixelX);
 	number("UnseenFogDarkening", UnseenFogDarkening);
 	number("UnseenFogFromMax", UnseenFogFromMax);
 	number("UnseenFogNormal", UnseenFogNormal);
@@ -927,6 +930,7 @@ struct FirstPersonGpu::State
 	std::vector<Uint8> blendSent; // the palette the blending table was last made for (see sendBlend)
 	std::vector<Uint32> wallPaintTexels;
 	std::vector<Sint32> mirrorNumbers, mirrorScratch; // the mirrors as the card has them (see sendMirrors), and this frame's, put together to compare
+	int mirrorUnitsAt = -1;                           // where the units a mirror shows begin in those numbers (setting "Reflections"); -1: none
 
 	void threadLoop();
 	void run(const std::function<void()> &work);
@@ -1622,6 +1626,13 @@ void FirstPersonGpu::State::sendMirrors(const Frame &frame)
 		}
 		std::copy(header, header + 16, numbers.begin() + (size_t)index * 16);
 	}
+	// (Setting "Reflections": behind them the units a mirror shows, in the same row: no buffer more for the shader.)
+	mirrorUnitsAt = -1;
+	if (frame.mirrorUnits && frame.mirrorUnitNumbers > 0 && numbers.size() + (size_t)frame.mirrorUnitNumbers <= (size_t)maxBufferTexels)
+	{
+		mirrorUnitsAt = (int)numbers.size();
+		numbers.insert(numbers.end(), frame.mirrorUnits, frame.mirrorUnits + frame.mirrorUnitNumbers);
+	}
 	if (numbers == mirrorNumbers)
 	{
 		return;
@@ -1691,6 +1702,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
+	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
 	const int colorLightCount = frame.palette ? std::clamp(frame.colorLightCount, 0, 16) : 0;
@@ -1998,9 +2010,9 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
 	encodeTiles(frame);
 	encodeTables(frame);
+	sendMirrors(frame); // (before the scene's numbers: it finds where the units a mirror shows begin)
 	setScene(rays);
 	sendWallPaints(frame);
-	sendMirrors(frame);
 	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: the world is bigger than this card's buffers take";

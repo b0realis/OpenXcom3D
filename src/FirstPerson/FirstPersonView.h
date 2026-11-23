@@ -1435,6 +1435,8 @@ private:
 	void watchUnits();
 	/// Draws the visible units as their sprites, turned to face the camera.
 	void drawUnits();
+	/// The units a mirror can show, as the numbers the graphics card takes (setting "Reflections").
+	void mirrorUnits(std::vector<Sint32> &numbers) const;
 	/// After the frame's sprites: the unit whose picture is where the player points (see getUnitAtPointer).
 	void findUnitAtPointer();
 	/// Records a soft shadow under a unit, to be drawn with the units (see replayDrawList).

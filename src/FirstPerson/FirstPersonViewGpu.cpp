@@ -384,6 +384,12 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.mirrorOfTile = view._mirrorOfTile.size() == tileCount ? view._mirrorOfTile.data() : nullptr;
 	frame.mirrors = mirrors.data();
 	frame.mirrorCount = (int)mirrors.size();
+	// (Setting "Reflections": the units the mirrors show. Not for a headset's eyes, drawn in one go.)
+	static std::vector<Sint32> mirrorUnits;
+	mirrorUnits.clear();
+	if (frame.reflections && frame.palette && !view._eyePass) view.mirrorUnits(mirrorUnits);
+	frame.mirrorUnits = mirrorUnits.size() > 1 && mirrorUnits[0] > 0 ? mirrorUnits.data() : nullptr;
+	frame.mirrorUnitNumbers = (int)mirrorUnits.size();
 }
 
 void FirstPersonView::gpuWarmUp()

@@ -406,6 +406,12 @@ const int GhostWallClearance = 2;
 /// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
 /// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
 const int WallPaintWhole = 255;
+// Setting "Reflections": the units a mirror shows (window glass, still water, a UFO's metal): the nearest MirrorUnitsMost
+// within MirrorUnitReach voxels of the eye across the map, each MirrorUnitNumbers numbers and its eight pictures
+// (see FirstPersonView::mirrorUnits, and mirrorUnit in the shader).
+const int MirrorUnitsMost = 12;
+const double MirrorUnitReach = 20 * 16.0;
+const int MirrorUnitNumbers = 8;
 /// An object with voxels is a flat picture on an edge (a poster, moved clear of the wall likewise, see buildModel)
 /// when it is thinner than that and at least this many voxels high and wide.
 const int PosterMinExtent = 6;

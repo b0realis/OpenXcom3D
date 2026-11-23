@@ -3188,7 +3188,7 @@ void FirstPersonMode::noteWeaponInHitLog(const BattleUnit *unit, const BattleIte
 	const std::string name = _state->tr(weapon->getRules()->getType());
 	const bool same = _hitLogNote.unit == unit && _hitLogNote.weapon == weapon && _hitLogNote.mode == mode
 		&& _hitLogNote.tile == unit->getPosition() && _hitLogNote.turn == _save->getTurn()
-		&& _save->getHitLog()->getHitLogText().compare(0, name.size(), name) == 0;
+		&& _save->getHitLog()->getHitLogText().compare(0, name.size() + 2, name + "\n\n") == 0; // (the note as the log writes it)
 	if (same)
 	{
 		return;
@@ -3335,7 +3335,12 @@ void FirstPersonMode::launchShot(BattleUnit *unit, BattleItem *weapon, BattleAct
 	// (Ctrl and Shift held with a spray weapon's auto shot: the game starts marking a spray burst
 	// instead, its first point this tile; the trigger is let go, so FPS style's held auto doesn't
 	// mark more, and confirm fire's second click isn't made: it would fire the burst at once.)
-	noteWeaponInHitLog(unit, weapon, mode);
+	// (No note in the hit log for a shot the game refuses at once, for want of time units or of a round, the first two
+	// things it checks: the shots before it stay under their weapon there.)
+	if (action->haveTU() && (mode == BA_THROW || weapon->getAmmoForAction(mode) != nullptr))
+	{
+		noteWeaponInHitLog(unit, weapon, mode);
+	}
 	battleGame->primaryAction(targetTile);
 	if (action->sprayTargeting)
 	{
