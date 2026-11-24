@@ -82699,10 +82699,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..e76f5e3f1
+index 000000000..04040f6f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,6100 @@
+@@ -0,0 +1,6117 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83097,6 +83097,10 @@ index 000000000..e76f5e3f1
 + * voxels landed on the water the art draws behind its tufts and stood blue. Each voxel above the water's face (the
 + * highest layer with voxels over half the tile) coloured as the water takes the colour of the art's nearest pixel that
 + * isn't water. Art all water is left as it is.
++ * And where all that stands above the water is thin stalks (no two side by side: the rice), the water's face is water
++ * wherever no stalk stands: the art's tufts, projected flat, had painted it green round them, and that paint went with
++ * the stalks when they were shot (the same player: "green paint should be limited TO the stock"). Each such voxel of the
++ * face takes the colour of the art's nearest water pixel. Islands of mud or moss, more than stalks, keep their faces.
 + * @param model The floor's model, its voxels coloured from its art, its face filled in.
 + * @param sprite Its sprite frame.
 + * @param groups The water's colour groups, a bit each (VoxelModel::stillWater).
@@ -83114,26 +83118,39 @@ index 000000000..e76f5e3f1
 +		if (filled * 2 >= Position::TileXY * Position::TileXY) face = z;
 +	}
 +	if (face < 0) return;
++	// The colour of the art's pixel nearest to where a voxel lands (buildModel's projection) that is water, or isn't.
 +	const int width = sprite->getWidth(), height = sprite->getHeight();
++	auto nearest = [&](int x, int y, int z, bool wet, Uint8 &color)
++	{
++		const int atX = 16 + x - y, atY = 24 + (x + y) / 2 - z + yOffset;
++		int best = INT_MAX;
++		for (int spriteY = 0; spriteY < height; ++spriteY)
++			for (int spriteX = 0; spriteX < width; ++spriteX)
++			{
++				const Uint8 pixel = sprite->getPixel(spriteX, spriteY);
++				const int distance = (spriteX - atX) * (spriteX - atX) + (spriteY - atY) * (spriteY - atY);
++				if (pixel && water(pixel) == wet && distance < best)
++				{
++					best = distance;
++					color = pixel;
++				}
++			}
++	};
++	bool standing = false, stalks = true;
++	bool stalkAt[Position::TileXY][Position::TileXY] = {};
 +	for (int z = face + 1; z < Position::TileZ; ++z)
 +		for (int y = 0; y < Position::TileXY; ++y)
 +			for (int x = 0; x < Position::TileXY; ++x)
 +			{
-+				if (!model.color[z][y][x] || !water(model.color[z][y][x])) continue;
-+				const int atX = 16 + x - y, atY = 24 + (x + y) / 2 - z + yOffset; // (buildModel's projection)
-+				int best = INT_MAX;
-+				for (int spriteY = 0; spriteY < height; ++spriteY)
-+					for (int spriteX = 0; spriteX < width; ++spriteX)
-+					{
-+						const Uint8 color = sprite->getPixel(spriteX, spriteY);
-+						const int distance = (spriteX - atX) * (spriteX - atX) + (spriteY - atY) * (spriteY - atY);
-+						if (color && !water(color) && distance < best)
-+						{
-+							best = distance;
-+							model.color[z][y][x] = color;
-+						}
-+					}
++				if (!model.color[z][y][x]) continue;
++				standing = stalkAt[y][x] = true;
++				if ((x > 0 && model.color[z][y][x - 1]) || (y > 0 && model.color[z][y - 1][x])) stalks = false;
++				if (water(model.color[z][y][x])) nearest(x, y, z, false, model.color[z][y][x]);
 +			}
++	if (!standing || !stalks) return;
++	for (int y = 0; y < Position::TileXY; ++y)
++		for (int x = 0; x < Position::TileXY; ++x)
++			if (model.color[face][y][x] && !stalkAt[y][x] && !water(model.color[face][y][x])) nearest(x, y, face, true, model.color[face][y][x]);
 +}
 +
 +/**
