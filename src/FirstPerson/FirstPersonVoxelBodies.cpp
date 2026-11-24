@@ -5478,7 +5478,11 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	else
 	{
 		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
-		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
+		// (Not looked for on a body the unit table names "neck: none": XPiratez's Clickor, whose arms' frames, its lower
+		// claws, begin at its waist, had its whole chest taken for a big head and its waist for the chin and neck under it:
+		// a shallow piece at the front and a thin column behind, "just spinal cord between chest and hips", a player,
+		// GitHub issue #259.)
+		headAndTorso(parts[0], (routine.traits & 262144) ? -1 : chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
 		const std::vector<Uint8> hull = routine.standard ? carve(parts[0], 0, torso, 0, false, Cardinals) : carve(parts[0], 1, torso);
 		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 	}

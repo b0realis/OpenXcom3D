@@ -140,6 +140,7 @@ public:
 		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
+		int neckNone = -1; // (no big head on a narrow torso is looked for: what is drawn under the shoulders is the trunk as drawn, no chin and thin neck: 1; looked for, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -388,7 +389,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears, neck;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -425,6 +426,7 @@ public:
 				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
 				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
 				if (entry.tryRead("ears", ears)) look.earsApart = ears == "apart" ? 1 : 0;
+				if (entry.tryRead("neck", neck)) look.neckNone = neck == "none" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -546,6 +548,7 @@ public:
 			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
+			if (entry.second.neckNone != -1) look.neckNone = entry.second.neckNone;
 		}
 		return look;
 	}

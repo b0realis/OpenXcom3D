@@ -1596,10 +1596,10 @@ index 000000000..720456009
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..a901d320b
+index 000000000..b32568f6b
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,543 @@
+@@ -0,0 +1,551 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1900,6 +1900,8 @@ index 000000000..a901d320b
 +  #           saucer), or none (nothing under it; not said, the same)
 +  #   ears: apart (a beast's ears, or horns, stand apart as its front drawing has them, however thick its side drawing
 +  #           draws them: not one plate across its head), or drawn (as ever: apart only where they are thin)
++  #   neck: none (no big head on a narrow torso is looked for: what is drawn under the shoulders is the trunk as drawn,
++  #           not a chin and a thin neck under the head; for a body whose arms begin low), or drawn (as ever)
 +  # A name of one star, "*", is every unit.
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
@@ -2049,6 +2051,12 @@ index 000000000..a901d320b
 +    # found a hat"): the ears stand apart, as the front drawing has them
 +    - names: [STR_SOLDIER_DOGE]
 +      ears: apart
++    # XPiratez's Clickor and The X-Com Files' antmen (the same drawings): their arms' frames are the lower claws, which
++    # begin at the waist, so the whole chest was taken for a big head and the waist under it for its chin and neck, a
++    # thin column behind a shallow piece (a player, GitHub issue #259: "just spinal cord between chest and hips"): the
++    # trunk as drawn down to the hips
++    - names: [CLICKOR.PCK, ANTMAN_WARRIOR.PCK, ANTMAN_WORKER.PCK]
++      neck: none
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
 +    # pressed lower: the four drawings, all made from above, leave a point on it)
@@ -90715,10 +90723,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..4376325ec
+index 000000000..42d9277d9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6552 @@
+@@ -0,0 +1,6556 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -96199,7 +96207,11 @@ index 000000000..4376325ec
 +	else
 +	{
 +		std::vector<Uint8> torso(GridCells, 0), neck(GridCells, 0);
-+		headAndTorso(parts[0], chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
++		// (Not looked for on a body the unit table names "neck: none": XPiratez's Clickor, whose arms' frames, its lower
++		// claws, begin at its waist, had its whole chest taken for a big head and its waist for the chin and neck under it:
++		// a shallow piece at the front and a thin column behind, "just spinal cord between chest and hips", a player,
++		// GitHub issue #259.)
++		headAndTorso(parts[0], (routine.traits & 262144) ? -1 : chinEnd(parts[0], parts[1], parts[2]), torso, neck, routine.torsoDepth);
 +		const std::vector<Uint8> hull = routine.standard ? carve(parts[0], 0, torso, 0, false, Cardinals) : carve(parts[0], 1, torso);
 +		for (int i = 0; i < GridCells; ++i) if ((torso[i] && hull[i]) || neck[i]) owner[i] = PartCodes[0];
 +	}
@@ -98101,10 +98113,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..c43afb6fd
+index 000000000..83183df40
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1406 @@
+@@ -0,0 +1,1414 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -98921,6 +98933,12 @@ index 000000000..c43afb6fd
 +		const Uint8 ears[2] = { 'E', 1 };
 +		hashBytes(hash, ears, 2);
 +	}
++	// (no chin and neck looked for, by the unit table: the same)
++	if (look.neckNone == 1)
++	{
++		const Uint8 neck[2] = { 'N', 1 };
++		hashBytes(hash, neck, 2);
++	}
 +	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
 +	if (look.smoothBack == 1)
 +	{
@@ -98982,6 +99000,8 @@ index 000000000..c43afb6fd
 +		if (look.waistDrawn == 1) job->traits |= 65536;
 +		// (ears apart, by the unit table: see profile in FirstPersonVoxelBodies.cpp)
 +		if (look.earsApart == 1) job->traits |= 131072;
++		// (no chin and neck looked for, by the unit table: see makeModel in FirstPersonVoxelBodies.cpp)
++		if (look.neckNone == 1) job->traits |= 262144;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -107155,10 +107175,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..94f720c6b
+index 000000000..d398cb461
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,618 @@
+@@ -0,0 +1,621 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -107301,6 +107321,7 @@ index 000000000..94f720c6b
 +		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 +		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 +		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
++		int neckNone = -1; // (no big head on a narrow torso is looked for: what is drawn under the shoulders is the trunk as drawn, no chin and thin neck: 1; looked for, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -107549,7 +107570,7 @@ index 000000000..94f720c6b
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears, neck;
 +				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -107586,6 +107607,7 @@ index 000000000..94f720c6b
 +				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
 +				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
 +				if (entry.tryRead("ears", ears)) look.earsApart = ears == "apart" ? 1 : 0;
++				if (entry.tryRead("neck", neck)) look.neckNone = neck == "none" ? 1 : 0;
 +				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -107707,6 +107729,7 @@ index 000000000..94f720c6b
 +			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 +			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 +			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
++			if (entry.second.neckNone != -1) look.neckNone = entry.second.neckNone;
 +		}
 +		return look;
 +	}

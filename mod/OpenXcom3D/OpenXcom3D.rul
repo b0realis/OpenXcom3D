@@ -298,6 +298,8 @@ firstPerson:
   #           saucer), or none (nothing under it; not said, the same)
   #   ears: apart (a beast's ears, or horns, stand apart as its front drawing has them, however thick its side drawing
   #           draws them: not one plate across its head), or drawn (as ever: apart only where they are thin)
+  #   neck: none (no big head on a narrow torso is looked for: what is drawn under the shoulders is the trunk as drawn,
+  #           not a chin and a thin neck under the head; for a body whose arms begin low), or drawn (as ever)
   # A name of one star, "*", is every unit.
   # A later entry (or a later mod's) overrides what it sets.
   units:
@@ -447,6 +449,12 @@ firstPerson:
     # found a hat"): the ears stand apart, as the front drawing has them
     - names: [STR_SOLDIER_DOGE]
       ears: apart
+    # XPiratez's Clickor and The X-Com Files' antmen (the same drawings): their arms' frames are the lower claws, which
+    # begin at the waist, so the whole chest was taken for a big head and the waist under it for its chin and neck, a
+    # thin column behind a shallow piece (a player, GitHub issue #259: "just spinal cord between chest and hips"): the
+    # trunk as drawn down to the hips
+    - names: [CLICKOR.PCK, ANTMAN_WARRIOR.PCK, ANTMAN_WORKER.PCK]
+      neck: none
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
     # pressed lower: the four drawings, all made from above, leave a point on it)

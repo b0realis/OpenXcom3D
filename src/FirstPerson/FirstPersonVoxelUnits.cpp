@@ -814,6 +814,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 ears[2] = { 'E', 1 };
 		hashBytes(hash, ears, 2);
 	}
+	// (no chin and neck looked for, by the unit table: the same)
+	if (look.neckNone == 1)
+	{
+		const Uint8 neck[2] = { 'N', 1 };
+		hashBytes(hash, neck, 2);
+	}
 	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
 	if (look.smoothBack == 1)
 	{
@@ -875,6 +881,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.waistDrawn == 1) job->traits |= 65536;
 		// (ears apart, by the unit table: see profile in FirstPersonVoxelBodies.cpp)
 		if (look.earsApart == 1) job->traits |= 131072;
+		// (no chin and neck looked for, by the unit table: see makeModel in FirstPersonVoxelBodies.cpp)
+		if (look.neckNone == 1) job->traits |= 262144;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;
