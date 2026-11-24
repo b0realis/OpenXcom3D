@@ -2236,18 +2236,22 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	}
 	if (hit.glass)
 	{
+		// (What is seen through the pane in full colour: as the light left it, or, without "Smooth light", its palette colour.
+		// The pane mirrors with "Reflections" either way: it did only with "Smooth light" too, the owner: "Lets make
+		// without smooth also".)
+		vec3 behind = fullColorSet ? fullColor : paletteRgb(color);
 		color = table(GlassRow, color);
 		// (As the glass table mixes each colour: a little paler and bluer. Through the goggles the table keeps to their
 		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
 		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 		// changed with every shot's light.)
-		vec3 through = fullColor;
-		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
+		vec3 through = behind;
+		fullColor = uGoggles != 0 ? paletteRgb(color) : through * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 #ifdef MIRROR_FLAGS
-		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
+		if (uReflections != 0 && hit.glassAxis >= 0) mirrorWanted = true;
 #endif
 #ifdef REFLECTIONS
-		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
+		if (uReflections != 0 && hit.glassAxis >= 0)
 		{
 			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
@@ -2289,6 +2293,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 			vec3 unitSeen;
 			if (mirrorUnit(pane + mirrored * 0.5, mirrored, unitReach, unitSeen)) seen = unitSeen;
 			fullColor = mix(fullColor, seen, share);
+			fullColorSet = true;
 		}
 #endif
 	}

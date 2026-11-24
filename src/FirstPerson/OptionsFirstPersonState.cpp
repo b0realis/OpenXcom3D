@@ -214,8 +214,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
 	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 	// speed on a graphics card), two settings players commonly change (the shot's preview, realistic hitboxes),
-	// and what goes by the hand and the habit, which no preset can know.
-	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
+	// and what goes by the hand and the habit, which no preset can know. ("Voxel units" was here too: it is
+	// experimental, under Advanced only, the very last, the owner's word.)
+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 	{
 		for (const OptionInfo &option : gathered)
 		{
@@ -226,6 +227,8 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	// could probably be separated into sections"); any setting not placed here goes under a heading of its own. The
 	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
 	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
+	// But the cheats come after them all, and after those the experimental settings, the very last (the owner: "move
+	// cheats to the bottom and experimental voxel models under it to be very last").
 	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsTacticalMap", "fpsTacticalMapIso", "fpsMapWheelLevels", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
 			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
@@ -241,6 +244,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
+		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
 			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
@@ -272,8 +276,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	{
 		if (!placed[index]) other.options.push_back(gathered[index]);
 	}
-	std::sort(sorted.begin(), sorted.end(), [](const Section &one, const Section &two) { return one.name < two.name; });
-	if (!other.options.empty()) sorted.push_back(other);
+	const auto last = [](const Section &section) { return section.heading == "STR_FPS_SECTION_CHEATS" ? 1 : section.heading == "STR_FPS_SECTION_EXPERIMENTAL" ? 2 : 0; };
+	std::sort(sorted.begin(), sorted.end(), [&last](const Section &one, const Section &two) { return last(one) != last(two) ? last(one) < last(two) : one.name < two.name; });
+	if (!other.options.empty()) sorted.insert(std::find_if(sorted.begin(), sorted.end(), [&last](const Section &section) { return last(section) > 0; }), other);
 	for (Section &section : sorted)
 	{
 		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });

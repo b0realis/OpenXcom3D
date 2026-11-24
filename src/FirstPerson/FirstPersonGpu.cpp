@@ -58,6 +58,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -3592,10 +3593,26 @@ std::unique_ptr<FirstPersonGpu> FirstPersonGpu::open(int device)
 	return gpu;
 }
 
+namespace
+{
+/// The game is ending (FirstPersonGpu::stopBuilding): no more programs are built ahead.
+std::atomic<bool> buildingStopped { false };
+}
+
+void FirstPersonGpu::stopBuilding()
+{
+	buildingStopped = true;
+}
+
 void FirstPersonGpu::prebuild(int extras)
 {
 	State &state = *_state;
 	state.run([&] {
+		// (Each program asked for below is one build by the driver, seconds each with no cache: the game's end waits
+		// for the one being built, not for the rest.)
+		const auto build = [&state](const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0) {
+			if (!buildingStopped) state.programFor(frame, results, laterRays, mirrorGo);
+		};
 		Frame wanted = {};
 		SDL_Color anyPalette[1] = {};
 		wanted.palette = anyPalette;
@@ -3611,11 +3628,11 @@ void FirstPersonGpu::prebuild(int extras)
 			// ("Reflections": the two programs of its two goes; the one of a single go only for several rays a pixel.)
 			if (mask & 2)
 			{
-				state.programFor(wanted, false, false, 1);
-				state.programFor(wanted, false, false, 2);
+				build(wanted, false, false, 1);
+				build(wanted, false, false, 2);
 			}
-			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
-			if (extras & 4) state.programFor(wanted, false, true);
+			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) build(wanted, false);
+			if (extras & 4) build(wanted, false, true);
 		}
 	});
 }

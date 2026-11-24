@@ -81,14 +81,20 @@ struct SharedGpu
 	}
 };
 
-FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
+SharedGpu &theSharedGpu()
 {
 	static SharedGpu shared;
+	return shared;
+}
+
+FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
+{
+	SharedGpu &shared = theSharedGpu();
 	if (opened) *opened = shared.opened.load();
 	if (open && !shared.tried)
 	{
 		shared.tried = true;
-		shared.opening = std::thread([] {
+		shared.opening = std::thread([&shared] {
 			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
 			// (The programs for "Coloured lights", "Reflections", "Light shafts" and "Surface relief", if those are on, before the card is called ready.)
@@ -106,6 +112,40 @@ FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
 FirstPersonGpu *readyFirstPersonGpu()
 {
 	return sharedGpu(false);
+}
+
+/**
+ * The game is ending: the renderer is closed now, while the driver is whole. Left to the end of the program, it was
+ * still being opened when the game was quit soon after a start with no shader cache (the driver building the card's
+ * programs: tens of seconds the first time), and the driver's own clean-up at the program's end (registered when its
+ * library was loaded, so run before ours) ran under the building: a crash at exit, in the driver, on the renderer's
+ * thread. So the programs still to be built ahead are left, and the one being built is given a moment; built, the
+ * renderer is closed as ever (its thread ends with its context). Still building (with no cache one program took 20 to
+ * 40 s here), the program ends at once without anyone's clean-up: the window is gone and everything is saved by now,
+ * and the driver's clean-up is what crashed (waiting it out kept a windowless game alive that long).
+ */
+void closeFirstPersonGpu()
+{
+	SharedGpu &shared = theSharedGpu();
+	FirstPersonGpu::stopBuilding();
+	shared.tried = true; // (and none is opened from now on)
+	if (shared.opening.joinable())
+	{
+		const auto start = std::chrono::steady_clock::now();
+		while (!shared.opened && std::chrono::steady_clock::now() - start < std::chrono::seconds(2))
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		}
+		if (!shared.opened)
+		{
+			Log(LOG_INFO) << "OpenXcom3D GPU: the game ends while the driver is still building the card's programs: it ends at once, without the driver's clean-up";
+			std::_Exit(EXIT_SUCCESS);
+		}
+		shared.opening.join();
+	}
+	shared.ready = nullptr;
+	shared.gpu.reset();
+	shared.opened = true;
 }
 
 namespace

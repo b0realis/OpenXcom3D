@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..aabe39a7e
+index 000000000..d8674a123
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,704 @@
+@@ -0,0 +1,705 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -140,6 +140,7 @@ index 000000000..aabe39a7e
 +  STR_FPS_SECTION_HUD: "HUD"
 +  STR_FPS_SECTION_SOUND: "SOUND"
 +  STR_FPS_SECTION_CHEATS: "CHEATS"
++  STR_FPS_SECTION_EXPERIMENTAL: "EXPERIMENTAL"
 +  STR_FPS_SECTION_VR: "VR"
 +  STR_FPS_SECTION_GPU: "SCREEN"
 +  STR_FPS_SECTION_OTHER: "OTHER"
@@ -834,10 +835,10 @@ index 000000000..aabe39a7e
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..b4d56282d
+index 000000000..f1c815e8d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,704 @@
+@@ -0,0 +1,705 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -850,6 +851,7 @@ index 000000000..b4d56282d
 +  STR_FPS_SECTION_HUD: "HUD"
 +  STR_FPS_SECTION_SOUND: "SOUND"
 +  STR_FPS_SECTION_CHEATS: "CHEATS"
++  STR_FPS_SECTION_EXPERIMENTAL: "EXPERIMENTAL"
 +  STR_FPS_SECTION_VR: "VR"
 +  STR_FPS_SECTION_GPU: "SCREEN"
 +  STR_FPS_SECTION_OTHER: "OTHER"
@@ -24327,10 +24329,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..e6a79a57d
+index 000000000..e885fe3be
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2105 @@
+@@ -0,0 +1,2129 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24380,6 +24382,7 @@ index 000000000..e6a79a57d
 + * and its 3D VIEW options tab.
 + */
 +#include "FirstPersonApi.h"
++#include "FirstPersonGpu.h"
 +#include <cstdio>
 +#include <cstdlib>
 +#include <cstring>
@@ -24822,19 +24825,20 @@ index 000000000..e6a79a57d
 +namespace
 +{
 +
-+/// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
-+/// settlePresets).
-+constexpr int PresetTables = 1;
++/// Which tables of presets these are (see gameplaySwitches, settlePresets): 1 since the owner's rulings on GitHub
++/// issue #193; 2 since "See-through corpses" is off in every preset (the owner: "should be off by default everywhere").
++constexpr int PresetTables = 2;
 +
 +/// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
 +constexpr int Kept = -9999;
 +
 +/**
 + * One of the settings a preset sets: its option (a switch or a number) and its value under
-+ * each of the group's presets, in their order (Kept: that preset leaves it as it is); where the
-+ * tables' last change (see PresetTables) changed them, its values before (Kept: it wasn't
-+ * listed); and whether it is only set when a preset is chosen, and is no part of what makes
-+ * the preset (a setting another group owns: see gameplaySwitches, the pixel size).
++ * each of the group's presets, in their order (Kept: that preset leaves it as it is); where a
++ * change of the tables (see PresetTables) changed them, their values before it (Kept: it wasn't
++ * listed): in the first tables, and in the second; and whether it is only set when a preset is
++ * chosen, and is no part of what makes the preset (a setting another group owns: see
++ * gameplaySwitches, the pixel size).
 + */
 +struct PresetSwitch
 +{
@@ -24842,9 +24846,21 @@ index 000000000..e6a79a57d
 +	bool *flag;
 +	int *number;
 +	std::vector<int> values;
-+	std::vector<int> before = {};
++	std::vector<int> before = {};   // (in tables 0, where they weren't as in tables 1)
 +	bool onChoice = false;
++	std::vector<int> inTables1 = {}; // (in tables 1, where they weren't as now)
 +};
++
++/**
++ * A setting's value under a preset in the tables a profile saw (see PresetTables).
++ */
++int presetValueIn(const PresetSwitch &presetSwitch, int preset, int tables)
++{
++	int value = presetSwitch.values[preset];
++	if (tables < 2 && !presetSwitch.inTables1.empty()) value = presetSwitch.inTables1[preset];
++	if (tables < 1 && !presetSwitch.before.empty()) value = presetSwitch.before[preset];
++	return value;
++}
 +
 +/**
 + * A group of presets: the option that says which is chosen (0 .. the presets' number - 1, and
@@ -24887,7 +24903,9 @@ index 000000000..e6a79a57d
 + * from Extended+ on (FAITHFUL: under the crosshair); XMbl leans with a tilt, jumps low
 + * obstacles and takes fall damage; guns come first at auto-equip and every room's walls are
 + * painted in all six. Those two are listed although no preset differs in them: choosing a
-+ * preset sets them, and they are part of what makes a named preset (see settlePresets).
++ * preset sets them, and they are part of what makes a named preset (see settlePresets). So is
++ * "See-through corpses", off in all six since the owner's "should be off by default
++ * everywhere" (it was on from Extended+: tables 2).
 + * And, of the same list, the owner's "Yes make both": from XMbl on the light is smooth
 + * between tiles (the first three leave "Smooth lighting" as the player has it), and XMbl,
 + * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
@@ -24938,7 +24956,7 @@ index 000000000..e6a79a57d
 +		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
 +		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 2,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
 +		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
-+		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
++		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    0,    0,    0,    0,    0 }, {}, false, { 0, 1, 1, 1, 1, 1 } },
 +		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
 +		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
 +		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
@@ -25230,7 +25248,7 @@ index 000000000..e6a79a57d
 + * Nothing but the two names changes: no setting of the player's is touched.
 + * But once, for a profile from before the tables' last change (PresetTables; the option
 + * "fpsPresetTables" keeps which tables a profile has seen): settings that are all as a named
-+ * preset had them before are that preset as it is now. Without it, every profile on
++ * preset had them in the tables the profile saw are that preset as it is now. Without it, every profile on
 + * Extended+ would have turned Custom with the old values, and the new defaults would have
 + * reached no one who had played before. A mix of the player's own matches no preset's old
 + * values and is left alone.
@@ -25247,7 +25265,7 @@ index 000000000..e6a79a57d
 +			{
 +				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
 +				if (presetSwitch.onChoice) continue;
-+				const int now = presetSwitch.values[preset], was = presetSwitch.before.empty() ? now : presetSwitch.before[preset];
++				const int now = presetSwitch.values[preset], was = presetValueIn(presetSwitch, preset, Options::fpsPresetTables);
 +				if (was != Kept) all = all && switchValue(presetSwitch) == was;
 +				changes = changes || (now != Kept && now != was);
 +			}
@@ -25638,8 +25656,8 @@ index 000000000..e6a79a57d
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, true, "STR_FPS_SEE_THROUGH_CROPS", category));
 +	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
-+	// the ghost opacity (the game's shots pass through them).
-+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, true, "STR_FPS_SEE_THROUGH_CORPSES", category));
++	// the ghost opacity (the game's shots pass through them). Off by default and in every preset (the owner).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
 +	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
@@ -26260,6 +26278,14 @@ index 000000000..e6a79a57d
 +}
 +
 +/**
++ * The game is ending (see FirstPersonApi.h).
++ */
++void closeGpu()
++{
++	closeFirstPersonGpu();
++}
++
++/**
 + * The game's aim was called off (see FirstPersonApi.h).
 + */
 +void aimCalledOff()
@@ -26438,10 +26464,10 @@ index 000000000..e6a79a57d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..a56355ea3
+index 000000000..ec322b5df
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,531 @@
+@@ -0,0 +1,540 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26570,6 +26596,14 @@ index 000000000..a56355ea3
 +void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height);
 +/// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
 +void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
++
++
++// ---- The game's end (main.cpp) ----
++
++/// The game is ending (its window closed, everything done but the program's end): closes the 3D view's renderer on the
++/// graphics card while the driver is still whole; if the driver is still building the card's programs, ends the program
++/// at once instead (see closeFirstPersonGpu).
++void closeGpu();
 +
 +
 +// ---- The battlescape screen (BattlescapeState.cpp) ----
@@ -26915,6 +26949,7 @@ index 000000000..a56355ea3
 +inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 +inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 +inline void aimCalledOff() { }
++inline void closeGpu() { }
 +inline unsigned aimCallOffs() { return 0; }
 +inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
@@ -28542,10 +28577,10 @@ index 000000000..417029f4d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..b18c460dd
+index 000000000..904e31ec1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3870 @@
+@@ -0,0 +1,3887 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -28606,6 +28641,7 @@ index 000000000..b18c460dd
 +#include <cstdio>
 +#include <cstdlib>
 +#include <array>
++#include <atomic>
 +#include <chrono>
 +#include <condition_variable>
 +#include <cstring>
@@ -32140,10 +32176,26 @@ index 000000000..b18c460dd
 +	return gpu;
 +}
 +
++namespace
++{
++/// The game is ending (FirstPersonGpu::stopBuilding): no more programs are built ahead.
++std::atomic<bool> buildingStopped { false };
++}
++
++void FirstPersonGpu::stopBuilding()
++{
++	buildingStopped = true;
++}
++
 +void FirstPersonGpu::prebuild(int extras)
 +{
 +	State &state = *_state;
 +	state.run([&] {
++		// (Each program asked for below is one build by the driver, seconds each with no cache: the game's end waits
++		// for the one being built, not for the rest.)
++		const auto build = [&state](const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0) {
++			if (!buildingStopped) state.programFor(frame, results, laterRays, mirrorGo);
++		};
 +		Frame wanted = {};
 +		SDL_Color anyPalette[1] = {};
 +		wanted.palette = anyPalette;
@@ -32159,11 +32211,11 @@ index 000000000..b18c460dd
 +			// ("Reflections": the two programs of its two goes; the one of a single go only for several rays a pixel.)
 +			if (mask & 2)
 +			{
-+				state.programFor(wanted, false, false, 1);
-+				state.programFor(wanted, false, false, 2);
++				build(wanted, false, false, 1);
++				build(wanted, false, false, 2);
 +			}
-+			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) state.programFor(wanted, false);
-+			if (extras & 4) state.programFor(wanted, false, true);
++			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) build(wanted, false);
++			if (extras & 4) build(wanted, false, true);
 +		}
 +	});
 +}
@@ -32418,10 +32470,10 @@ index 000000000..b18c460dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..28806992a
+index 000000000..a37624fe3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,333 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32465,6 +32517,9 @@ index 000000000..28806992a
 +class FirstPersonGpu;
 +/// The one renderer on the graphics card, once it is open and ready (see FirstPersonViewGpu.cpp); null before, and where there is none.
 +FirstPersonGpu *readyFirstPersonGpu();
++/// The game is ending: closes the renderer while the driver is still whole, or ends the program at once while the driver
++/// is still building its programs (see FirstPerson::closeGpu).
++void closeFirstPersonGpu();
 +
 +class FirstPersonGpu
 +{
@@ -32711,6 +32766,8 @@ index 000000000..28806992a
 +	/// them, and those for a pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one
 +	/// waits while the driver builds it.
 +	void prebuild(int extras);
++	/// The game is ending: a prebuild going on stops after the program the driver is building now (any thread may say so).
++	static void stopBuilding();
 +	/// Forgets every model sent up so far (a new battle: the view builds its models anew).
 +	void forgetModels();
 +	/// Casts the frame's rays, a ray for each block of pixelSize x pixelSize pixels, and fills the picture.
@@ -32964,10 +33021,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..59dcb0e29
+index 000000000..aa155c59a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3398 @@
+@@ -0,0 +1,3403 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -35206,18 +35263,22 @@ index 000000000..59dcb0e29
 +	}
 +	if (hit.glass)
 +	{
++		// (What is seen through the pane in full colour: as the light left it, or, without "Smooth light", its palette colour.
++		// The pane mirrors with "Reflections" either way: it did only with "Smooth light" too, the owner: "Lets make
++		// without smooth also".)
++		vec3 behind = fullColorSet ? fullColor : paletteRgb(color);
 +		color = table(GlassRow, color);
 +		// (As the glass table mixes each colour: a little paler and bluer. Through the goggles the table keeps to their
 +		// colours, and so does this: a player, GitHub issue #166, "gun fire makes night vision flash windows not night
 +		// vision": in full colour what was seen through a window stayed blue-grey among the goggles' green, and
 +		// changed with every shot's light.)
-+		vec3 through = fullColor;
-+		fullColor = uGoggles != 0 ? paletteRgb(color) : fullColor * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
++		vec3 through = behind;
++		fullColor = uGoggles != 0 ? paletteRgb(color) : through * 0.7 + vec3(150.0, 180.0, 205.0) * 0.3;
 +#ifdef MIRROR_FLAGS
-+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0) mirrorWanted = true;
++		if (uReflections != 0 && hit.glassAxis >= 0) mirrorWanted = true;
 +#endif
 +#ifdef REFLECTIONS
-+		if (uReflections != 0 && fullColorSet && hit.glassAxis >= 0)
++		if (uReflections != 0 && hit.glassAxis >= 0)
 +		{
 +			// (Setting "Reflections", a player's wish, GitHub issue #174, "reflections on glass panes": one ray off the
 +			// pane's face, from where the eye's ray went into it; what it meets in the game's light there, or the sky.
@@ -35259,6 +35320,7 @@ index 000000000..59dcb0e29
 +			vec3 unitSeen;
 +			if (mirrorUnit(pane + mirrored * 0.5, mirrored, unitReach, unitSeen)) seen = unitSeen;
 +			fullColor = mix(fullColor, seen, share);
++			fullColorSet = true;
 +		}
 +#endif
 +	}
@@ -68268,10 +68330,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..0c02ac39e
+index 000000000..6963b3490
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,826 @@
+@@ -0,0 +1,866 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68355,14 +68417,20 @@ index 000000000..0c02ac39e
 +	}
 +};
 +
-+FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
++SharedGpu &theSharedGpu()
 +{
 +	static SharedGpu shared;
++	return shared;
++}
++
++FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
++{
++	SharedGpu &shared = theSharedGpu();
 +	if (opened) *opened = shared.opened.load();
 +	if (open && !shared.tried)
 +	{
 +		shared.tried = true;
-+		shared.opening = std::thread([] {
++		shared.opening = std::thread([&shared] {
 +			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
 +			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
 +			// (The programs for "Coloured lights", "Reflections", "Light shafts" and "Surface relief", if those are on, before the card is called ready.)
@@ -68380,6 +68448,40 @@ index 000000000..0c02ac39e
 +FirstPersonGpu *readyFirstPersonGpu()
 +{
 +	return sharedGpu(false);
++}
++
++/**
++ * The game is ending: the renderer is closed now, while the driver is whole. Left to the end of the program, it was
++ * still being opened when the game was quit soon after a start with no shader cache (the driver building the card's
++ * programs: tens of seconds the first time), and the driver's own clean-up at the program's end (registered when its
++ * library was loaded, so run before ours) ran under the building: a crash at exit, in the driver, on the renderer's
++ * thread. So the programs still to be built ahead are left, and the one being built is given a moment; built, the
++ * renderer is closed as ever (its thread ends with its context). Still building (with no cache one program took 20 to
++ * 40 s here), the program ends at once without anyone's clean-up: the window is gone and everything is saved by now,
++ * and the driver's clean-up is what crashed (waiting it out kept a windowless game alive that long).
++ */
++void closeFirstPersonGpu()
++{
++	SharedGpu &shared = theSharedGpu();
++	FirstPersonGpu::stopBuilding();
++	shared.tried = true; // (and none is opened from now on)
++	if (shared.opening.joinable())
++	{
++		const auto start = std::chrono::steady_clock::now();
++		while (!shared.opened && std::chrono::steady_clock::now() - start < std::chrono::seconds(2))
++		{
++			std::this_thread::sleep_for(std::chrono::milliseconds(20));
++		}
++		if (!shared.opened)
++		{
++			Log(LOG_INFO) << "OpenXcom3D GPU: the game ends while the driver is still building the card's programs: it ends at once, without the driver's clean-up";
++			std::_Exit(EXIT_SUCCESS);
++		}
++		shared.opening.join();
++	}
++	shared.ready = nullptr;
++	shared.gpu.reset();
++	shared.opened = true;
 +}
 +
 +namespace
@@ -73537,10 +73639,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..8dcdd7764
+index 000000000..0d0adade4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,777 @@
+@@ -0,0 +1,778 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73703,13 +73805,14 @@ index 000000000..8dcdd7764
 +/// Setting "Metallic surfaces" (the card's rays, see ShadeSource): a UFO's parts are metal. The sun glints on them, as
 +/// tight as MetalShine (the exponent of the highlight) and MetalSun shades bright at its middle; seen along its face a
 +/// hull shows the sky's light, up to MetalRim shades; and whatever lamp lights it (the flashlight, a flare, a shot)
-+/// gleams where the face is turned to the eye, MetalLamp of that light again. A highlight makes a colour up to
++/// gleams where the face is turned to the eye, MetalLamp of that light again (it was 0.8: close under the flashlight, at
++/// 7 tiles, a hull's drawing went nearly white at night; halved on the owner's word). A highlight makes a colour up to
 +/// MetalBrightest shades brighter than its drawing has it, in its own colour group, and no more than MetalRoom of the
-+/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Mirror" the hull shows what
++/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Reflections" the hull shows what
 +/// its face mirrors, tinted by its own colour, MetalMirror of it at most (seen along the face; a third of that head on).
 +/// And it is speckled (the owner: "Finish with speckle also"): one voxel in MetalFlakeEvery is a flake turned up to
 +/// MetalFlakeTilt its own way, glinting MetalFlake shades where the sun or a lamp catches it, as tight as MetalFlakeShine.
-+const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.8f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
++const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.4f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
 +const float MetalFlakeTilt = 0.35f, MetalFlake = 3.0f, MetalFlakeShine = 40.0f;
 +const int MetalFlakeEvery = 5;
 +/// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how
@@ -105132,10 +105235,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..d32e43294
+index 000000000..b0eebc484
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1191 @@
+@@ -0,0 +1,1196 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -105352,8 +105455,9 @@ index 000000000..d32e43294
 +	// The first page (sub-tab Settings; GitHub issue #164: the presets, the renderer and a few most used settings,
 +	// all the rest under Advanced): the two presets, the renderer, the render scale (the one number to turn for
 +	// speed on a graphics card), two settings players commonly change (the shot's preview, realistic hitboxes),
-+	// and what goes by the hand and the habit, which no preset can know.
-+	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsVoxelUnits", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
++	// and what goes by the hand and the habit, which no preset can know. ("Voxel units" was here too: it is
++	// experimental, under Advanced only, the very last, the owner's word.)
++	for (const char *id : { "fpsPreset", "fpsRenderer", "fpsGraphicsDetail", "fpsRenderScale", "fpsTrajectory", "fpsSpriteHitboxes", "fpsMouseSensitivity", "fpsStartInFirstPerson", "fpsGameOptions" })
 +	{
 +		for (const OptionInfo &option : gathered)
 +		{
@@ -105364,6 +105468,8 @@ index 000000000..d32e43294
 +	// could probably be separated into sections"); any setting not placed here goes under a heading of its own. The
 +	// sections are listed by the alphabet, and so are the settings in each, by the names shown (the owner: "in their
 +	// own logical groups and alphabetical"): a setting is found by its name, not by where it happened to be added.
++	// But the cheats come after them all, and after those the experimental settings, the very last (the owner: "move
++	// cheats to the bottom and experimental voxel models under it to be very last").
 +	static const struct { const char *heading; std::vector<const char*> ids; } sections[] = {
 +		{ "STR_FPS_SECTION_VIEW", { "fpsSoldierPreview", "fpsMapCamera", "fpsTacticalMap", "fpsTacticalMapIso", "fpsMapWheelLevels", "fpsCameraEyes", "fpsCameraArtifacts", "fpsMouseSensitivity", "fpsInvertMouse", "fpsFieldOfView",
 +			"fpsStartInFirstPerson", "fpsAlienTurn3D", "fpsAlienTurnCameras", "fpsAlienTurnFacing", "fpsFallenSoldierCamera", "fpsEyeLower", "fpsHeadBob" } },
@@ -105379,6 +105485,7 @@ index 000000000..d32e43294
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
++		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 +		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
 +			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
@@ -105410,8 +105517,9 @@ index 000000000..d32e43294
 +	{
 +		if (!placed[index]) other.options.push_back(gathered[index]);
 +	}
-+	std::sort(sorted.begin(), sorted.end(), [](const Section &one, const Section &two) { return one.name < two.name; });
-+	if (!other.options.empty()) sorted.push_back(other);
++	const auto last = [](const Section &section) { return section.heading == "STR_FPS_SECTION_CHEATS" ? 1 : section.heading == "STR_FPS_SECTION_EXPERIMENTAL" ? 2 : 0; };
++	std::sort(sorted.begin(), sorted.end(), [&last](const Section &one, const Section &two) { return last(one) != last(two) ? last(one) < last(two) : one.name < two.name; });
++	if (!other.options.empty()) sorted.insert(std::find_if(sorted.begin(), sorted.end(), [&last](const Section &section) { return last(section) > 0; }), other);
 +	for (Section &section : sorted)
 +	{
 +		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });
@@ -107679,10 +107787,18 @@ index 6c121c7b9..be4276167 100644
  	/// Sets the global shade.
  	void setGlobalShade(int shade);
 diff --git a/src/main.cpp b/src/main.cpp
-index 4fd8a1d41..a89b6bb01 100644
+index 4fd8a1d41..401dfdda2 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -121,6 +121,9 @@ int main(int argc, char *argv[])
+@@ -27,6 +27,7 @@
+ #include "Engine/Options.h"
+ #include "Engine/FileMap.h"
+ #include "Menu/StartState.h"
++#include "FirstPerson/FirstPersonApi.h"
+ 
+ /** @mainpage
+  * @author OpenXcom Developers
+@@ -121,6 +122,9 @@ int main(int argc, char *argv[])
  		return EXIT_SUCCESS;
  	std::ostringstream title;
  	title << "OpenXcom " << OPENXCOM_VERSION_SHORT << OPENXCOM_VERSION_GIT;
@@ -107691,4 +107807,12 @@ index 4fd8a1d41..a89b6bb01 100644
 +#endif
  	Options::baseXResolution = Options::displayWidth;
  	Options::baseYResolution = Options::displayHeight;
+ 
+@@ -140,6 +144,7 @@ int main(int argc, char *argv[])
+ 		CrossPlatform::startUpdateProcess();
+ 	}
+ 
++	FirstPerson::closeGpu(); // OpenXcom3D: the 3D view's renderer closed while the graphics card's driver is whole
+ 	return EXIT_SUCCESS;
+ }
  

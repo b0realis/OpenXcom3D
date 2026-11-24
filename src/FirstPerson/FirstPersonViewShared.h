@@ -160,13 +160,14 @@ const float ReliefSubtle = 0.5f, ReliefStrong = 1.0f;
 /// Setting "Metallic surfaces" (the card's rays, see ShadeSource): a UFO's parts are metal. The sun glints on them, as
 /// tight as MetalShine (the exponent of the highlight) and MetalSun shades bright at its middle; seen along its face a
 /// hull shows the sky's light, up to MetalRim shades; and whatever lamp lights it (the flashlight, a flare, a shot)
-/// gleams where the face is turned to the eye, MetalLamp of that light again. A highlight makes a colour up to
+/// gleams where the face is turned to the eye, MetalLamp of that light again (it was 0.8: close under the flashlight, at
+/// 7 tiles, a hull's drawing went nearly white at night; halved on the owner's word). A highlight makes a colour up to
 /// MetalBrightest shades brighter than its drawing has it, in its own colour group, and no more than MetalRoom of the
-/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Mirror" the hull shows what
+/// shades it is from its group's brightest (what is drawn bright already was a white patch). With "Reflections" the hull shows what
 /// its face mirrors, tinted by its own colour, MetalMirror of it at most (seen along the face; a third of that head on).
 /// And it is speckled (the owner: "Finish with speckle also"): one voxel in MetalFlakeEvery is a flake turned up to
 /// MetalFlakeTilt its own way, glinting MetalFlake shades where the sun or a lamp catches it, as tight as MetalFlakeShine.
-const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.8f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
+const float MetalShine = 14.0f, MetalSun = 3.5f, MetalRim = 2.0f, MetalLamp = 0.4f, MetalBrightest = 3.5f, MetalRoom = 0.5f, MetalMirror = 0.35f;
 const float MetalFlakeTilt = 0.35f, MetalFlake = 3.0f, MetalFlakeShine = 40.0f;
 const int MetalFlakeEvery = 5;
 /// Tactical flares: how long they burn (seconds), how far their light reaches (voxels), and how

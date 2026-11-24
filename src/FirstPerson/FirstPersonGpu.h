@@ -41,6 +41,9 @@ namespace OpenXcom
 class FirstPersonGpu;
 /// The one renderer on the graphics card, once it is open and ready (see FirstPersonViewGpu.cpp); null before, and where there is none.
 FirstPersonGpu *readyFirstPersonGpu();
+/// The game is ending: closes the renderer while the driver is still whole, or ends the program at once while the driver
+/// is still building its programs (see FirstPerson::closeGpu).
+void closeFirstPersonGpu();
 
 class FirstPersonGpu
 {
@@ -287,6 +290,8 @@ public:
 	/// them, and those for a pixel's later rays (4, "Supersampling"), for the settings that are on: else the first frame that needs one
 	/// waits while the driver builds it.
 	void prebuild(int extras);
+	/// The game is ending: a prebuild going on stops after the program the driver is building now (any thread may say so).
+	static void stopBuilding();
 	/// Forgets every model sent up so far (a new battle: the view builds its models anew).
 	void forgetModels();
 	/// Casts the frame's rays, a ray for each block of pixelSize x pixelSize pixels, and fills the picture.

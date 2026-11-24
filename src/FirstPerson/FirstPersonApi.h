@@ -128,6 +128,14 @@ void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int 
 void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int height, int displayHeight);
 
 
+// ---- The game's end (main.cpp) ----
+
+/// The game is ending (its window closed, everything done but the program's end): closes the 3D view's renderer on the
+/// graphics card while the driver is still whole; if the driver is still building the card's programs, ends the program
+/// at once instead (see closeFirstPersonGpu).
+void closeGpu();
+
+
 // ---- The battlescape screen (BattlescapeState.cpp) ----
 
 /// Creates the first-person mode for a battlescape screen, or returns nullptr unless an active
@@ -471,6 +479,7 @@ inline void mapAkimbo(BattlescapeState *, BattleAction &) { }
 inline bool shotKeepsFacing(BattlescapeState *, const BattleAction &) { return false; }
 inline void reactionAkimbo(BattlescapeState *, BattleAction &) { }
 inline void aimCalledOff() { }
+inline void closeGpu() { }
 inline unsigned aimCallOffs() { return 0; }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }

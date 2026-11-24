@@ -47,6 +47,7 @@
  * and its 3D VIEW options tab.
  */
 #include "FirstPersonApi.h"
+#include "FirstPersonGpu.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -489,19 +490,20 @@ void settleOptions()
 namespace
 {
 
-/// Which tables of presets these are: 1 since the owner's rulings on GitHub issue #193 (see gameplaySwitches,
-/// settlePresets).
-constexpr int PresetTables = 1;
+/// Which tables of presets these are (see gameplaySwitches, settlePresets): 1 since the owner's rulings on GitHub
+/// issue #193; 2 since "See-through corpses" is off in every preset (the owner: "should be off by default everywhere").
+constexpr int PresetTables = 2;
 
 /// A preset's value for a setting it leaves as it is (the player's, or what another group of presets has made it).
 constexpr int Kept = -9999;
 
 /**
  * One of the settings a preset sets: its option (a switch or a number) and its value under
- * each of the group's presets, in their order (Kept: that preset leaves it as it is); where the
- * tables' last change (see PresetTables) changed them, its values before (Kept: it wasn't
- * listed); and whether it is only set when a preset is chosen, and is no part of what makes
- * the preset (a setting another group owns: see gameplaySwitches, the pixel size).
+ * each of the group's presets, in their order (Kept: that preset leaves it as it is); where a
+ * change of the tables (see PresetTables) changed them, their values before it (Kept: it wasn't
+ * listed): in the first tables, and in the second; and whether it is only set when a preset is
+ * chosen, and is no part of what makes the preset (a setting another group owns: see
+ * gameplaySwitches, the pixel size).
  */
 struct PresetSwitch
 {
@@ -509,9 +511,21 @@ struct PresetSwitch
 	bool *flag;
 	int *number;
 	std::vector<int> values;
-	std::vector<int> before = {};
+	std::vector<int> before = {};   // (in tables 0, where they weren't as in tables 1)
 	bool onChoice = false;
+	std::vector<int> inTables1 = {}; // (in tables 1, where they weren't as now)
 };
+
+/**
+ * A setting's value under a preset in the tables a profile saw (see PresetTables).
+ */
+int presetValueIn(const PresetSwitch &presetSwitch, int preset, int tables)
+{
+	int value = presetSwitch.values[preset];
+	if (tables < 2 && !presetSwitch.inTables1.empty()) value = presetSwitch.inTables1[preset];
+	if (tables < 1 && !presetSwitch.before.empty()) value = presetSwitch.before[preset];
+	return value;
+}
 
 /**
  * A group of presets: the option that says which is chosen (0 .. the presets' number - 1, and
@@ -554,7 +568,9 @@ struct Presets
  * from Extended+ on (FAITHFUL: under the crosshair); XMbl leans with a tilt, jumps low
  * obstacles and takes fall damage; guns come first at auto-equip and every room's walls are
  * painted in all six. Those two are listed although no preset differs in them: choosing a
- * preset sets them, and they are part of what makes a named preset (see settlePresets).
+ * preset sets them, and they are part of what makes a named preset (see settlePresets). So is
+ * "See-through corpses", off in all six since the owner's "should be off by default
+ * everywhere" (it was on from Extended+: tables 2).
  * And, of the same list, the owner's "Yes make both": from XMbl on the light is smooth
  * between tiles (the first three leave "Smooth lighting" as the player has it), and XMbl,
  * when it is chosen, sets the pixel size to 1, full detail. The pixel size is "Graphics
@@ -605,7 +621,7 @@ const std::vector<PresetSwitch> &gameplaySwitches()
 		{ "fpsDownedIcons",       nullptr, &fpsDownedIcons,       { 1,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
 		{ "fpsWallPaint",         nullptr, &fpsWallPaint,         { 2,    2,    2,    2,    2,    2 }, { 1, 1, 1, 1, 2, 2 } },
 		{ "fpsSeeThroughCrops",   &fpsSeeThroughCrops,   nullptr, { 0,    1,    1,    1,    1,    1 } },
-		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    1,    1,    1,    1,    1 } },
+		{ "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, nullptr, { 0,    0,    0,    0,    0,    0 }, {}, false, { 0, 1, 1, 1, 1, 1 } },
 		{ "fpsUnseenTerrain",     nullptr, &fpsUnseenTerrain,     { 0,    0,    2,    2,    2,    2 } },
 		{ "fpsSmoothLighting",    &fpsSmoothLighting,    nullptr, { Kept, Kept, Kept, 1,    1,    1 }, { Kept, Kept, Kept, Kept, Kept, Kept } },
 		{ "fpsPixelSize",         nullptr, &fpsPixelSize,         { Kept, Kept, Kept, 1,    Kept, Kept }, { Kept, Kept, Kept, Kept, Kept, Kept }, true },
@@ -897,7 +913,7 @@ void optionsLoaded()
  * Nothing but the two names changes: no setting of the player's is touched.
  * But once, for a profile from before the tables' last change (PresetTables; the option
  * "fpsPresetTables" keeps which tables a profile has seen): settings that are all as a named
- * preset had them before are that preset as it is now. Without it, every profile on
+ * preset had them in the tables the profile saw are that preset as it is now. Without it, every profile on
  * Extended+ would have turned Custom with the old values, and the new defaults would have
  * reached no one who had played before. A mix of the player's own matches no preset's old
  * values and is left alone.
@@ -914,7 +930,7 @@ void settlePresets()
 			{
 				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
 				if (presetSwitch.onChoice) continue;
-				const int now = presetSwitch.values[preset], was = presetSwitch.before.empty() ? now : presetSwitch.before[preset];
+				const int now = presetSwitch.values[preset], was = presetValueIn(presetSwitch, preset, Options::fpsPresetTables);
 				if (was != Kept) all = all && switchValue(presetSwitch) == was;
 				changes = changes || (now != Kept && now != was);
 			}
@@ -1305,8 +1321,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiftBeams", &fpsLiftBeams, true, "STR_FPS_LIFT_BEAMS", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCrops", &fpsSeeThroughCrops, true, "STR_FPS_SEE_THROUGH_CROPS", category));
 	// A corpse or item pointed at, the game's line passing it to something behind: drawn faint, at
-	// the ghost opacity (the game's shots pass through them).
-	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, true, "STR_FPS_SEE_THROUGH_CORPSES", category));
+	// the ghost opacity (the game's shots pass through them). Off by default and in every preset (the owner).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsSeeThroughCorpses", &fpsSeeThroughCorpses, false, "STR_FPS_SEE_THROUGH_CORPSES", category));
 	// The map's edge as small red dots on the floor, nothing beyond it, instead of the tape.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDiscreetEdge", &fpsDiscreetEdge, false, "STR_FPS_DISCREET_EDGE", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsRenderer", &fpsRenderer, 0, "STR_FPS_RENDERER", category));
@@ -1924,6 +1940,14 @@ unsigned &aimCallOffCount()
 	static unsigned count = 0;
 	return count;
 }
+}
+
+/**
+ * The game is ending (see FirstPersonApi.h).
+ */
+void closeGpu()
+{
+	closeFirstPersonGpu();
 }
 
 /**
