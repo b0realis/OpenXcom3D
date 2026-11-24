@@ -538,6 +538,7 @@ const struct { const char *id; HiddenAs as; } HiddenSettings[] = {
 	{ "fpsAllLightShadows", HIDDEN_FOLDED },    // the same
 	{ "fpsSeeThroughCorpses", HIDDEN_FOLDED },  // into "See-through": Off, Crops, All (the owner's call: one row for both)
 	{ "fpsFlightCostOverride", HIDDEN_FOLDED }, // into "Flight cost per level": Rules, 0 to 24
+	{ "fpsDamageOverkill", HIDDEN_FOLDED },     // into "Damage numbers": Off, On, Overkill (GitHub issue #262)
 	{ "FPS", HIDDEN_ELSEWHERE },                // the game's frame rate limit (its own General tab)
 	{ "fpsCounter", HIDDEN_ELSEWHERE },         // the game's frame counter (F7)
 	{ "fpsVrMode", HIDDEN_DESKTOP },            // VR: the Meta Quest's (a desktop has no headset; VR mode Off)
@@ -1561,6 +1562,9 @@ void createOptions(std::vector<OptionInfo> &options)
 	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls
 	// hidden) and on the map (see FirstPersonDamageNumbers.cpp). Off: none.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageNumbers", &fpsDamageNumbers, false, "STR_FPS_DAMAGE_NUMBERS", category));
+	// And a killing blow's health past what the unit had, in orange after the red (a player, GitHub issue #262; the owner: "as
+	// an expanded setting of damage numbers"): the row "Damage numbers" sets it, Off / On / Overkill (see foldedChoice).
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageOverkill", &fpsDamageOverkill, false, "STR_FPS_DAMAGE_OVERKILL", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitLogDetail", &fpsHitLogDetail, false, "STR_FPS_HIT_LOG_DETAIL", category)); // (the owner: whom, how much, who fell)
 	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
@@ -1924,10 +1928,11 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
  * @param shieldLost The points its energy shield lost (see shieldPoints).
+ * @param healthDealt The health the hit took before the game's floor (see noteHealthDamage).
  */
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt)
 {
-	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost, healthDealt);
 }
 
 /**
@@ -1970,6 +1975,31 @@ std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int 
 		}
 	}
 	return text + ") ";
+}
+
+namespace
+{
+/// The health the last hit took before the game's floor (see noteHealthDamage).
+int healthDamageNoted = 0;
+}
+
+/**
+ * Notes the health a hit takes off a unit as the game works it out, before it floors the unit's health (most of
+ * the game's damage types stop it at 0: a killing blow's health lost is what was left): setting "Damage numbers"
+ * Overkill (a player, GitHub issue #262: "show the ACTUAL raw damage roll, to know how much overkill was done").
+ * BattleUnit::damage notes it; TileEngine::hitUnit notes 0 before the hit (a hit that deals none notes nothing)
+ * and reads it after.
+ * @param health The health.
+ */
+void noteHealthDamage(int health)
+{
+	healthDamageNoted = health;
+}
+
+/// The health the last hit took before the game's floor (see noteHealthDamage).
+int lastHealthDamage()
+{
+	return healthDamageNoted;
 }
 
 /**

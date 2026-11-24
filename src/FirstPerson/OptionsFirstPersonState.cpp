@@ -136,6 +136,7 @@ const char *const alienTurnNames[] = { "STR_FPS_ALIEN_TURN_MAP", "STR_FPS_ALIEN_
 const char *const shadowNames[] = { "STR_FPS_SHADOWS_OFF", "STR_FPS_SHADOWS_ON", "STR_FPS_SHADOWS_SOFT", "STR_FPS_SHADOWS_LAMPS", "STR_FPS_SHADOWS_SOFT_LAMPS" };
 const char *const seeThroughNames[] = { "STR_FPS_SEE_THROUGH_OFF", "STR_FPS_SEE_THROUGH_CROPS_CHOICE", "STR_FPS_SEE_THROUGH_ALL" };
 const char *const flightCostNames[] = { "STR_FPS_FLIGHT_COST_RULES" }; // (then the time units, 0 to 24)
+const char *const damageNumberNames[] = { "STR_FPS_DAMAGE_NUMBERS_OFF", "STR_FPS_DAMAGE_NUMBERS_ON", "STR_FPS_DAMAGE_NUMBERS_OVERKILL" };
 
 /// The highest flight cost a level, in time units.
 const int FlightCostMax = 24;
@@ -174,6 +175,11 @@ int foldedChoice(const std::string &id, int &choices)
 	{
 		choices = 3;
 		return !fpsSeeThroughCrops ? 0 : fpsSeeThroughCorpses ? 2 : 1;
+	}
+	if (id == "fpsDamageNumbers") // Off, On, with a killing blow's overkill ("fpsDamageOverkill": GitHub issue #262)
+	{
+		choices = 3;
+		return !fpsDamageNumbers ? 0 : fpsDamageOverkill ? 2 : 1;
 	}
 	if (id == "fpsFlightCost") // the game's rules, or a cost for all ("Flight cost overrides rules"): 0 to 24 time units
 	{
@@ -225,6 +231,11 @@ void setFoldedChoice(const std::string &id, int choice)
 		fpsSeeThroughCrops = choice > 0;
 		fpsSeeThroughCorpses = choice == 2; // (off too with Off: the corpses go by it alone)
 	}
+	else if (id == "fpsDamageNumbers")
+	{
+		fpsDamageNumbers = choice > 0;
+		if (choice > 0) fpsDamageOverkill = choice == 2;
+	}
 	else if (id == "fpsFlightCost")
 	{
 		fpsFlightCostOverride = choice > 0;
@@ -241,6 +252,7 @@ std::vector<std::string> foldedInto(const std::string &id)
 	if (id == "fpsShadows") return { "fpsSoftShadows", "fpsAllLightShadows" };
 	if (id == "fpsSeeThroughCrops") return { "fpsSeeThroughCorpses" };
 	if (id == "fpsFlightCost") return { "fpsFlightCostOverride" };
+	if (id == "fpsDamageNumbers") return { "fpsDamageOverkill" };
 	return {};
 }
 
@@ -367,7 +379,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
@@ -490,7 +502,7 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 	{
 		if (option.id() == "fpsFlightCost") return choice == 0 ? std::string(tr(flightCostNames[0])) : std::to_string(choice - 1);
 		const char *const *names = option.id() == "fpsTacticalMap" ? tacticalMapNames : option.id() == "fpsCrosshairInfo" ? shotInfoNames
-			: option.id() == "fpsAlienTurn3D" ? alienTurnNames : option.id() == "fpsShadows" ? shadowNames : seeThroughNames;
+			: option.id() == "fpsAlienTurn3D" ? alienTurnNames : option.id() == "fpsShadows" ? shadowNames : option.id() == "fpsDamageNumbers" ? damageNumberNames : seeThroughNames;
 		return std::string(tr(names[choice]));
 	}
 	switch (option.type())

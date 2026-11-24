@@ -2706,9 +2706,13 @@ bool FirstPersonMode::clearLineOfFire(BattleUnit *viewer, BattleUnit *enemy) con
  * @param healthLost The health it lost.
  * @param armorLost The armour points it lost (the side struck).
  * @param stunTaken The stun it took.
+ * With "Damage numbers" Overkill, a hit that took more health than the unit had (a killing blow: most of the game's damage
+ * types stop the health at 0) shows the health it had in red and the rest in orange after it, "+30" (a player, GitHub
+ * issue #262: "show the ACTUAL raw damage roll, to know how much overkill was done").
  * @param shieldLost The points its energy shield lost (a mod's, see FirstPerson::shieldPoints).
+ * @param healthDealt The health the hit took before the game's floor (see FirstPerson::noteHealthDamage).
  */
-void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 	if (!mode || !Options::fpsDamageNumbers || !unit)
@@ -2729,7 +2733,17 @@ void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *uni
 	const int size = unit->getArmor()->getSize();
 	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
 		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
-	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, SDL_GetTicks());
+	// (Overkill: the health it had is the red number, past it the orange; the game's own overkill below 0, which some damage
+	// types allow, counts as past it too)
+	int overkill = 0;
+	if (Options::fpsDamageOverkill)
+	{
+		const int healthHad = unit->getHealth() + healthLost;
+		const int healthShown = std::clamp(healthLost, 0, std::max(0, healthHad));
+		overkill = std::max(0, std::max(healthLost, healthDealt) - healthShown);
+		healthLost = healthShown;
+	}
+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, overkill, SDL_GetTicks());
 }
 
 /**

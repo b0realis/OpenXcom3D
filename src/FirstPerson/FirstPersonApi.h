@@ -391,7 +391,10 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 /// the one place each of them deals its damage, after it): the health it lost, the armour it took off
 /// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
 /// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
-void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt);
+/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
+void noteHealthDamage(int health);
+int lastHealthDamage();
 /// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 /// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
 std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut);
@@ -490,7 +493,9 @@ inline void closeGpu() { }
 inline unsigned aimCallOffs() { return 0; }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
-inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
+inline void noteHealthDamage(int) { }
+inline int lastHealthDamage() { return 0; }
 inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
 inline int armorPoints(const BattleUnit *) { return 0; }
 inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }

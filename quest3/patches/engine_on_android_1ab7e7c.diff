@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..aefb6664f
+index 000000000..e887d0366
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,725 @@
+@@ -0,0 +1,730 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -817,7 +817,12 @@ index 000000000..aefb6664f
 +  STR_FPS_WOUNDED_MARKERS_OFF: "Off"
 +  STR_FPS_WOUNDED_MARKERS_ON: "On"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
-+  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armour blue, stun purple; a grey 0 when it did nothing."
++  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage over the unit: health red, armour blue, stun purple, a grey 0 for none. Overkill: a kill's damage past its health, orange."
++  STR_FPS_DAMAGE_NUMBERS_OFF: "Off"
++  STR_FPS_DAMAGE_NUMBERS_ON: "On"
++  STR_FPS_DAMAGE_NUMBERS_OVERKILL: "Overkill"
++  STR_FPS_DAMAGE_OVERKILL: "Damage numbers: overkill"
++  STR_FPS_DAMAGE_OVERKILL_DESC: "Damage numbers Overkill: a killing hit's damage past the health the unit had, in orange after the red."
 +  STR_FPS_HIT_LOG_DETAIL: "Detailed hit log"
 +  STR_FPS_HIT_LOG_DETAIL_DESC: "The hit log (Ctrl+H) also names whom each hit hurt, by how much, and who fell: HIT (Sectoid 23, killed). On the map too."
 +  STR_FPS_HIT_LOG_STUN: "stun"
@@ -893,10 +898,10 @@ index 000000000..aefb6664f
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c908b61dd
+index 000000000..720456009
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,725 @@
+@@ -0,0 +1,730 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1548,7 +1553,12 @@ index 000000000..c908b61dd
 +  STR_FPS_WOUNDED_MARKERS_OFF: "Off"
 +  STR_FPS_WOUNDED_MARKERS_ON: "On"
 +  STR_FPS_DAMAGE_NUMBERS: "Damage numbers"
-+  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage rises over the unit, in 3D and on the map: health lost red, armor blue, stun purple; a gray 0 when it did nothing."
++  STR_FPS_DAMAGE_NUMBERS_DESC: "A hit's damage over the unit: health red, armor blue, stun purple, a gray 0 for none. Overkill: a kill's damage past its health, orange."
++  STR_FPS_DAMAGE_NUMBERS_OFF: "Off"
++  STR_FPS_DAMAGE_NUMBERS_ON: "On"
++  STR_FPS_DAMAGE_NUMBERS_OVERKILL: "Overkill"
++  STR_FPS_DAMAGE_OVERKILL: "Damage numbers: overkill"
++  STR_FPS_DAMAGE_OVERKILL_DESC: "Damage numbers Overkill: a killing hit's damage past the health the unit had, in orange after the red."
 +  STR_FPS_HIT_LOG_DETAIL: "Detailed hit log"
 +  STR_FPS_HIT_LOG_DETAIL_DESC: "The hit log (Ctrl+H) also names whom each hit hurt, by how much, and who fell: HIT (Sectoid 23, killed). On the map too."
 +  STR_FPS_HIT_LOG_STUN: "stun"
@@ -21906,7 +21916,7 @@ index 067c7b3ba..61a8b856f 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index cffa2c5bd..596b17929 100644
+index cffa2c5bd..b6adf665f 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -45,6 +45,7 @@
@@ -21993,7 +22003,7 @@ index cffa2c5bd..596b17929 100644
  					_save->getBattleGame()->statePushBack(new ProjectileFlyBState(_save->getBattleGame(), action));
  				}
  				return true;
-@@ -3146,30 +3175,34 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+@@ -3146,30 +3175,35 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
  
  	const int healthOrig = target->getHealth();
  	const int stunLevelOrig = target->getStunlevel();
@@ -22001,11 +22011,12 @@ index cffa2c5bd..596b17929 100644
 +	const int armorOrig = FirstPerson::armorPoints(target); // (OpenXcom3D: setting "Damage numbers", the armour a hit takes off)
 +	const int shieldOrig = FirstPerson::shieldPoints(_save->getBattleState(), target); // (and what it takes off a mod's energy shield)
  
++	FirstPerson::noteHealthDamage(0); // (OpenXcom3D: setting "Damage numbers" Overkill, the health the hit takes before the game's floor: see BattleUnit::damage)
  	target->damage(relative, damage, type, _save, attack);
  
  	const int healthDamage = healthOrig - target->getHealth();
  	const int stunDamage = target->getStunlevel() - stunLevelOrig;
-+	FirstPerson::unitDamaged(_save->getBattleState(), target, healthDamage, armorOrig - FirstPerson::armorPoints(target), stunDamage, shieldOrig - FirstPerson::shieldPoints(_save->getBattleState(), target)); // (OpenXcom3D: setting "Damage numbers")
++	FirstPerson::unitDamaged(_save->getBattleState(), target, healthDamage, armorOrig - FirstPerson::armorPoints(target), stunDamage, shieldOrig - FirstPerson::shieldPoints(_save->getBattleState(), target), FirstPerson::lastHealthDamage()); // (OpenXcom3D: setting "Damage numbers")
  
  	// hit log
  	if (attack.attacker)
@@ -22037,7 +22048,7 @@ index cffa2c5bd..596b17929 100644
  		}
  	}
  
-@@ -3231,7 +3264,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3231,7 +3265,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -22046,7 +22057,7 @@ index cffa2c5bd..596b17929 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3282,9 +3315,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3282,9 +3316,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -22066,7 +22077,7 @@ index cffa2c5bd..596b17929 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -3514,6 +3556,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3514,6 +3557,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  	// now detonate the tiles affected by explosion
  	if (type->ToTile > 0.0f)
  	{
@@ -22074,7 +22085,7 @@ index cffa2c5bd..596b17929 100644
  		for (auto& pair : tilesAffected)
  		{
  			if (detonate(pair.first, pair.second))
-@@ -4362,6 +4405,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4362,6 +4406,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -22090,7 +22101,7 @@ index cffa2c5bd..596b17929 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4381,7 +4433,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4381,7 +4434,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory)
  				{ // store the position of impact
@@ -22099,7 +22110,7 @@ index cffa2c5bd..596b17929 100644
  				}
  				return true;
  			}
-@@ -4395,13 +4447,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4395,13 +4448,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory != 0)
  				{ // store the position of impact
@@ -22117,7 +22128,7 @@ index cffa2c5bd..596b17929 100644
  	if (hit)
  	{
  		return result;
-@@ -4424,6 +4479,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
+@@ -4424,6 +4480,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
  {
  	if (target == origin) return V_EMPTY;//just in case
  
@@ -22128,7 +22139,7 @@ index cffa2c5bd..596b17929 100644
  	int result = V_EMPTY;
  	Position lastPosition = origin;
  	Position nextPosition = lastPosition;
-@@ -4528,7 +4587,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4528,7 +4588,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -22137,7 +22148,7 @@ index cffa2c5bd..596b17929 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4554,8 +4613,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4554,8 +4614,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		_cacheTileBelow = tileBelow;
   	}
  
@@ -22158,7 +22169,7 @@ index cffa2c5bd..596b17929 100644
  		return V_EMPTY;
  	}
  
-@@ -4586,12 +4657,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4586,12 +4658,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		}
  	}
  
@@ -22180,7 +22191,7 @@ index cffa2c5bd..596b17929 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5385,7 +5465,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5385,7 +5466,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -22195,7 +22206,7 @@ index cffa2c5bd..596b17929 100644
  						{
  							if (dest)
  							{
-@@ -5707,11 +5793,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5707,11 +5794,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -22218,7 +22229,7 @@ index cffa2c5bd..596b17929 100644
  		{
  			if (voxelType)
  			{
-@@ -5869,6 +5965,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5869,6 +5966,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -22227,7 +22238,7 @@ index cffa2c5bd..596b17929 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5893,6 +5991,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5893,6 +5992,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -23399,7 +23410,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..b8de9f861 100644
+index 0467dd243..bd0d5e7c4 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -23416,7 +23427,7 @@ index 0467dd243..b8de9f861 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail;
++OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -24446,10 +24457,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..31bfa54d1
+index 000000000..0a4a00c5e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2240 @@
+@@ -0,0 +1,2270 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24990,6 +25001,7 @@ index 000000000..31bfa54d1
 +	{ "fpsAllLightShadows", HIDDEN_FOLDED },    // the same
 +	{ "fpsSeeThroughCorpses", HIDDEN_FOLDED },  // into "See-through": Off, Crops, All (the owner's call: one row for both)
 +	{ "fpsFlightCostOverride", HIDDEN_FOLDED }, // into "Flight cost per level": Rules, 0 to 24
++	{ "fpsDamageOverkill", HIDDEN_FOLDED },     // into "Damage numbers": Off, On, Overkill (GitHub issue #262)
 +	{ "FPS", HIDDEN_ELSEWHERE },                // the game's frame rate limit (its own General tab)
 +	{ "fpsCounter", HIDDEN_ELSEWHERE },         // the game's frame counter (F7)
 +	{ "fpsVrMode", HIDDEN_DESKTOP },            // VR: the Meta Quest's (a desktop has no headset; VR mode Off)
@@ -26013,6 +26025,9 @@ index 000000000..31bfa54d1
 +	// these; every hit on a unit the squad sees, whoever struck, in 3D (in the world, behind walls
 +	// hidden) and on the map (see FirstPersonDamageNumbers.cpp). Off: none.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageNumbers", &fpsDamageNumbers, false, "STR_FPS_DAMAGE_NUMBERS", category));
++	// And a killing blow's health past what the unit had, in orange after the red (a player, GitHub issue #262; the owner: "as
++	// an expanded setting of damage numbers"): the row "Damage numbers" sets it, Off / On / Overkill (see foldedChoice).
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsDamageOverkill", &fpsDamageOverkill, false, "STR_FPS_DAMAGE_OVERKILL", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitLogDetail", &fpsHitLogDetail, false, "STR_FPS_HIT_LOG_DETAIL", category)); // (the owner: whom, how much, who fell)
 +	// Staying in the 3D view during the alien turn, starting battles in it, and the debug cheat
 +	// "doom mode" (endless time units and energy), with its two extras, each doom mode plus
@@ -26376,10 +26391,11 @@ index 000000000..31bfa54d1
 + * @param armorLost The armour points it lost (the side struck).
 + * @param stunTaken The stun it took.
 + * @param shieldLost The points its energy shield lost (see shieldPoints).
++ * @param healthDealt The health the hit took before the game's floor (see noteHealthDamage).
 + */
-+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
++void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt)
 +{
-+	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost);
++	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost, healthDealt);
 +}
 +
 +/**
@@ -26422,6 +26438,31 @@ index 000000000..31bfa54d1
 +		}
 +	}
 +	return text + ") ";
++}
++
++namespace
++{
++/// The health the last hit took before the game's floor (see noteHealthDamage).
++int healthDamageNoted = 0;
++}
++
++/**
++ * Notes the health a hit takes off a unit as the game works it out, before it floors the unit's health (most of
++ * the game's damage types stop it at 0: a killing blow's health lost is what was left): setting "Damage numbers"
++ * Overkill (a player, GitHub issue #262: "show the ACTUAL raw damage roll, to know how much overkill was done").
++ * BattleUnit::damage notes it; TileEngine::hitUnit notes 0 before the hit (a hit that deals none notes nothing)
++ * and reads it after.
++ * @param health The health.
++ */
++void noteHealthDamage(int health)
++{
++	healthDamageNoted = health;
++}
++
++/// The health the last hit took before the game's floor (see noteHealthDamage).
++int lastHealthDamage()
++{
++	return healthDamageNoted;
 +}
 +
 +/**
@@ -26692,10 +26733,10 @@ index 000000000..31bfa54d1
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..764a347a3
+index 000000000..71ebf548a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,547 @@
+@@ -0,0 +1,552 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27089,7 +27130,10 @@ index 000000000..764a347a3
 +/// the one place each of them deals its damage, after it): the health it lost, the armour it took off
 +/// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
 +/// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
-+void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
++void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt);
++/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
++void noteHealthDamage(int health);
++int lastHealthDamage();
 +/// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 +/// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
 +std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut);
@@ -27188,7 +27232,9 @@ index 000000000..764a347a3
 +inline unsigned aimCallOffs() { return 0; }
 +inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
-+inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int) { }
++inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
++inline void noteHealthDamage(int) { }
++inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
 +inline int armorPoints(const BattleUnit *) { return 0; }
 +inline int shieldPoints(BattlescapeState *, const BattleUnit *) { return 0; }
@@ -28310,10 +28356,10 @@ index 000000000..c803cb30a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonDamageNumbers.cpp b/src/FirstPerson/FirstPersonDamageNumbers.cpp
 new file mode 100644
-index 000000000..f9a3a85a0
+index 000000000..c7e62d4d4
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonDamageNumbers.cpp
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,373 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -28403,7 +28449,7 @@ index 000000000..f9a3a85a0
 +const int DissolveOrder[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 +
 +/// What a cell of a number's picture is.
-+enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM };
++enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM, CELL_OVERKILL };
 +
 +/// A hit's numbers laid out in the small font, one cell a pixel (scale 1).
 +struct NumberPicture
@@ -28427,6 +28473,7 @@ index 000000000..f9a3a85a0
 +	std::vector<std::pair<std::string, NumberCell>> parts;
 +	if (number.shield > 0) parts.push_back({ std::to_string(number.shield), CELL_SHIELD }); // (first: the shield is struck first)
 +	if (number.health > 0) parts.push_back({ std::to_string(number.health), CELL_HEALTH });
++	if (number.overkill > 0) parts.push_back({ "+" + std::to_string(number.overkill), CELL_OVERKILL }); // (the health past what the unit had)
 +	if (number.armor > 0) parts.push_back({ std::to_string(number.armor), CELL_ARMOR });
 +	if (number.stun > 0) parts.push_back({ std::to_string(number.stun), CELL_STUN });
 +	if (parts.empty()) parts.push_back({ "0", CELL_NO_HARM });
@@ -28514,9 +28561,10 @@ index 000000000..f9a3a85a0
 + * @param armor The armour points it lost.
 + * @param stun The stun it took.
 + * @param shield The points its energy shield lost.
++ * @param overkill The health past what the unit had (setting "Damage numbers" Overkill; else 0).
 + * @param now The time (SDL ticks).
 + */
-+void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now)
++void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, int overkill, Uint32 now)
 +{
 +	DamageNumber number;
 +	std::copy(head, head + 3, number.head);
@@ -28525,6 +28573,7 @@ index 000000000..f9a3a85a0
 +	number.armor = std::max(0, armor);
 +	number.stun = std::max(0, stun);
 +	number.shield = std::max(0, shield);
++	number.overkill = std::max(0, overkill);
 +	number.start = now;
 +	_numbers.push_back(number);
 +}
@@ -28556,6 +28605,7 @@ index 000000000..f9a3a85a0
 +	colors.shield = nearestPaletteColor(palette, 255, 255, 255);
 +	colors.none = nearestPaletteColor(palette, 170, 170, 170);
 +	colors.outline = nearestPaletteColor(palette, 0, 0, 0);
++	colors.overkill = nearestPaletteColor(palette, 255, 150, 30);
 +	return colors;
 +}
 +
@@ -28646,7 +28696,7 @@ index 000000000..f9a3a85a0
 +	const DamageNumberColors &colors, const float *depthBuffer, double depth)
 +{
 +	const NumberPicture picture = numberPicture(font, number);
-+	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none };
++	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none, colors.overkill };
 +
 +	// How much of it shows: all of it, then dissolving away.
 +	const double share = (now - number.start) / (double)DamageNumberLife;
@@ -28685,10 +28735,10 @@ index 000000000..f9a3a85a0
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonDamageNumbers.h b/src/FirstPerson/FirstPersonDamageNumbers.h
 new file mode 100644
-index 000000000..417029f4d
+index 000000000..59002ea0a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonDamageNumbers.h
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,122 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -28761,6 +28811,7 @@ index 000000000..417029f4d
 +	int armor;        // the armour points it took off the side struck (blue)
 +	int stun;         // the stun it took (purple)
 +	int shield;       // the points its energy shield lost (white; a mod's shields); none of the four: a grey 0
++	int overkill;     // with "Damage numbers" Overkill, the health the hit took past what the unit had (orange, after the red)
 +	Uint32 start;     // when it was hit (SDL ticks)
 +};
 +
@@ -28769,7 +28820,7 @@ index 000000000..417029f4d
 +{
 +public:
 +	/// Notes a hit's numbers (see DamageNumber).
-+	void add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now);
++	void add(const double head[3], int level, int health, int armor, int stun, int shield, int overkill, Uint32 now);
 +	/// Drops the numbers that have had their time; true if any are left.
 +	bool update(Uint32 now);
 +	/// The numbers showing.
@@ -28780,7 +28831,7 @@ index 000000000..417029f4d
 +
 +/// The palette colours the numbers are drawn in: the nearest to a clear red, blue, purple and grey,
 +/// and black for their outline.
-+struct DamageNumberColors { Uint8 health, armor, stun, shield, none, outline; };
++struct DamageNumberColors { Uint8 health, armor, stun, shield, none, outline, overkill; };
 +DamageNumberColors damageNumberColors(const SDL_Color *palette);
 +
 +/// Where a number's point is on the screen: the column it's centred on and the row it rises from
@@ -41945,7 +41996,7 @@ index 000000000..c1bf4e1ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..fcabbefcb
+index 000000000..2b84fe6f5
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
 @@ -0,0 +1,1610 @@
@@ -42130,7 +42181,7 @@ index 000000000..fcabbefcb
 +	/// A round or a blow struck a unit: an enemy in sight it did no harm marks the crosshair.
 +	static void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefore, int stunBefore);
 +	/// A shot, a blow or a blast hurt a unit (setting "Damage numbers"): its numbers to rise over it, if the squad sees it.
-+	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost);
++	static void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt);
 +	/// Setting "Damage numbers": draws the numbers rising over the units hit on the isometric map.
 +	static void drawMapDamageNumbers(BattlescapeState *state, Surface *surface, const Camera *camera);
 +	/// Do a shotgun's pellets and a volley's two rounds each land on their own (setting "Each pellet on its own")?
@@ -44563,10 +44614,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..8271481f6
+index 000000000..44bf2df96
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2794 @@
+@@ -0,0 +1,2808 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47275,9 +47326,13 @@ index 000000000..8271481f6
 + * @param healthLost The health it lost.
 + * @param armorLost The armour points it lost (the side struck).
 + * @param stunTaken The stun it took.
++ * With "Damage numbers" Overkill, a hit that took more health than the unit had (a killing blow: most of the game's damage
++ * types stop the health at 0) shows the health it had in red and the rest in orange after it, "+30" (a player, GitHub
++ * issue #262: "show the ACTUAL raw damage roll, to know how much overkill was done").
 + * @param shieldLost The points its energy shield lost (a mod's, see FirstPerson::shieldPoints).
++ * @param healthDealt The health the hit took before the game's floor (see FirstPerson::noteHealthDamage).
 + */
-+void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost)
++void FirstPersonMode::unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt)
 +{
 +	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
 +	if (!mode || !Options::fpsDamageNumbers || !unit)
@@ -47298,7 +47353,17 @@ index 000000000..8271481f6
 +	const int size = unit->getArmor()->getSize();
 +	const double head[3] = { position.x * 16.0 + 8.0 * size, position.y * 16.0 + 8.0 * size,
 +		position.z * 24.0 - tile->getTerrainLevel() + (lying ? 4.0 : unit->getFloatHeight() + unit->getHeight() + 2.0) };
-+	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, SDL_GetTicks());
++	// (Overkill: the health it had is the red number, past it the orange; the game's own overkill below 0, which some damage
++	// types allow, counts as past it too)
++	int overkill = 0;
++	if (Options::fpsDamageOverkill)
++	{
++		const int healthHad = unit->getHealth() + healthLost;
++		const int healthShown = std::clamp(healthLost, 0, std::max(0, healthHad));
++		overkill = std::max(0, std::max(healthLost, healthDealt) - healthShown);
++		healthLost = healthShown;
++	}
++	mode->_damageNumbers.add(head, position.z, healthLost, armorLost, stunTaken, shieldLost, overkill, SDL_GetTicks());
 +}
 +
 +/**
@@ -66691,10 +66756,10 @@ index 000000000..95fc848cf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..e78daa4e8
+index 000000000..42e6cb91b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1478 @@
+@@ -0,0 +1,1481 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -67363,7 +67428,10 @@ index 000000000..e78daa4e8
 +		// particles off by default ... I can't be arsed to go through which should, and shouldn't have it".)
 +		const VoxelUnitModel *hoverBody = unitSize > 1 && unit->getMovementType() == MT_FLY && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
 +		const bool hovers = hoverBody && hoverBody->sparks;
-+		const bool breathes = unit->getBreathExhaleFrame() >= 0;
++		// (Breath as the map draws it (UnitSprite): under the sea only (a TFTD battle on land has its units breathe as well,
++		// and showed bubbles from every aquanaut, alien and tank: a player, GitHub issue #260), an armour that has bubbles,
++		// and no floor over the unit.)
++		const bool breathes = unit->getBreathExhaleFrame() >= 0 && _save->getDepth() != 0 && unit->getArmor()->drawBubbles() && !unit->getFloorAbove();
 +		if (!hovers && !breathes) continue;
 +		auto glide = _unitGlides.find(unit);
 +		if (glide == _unitGlides.end() || now - glide->second.seen >= 250) continue;
@@ -105487,10 +105555,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..dea84050f
+index 000000000..9de1ef006
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1345 @@
+@@ -0,0 +1,1357 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -105629,6 +105697,7 @@ index 000000000..dea84050f
 +const char *const shadowNames[] = { "STR_FPS_SHADOWS_OFF", "STR_FPS_SHADOWS_ON", "STR_FPS_SHADOWS_SOFT", "STR_FPS_SHADOWS_LAMPS", "STR_FPS_SHADOWS_SOFT_LAMPS" };
 +const char *const seeThroughNames[] = { "STR_FPS_SEE_THROUGH_OFF", "STR_FPS_SEE_THROUGH_CROPS_CHOICE", "STR_FPS_SEE_THROUGH_ALL" };
 +const char *const flightCostNames[] = { "STR_FPS_FLIGHT_COST_RULES" }; // (then the time units, 0 to 24)
++const char *const damageNumberNames[] = { "STR_FPS_DAMAGE_NUMBERS_OFF", "STR_FPS_DAMAGE_NUMBERS_ON", "STR_FPS_DAMAGE_NUMBERS_OVERKILL" };
 +
 +/// The highest flight cost a level, in time units.
 +const int FlightCostMax = 24;
@@ -105667,6 +105736,11 @@ index 000000000..dea84050f
 +	{
 +		choices = 3;
 +		return !fpsSeeThroughCrops ? 0 : fpsSeeThroughCorpses ? 2 : 1;
++	}
++	if (id == "fpsDamageNumbers") // Off, On, with a killing blow's overkill ("fpsDamageOverkill": GitHub issue #262)
++	{
++		choices = 3;
++		return !fpsDamageNumbers ? 0 : fpsDamageOverkill ? 2 : 1;
 +	}
 +	if (id == "fpsFlightCost") // the game's rules, or a cost for all ("Flight cost overrides rules"): 0 to 24 time units
 +	{
@@ -105718,6 +105792,11 @@ index 000000000..dea84050f
 +		fpsSeeThroughCrops = choice > 0;
 +		fpsSeeThroughCorpses = choice == 2; // (off too with Off: the corpses go by it alone)
 +	}
++	else if (id == "fpsDamageNumbers")
++	{
++		fpsDamageNumbers = choice > 0;
++		if (choice > 0) fpsDamageOverkill = choice == 2;
++	}
 +	else if (id == "fpsFlightCost")
 +	{
 +		fpsFlightCostOverride = choice > 0;
@@ -105734,6 +105813,7 @@ index 000000000..dea84050f
 +	if (id == "fpsShadows") return { "fpsSoftShadows", "fpsAllLightShadows" };
 +	if (id == "fpsSeeThroughCrops") return { "fpsSeeThroughCorpses" };
 +	if (id == "fpsFlightCost") return { "fpsFlightCostOverride" };
++	if (id == "fpsDamageNumbers") return { "fpsDamageOverkill" };
 +	return {};
 +}
 +
@@ -105860,7 +105940,7 @@ index 000000000..dea84050f
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
-+			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
++			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 +		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
 +		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
@@ -105983,7 +106063,7 @@ index 000000000..dea84050f
 +	{
 +		if (option.id() == "fpsFlightCost") return choice == 0 ? std::string(tr(flightCostNames[0])) : std::to_string(choice - 1);
 +		const char *const *names = option.id() == "fpsTacticalMap" ? tacticalMapNames : option.id() == "fpsCrosshairInfo" ? shotInfoNames
-+			: option.id() == "fpsAlienTurn3D" ? alienTurnNames : option.id() == "fpsShadows" ? shadowNames : seeThroughNames;
++			: option.id() == "fpsAlienTurn3D" ? alienTurnNames : option.id() == "fpsShadows" ? shadowNames : option.id() == "fpsDamageNumbers" ? damageNumberNames : seeThroughNames;
 +		return std::string(tr(names[choice]));
 +	}
 +	switch (option.type())
@@ -107981,7 +108061,7 @@ index 0a825f760..a753621bb 100644
  	/// Name of class used in script.
  	static constexpr const char *ScriptName = "BattleItem";
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index e6e2195ce..f627762a5 100644
+index e6e2195ce..09baf1867 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -55,6 +55,7 @@
@@ -108053,6 +108133,14 @@ index e6e2195ce..f627762a5 100644
  	UnitSide side = SIDE_FRONT;
  	UnitBodyPart bodypart = BODYPART_TORSO;
  
+@@ -1847,6 +1874,7 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
+ 
+ 		setValueMax(_tu, - std::get<toTime>(args.data), 0, _stats.tu);
+ 
++		FirstPerson::noteHealthDamage(std::get<toHealth>(args.data)); // OpenXcom3D add-on: setting "Damage numbers" Overkill, the health a hit took before the floor below
+ 		setValueMax(_health, - std::get<toHealth>(args.data), std::min(overKillMinimum, _health), _stats.health); // `std::min` required because of script that could set `_health = -100`, if we do not have "overkill" `-100` become min value allowed by this line, if "overkill" then this line can go lower than this.
+ 
+ 		setValueMax(_mana, - std::get<toMana>(args.data), 0, _stats.mana);
 diff --git a/src/Savegame/BattleUnit.h b/src/Savegame/BattleUnit.h
 index ecc040fb6..e4005c700 100644
 --- a/src/Savegame/BattleUnit.h

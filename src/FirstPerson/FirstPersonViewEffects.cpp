@@ -666,7 +666,10 @@ void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
 		// particles off by default ... I can't be arsed to go through which should, and shouldn't have it".)
 		const VoxelUnitModel *hoverBody = unitSize > 1 && unit->getMovementType() == MT_FLY && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
 		const bool hovers = hoverBody && hoverBody->sparks;
-		const bool breathes = unit->getBreathExhaleFrame() >= 0;
+		// (Breath as the map draws it (UnitSprite): under the sea only (a TFTD battle on land has its units breathe as well,
+		// and showed bubbles from every aquanaut, alien and tank: a player, GitHub issue #260), an armour that has bubbles,
+		// and no floor over the unit.)
+		const bool breathes = unit->getBreathExhaleFrame() >= 0 && _save->getDepth() != 0 && unit->getArmor()->drawBubbles() && !unit->getFloorAbove();
 		if (!hovers && !breathes) continue;
 		auto glide = _unitGlides.find(unit);
 		if (glide == _unitGlides.end() || now - glide->second.seen >= 250) continue;

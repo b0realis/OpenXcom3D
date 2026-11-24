@@ -87,7 +87,7 @@ const int KeepClearMargin = 16;
 const int DissolveOrder[4][4] = { { 0, 8, 2, 10 }, { 12, 4, 14, 6 }, { 3, 11, 1, 9 }, { 15, 7, 13, 5 } };
 
 /// What a cell of a number's picture is.
-enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM };
+enum NumberCell { CELL_NONE, CELL_OUTLINE, CELL_HEALTH, CELL_ARMOR, CELL_STUN, CELL_SHIELD, CELL_NO_HARM, CELL_OVERKILL };
 
 /// A hit's numbers laid out in the small font, one cell a pixel (scale 1).
 struct NumberPicture
@@ -111,6 +111,7 @@ NumberPicture numberPicture(const Font *font, const DamageNumber &number)
 	std::vector<std::pair<std::string, NumberCell>> parts;
 	if (number.shield > 0) parts.push_back({ std::to_string(number.shield), CELL_SHIELD }); // (first: the shield is struck first)
 	if (number.health > 0) parts.push_back({ std::to_string(number.health), CELL_HEALTH });
+	if (number.overkill > 0) parts.push_back({ "+" + std::to_string(number.overkill), CELL_OVERKILL }); // (the health past what the unit had)
 	if (number.armor > 0) parts.push_back({ std::to_string(number.armor), CELL_ARMOR });
 	if (number.stun > 0) parts.push_back({ std::to_string(number.stun), CELL_STUN });
 	if (parts.empty()) parts.push_back({ "0", CELL_NO_HARM });
@@ -198,9 +199,10 @@ Uint8 nearestPaletteColor(const SDL_Color *palette, int red, int green, int blue
  * @param armor The armour points it lost.
  * @param stun The stun it took.
  * @param shield The points its energy shield lost.
+ * @param overkill The health past what the unit had (setting "Damage numbers" Overkill; else 0).
  * @param now The time (SDL ticks).
  */
-void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, Uint32 now)
+void DamageNumbers::add(const double head[3], int level, int health, int armor, int stun, int shield, int overkill, Uint32 now)
 {
 	DamageNumber number;
 	std::copy(head, head + 3, number.head);
@@ -209,6 +211,7 @@ void DamageNumbers::add(const double head[3], int level, int health, int armor, 
 	number.armor = std::max(0, armor);
 	number.stun = std::max(0, stun);
 	number.shield = std::max(0, shield);
+	number.overkill = std::max(0, overkill);
 	number.start = now;
 	_numbers.push_back(number);
 }
@@ -240,6 +243,7 @@ DamageNumberColors damageNumberColors(const SDL_Color *palette)
 	colors.shield = nearestPaletteColor(palette, 255, 255, 255);
 	colors.none = nearestPaletteColor(palette, 170, 170, 170);
 	colors.outline = nearestPaletteColor(palette, 0, 0, 0);
+	colors.overkill = nearestPaletteColor(palette, 255, 150, 30);
 	return colors;
 }
 
@@ -330,7 +334,7 @@ void drawDamageNumber(Surface *surface, const Font *font, const DamageNumber &nu
 	const DamageNumberColors &colors, const float *depthBuffer, double depth)
 {
 	const NumberPicture picture = numberPicture(font, number);
-	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none };
+	const Uint8 cellColors[] = { 0, colors.outline, colors.health, colors.armor, colors.stun, colors.shield, colors.none, colors.overkill };
 
 	// How much of it shows: all of it, then dissolving away.
 	const double share = (now - number.start) / (double)DamageNumberLife;
