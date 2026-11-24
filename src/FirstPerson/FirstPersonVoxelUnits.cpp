@@ -808,6 +808,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 hover[2] = { 's', 1 };
 		hashBytes(hash, hover, 2);
 	}
+	// (ears apart, by the unit table: only said of a unit hashed in, as above)
+	if (look.earsApart == 1)
+	{
+		const Uint8 ears[2] = { 'E', 1 };
+		hashBytes(hash, ears, 2);
+	}
 	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
 	if (look.smoothBack == 1)
 	{
@@ -867,6 +873,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.smallTurret == 1 && !unit->getArmor()->allowsMoving()) job->traits |= 32768;
 		// (a waist as drawn, by the unit table: see makeModel)
 		if (look.waistDrawn == 1) job->traits |= 65536;
+		// (ears apart, by the unit table: see profile in FirstPersonVoxelBodies.cpp)
+		if (look.earsApart == 1) job->traits |= 131072;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

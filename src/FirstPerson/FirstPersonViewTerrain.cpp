@@ -387,6 +387,53 @@ Uint8 nearestColor(const SDL_Color *palette, const float *rgb)
 }
 
 /**
+ * Repaints the voxels of a terrain part coloured with its art's filler (the mod's table `filler:`: a colour of no
+ * meaning, painted where the map never shows the picture, covered by the tiles beside it): each takes the colour of
+ * the nearest voxel of the part's own colours in its layer, or, with none there, the part's commonest one. A part
+ * wholly of filler is left as it is.
+ * @param model The model, its voxels coloured from its art.
+ * @param filler The filler colours.
+ */
+void repaintFiller(FirstPersonView::VoxelModel &model, const std::set<int> &filler)
+{
+	int counts[256] = {};
+	bool any = false;
+	for (int z = 0; z < 24; ++z)
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x)
+			{
+				const Uint8 color = model.color[z][y][x];
+				if (!color) continue;
+				if (filler.count(color)) any = true;
+				else ++counts[color];
+			}
+	int common = 0;
+	for (int color = 1; color < 256; ++color) if (counts[color] > counts[common]) common = color;
+	if (!any || !common) return;
+	for (int z = 0; z < 24; ++z)
+	{
+		// (the layer as it was: a repainted voxel is no source for the next)
+		Uint8 layer[16][16];
+		std::memcpy(layer, model.color[z], sizeof(layer));
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x)
+			{
+				if (!layer[y][x] || !filler.count(layer[y][x])) continue;
+				int best = INT_MAX;
+				Uint8 color = (Uint8)common;
+				for (int b = 0; b < 16; ++b)
+					for (int a = 0; a < 16; ++a)
+					{
+						const Uint8 own = layer[b][a];
+						const int distance = (a - x) * (a - x) + (b - y) * (b - y);
+						if (own && !filler.count(own) && distance < best) { best = distance; color = own; }
+					}
+				model.color[z][y][x] = color;
+			}
+	}
+}
+
+/**
  * Works out the colours of the sides the isometric art never shows. The art looks at the map
  * from above and from the south-east, so it shows only tops and the faces looking east and
  * south. Seen in 3D, an underside, a plate's ceiling, and the faces looking west and north
@@ -3524,6 +3571,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 	}
 	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
 	model.foliage = firstFrame ? firstFrame->foliage : mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
+	// (the art's filler, by the mod's table: the part's own colours instead, see repaintFiller)
+	if (const std::set<int> *filler = !model.empty ? firstPerson.getFiller(dataSet->getName()) : nullptr) repaintFiller(model, *filler);
 	colorHiddenSides(model, sprite);
 	findGlow(model);
 	model.water = waterFloor && !model.empty;

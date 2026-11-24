@@ -120,6 +120,26 @@ firstPerson:
   # `records: [...]`, only those records of the set. A list replaces the earlier one.
   # XPiratez and The X-Com Files: the swamps (blue; green in the wastes), the beach, the rice farm's paddies, the
   # mountain's puddles, the nuclear waste's pools.
+  # Filler: terrain data sets whose art paints a colour of no meaning where the map never shows it, covered by the tiles
+  # beside it (XPiratez's craft noses: the end of the hull a pink, palette colour 195, 496 pixels in each colour of
+  # them; the purple craft's pinks are its paint and stay): in 3D those voxels take the nearest of the part's own
+  # colours (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft").
+  # `{ dataSet, colors: [palette indexes] }`
+  filler:
+    - { dataSet: C_EXT_NOSE, colors: [195] }
+    - { dataSet: C_EXT_NOSE_BUMPER, colors: [195] }
+    - { dataSet: C_EXT_NOSE_BUMPER_RED, colors: [195] }
+    - { dataSet: C_EXT_NOSE_BUMPLESS, colors: [195] }
+    - { dataSet: C_EXT_NOSE_BUMPLESS_GOLD, colors: [195] }
+    - { dataSet: C_EXT_NOSE_BUMPLESS_RED, colors: [195] }
+    - { dataSet: C_EXT_NOSE_DBLUE, colors: [195] }
+    - { dataSet: C_EXT_NOSE_RED, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SIDE, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SIDE_GOLD, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SIDE_RED, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SIDE_SILVER, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SILVER, colors: [195] }
+    - { dataSet: C_EXT_NOSE_SILVERGREEN, colors: [195] }
   stillWater:
     - { dataSet: FORESTSWAMP, groups: [8] }
     - { dataSet: FORESTSWAMP_SNOW, groups: [8] }
@@ -276,6 +296,8 @@ firstPerson:
   #           a jacket or a pack lower down, the nape between them is filled out level with them), or drawn (as ever)
   #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
   #           saucer), or none (nothing under it; not said, the same)
+  #   ears: apart (a beast's ears, or horns, stand apart as its front drawing has them, however thick its side drawing
+  #           draws them: not one plate across its head), or drawn (as ever: apart only where they are thin)
   # A name of one star, "*", is every unit.
   # A later entry (or a later mod's) overrides what it sets.
   units:
@@ -311,6 +333,14 @@ firstPerson:
       top: back
       sculpt: frontal
       back: smooth
+    # XPiratez's Academy students and nurses (sheets SCI_12 and SCI_11): their trunks came out deeper than wide, a bulge
+    # of chest and belly from the side (a player, GitHub issue #259: "student needs weight loss", "nurse too"). People:
+    # standard humanoids, and drawn as the gals are, the gals' depth limit (trimmed at the back) and the waist as drawn
+    # (the owner, shown the two and both together: "Both")
+    - names: [SCI_12.PCK, SCI_11.PCK]
+      humanoid: standard
+      torsoDepth: 80
+      waist: drawn
     # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
     # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
     # drawings
@@ -412,6 +442,11 @@ firstPerson:
     # BH_ARMORED.PCK, are drawn anew in the same pose)
     - names: [GILLDOG, BLOODHOUND, SLIMEDOGE.PCK, BAN_6.PCK, BH_ARMORED.PCK]
       trunk: round
+    # XPiratez's war dogs (the soldier type STR_SOLDIER_DOGE, in every armour): their pointed ears are drawn thick side on,
+    # and they made one plate across the head, between the ears as wide as the head (a player, GitHub issue #259: "dog
+    # found a hat"): the ears stand apart, as the front drawing has them
+    - names: [STR_SOLDIER_DOGE]
+      ears: apart
     # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
     # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
     # pressed lower: the four drawings, all made from above, leave a point on it)
@@ -468,6 +503,22 @@ firstPerson:
     # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
     - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
       arms: along own posed elbow
+    # XPiratez's men drawn on the soldiers' sheets (PIR_n, so the gals' entry above names them too): the armours drawn on
+    # the male body (layersDefaultPrefix MHUMAN: the slaves', a hero's karate outfit, the Saint's...). The gals' waist
+    # as drawn drew theirs in to a thread under the chest (a player, GitHub issue #259: "waists scarily thin"): filled
+    # out again, as before the gals' ruling
+    - names: [STR_SLAVE_NUDE_UC, STR_SLAVE_NUDE_SEA_UC, STR_SLAVE_NUDE_DREAMLAND_UC, STR_SLAVE_ARMOR_LOINCLOTH_UC,
+              STR_SLAVE_ARMOR_LOINCLOTH_SEA_UC, STR_SLAVE_ARMOR_TUNIC_UC, STR_SLAVE_ARMOR_TUNIC_A_UC,
+              STR_SLAVE_ARMOR_PIROMAN_UC, STR_SLAVE_ARMOR_PIROMAN_A_UC, STR_SLAVE_ARMOR_PIRATE_UC, STR_SLAVE_PUNK_UC,
+              STR_SLAVE_ANZUG_UC, STR_SLAVE_ARMOR_JUMPSUIT_UC, STR_SLAVE_ARMOR_DURASUIT_UC,
+              STR_SLAVE_ARMOR_TAC_VEST_UC, STR_DEFENDER_SLAVE_UC, STR_SLAVE_ARMOR_OPERATOR_UC, STR_SLAVE_ARMOR_GI_UC,
+              STR_SLAVE_ARMOR_POINTMAN_UC, STR_SLAVE_ARMOR_STRONGMAN_UC, STR_SLAVE_ARMOR_DEMOLISHER_UC,
+              STR_SLAVE_ARMOR_LEGION_UC, STR_SLAVE_ARMOR_DOOM_UC, STR_SLAVE_ARMOR_DOOM_2_UC,
+              STR_SLAVE_ARMOR_DOOM_Z_UC, STR_HERO_KARATE_OUTFIT_UC, STR_HERO_KARATE_OUTFIT_SEA_UC,
+              STR_SLAVE_ARMOR_SAINT_UC, STR_SUPER_SLAVE_ARMOR_UC, STR_BAT_GLAD_ARMOR_UC, STR_FLASH_BANG_ARMOR_UC,
+              STR_PILLOW_KNIGHT_UC, STR_SLAVE_DIVER_SEA_UC, STR_SLAVE_DIVER_UC, STR_REBELSTAR_SUIT_UC,
+              STR_REBELSTAR_SUIT_SEA_UC, STR_SLAVE_ARMOR_CENTURION_UC, STR_SLAVE_ARMOR_CENTURION_SEA_UC]
+      waist: filled
     # what hovers on sparks: saucers and hover vehicles (X-COM's Cyberdisc and Hovertanks, TFTD's Displacers, the big
     # mods' own). A creature that flies, a gate, a walker, a jellyfish in the sea has nothing under it
     - names: [CYBERDISC, "*DISC", HOVERTANK, "HOVER*", DISPLACER]

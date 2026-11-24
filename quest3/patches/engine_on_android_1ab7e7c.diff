@@ -1634,10 +1634,10 @@ index 000000000..720456009
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..88326e006
+index 000000000..a901d320b
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,543 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1760,6 +1760,26 @@ index 000000000..88326e006
 +  # `records: [...]`, only those records of the set. A list replaces the earlier one.
 +  # XPiratez and The X-Com Files: the swamps (blue; green in the wastes), the beach, the rice farm's paddies, the
 +  # mountain's puddles, the nuclear waste's pools.
++  # Filler: terrain data sets whose art paints a colour of no meaning where the map never shows it, covered by the tiles
++  # beside it (XPiratez's craft noses: the end of the hull a pink, palette colour 195, 496 pixels in each colour of
++  # them; the purple craft's pinks are its paint and stay): in 3D those voxels take the nearest of the part's own
++  # colours (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft").
++  # `{ dataSet, colors: [palette indexes] }`
++  filler:
++    - { dataSet: C_EXT_NOSE, colors: [195] }
++    - { dataSet: C_EXT_NOSE_BUMPER, colors: [195] }
++    - { dataSet: C_EXT_NOSE_BUMPER_RED, colors: [195] }
++    - { dataSet: C_EXT_NOSE_BUMPLESS, colors: [195] }
++    - { dataSet: C_EXT_NOSE_BUMPLESS_GOLD, colors: [195] }
++    - { dataSet: C_EXT_NOSE_BUMPLESS_RED, colors: [195] }
++    - { dataSet: C_EXT_NOSE_DBLUE, colors: [195] }
++    - { dataSet: C_EXT_NOSE_RED, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SIDE, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SIDE_GOLD, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SIDE_RED, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SIDE_SILVER, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SILVER, colors: [195] }
++    - { dataSet: C_EXT_NOSE_SILVERGREEN, colors: [195] }
 +  stillWater:
 +    - { dataSet: FORESTSWAMP, groups: [8] }
 +    - { dataSet: FORESTSWAMP_SNOW, groups: [8] }
@@ -1916,6 +1936,8 @@ index 000000000..88326e006
 +  #           a jacket or a pack lower down, the nape between them is filled out level with them), or drawn (as ever)
 +  #   hover: sparks (a big unit that flies hovers on a rain of sparks and the dust they raise: a hover tank, a
 +  #           saucer), or none (nothing under it; not said, the same)
++  #   ears: apart (a beast's ears, or horns, stand apart as its front drawing has them, however thick its side drawing
++  #           draws them: not one plate across its head), or drawn (as ever: apart only where they are thin)
 +  # A name of one star, "*", is every unit.
 +  # A later entry (or a later mod's) overrides what it sets.
 +  units:
@@ -1951,6 +1973,14 @@ index 000000000..88326e006
 +      top: back
 +      sculpt: frontal
 +      back: smooth
++    # XPiratez's Academy students and nurses (sheets SCI_12 and SCI_11): their trunks came out deeper than wide, a bulge
++    # of chest and belly from the side (a player, GitHub issue #259: "student needs weight loss", "nurse too"). People:
++    # standard humanoids, and drawn as the gals are, the gals' depth limit (trimmed at the back) and the waist as drawn
++    # (the owner, shown the two and both together: "Both")
++    - names: [SCI_12.PCK, SCI_11.PCK]
++      humanoid: standard
++      torsoDepth: 80
++      waist: drawn
 +    # XPiratez's gnomes are drawn on the gals' sheets, with their legs set apart one way from the front and another from
 +    # the back: cut by both frontal outlines they stood on one thread of a leg. As every unit not named: by all eight
 +    # drawings
@@ -2052,6 +2082,11 @@ index 000000000..88326e006
 +    # BH_ARMORED.PCK, are drawn anew in the same pose)
 +    - names: [GILLDOG, BLOODHOUND, SLIMEDOGE.PCK, BAN_6.PCK, BH_ARMORED.PCK]
 +      trunk: round
++    # XPiratez's war dogs (the soldier type STR_SOLDIER_DOGE, in every armour): their pointed ears are drawn thick side on,
++    # and they made one plate across the head, between the ears as wide as the head (a player, GitHub issue #259: "dog
++    # found a hat"): the ears stand apart, as the front drawing has them
++    - names: [STR_SOLDIER_DOGE]
++      ears: apart
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
 +    # pressed lower: the four drawings, all made from above, leave a point on it)
@@ -2108,6 +2143,22 @@ index 000000000..88326e006
 +    # XPiratez's punk outfits (a slave soldier's, a Lokk'Naar's): the same
 +    - names: [STR_SLAVE_PUNK_UC, STR_LOKNAR_PUNK_UC]
 +      arms: along own posed elbow
++    # XPiratez's men drawn on the soldiers' sheets (PIR_n, so the gals' entry above names them too): the armours drawn on
++    # the male body (layersDefaultPrefix MHUMAN: the slaves', a hero's karate outfit, the Saint's...). The gals' waist
++    # as drawn drew theirs in to a thread under the chest (a player, GitHub issue #259: "waists scarily thin"): filled
++    # out again, as before the gals' ruling
++    - names: [STR_SLAVE_NUDE_UC, STR_SLAVE_NUDE_SEA_UC, STR_SLAVE_NUDE_DREAMLAND_UC, STR_SLAVE_ARMOR_LOINCLOTH_UC,
++              STR_SLAVE_ARMOR_LOINCLOTH_SEA_UC, STR_SLAVE_ARMOR_TUNIC_UC, STR_SLAVE_ARMOR_TUNIC_A_UC,
++              STR_SLAVE_ARMOR_PIROMAN_UC, STR_SLAVE_ARMOR_PIROMAN_A_UC, STR_SLAVE_ARMOR_PIRATE_UC, STR_SLAVE_PUNK_UC,
++              STR_SLAVE_ANZUG_UC, STR_SLAVE_ARMOR_JUMPSUIT_UC, STR_SLAVE_ARMOR_DURASUIT_UC,
++              STR_SLAVE_ARMOR_TAC_VEST_UC, STR_DEFENDER_SLAVE_UC, STR_SLAVE_ARMOR_OPERATOR_UC, STR_SLAVE_ARMOR_GI_UC,
++              STR_SLAVE_ARMOR_POINTMAN_UC, STR_SLAVE_ARMOR_STRONGMAN_UC, STR_SLAVE_ARMOR_DEMOLISHER_UC,
++              STR_SLAVE_ARMOR_LEGION_UC, STR_SLAVE_ARMOR_DOOM_UC, STR_SLAVE_ARMOR_DOOM_2_UC,
++              STR_SLAVE_ARMOR_DOOM_Z_UC, STR_HERO_KARATE_OUTFIT_UC, STR_HERO_KARATE_OUTFIT_SEA_UC,
++              STR_SLAVE_ARMOR_SAINT_UC, STR_SUPER_SLAVE_ARMOR_UC, STR_BAT_GLAD_ARMOR_UC, STR_FLASH_BANG_ARMOR_UC,
++              STR_PILLOW_KNIGHT_UC, STR_SLAVE_DIVER_SEA_UC, STR_SLAVE_DIVER_UC, STR_REBELSTAR_SUIT_UC,
++              STR_REBELSTAR_SUIT_SEA_UC, STR_SLAVE_ARMOR_CENTURION_UC, STR_SLAVE_ARMOR_CENTURION_SEA_UC]
++      waist: filled
 +    # what hovers on sparks: saucers and hover vehicles (X-COM's Cyberdisc and Hovertanks, TFTD's Displacers, the big
 +    # mods' own). A creature that flies, a gate, a walker, a jellyfish in the sea has nothing under it
 +    - names: [CYBERDISC, "*DISC", HOVERTANK, "HOVER*", DISPLACER]
@@ -82696,10 +82747,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..56a5703b5
+index 000000000..1dc3d59dc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,6005 @@
+@@ -0,0 +1,6054 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83086,6 +83137,53 @@ index 000000000..56a5703b5
 +		}
 +	}
 +	return (Uint8)best;
++}
++
++/**
++ * Repaints the voxels of a terrain part coloured with its art's filler (the mod's table `filler:`: a colour of no
++ * meaning, painted where the map never shows the picture, covered by the tiles beside it): each takes the colour of
++ * the nearest voxel of the part's own colours in its layer, or, with none there, the part's commonest one. A part
++ * wholly of filler is left as it is.
++ * @param model The model, its voxels coloured from its art.
++ * @param filler The filler colours.
++ */
++void repaintFiller(FirstPersonView::VoxelModel &model, const std::set<int> &filler)
++{
++	int counts[256] = {};
++	bool any = false;
++	for (int z = 0; z < 24; ++z)
++		for (int y = 0; y < 16; ++y)
++			for (int x = 0; x < 16; ++x)
++			{
++				const Uint8 color = model.color[z][y][x];
++				if (!color) continue;
++				if (filler.count(color)) any = true;
++				else ++counts[color];
++			}
++	int common = 0;
++	for (int color = 1; color < 256; ++color) if (counts[color] > counts[common]) common = color;
++	if (!any || !common) return;
++	for (int z = 0; z < 24; ++z)
++	{
++		// (the layer as it was: a repainted voxel is no source for the next)
++		Uint8 layer[16][16];
++		std::memcpy(layer, model.color[z], sizeof(layer));
++		for (int y = 0; y < 16; ++y)
++			for (int x = 0; x < 16; ++x)
++			{
++				if (!layer[y][x] || !filler.count(layer[y][x])) continue;
++				int best = INT_MAX;
++				Uint8 color = (Uint8)common;
++				for (int b = 0; b < 16; ++b)
++					for (int a = 0; a < 16; ++a)
++					{
++						const Uint8 own = layer[b][a];
++						const int distance = (a - x) * (a - x) + (b - y) * (b - y);
++						if (own && !filler.count(own) && distance < best) { best = distance; color = own; }
++					}
++				model.color[z][y][x] = color;
++			}
++	}
 +}
 +
 +/**
@@ -86226,6 +86324,8 @@ index 000000000..56a5703b5
 +	}
 +	// A mass of foliage: drawn leafy on a tile without a floor (see foliageArt, leafyModel).
 +	model.foliage = firstFrame ? firstFrame->foliage : mapData->getObjectType() == O_OBJECT && !cutout && foliageArt(model, sprite, getPalette());
++	// (the art's filler, by the mod's table: the part's own colours instead, see repaintFiller)
++	if (const std::set<int> *filler = !model.empty ? firstPerson.getFiller(dataSet->getName()) : nullptr) repaintFiller(model, *filler);
 +	colorHiddenSides(model, sprite);
 +	findGlow(model);
 +	model.water = waterFloor && !model.empty;
@@ -90625,10 +90725,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..ac66ae6f5
+index 000000000..4376325ec
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6534 @@
+@@ -0,0 +1,6552 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -90725,6 +90825,9 @@ index 000000000..ac66ae6f5
 +thread_local std::vector<Uint8> Painted;
 +thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 +thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
++thread_local bool EarsApart = false; // (a long body the unit table names "ears: apart": see profile)
++/// With "ears: apart", how many rows over the front drawing's top a side drawing's ear may reach (see profile).
++const int EarsReach = 4;
 +
 +/// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 +void useGrid(int size)
@@ -92927,6 +93030,15 @@ index 000000000..ac66ae6f5
 +			const int end = cellAhead(along) >= 0.0f ? 0 : 1;
 +			const int endRow = reading.row(end, drawnAhead, cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
 +			bool pair = false;
++			// (the front drawing's row a pair of ears is looked up in: its own; with "ears: apart", a row of the side
++			// drawing over the front drawing's top, the tips of ears drawn higher side on than from the front, takes
++			// the front drawing's first rows, the ears' tips: a dog's stood as a column over the middle of its head)
++			int pairRow = endRow;
++			if (EarsApart && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] == 0)
++			{
++				for (int below = endRow + 1; below < std::min(FrameSize, endRow + EarsReach); ++below)
++					if (rowRuns[0][below] > 0) { pairRow = below; break; }
++			}
 +			// (Not a body the unit table names "trunk: round": it stays as broad as it is tall. The X-Com Files' Gilldog is
 +			// drawn from the front crouching, its legs out beside it at its trunk's height: as broad as that drawing
 +			// its trunk and head were one barrel across the whole tile; a player, GitHub issue #221, "a very STRANGE
@@ -92944,6 +93056,11 @@ index 000000000..ac66ae6f5
 +					else if (RoundTrunk && !lying) breadth = std::min(breadth, tall); // (a part standing: no broader than it is tall there)
 +				}
 +				else pair = !RoundTrunk && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2; // (a round trunk has no ears: a thin part of it is round too)
++				// (Ears the side drawing draws thick, a dog's pointed ears seen side on, made a head's part as broad as its
++				// row: across the gap between them, one plate over the head, "dog found a hat" (a player, GitHub issue
++				// #259). With "ears: apart", a part standing, a head's, where the front drawing has two stretches or more
++				// stands where they are, thick or thin.)
++				if (EarsApart && !lying && end == 0 && pairRow >= 0 && pairRow < FrameSize && rowRuns[0][pairRow] >= 2) pair = true;
 +			}
 +			const float half = std::min(widest, std::max(ProfileHalfLeast, breadth * std::sqrt(std::max(0.0f, 1.0f - off * off))));
 +			// (the belly's raised rows: only the legs are left of them)
@@ -92955,7 +93072,7 @@ index 000000000..ac66ae6f5
 +				{
 +					// (the front drawing has the unit's right on its left; either side's stretch counts for both)
 +					const float offset = cellRight(across) * PixelsAcross;
-+					if (!part.at(Front, (int)std::floor(reading.middle[0] - offset), endRow) && !part.at(Front, (int)std::floor(reading.middle[0] + offset), endRow)) continue;
++					if (!part.at(Front, (int)std::floor(reading.middle[0] - offset), pairRow) && !part.at(Front, (int)std::floor(reading.middle[0] + offset), pairRow)) continue;
 +				}
 +				else if (!leg && std::abs(cellRight(across)) > half) continue;
 +				const int legBarsRow = leg && endRow >= 0 && endRow < FrameSize ? barsRow[end][endRow] : -1;
@@ -95948,6 +96065,7 @@ index 000000000..ac66ae6f5
 +	const bool fourSided = routine.big && !bigHull && routine.sides;
 +	SlantOnly = routine.big && !bigHull;
 +	RoundTrunk = (routine.traits & 1) != 0;
++	EarsApart = (routine.traits & 131072) != 0;
 +	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 +	// and profile.)
 +	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
@@ -97993,10 +98111,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..fe33340b3
+index 000000000..c43afb6fd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1398 @@
+@@ -0,0 +1,1406 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -98807,6 +98925,12 @@ index 000000000..fe33340b3
 +		const Uint8 hover[2] = { 's', 1 };
 +		hashBytes(hash, hover, 2);
 +	}
++	// (ears apart, by the unit table: only said of a unit hashed in, as above)
++	if (look.earsApart == 1)
++	{
++		const Uint8 ears[2] = { 'E', 1 };
++		hashBytes(hash, ears, 2);
++	}
 +	// (a smooth back, by the unit table: only said of a unit hashed in, as above)
 +	if (look.smoothBack == 1)
 +	{
@@ -98866,6 +98990,8 @@ index 000000000..fe33340b3
 +		if (look.smallTurret == 1 && !unit->getArmor()->allowsMoving()) job->traits |= 32768;
 +		// (a waist as drawn, by the unit table: see makeModel)
 +		if (look.waistDrawn == 1) job->traits |= 65536;
++		// (ears apart, by the unit table: see profile in FirstPersonVoxelBodies.cpp)
++		if (look.earsApart == 1) job->traits |= 131072;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -107039,10 +107165,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..2b24f7634
+index 000000000..94f720c6b
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,590 @@
+@@ -0,0 +1,618 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -107184,6 +107310,7 @@ index 000000000..2b24f7634
 +		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
 +		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 +		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
++		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
 +	};
 +	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 +	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -107227,6 +107354,7 @@ index 000000000..2b24f7634
 +	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 +	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
 +	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
++	std::map<std::string, std::set<int>> _filler;   // terrain data set -> the palette colours its art fills where the map never shows it
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 +	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
@@ -107331,6 +107459,24 @@ index 000000000..2b24f7634
 +			}
 +		}
 +
++		// Filler: terrain data sets whose art paints, where the map never shows it (covered by the tiles beside it), a
++		// colour of no meaning (XPiratez's craft noses: a pink); seen in 3D from that side, such a part showed the pink
++		// (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft"). Each
++		// `{ dataSet, colors: [palette indexes] }`; those voxels take the nearest colour of the part's own (see
++		// FirstPersonView::buildModel). A list replaces the earlier one.
++		if (const auto& filler = reader["filler"])
++		{
++			_filler.clear();
++			for (const auto& entry : filler.children())
++			{
++				std::string dataSet;
++				std::vector<int> colors;
++				entry.tryRead("dataSet", dataSet);
++				entry.tryRead("colors", colors);
++				for (int color : colors) if (color > 0 && color < 256) _filler[dataSet].insert(color);
++			}
++		}
++
 +		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
 +		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
 +		// floors, or its name and records for some (a ship's data set with the sea round the ship
@@ -107413,7 +107559,7 @@ index 000000000..2b24f7634
 +			for (const auto& entry : units.children())
 +			{
 +				std::vector<std::string> names;
-+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist;
++				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears;
 +				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 +				UnitLook look;
 +				entry.tryRead("names", names);
@@ -107449,6 +107595,7 @@ index 000000000..2b24f7634
 +				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 +				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
 +				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
++				if (entry.tryRead("ears", ears)) look.earsApart = ears == "apart" ? 1 : 0;
 +				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 +				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 +				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -107569,6 +107716,7 @@ index 000000000..2b24f7634
 +			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
 +			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 +			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
++			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
 +		}
 +		return look;
 +	}
@@ -107589,6 +107737,12 @@ index 000000000..2b24f7634
 +	{
 +		auto found = _turned.find(std::make_pair(dataSet, record));
 +		return found != _turned.end() ? found->second : -1;
++	}
++	/// The palette colours a terrain data set's art fills where the map never shows it (`filler:`), or null.
++	const std::set<int> *getFiller(const std::string &dataSet) const
++	{
++		auto found = _filler.find(dataSet);
++		return found != _filler.end() ? &found->second : nullptr;
 +	}
 +	/// The palette's colour groups (a bit each) that are still water on a terrain record's floor (`stillWater:`), or 0.
 +	Uint16 getStillWater(const std::string &dataSet, int record) const

@@ -94,6 +94,9 @@ thread_local bool BigUnit = false; // (two tiles by two: see tileFloorRows)
 thread_local std::vector<Uint8> Painted;
 thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
+thread_local bool EarsApart = false; // (a long body the unit table names "ears: apart": see profile)
+/// With "ears: apart", how many rows over the front drawing's top a side drawing's ear may reach (see profile).
+const int EarsReach = 4;
 
 /// The grid and the floor's place on the frames for a unit of this size (in tiles across).
 void useGrid(int size)
@@ -2296,6 +2299,15 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 			const int end = cellAhead(along) >= 0.0f ? 0 : 1;
 			const int endRow = reading.row(end, drawnAhead, cellUp(up)) + (row - (int)std::floor(FloorY - cellUp(up)));
 			bool pair = false;
+			// (the front drawing's row a pair of ears is looked up in: its own; with "ears: apart", a row of the side
+			// drawing over the front drawing's top, the tips of ears drawn higher side on than from the front, takes
+			// the front drawing's first rows, the ears' tips: a dog's stood as a column over the middle of its head)
+			int pairRow = endRow;
+			if (EarsApart && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] == 0)
+			{
+				for (int below = endRow + 1; below < std::min(FrameSize, endRow + EarsReach); ++below)
+					if (rowRuns[0][below] > 0) { pairRow = below; break; }
+			}
 			// (Not a body the unit table names "trunk: round": it stays as broad as it is tall. The X-Com Files' Gilldog is
 			// drawn from the front crouching, its legs out beside it at its trunk's height: as broad as that drawing
 			// its trunk and head were one barrel across the whole tile; a player, GitHub issue #221, "a very STRANGE
@@ -2313,6 +2325,11 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 					else if (RoundTrunk && !lying) breadth = std::min(breadth, tall); // (a part standing: no broader than it is tall there)
 				}
 				else pair = !RoundTrunk && end == 0 && endRow >= 0 && endRow < FrameSize && rowRuns[0][endRow] >= 2; // (a round trunk has no ears: a thin part of it is round too)
+				// (Ears the side drawing draws thick, a dog's pointed ears seen side on, made a head's part as broad as its
+				// row: across the gap between them, one plate over the head, "dog found a hat" (a player, GitHub issue
+				// #259). With "ears: apart", a part standing, a head's, where the front drawing has two stretches or more
+				// stands where they are, thick or thin.)
+				if (EarsApart && !lying && end == 0 && pairRow >= 0 && pairRow < FrameSize && rowRuns[0][pairRow] >= 2) pair = true;
 			}
 			const float half = std::min(widest, std::max(ProfileHalfLeast, breadth * std::sqrt(std::max(0.0f, 1.0f - off * off))));
 			// (the belly's raised rows: only the legs are left of them)
@@ -2324,7 +2341,7 @@ std::vector<Uint8> profile(const PartFrames &part, float &legsTop, bool legged, 
 				{
 					// (the front drawing has the unit's right on its left; either side's stretch counts for both)
 					const float offset = cellRight(across) * PixelsAcross;
-					if (!part.at(Front, (int)std::floor(reading.middle[0] - offset), endRow) && !part.at(Front, (int)std::floor(reading.middle[0] + offset), endRow)) continue;
+					if (!part.at(Front, (int)std::floor(reading.middle[0] - offset), pairRow) && !part.at(Front, (int)std::floor(reading.middle[0] + offset), pairRow)) continue;
 				}
 				else if (!leg && std::abs(cellRight(across)) > half) continue;
 				const int legBarsRow = leg && endRow >= 0 && endRow < FrameSize ? barsRow[end][endRow] : -1;
@@ -5317,6 +5334,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	const bool fourSided = routine.big && !bigHull && routine.sides;
 	SlantOnly = routine.big && !bigHull;
 	RoundTrunk = (routine.traits & 1) != 0;
+	EarsApart = (routine.traits & 131072) != 0;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)

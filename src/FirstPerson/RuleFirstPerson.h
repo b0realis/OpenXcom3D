@@ -139,6 +139,7 @@ public:
 		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
 		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
+		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
 	};
 	/// Does a name hold a word of the unit table? A name's words are its runs of letters (STR_GHOST_GAL: STR, GHOST,
 	/// GAL; BLACK_CAT.PCK: BLACK, CAT, PCK), and a pattern is a word (CAT: not CATGIRL), a word's start (GHOST*:
@@ -182,6 +183,7 @@ private:
 	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
 	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
+	std::map<std::string, std::set<int>> _filler;   // terrain data set -> the palette colours its art fills where the map never shows it
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
 	std::set<std::string> _builtInItemsShown;    // built-in items drawn in the hands all the same (a shield, an arm cannon)
@@ -286,6 +288,24 @@ public:
 			}
 		}
 
+		// Filler: terrain data sets whose art paints, where the map never shows it (covered by the tiles beside it), a
+		// colour of no meaning (XPiratez's craft noses: a pink); seen in 3D from that side, such a part showed the pink
+		// (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft"). Each
+		// `{ dataSet, colors: [palette indexes] }`; those voxels take the nearest colour of the part's own (see
+		// FirstPersonView::buildModel). A list replaces the earlier one.
+		if (const auto& filler = reader["filler"])
+		{
+			_filler.clear();
+			for (const auto& entry : filler.children())
+			{
+				std::string dataSet;
+				std::vector<int> colors;
+				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("colors", colors);
+				for (int color : colors) if (color > 0 && color < 256) _filler[dataSet].insert(color);
+			}
+		}
+
 		// The terrain data sets whose floors are water: where it reaches the map's edge, the sea
 		// goes on beyond it (FirstPersonView::chooseGround). A data set's name for all of its
 		// floors, or its name and records for some (a ship's data set with the sea round the ship
@@ -368,7 +388,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -404,6 +424,7 @@ public:
 				if (entry.tryRead("back", back)) look.smoothBack = back == "smooth" ? 1 : 0;
 				if (entry.tryRead("stands", stands)) look.onFloor = stands == "floor" ? 1 : 0;
 				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
+				if (entry.tryRead("ears", ears)) look.earsApart = ears == "apart" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -524,6 +545,7 @@ public:
 			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
 			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
+			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
 		}
 		return look;
 	}
@@ -544,6 +566,12 @@ public:
 	{
 		auto found = _turned.find(std::make_pair(dataSet, record));
 		return found != _turned.end() ? found->second : -1;
+	}
+	/// The palette colours a terrain data set's art fills where the map never shows it (`filler:`), or null.
+	const std::set<int> *getFiller(const std::string &dataSet) const
+	{
+		auto found = _filler.find(dataSet);
+		return found != _filler.end() ? &found->second : nullptr;
 	}
 	/// The palette's colour groups (a bit each) that are still water on a terrain record's floor (`stillWater:`), or 0.
 	Uint16 getStillWater(const std::string &dataSet, int record) const
