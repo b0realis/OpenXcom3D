@@ -124,6 +124,126 @@ std::string gameKeyName(const std::string &optionId)
 	return optionId.compare(0, strlen(EnemyKeyPrefix), EnemyKeyPrefix) == 0 ? "STR_FPS_KEY_ENEMY" : "";
 }
 
+// ---- Rows that set several settings (the owner's critical pass, 2026-11-24, "Merge") ----
+// Each row is one setting's, and the settings folded into it have no row of their own (FirstPerson::isHiddenSetting).
+// The row shows a choice made of them all and sets them all. "Off" leaves a folded one as it is where it does nothing
+// then (so a preset's value of it survives a player's Off), and switches off one that works on its own.
+
+/// The choices' names of each such row (in the order a left click goes round them).
+const char *const tacticalMapNames[] = { "STR_FPS_TACTICAL_MAP_OFF", "STR_FPS_TACTICAL_MAP_3D", "STR_FPS_TACTICAL_MAP_BOTH" };
+const char *const shotInfoNames[] = { "STR_FPS_SHOT_INFO_OFF", "STR_FPS_SHOT_INFO_BASIC", "STR_FPS_SHOT_INFO_COSTS", "STR_FPS_SHOT_INFO_DAMAGE", "STR_FPS_SHOT_INFO_FULL" };
+const char *const alienTurnNames[] = { "STR_FPS_ALIEN_TURN_MAP", "STR_FPS_ALIEN_TURN_FREE", "STR_FPS_ALIEN_TURN_FACING_CHOICE" };
+const char *const shadowNames[] = { "STR_FPS_SHADOWS_OFF", "STR_FPS_SHADOWS_ON", "STR_FPS_SHADOWS_SOFT", "STR_FPS_SHADOWS_LAMPS", "STR_FPS_SHADOWS_SOFT_LAMPS" };
+const char *const seeThroughNames[] = { "STR_FPS_SEE_THROUGH_OFF", "STR_FPS_SEE_THROUGH_CROPS_CHOICE", "STR_FPS_SEE_THROUGH_ALL" };
+const char *const flightCostNames[] = { "STR_FPS_FLIGHT_COST_RULES" }; // (then the time units, 0 to 24)
+
+/// The highest flight cost a level, in time units.
+const int FlightCostMax = 24;
+
+/**
+ * Whether an option's row sets settings folded into it, and if so how many choices it has and which one the
+ * settings make now.
+ * @param id The row's option.
+ * @param choices Set to the number of choices.
+ * @return The choice now (0 ..), or -1 for a row of one setting.
+ */
+int foldedChoice(const std::string &id, int &choices)
+{
+	using namespace Options;
+	if (id == "fpsTacticalMap") // Off, from the 3D view, from both views ("Tactical map from the isometric view")
+	{
+		choices = 3;
+		return !fpsTacticalMap ? 0 : fpsTacticalMapIso ? 2 : 1;
+	}
+	if (id == "fpsCrosshairInfo") // Off, the basic info, with the costs ("Expanded crosshair info"), with the damage ("Shot damage"), both
+	{
+		choices = 5;
+		return !fpsCrosshairInfo ? 0 : 1 + (fpsCrosshairCosts ? 1 : 0) + (fpsCrosshairDamage ? 2 : 0);
+	}
+	if (id == "fpsAlienTurn3D") // on the map, in 3D looking anywhere, in 3D as the soldier faces ("Alien turn: look as the soldier faces")
+	{
+		choices = 3;
+		return !fpsAlienTurn3D ? 0 : fpsAlienTurnFacing ? 2 : 1;
+	}
+	if (id == "fpsShadows") // Off, On; and on the card: soft ("Soft sun shadows"), from the lamps too ("Shadows from every light"), both
+	{
+		choices = fpsRenderer == 1 ? 5 : 2;
+		return !fpsShadows ? 0 : fpsRenderer != 1 ? 1 : 1 + (fpsSoftShadows ? 1 : 0) + (fpsAllLightShadows ? 2 : 0);
+	}
+	if (id == "fpsSeeThroughCrops") // Off, the crops, the crops and the corpses ("See-through corpses")
+	{
+		choices = 3;
+		return !fpsSeeThroughCrops ? 0 : fpsSeeThroughCorpses ? 2 : 1;
+	}
+	if (id == "fpsFlightCost") // the game's rules, or a cost for all ("Flight cost overrides rules"): 0 to 24 time units
+	{
+		choices = FlightCostMax + 2;
+		return fpsFlightCostOverride ? 1 + std::clamp(fpsFlightCost, 0, FlightCostMax) : 0;
+	}
+	choices = 0;
+	return -1;
+}
+
+/**
+ * Sets the settings of a row with settings folded into it to one of its choices (see foldedChoice).
+ * @param id The row's option.
+ * @param choice The choice.
+ */
+void setFoldedChoice(const std::string &id, int choice)
+{
+	using namespace Options;
+	if (id == "fpsTacticalMap")
+	{
+		fpsTacticalMap = choice > 0;
+		fpsTacticalMapIso = choice == 2; // (off too with Off: the isometric view's map button goes by it alone)
+	}
+	else if (id == "fpsCrosshairInfo")
+	{
+		fpsCrosshairInfo = choice > 0;
+		if (choice > 0)
+		{
+			fpsCrosshairCosts = choice == 2 || choice == 4;
+			fpsCrosshairDamage = choice >= 3;
+		}
+	}
+	else if (id == "fpsAlienTurn3D")
+	{
+		fpsAlienTurn3D = choice > 0;
+		if (choice > 0) fpsAlienTurnFacing = choice == 2;
+	}
+	else if (id == "fpsShadows")
+	{
+		fpsShadows = choice > 0;
+		if (choice > 0 && fpsRenderer == 1)
+		{
+			fpsSoftShadows = choice == 2 || choice == 4;
+			fpsAllLightShadows = choice >= 3;
+		}
+	}
+	else if (id == "fpsSeeThroughCrops")
+	{
+		fpsSeeThroughCrops = choice > 0;
+		fpsSeeThroughCorpses = choice == 2; // (off too with Off: the corpses go by it alone)
+	}
+	else if (id == "fpsFlightCost")
+	{
+		fpsFlightCostOverride = choice > 0;
+		if (choice > 0) fpsFlightCost = choice - 1;
+	}
+}
+
+/// The settings folded into a row (see foldedChoice), for the presets to follow a change of any (see presetSwitchChanged).
+std::vector<std::string> foldedInto(const std::string &id)
+{
+	if (id == "fpsTacticalMap") return { "fpsTacticalMapIso" };
+	if (id == "fpsCrosshairInfo") return { "fpsCrosshairCosts", "fpsCrosshairDamage" };
+	if (id == "fpsAlienTurn3D") return { "fpsAlienTurnFacing" };
+	if (id == "fpsShadows") return { "fpsSoftShadows", "fpsAllLightShadows" };
+	if (id == "fpsSeeThroughCrops") return { "fpsSeeThroughCorpses" };
+	if (id == "fpsFlightCost") return { "fpsFlightCostOverride" };
+	return {};
+}
+
 }
 
 /**
@@ -198,10 +318,16 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 
 	// Gather the add-on's options with a label (the switches and numbers as settings, the rest
 	// as keys), and two of the game's own settings: its frame rate limit (for fast screens) and
-	// its frame counter (F7, handy in 3D), with the graphics.
+	// its frame counter (F7, handy in 3D), with the graphics (both hidden now: the game's General
+	// tab and F7 have them).
+	// (Not the settings the tab leaves out since the owner's critical pass: FirstPerson::isHiddenSetting.)
 	std::vector<OptionInfo> gathered;
 	for (const auto &option : Options::getOptionInfo())
 	{
+		if (option.type() != OPTION_KEY && FirstPerson::isHiddenSetting(option.id()))
+		{
+			continue;
+		}
 		if (option.category() == "STR_FIRST_PERSON" && !option.description().empty())
 		{
 			(option.type() == OPTION_KEY ? _keys : gathered).push_back(option);
@@ -357,6 +483,16 @@ std::string OptionsFirstPersonState::label(const OptionInfo &option) const
  */
 std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 {
+	// A row with settings folded into it: its choice's name (the flight cost's, past the rules, in time units).
+	int choices = 0;
+	const int choice = foldedChoice(option.id(), choices);
+	if (choice >= 0)
+	{
+		if (option.id() == "fpsFlightCost") return choice == 0 ? std::string(tr(flightCostNames[0])) : std::to_string(choice - 1);
+		const char *const *names = option.id() == "fpsTacticalMap" ? tacticalMapNames : option.id() == "fpsCrosshairInfo" ? shotInfoNames
+			: option.id() == "fpsAlienTurn3D" ? alienTurnNames : option.id() == "fpsShadows" ? shadowNames : seeThroughNames;
+		return std::string(tr(names[choice]));
+	}
 	switch (option.type())
 	{
 	case OPTION_BOOL:
@@ -735,9 +871,22 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		}
 		return;
 	}
+	// A row with settings folded into it: one choice on (left) or back (right), round and round; but the flight cost,
+	// which stops at either end as it always did. The presets follow each of its settings (see below).
+	int foldedChoices = 0;
+	const int folded = foldedChoice(option->id(), foldedChoices);
+	if (folded >= 0)
+	{
+		const int direction = (button == SDL_BUTTON_LEFT) ? 1 : -1;
+		setFoldedChoice(option->id(), option->id() == "fpsFlightCost" ? std::clamp(folded + direction, 0, foldedChoices - 1) : (folded + direction + foldedChoices) % foldedChoices);
+		for (const std::string &partner : foldedInto(option->id()))
+		{
+			FirstPerson::presetSwitchChanged(partner);
+		}
+	}
 	// The recommended game options: a click sets them (again, if they were set before; there is no taking them
 	// back but by Cancel, or on the game's own tabs).
-	if (option->type() == OPTION_BOOL && option->asBool() == &Options::fpsGameOptions)
+	else if (option->type() == OPTION_BOOL && option->asBool() == &Options::fpsGameOptions)
 	{
 		FirstPerson::applyGameOptions(_game->getMod());
 		Options::fpsGameOptions = true;
@@ -990,10 +1139,15 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (*value + direction + 3) % 3;
 		}
-		// Sprite upscaling (off, smooth, smooth + detail, finest): round and round too.
+		// Sprite upscaling (off, smooth, smooth + detail, finest): round and round too. On a desktop Off and Finest
+		// alone (the owner's critical pass: "Two on desktop"); the Meta Quest's weaker CPU keeps all four.
 		else if (value == &Options::fpsSpriteUpscale)
 		{
+#ifdef __ANDROID__
 			*value = (*value + direction + 4) % 4;
+#else
+			*value = *value == 0 ? 3 : 0;
+#endif
 		}
 		// How many voxels the camera sits below the game's eye height: 0 to 6.
 		else if (value == &Options::fpsEyeLower)
@@ -1005,11 +1159,6 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		else if (value == &Options::fpsPixelSize)
 		{
 			*value = (std::clamp(*value, 0, 3) + direction + 4) % 4;
-		}
-		// Time units per level a flying soldier pays: 0 to 24.
-		else if (value == &Options::fpsFlightCost)
-		{
-			*value = std::clamp(*value + direction, 0, 24);
 		}
 		// The game's frame rate limit, in the steps screens have (0 = unlimited, after the
 		// highest). One step up goes to the next step above the current limit, one step down

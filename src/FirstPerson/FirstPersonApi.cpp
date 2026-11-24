@@ -484,7 +484,118 @@ void settleOptions()
 	{
 		Options::keyFpsModeAuto = SDLK_UNKNOWN;
 	}
+	// The rows that set several settings since the owner's critical pass (OptionsFirstPersonState, foldedChoice) have no
+	// choice for two mixes a profile may have from before, by hand: the isometric view's tactical map without the 3D
+	// view's, and see-through corpses without see-through crops. Each is given the other too (the row's last choice),
+	// so nothing the player had switched on goes. On a desktop "Sprite upscaling" is Off or Finest: Smooth and Smooth +
+	// detail are Finest (the Meta Quest keeps its four).
+	if (Options::fpsTacticalMapIso && !Options::fpsTacticalMap) Options::fpsTacticalMap = true;
+	if (Options::fpsSeeThroughCorpses && !Options::fpsSeeThroughCrops) Options::fpsSeeThroughCrops = true;
+	if (!QuestBuild && (Options::fpsSpriteUpscale == 1 || Options::fpsSpriteUpscale == 2)) Options::fpsSpriteUpscale = 3;
+	fixHiddenSettings();
 	settlePresets(); // (after the akimbo setting has its value: the gameplay presets set it)
+}
+
+namespace
+{
+
+/// How a setting is kept off the 3D VIEW tab (see HiddenSettings).
+enum HiddenAs
+{
+	HIDDEN_FIXED,     // not listed, and always at its default: a profile with another value is given the default
+	HIDDEN_FOLDED,    // not listed: another setting's row sets it with its own (OptionsFirstPersonState, foldedChoice)
+	HIDDEN_ELSEWHERE, // not listed: one of the game's own, on its own tab or key, left as the player has it
+	HIDDEN_DESKTOP,   // the Meta Quest build's alone: listed there; on a desktop not listed, and always at its default
+};
+
+/// The settings the 3D VIEW tab doesn't list (the owner's critical pass of 2026-11-24: "keep all the hidden options
+/// in code easily accessible if we need them in the future"). Each is an option as before, with its code, its texts
+/// and its line in the profile; only its row is gone. To bring one back, take its line out of this table. Run with
+/// OPENXCOM3D_ALL_SETTINGS=1, the tab lists every one and leaves each as the profile has it (to try one out; the
+/// test suite runs that way).
+const struct { const char *id; HiddenAs as; } HiddenSettings[] = {
+	{ "fpsEachPellet", HIDDEN_FIXED },          // a fix, no taste: each of a shotgun's pellets on its own, none lost when the first leaves the map
+	{ "fpsPelletsInFlight", HIDDEN_FIXED },     // the pellets seen flying (no one wants them invisible)
+	{ "fpsSmoothFire", HIDDEN_FIXED },          // the flames smooth (off: the dot-by-dot look from before 1.14)
+	{ "fpsMeleeFloors", HIDDEN_FIXED },         // floors struck too, with "Melee hits walls and downed"
+	{ "fpsFallenSoldierCamera", HIDDEN_FIXED }, // the camera of a soldier who falls, as the other cameras of the aliens' turn
+	{ "fpsFacingIcons", HIDDEN_FIXED },         // the facing icons, shown only while their key (Left Alt) is held anyway
+	{ "fpsMiddleClickIdentify", HIDDEN_FIXED }, // the middle click on a unit as on the map
+	{ "fpsCraftIcons", HIDDEN_FIXED },          // a craft's own icon, only where the mod has one
+	{ "fpsSafeLanding", HIDDEN_FIXED },         // the stop before a step into the sea or a fall to death
+	{ "fpsLiftBeams", HIDDEN_FIXED },           // the lifts' beams, with "Particles" (which they need)
+	{ "fpsEyeLower", HIDDEN_FIXED },            // the eye 3 voxels below the game's eye height
+	{ "fpsGhostOpacity", HIDDEN_FIXED },        // the parts without shape at 50%
+	{ "fpsMapWheelLevels", HIDDEN_FIXED },      // the tactical map's wheel goes up and down its levels (Ctrl and the wheel zoom)
+	{ "fpsHitFlash", HIDDEN_FIXED },            // a unit hit flashes, with "Muzzle flashes" (which says so: flashes from gunfire, hits and blasts)
+	{ "fpsForceArcing", HIDDEN_FIXED },         // an arcing shot the game would refuse fires anyway (the owner's call)
+	{ "fpsRightClickDoors", HIDDEN_FIXED },     // a right click on a door opens it, as on the map (the owner's call)
+	{ "fpsTacticalMapIso", HIDDEN_FOLDED },     // into "Tactical map": Off, In 3D, Both views
+	{ "fpsCrosshairCosts", HIDDEN_FOLDED },     // into "Shot info": Off, Basic, Costs, Damage, Full
+	{ "fpsCrosshairDamage", HIDDEN_FOLDED },    // the same
+	{ "fpsAlienTurnFacing", HIDDEN_FOLDED },    // into "Alien turn": Map, 3D, Facing
+	{ "fpsSoftShadows", HIDDEN_FOLDED },        // into "Shadows": Off, On, and on the card Soft, Lamps, Soft+lamps
+	{ "fpsAllLightShadows", HIDDEN_FOLDED },    // the same
+	{ "fpsSeeThroughCorpses", HIDDEN_FOLDED },  // into "See-through": Off, Crops, All (the owner's call: one row for both)
+	{ "fpsFlightCostOverride", HIDDEN_FOLDED }, // into "Flight cost per level": Rules, 0 to 24
+	{ "FPS", HIDDEN_ELSEWHERE },                // the game's frame rate limit (its own General tab)
+	{ "fpsCounter", HIDDEN_ELSEWHERE },         // the game's frame counter (F7)
+	{ "fpsVrMode", HIDDEN_DESKTOP },            // VR: the Meta Quest's (a desktop has no headset; VR mode Off)
+	{ "fpsVrEyeSize", HIDDEN_DESKTOP },
+	{ "fpsVrWeapon", HIDDEN_DESKTOP },
+	{ "fpsVrTurning", HIDDEN_DESKTOP },
+	{ "fpsVrLaser", HIDDEN_DESKTOP },
+	{ "fpsVrSmoothing", HIDDEN_DESKTOP },
+	{ "fpsVrFoveation", HIDDEN_DESKTOP },
+	{ "fpsVrCardEyes", HIDDEN_DESKTOP },
+};
+
+/// Does the tab list every setting, hidden ones too (OPENXCOM3D_ALL_SETTINGS=1)?
+bool allSettingsListed()
+{
+	static const bool listed = getenv("OPENXCOM3D_ALL_SETTINGS") && std::strcmp(getenv("OPENXCOM3D_ALL_SETTINGS"), "1") == 0;
+	return listed;
+}
+
+/// How a setting is hidden (see HiddenSettings), if it is: true and its way, else false.
+bool hiddenAs(const std::string &id, HiddenAs &as)
+{
+	for (const auto &hidden : HiddenSettings)
+	{
+		if (id == hidden.id && (hidden.as != HIDDEN_DESKTOP || !QuestBuild))
+		{
+			as = hidden.as;
+			return true;
+		}
+	}
+	return false;
+}
+
+}
+
+/**
+ * Whether the 3D VIEW tab leaves a setting out (see HiddenSettings; none with OPENXCOM3D_ALL_SETTINGS=1).
+ * @param id The setting's option.
+ */
+bool isHiddenSetting(const std::string &id)
+{
+	HiddenAs as;
+	return !allSettingsListed() && hiddenAs(id, as);
+}
+
+/**
+ * Gives each setting the tab leaves out at a fixed value its default (see HiddenSettings): a profile that had
+ * another value plays as everyone does. Called with settleOptions (a battle or the 3D VIEW tab opening). Nothing
+ * with OPENXCOM3D_ALL_SETTINGS=1.
+ */
+void fixHiddenSettings()
+{
+	if (allSettingsListed()) return;
+	for (const OptionInfo &option : Options::getOptionInfo())
+	{
+		HiddenAs as;
+		if (hiddenAs(option.id(), as) && (as == HIDDEN_FIXED || as == HIDDEN_DESKTOP)) option.reset();
+	}
 }
 
 namespace

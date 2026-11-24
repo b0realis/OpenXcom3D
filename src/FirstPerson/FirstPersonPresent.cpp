@@ -103,6 +103,23 @@ bool wantsFullColorDisplay()
 }
 
 /**
+ * Whether the display keeps its video mode when the game resets it and nothing the mode is made of changed (its
+ * size, colour depth and flags; Screen::resetDisplay). OK on the options screen resets the display whatever was
+ * changed, and the SDL 1.2 layer over SDL2 that the Windows and macOS downloads use makes a new window for each video
+ * mode set there (on Windows in fullscreen, on macOS always): the game seemed to close and open again, and a stream
+ * capturing its window lost it (a player's report, on switching Voxel units). With our mod on only (the game's way
+ * without it).
+ */
+bool keepsVideoMode()
+{
+	for (const auto &mod : Options::mods)
+	{
+		if (mod.first == "OpenXcom3D" && mod.second) return true;
+	}
+	return false;
+}
+
+/**
  * The game's screen on a full-colour display opened for the 3D view (see wantsFullColorDisplay),
  * with the game's plain output: each pixel of the picture area takes the nearest pixel of the
  * screen. (The engine's own magnifying is for its 8-bit screen, or one of its 32-bit scalers.)

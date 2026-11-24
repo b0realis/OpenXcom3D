@@ -122,6 +122,8 @@ void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
 /// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
 bool wantsFullColorDisplay();
+/// Does the display keep its video mode when it is reset with its size, colour depth and flags as they were (our mod on)?
+bool keepsVideoMode();
 /// The game's 32-bit screen copied onto a full-colour display opened for the 3D view, magnified to the picture area (the engine's plain output).
 void flipFullColor(SDL_Surface *screen, SDL_Surface *display, int x, int y, int width, int height);
 /// Zoom::flipWithZoom's hook, with the engine's OpenGL output: draws the view asked for over the window.
@@ -170,6 +172,10 @@ State *createOptionsTab(OptionsOrigin origin);
 /// Settles settings that take their first value from an older one (the smoke from "See-through
 /// smoke", the flashlight from 1.0's two flashlight settings, the next fire mode key from 1.0's).
 void settleOptions();
+/// Whether the 3D VIEW tab leaves a setting out (the owner's critical pass; the table in FirstPersonApi.cpp).
+bool isHiddenSetting(const std::string &id);
+/// Gives each setting the tab leaves out at a fixed value its default (called with settleOptions).
+void fixHiddenSettings();
 /// Called once the player's options are read (Options::init): the Meta Quest build's defaults that
 /// changed, set once on a profile saved before them (see the function).
 void optionsLoaded();
@@ -448,6 +454,7 @@ bool tacticalMap(BattlescapeState *state);
 // Stock OXCE: the add-on is left out, and every hook does nothing.
 inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
 inline bool wantsFullColorDisplay() { return false; }
+inline bool keepsVideoMode() { return false; }
 inline void flipFullColor(SDL_Surface *, SDL_Surface *, int, int, int, int) { }
 inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
