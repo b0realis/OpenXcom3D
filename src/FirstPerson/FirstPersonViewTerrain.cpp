@@ -387,6 +387,51 @@ Uint8 nearestColor(const SDL_Color *palette, const float *rgb)
 }
 
 /**
+ * Gives what stands above still water the art's colours that aren't the water's (a player, GitHub issue #261: a
+ * paddy's rice, the game's own voxels, a few thin stalks, "all of its actual sprite data is green"): projected, those
+ * voxels landed on the water the art draws behind its tufts and stood blue. Each voxel above the water's face (the
+ * highest layer with voxels over half the tile) coloured as the water takes the colour of the art's nearest pixel that
+ * isn't water. Art all water is left as it is.
+ * @param model The floor's model, its voxels coloured from its art, its face filled in.
+ * @param sprite Its sprite frame.
+ * @param groups The water's colour groups, a bit each (VoxelModel::stillWater).
+ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
+ */
+void dryAboveWater(FirstPersonView::VoxelModel &model, const Surface *sprite, Uint16 groups, int yOffset)
+{
+	auto water = [groups](Uint8 color) { return ((groups >> (color >> 4)) & 1) != 0; };
+	int face = -1;
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		int filled = 0;
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x) filled += model.color[z][y][x] != 0;
+		if (filled * 2 >= Position::TileXY * Position::TileXY) face = z;
+	}
+	if (face < 0) return;
+	const int width = sprite->getWidth(), height = sprite->getHeight();
+	for (int z = face + 1; z < Position::TileZ; ++z)
+		for (int y = 0; y < Position::TileXY; ++y)
+			for (int x = 0; x < Position::TileXY; ++x)
+			{
+				if (!model.color[z][y][x] || !water(model.color[z][y][x])) continue;
+				const int atX = 16 + x - y, atY = 24 + (x + y) / 2 - z + yOffset; // (buildModel's projection)
+				int best = INT_MAX;
+				for (int spriteY = 0; spriteY < height; ++spriteY)
+					for (int spriteX = 0; spriteX < width; ++spriteX)
+					{
+						const Uint8 color = sprite->getPixel(spriteX, spriteY);
+						const int distance = (spriteX - atX) * (spriteX - atX) + (spriteY - atY) * (spriteY - atY);
+						if (color && !water(color) && distance < best)
+						{
+							best = distance;
+							model.color[z][y][x] = color;
+						}
+					}
+			}
+}
+
+/**
  * Repaints the voxels of a terrain part coloured with its art's filler (the mod's table `filler:`: a colour of no
  * meaning, painted where the map never shows the picture, covered by the tiles beside it): each takes the colour of
  * the nearest voxel of the part's own colours in its layer, or, with none there, the part's commonest one. A part
@@ -3561,6 +3606,7 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
 				}
 			model.artFill = false;
+			dryAboveWater(model, sprite, groups, yOffset); // (a paddy's rice the art's green, not the water's blue)
 		}
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels

@@ -82747,10 +82747,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..1dc3d59dc
+index 000000000..e76f5e3f1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,6054 @@
+@@ -0,0 +1,6100 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83137,6 +83137,51 @@ index 000000000..1dc3d59dc
 +		}
 +	}
 +	return (Uint8)best;
++}
++
++/**
++ * Gives what stands above still water the art's colours that aren't the water's (a player, GitHub issue #261: a
++ * paddy's rice, the game's own voxels, a few thin stalks, "all of its actual sprite data is green"): projected, those
++ * voxels landed on the water the art draws behind its tufts and stood blue. Each voxel above the water's face (the
++ * highest layer with voxels over half the tile) coloured as the water takes the colour of the art's nearest pixel that
++ * isn't water. Art all water is left as it is.
++ * @param model The floor's model, its voxels coloured from its art, its face filled in.
++ * @param sprite Its sprite frame.
++ * @param groups The water's colour groups, a bit each (VoxelModel::stillWater).
++ * @param yOffset How much higher than usual the map draws the sprite (see buildModel).
++ */
++void dryAboveWater(FirstPersonView::VoxelModel &model, const Surface *sprite, Uint16 groups, int yOffset)
++{
++	auto water = [groups](Uint8 color) { return ((groups >> (color >> 4)) & 1) != 0; };
++	int face = -1;
++	for (int z = 0; z < Position::TileZ; ++z)
++	{
++		int filled = 0;
++		for (int y = 0; y < Position::TileXY; ++y)
++			for (int x = 0; x < Position::TileXY; ++x) filled += model.color[z][y][x] != 0;
++		if (filled * 2 >= Position::TileXY * Position::TileXY) face = z;
++	}
++	if (face < 0) return;
++	const int width = sprite->getWidth(), height = sprite->getHeight();
++	for (int z = face + 1; z < Position::TileZ; ++z)
++		for (int y = 0; y < Position::TileXY; ++y)
++			for (int x = 0; x < Position::TileXY; ++x)
++			{
++				if (!model.color[z][y][x] || !water(model.color[z][y][x])) continue;
++				const int atX = 16 + x - y, atY = 24 + (x + y) / 2 - z + yOffset; // (buildModel's projection)
++				int best = INT_MAX;
++				for (int spriteY = 0; spriteY < height; ++spriteY)
++					for (int spriteX = 0; spriteX < width; ++spriteX)
++					{
++						const Uint8 color = sprite->getPixel(spriteX, spriteY);
++						const int distance = (spriteX - atX) * (spriteX - atX) + (spriteY - atY) * (spriteY - atY);
++						if (color && !water(color) && distance < best)
++						{
++							best = distance;
++							model.color[z][y][x] = color;
++						}
++					}
++			}
 +}
 +
 +/**
@@ -86314,6 +86359,7 @@ index 000000000..1dc3d59dc
 +					model.min[1] = std::min<int>(model.min[1], y); model.max[1] = std::max<int>(model.max[1], y);
 +				}
 +			model.artFill = false;
++			dryAboveWater(model, sprite, groups, yOffset); // (a paddy's rice the art's green, not the water's blue)
 +		}
 +	}
 +	// An object the art draws as a block of crops though the game gives it only a few voxels
