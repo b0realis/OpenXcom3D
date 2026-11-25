@@ -27,17 +27,30 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# The deployment waits a little after the upload, and tries once more a minute later if it still misses the artifact:
+# since 2026-11 GitHub lists a freshly uploaded artifact seconds late (up to about 46 s seen), and deploy-pages looks it
+# up once, at once ("No artifacts named github-pages were found"; actions/deploy-pages#451). Re-running the job can't
+# mend that: it uploads a second artifact of the same name ("Multiple artifacts named github-pages").
 jobs:
   deploy:
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_again.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
           path: pages
+      - name: Wait for the artifact to be listed
+        run: sleep 20
       - id: deployment
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      - name: Wait longer, the artifact not listed yet
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: deployment_again
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
