@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..be982be49
+index 000000000..396e2ff6f
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,755 @@
+@@ -0,0 +1,756 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -651,6 +651,7 @@ index 000000000..be982be49
 +  STR_FPS_FEED_THERMAL: "IR"
 +  STR_FPS_FEED_STABILISER: "STAB"
 +  STR_FPS_FEED_FLY_TO: "FLY TO"
++  STR_FPS_FEED_FOLLOW: "FOLLOW"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
@@ -885,10 +886,10 @@ index 000000000..be982be49
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..1ce20d7c5
+index 000000000..617acf5e9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,755 @@
+@@ -0,0 +1,756 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1412,6 +1413,7 @@ index 000000000..1ce20d7c5
 +  STR_FPS_FEED_THERMAL: "IR"
 +  STR_FPS_FEED_STABILISER: "STAB"
 +  STR_FPS_FEED_FLY_TO: "FLY TO"
++  STR_FPS_FEED_FOLLOW: "FOLLOW"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
@@ -45506,10 +45508,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..096e60aa9
+index 000000000..d2e4c5505
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,1624 @@
+@@ -0,0 +1,1646 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45641,6 +45643,9 @@ index 000000000..096e60aa9
 +/// it flies this many pixels a second. FLY TO glides to the soldier in this many milliseconds. The level buttons at the
 +/// right are this big.
 +const int FeedArrowLong = 14, FeedArrowDeep = 7, FeedArrowInset = 3, FeedFlySpeed = 260, FeedFlyMs = 700, FeedLevelButton = 12;
++/// FOLLOW: the drone closes this share of the way to its soldier each second (smoothly, as the time between frames
++/// allows), and stops short of a pixel.
++const double FeedFollowRate = 5.0;
 +const double FeedSwayPeriods[4] = { 5300.0, 2100.0, 6900.0, 2900.0 };
 +
 +/// An SDL rectangle from ints (SDL 1.2's are 16-bit).
@@ -45695,7 +45700,7 @@ index 000000000..096e60aa9
 +	enum Maximised { MAX_NONE, MAX_DRONE };
 +	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 +	/// lit (a switch that is on).
-+	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
++	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
 +		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY };
 +	/// How the drone sees: black and white; night vision, all of it green (realistic) or the units and items in their own
 +	/// colours (enhanced); thermal, the units, explosions and fire white hot on a cool grey world.
@@ -45715,7 +45720,7 @@ index 000000000..096e60aa9
 +	// Flying the drone: the arrow held (one of FB_MOVE_*, else none), and a glide to a soldier (FLY TO): from where to
 +	// where (the map's offsets), since when; the mouse's last point (to light what it is over); the last frame's time.
 +	int moving = -1;
-+	bool gliding = false;
++	bool gliding = false, follow = false;
 +	Position glideFrom, glideTo;
 +	Uint32 glideStart = 0, lastFrame = 0;
 +	int mouseX = -1, mouseY = -1;
@@ -45779,7 +45784,7 @@ index 000000000..096e60aa9
 +bool droneButton(CommandFeed::ButtonKind kind)
 +{
 +	return kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
-+		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_MOVE_UP
++		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_MOVE_UP
 +		|| kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT || kind == CommandFeed::FB_LEVEL_UP
 +		|| kind == CommandFeed::FB_LEVEL_DOWN;
 +}
@@ -45925,6 +45930,22 @@ index 000000000..096e60aa9
 +		if (wantX != at.x || wantY != at.y) camera->scrollXY(wantX - at.x, wantY - at.y, true);
 +		if (done >= 1.0) feed.gliding = false;
 +	}
++	// FOLLOW (the owner: "a button to always follow the selected soldier"): in the player's turn the drone keeps after
++	// the soldier in the 3D window, on their level, closing the way smoothly (the selected one, another when another is
++	// selected). Not in the enemy's turn: the game's own camera goes after the aliens then.
++	const BattleUnit *followed = isActive() && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
++	if (feed.follow && !feed.gliding && feed.moving < 0 && _save->getSide() == FACTION_PLAYER && followed && followed->getFaction() == FACTION_PLAYER
++		&& !followed->isOut() && followed->getTile())
++	{
++		const Position at = camera->getMapOffset();
++		camera->centerOnPosition(followed->getPosition(), false);
++		const Position target = camera->getMapOffset();
++		camera->setMapOffset(Position(at.x, at.y, target.z));
++		const double share = std::min(1.0, seconds * FeedFollowRate);
++		const int byX = (int)std::lround((target.x - at.x) * share), byY = (int)std::lround((target.y - at.y) * share);
++		// (the last pixels at once, not crawled over)
++		camera->scrollXY(std::abs(target.x - at.x) <= 1 ? target.x - at.x : byX, std::abs(target.y - at.y) <= 1 ? target.y - at.y : byY, true);
++	}
 +
 +	// The crosshair (and the words beside it, placed by it: see updateCrosshair) in the middle of the 3D window.
 +	const SDL_Rect &picture = feed.viewPicture;
@@ -46049,7 +46070,7 @@ index 000000000..096e60aa9
 +}
 +
 +/**
-+ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FLY TO,
++ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FOLLOW, FLY TO,
 + * stabiliser, night vision (realistic, then enhanced), thermal, names, boxes and all over the screen, and on its picture
 + * the arrows at its edges (held: it flies that way) and the level buttons at its right; the minimap's all over the screen; the 3D window's, which goes to the full 3D
 + * view; the inventory window's, which opens the game's inventory screen.
@@ -46080,6 +46101,7 @@ index 000000000..096e60aa9
 +		feed.vision == CommandFeed::VISION_NIGHT || feed.vision == CommandFeed::VISION_NIGHT_PLUS);
 +	add(CommandFeed::FB_STABILISER, drone, right, _state->tr("STR_FPS_FEED_STABILISER"), feed.stabiliser);
 +	add(CommandFeed::FB_FLY_TO, drone, right, _state->tr("STR_FPS_FEED_FLY_TO"), feed.gliding);
++	add(CommandFeed::FB_FOLLOW, drone, right, _state->tr("STR_FPS_FEED_FOLLOW"), feed.follow);
 +	// (the arrows at the drone picture's edges, and the level buttons at its right under the top one)
 +	const SDL_Rect &picture = feed.dronePictureNow();
 +	const int along = FeedArrowLong * ui, deep = FeedArrowDeep * ui, arrowInset = FeedArrowInset * ui, levelSide = FeedLevelButton * ui;
@@ -46793,9 +46815,11 @@ index 000000000..096e60aa9
 +	case CommandFeed::FB_THERMAL: feed.vision = feed.vision == CommandFeed::VISION_THERMAL ? CommandFeed::VISION_PLAIN : CommandFeed::VISION_THERMAL; break;
 +	case CommandFeed::FB_STABILISER: feed.stabiliser = !feed.stabiliser; break;
 +	case CommandFeed::FB_FLY_TO: flyFeedTo(); break;
++	case CommandFeed::FB_FOLLOW: feed.follow = !feed.follow; break;
 +	case CommandFeed::FB_MOVE_UP: case CommandFeed::FB_MOVE_DOWN: case CommandFeed::FB_MOVE_LEFT: case CommandFeed::FB_MOVE_RIGHT:
 +		feed.moving = button.kind; // (flies while held, see updateFeed)
 +		feed.gliding = false;
++		feed.follow = false; // (flown by hand: no longer following)
 +		return;
 +	case CommandFeed::FB_LEVEL_UP: _state->_map->getCamera()->up(); break;
 +	case CommandFeed::FB_LEVEL_DOWN: _state->_map->getCamera()->down(); break;
