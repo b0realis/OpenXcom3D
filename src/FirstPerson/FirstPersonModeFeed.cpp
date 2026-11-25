@@ -138,7 +138,12 @@ const double FeedFollowRate = 5.0;
 const Uint32 FeedInventoryEveryMs = 100;
 /// The squad tab's table: a row this high (times the magnification) under a line of column heads, its scroll bar this
 /// wide, its columns this far apart, a name at least this wide (else health, energy and morale go, morale first).
-const int FeedRowH = 10, FeedScrollW = 4, FeedColumnGap = 4, FeedNameLeast = 36;
+const int FeedRowH = 13, FeedScrollW = 4, FeedColumnGap = 4, FeedNameLeast = 36;
+/// A step of the 3D view's walked on the drone's map: the game's ticks round its phases (a turn, the start, the end; see
+/// feedStepPhaseMs).
+const int FeedStepTicks = 4;
+/// The squad tab's values: low under this share of their most (on an amber ground), critical under this one (on red).
+const double FeedLowShare = 0.5, FeedCriticalShare = 0.25;
 const double FeedSwayPeriods[4] = { 5300.0, 2100.0, 6900.0, 2900.0 };
 
 /// An SDL rectangle from ints (SDL 1.2's are 16-bit).
@@ -282,6 +287,7 @@ struct CommandFeed
 	Uint8 grey[3][256], green[3][256], cool[3][256], hot[3][256], snow[8];
 	Uint8 black = 0, frameColour = 0, frameLit = 0, titleBack = 0, wordsColour = 0, dimColour = 0, liveColour = 0, hudColour = 0, pickedColour = 0;
 	Uint8 purple = 0, purpleLit = 0, turnColour = 0, clockColour = 0, dangerColour = 0, rowBack = 0;
+	Uint8 tuColour = 0, healthColour = 0, energyColour = 0, moraleColour = 0, lowBack = 0, lowWords = 0, criticalBack = 0;
 	std::unique_ptr<Text> writer;
 	Uint32 noise = 0x9E3779B9u;
 	/// The snow's and the tears' dice.
@@ -599,32 +605,42 @@ void FirstPersonMode::beforeBattleThink()
 
 /**
  * A step the 3D view walks, with the feed up: how quick its walk plays on the drone's map (the owner: "the camera feed
- * does not show animations. They can be faster animations to conform to 3d no problem - just they must be shown!"; the
- * 3D view's steps are instant moves, see commitStep). The game walks a step in about 10 of its ticks (a diagonal one in
- * 18: twice the phases), at most one a frame; the 3D eye crosses the tile (and StepLead over the next edge) at the
- * walking pace, and the next step waits for the game's walk to end. So the ticks come every frame or every few, as
- * many as still end the walk in time (never slower than the game's own walking speed); a screen too slow for that
- * (a sprint's diagonal steps at 60 frames a second) keeps the instant step, and the 3D walk never waits.
- * @param run Whether the step is run (the sprint's pace).
+ * does not show animations. They can be faster animations to conform to 3d no problem - just they must be shown!", then
+ * "The walk (all) animations can be sped up ... to conform to 3d"; the 3D view's steps are instant moves, see
+ * commitStep). The game walks a step's phases (8, a diagonal one 16) a tick each, at most a tick a frame, round some
+ * ticks of its own (a turn to the step's way, the start, the end: FeedStepTicks, an instant step has them too, and 2
+ * phases); the next step waits for that walk to end. The 3D eye asks for the next step as it crosses a tile's edge on
+ * either axis: walking straight, a tile on; walking aslant (the steps taken in turn on each axis, or a diagonal one),
+ * sooner. So the phases come as many to a tick as still end the walk before then (a sprint aslant at 60 frames a second:
+ * the step's middle and its end, as the instant step's; walking on, all 8), and the ticks every frame or every few,
+ * never slower than the game's own walking speed: the walk shows, and the 3D walk never waits longer for it.
+ * @param run Whether the step is run (the sprint's pace, while the eye's own pace isn't known yet).
  * @param diagonal Whether it is a diagonal step.
- * @return A step phase's milliseconds, or 0 for an instant step.
+ * @param phaseStep Set to the phases walked a tick.
+ * @return A step phase's milliseconds (a tick's), or 0 for the game's own instant step (no feed).
  */
-int FirstPersonMode::feedStepPhaseMs(bool run, bool diagonal) const
+int FirstPersonMode::feedStepPhaseMs(bool run, bool diagonal, int &phaseStep) const
 {
+	phaseStep = 1;
 	if (!feedShown() || vrOn())
 	{
 		return 0;
 	}
-	const double voxelsPerMs = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (run ? SprintPace : 1.0) / 1000.0;
-	const double inTime = ((diagonal ? 16.0 * 1.4142 : 16.0) + StepLead) / voxelsPerMs * 0.9; // (a little to spare)
-	const int ticks = diagonal ? 18 : 10;
-	const double frame = std::max(1.0, _feed->frameMs);
-	int frames = (int)std::floor(inTime / (ticks * frame)); // (frames a tick)
-	frames = std::min(frames, std::max(1, (int)std::lround(Options::battleXcomSpeed / frame)));
-	if (frames < 1)
+	// (the eye's pace on each axis, voxels a second; none yet (the first step, a tile move): the walking pace that way)
+	double alongX = std::abs(_velocityX), alongY = std::abs(_velocityY);
+	const double pace = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (run ? SprintPace : 1.0);
+	if (alongX + alongY < pace * 0.5)
 	{
-		return 0;
+		alongX = diagonal ? pace * 0.7071 : pace;
+		alongY = diagonal ? pace * 0.7071 : 0.0;
 	}
+	const double untilNext = 16.0 * 1000.0 / (diagonal ? std::max(alongX, alongY) : alongX + alongY) * 0.85; // (a little to spare)
+	const double frame = std::max(1.0, _feed->frameMs);
+	const int phases = diagonal ? 16 : 8;
+	const int phaseTicks = std::clamp((int)std::floor(untilNext / frame) - FeedStepTicks, 2, phases);
+	phaseStep = (phases + phaseTicks - 1) / phaseTicks;
+	const int ticks = FeedStepTicks + (phases + phaseStep - 1) / phaseStep;
+	const int frames = std::clamp((int)std::floor(untilNext / (ticks * frame)), 1, std::max(1, (int)std::lround(Options::battleXcomSpeed / frame)));
 	return std::max(1, (int)std::lround((frames - 0.5) * frame)); // (the battle's timer then ticks every so many frames)
 }
 
@@ -1752,9 +1768,13 @@ void FirstPersonMode::updateFeedSquad()
 /**
  * The squad tab: a table of the whole squad, a row each, under the column heads: the number (as on the squad buttons),
  * the name, the time units left of the most, health (of the most), energy, morale and the state (OK, wounded, bleeding,
- * down, dead, panicking, berserk, turned against us, ours by mind control); the selected soldier's row lit, the fallen
- * dim, worrying values in warm colours. Columns as wide as their head or widest value; too narrow a window leaves out
- * morale, then energy, then health. The scroll bar at the right when the rows don't all fit.
+ * down, dead, panicking, berserk, turned against us, ours by mind control); the rows apart on grounds in turn, the
+ * selected soldier's lit, the fallen dim; each value in its own colour (its head too), and a soldier low on something
+ * shows it (the owner: "colour various properties. When soldiers are low on something lets colour that - emphasize
+ * somehow!"): under FeedLowShare of its most on an amber ground, under FeedCriticalShare (time units none left) on a red
+ * one, as a state that needs help does (bleeding, panic, berserk, turned; down on amber). Columns as wide as their head
+ * or widest value; too narrow a window leaves out morale, then energy, then health. The scroll bar at the right when the
+ * rows don't all fit.
  * @param screen The game's screen.
  */
 void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
@@ -1771,13 +1791,15 @@ void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
 		return;
 	}
 	enum { COL_NUMBER, COL_NAME, COL_TU, COL_HEALTH, COL_ENERGY, COL_MORALE, COL_STATE, COLUMNS };
-	struct Row { std::string cell[COLUMNS]; Uint8 colour[COLUMNS]; bool picked; };
+	struct Row { std::string cell[COLUMNS]; Uint8 colour[COLUMNS]; Uint8 ground[COLUMNS]; bool picked; };
 	const BattleUnit *selected = _save->getSelectedUnit();
-	// (a value's colour: time units green, amber under half, red at none; the others plain, amber when down, red under a third)
-	auto level = [&](int value, int most, bool timeUnits) {
-		if (most <= 0) return feed.wordsColour;
-		if (timeUnits) return value <= 0 ? feed.dangerColour : value * 2 < most ? feed.turnColour : feed.hudColour;
-		return value * 3 <= most ? feed.dangerColour : value < most ? feed.turnColour : feed.wordsColour;
+	// (a value in its column's colour; low, in light words on an amber ground; critical, in white on red)
+	auto level = [&](Row &row, int column, int value, int most, Uint8 colour) {
+		row.colour[column] = colour;
+		row.ground[column] = 0;
+		if (most <= 0) return;
+		if (value <= 0 || value < most * FeedCriticalShare) { row.colour[column] = feed.wordsColour; row.ground[column] = feed.criticalBack; }
+		else if (value < most * FeedLowShare) { row.colour[column] = feed.lowWords; row.ground[column] = feed.lowBack; }
 	};
 	std::vector<Row> rows;
 	rows.reserve(feed.squadUnits.size());
@@ -1786,6 +1808,7 @@ void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
 		const BattleUnit *unit = feed.squadUnits[place];
 		const UnitStats *most = unit->getBaseStats();
 		Row row;
+		std::fill(row.ground, row.ground + COLUMNS, (Uint8)0);
 		row.picked = unit == selected;
 		const bool out = unit->isOut();
 		row.cell[COL_NUMBER] = std::to_string(place + 1);
@@ -1795,23 +1818,31 @@ void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
 		row.cell[COL_ENERGY] = std::to_string(unit->getEnergy());
 		row.cell[COL_MORALE] = std::to_string(unit->getMorale());
 		const char *state = "STR_FPS_FEED_STATE_OK";
-		Uint8 stateColour = feed.hudColour;
+		Uint8 stateColour = feed.hudColour, stateGround = 0;
 		if (out && unit->getHealth() <= 0) { state = "STR_FPS_FEED_STATE_DEAD"; stateColour = feed.dimColour; }
-		else if (out) { state = "STR_FPS_FEED_STATE_DOWN"; stateColour = feed.turnColour; }
-		else if (unit->getOriginalFaction() == FACTION_PLAYER && unit->getFaction() != FACTION_PLAYER) { state = "STR_FPS_FEED_STATE_TURNED"; stateColour = feed.dangerColour; }
+		else if (out) { state = "STR_FPS_FEED_STATE_DOWN"; stateColour = feed.lowWords; stateGround = feed.lowBack; }
+		else if (unit->getOriginalFaction() == FACTION_PLAYER && unit->getFaction() != FACTION_PLAYER) { state = "STR_FPS_FEED_STATE_TURNED"; stateColour = feed.wordsColour; stateGround = feed.criticalBack; }
 		else if (unit->getOriginalFaction() != FACTION_PLAYER) { state = "STR_FPS_FEED_STATE_CONTROLLED"; stateColour = feed.clockColour; }
-		else if (unit->getStatus() == STATUS_PANICKING) { state = "STR_FPS_FEED_STATE_PANIC"; stateColour = feed.dangerColour; }
-		else if (unit->getStatus() == STATUS_BERSERK) { state = "STR_FPS_FEED_STATE_BERSERK"; stateColour = feed.dangerColour; }
-		else if (unit->getFatalWounds() > 0) { state = "STR_FPS_FEED_STATE_BLEEDING"; stateColour = feed.dangerColour; }
+		else if (unit->getStatus() == STATUS_PANICKING) { state = "STR_FPS_FEED_STATE_PANIC"; stateColour = feed.wordsColour; stateGround = feed.criticalBack; }
+		else if (unit->getStatus() == STATUS_BERSERK) { state = "STR_FPS_FEED_STATE_BERSERK"; stateColour = feed.wordsColour; stateGround = feed.criticalBack; }
+		else if (unit->getFatalWounds() > 0) { state = "STR_FPS_FEED_STATE_BLEEDING"; stateColour = feed.wordsColour; stateGround = feed.criticalBack; }
 		else if (unit->getHealth() < most->health) { state = "STR_FPS_FEED_STATE_WOUNDED"; stateColour = feed.turnColour; }
 		row.cell[COL_STATE] = _state->tr(state);
 		const Uint8 plain = out ? feed.dimColour : feed.wordsColour;
 		row.colour[COL_NUMBER] = row.colour[COL_NAME] = row.picked ? feed.pickedColour : plain;
-		row.colour[COL_TU] = out ? feed.dimColour : level(unit->getTimeUnits(), most->tu, true);
-		row.colour[COL_HEALTH] = out ? feed.dimColour : level(unit->getHealth(), most->health, false);
-		row.colour[COL_ENERGY] = out ? feed.dimColour : level(unit->getEnergy(), most->stamina, false);
-		row.colour[COL_MORALE] = out ? feed.dimColour : level(unit->getMorale(), 100, false);
+		if (out)
+		{
+			row.colour[COL_TU] = row.colour[COL_HEALTH] = row.colour[COL_ENERGY] = row.colour[COL_MORALE] = feed.dimColour; // (the fallen: nothing to tell)
+		}
+		else
+		{
+			level(row, COL_TU, unit->getTimeUnits(), most->tu, feed.tuColour);
+			level(row, COL_HEALTH, unit->getHealth(), most->health, feed.healthColour);
+			level(row, COL_ENERGY, unit->getEnergy(), most->stamina, feed.energyColour);
+			level(row, COL_MORALE, unit->getMorale(), 100, feed.moraleColour);
+		}
 		row.colour[COL_STATE] = stateColour;
+		row.ground[COL_STATE] = stateGround;
 		rows.push_back(row);
 	}
 	// The columns: as wide as their head or widest value; morale, energy and health left out (in that order) while the
@@ -1855,15 +1886,25 @@ void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
 		const int at = number ? left[column] + wide[column] - measure(words) : left[column];
 		feedWrite(screen, words, at, y, colour, wide[column]);
 	};
-	for (int column = 0; column < COLUMNS; ++column) cell(column, head[column], area.y + ui, feed.dimColour);
+	// (the heads in their columns' colours; the words in the middle of a row)
+	const int wordsAt = (rowH - FeedWordsH * ui) / 2 + ui;
+	const Uint8 headColour[COLUMNS] = { feed.dimColour, feed.dimColour, feed.tuColour, feed.healthColour, feed.energyColour, feed.moraleColour, feed.dimColour };
+	for (int column = 0; column < COLUMNS; ++column) cell(column, head[column], area.y + wordsAt, headColour[column]);
 	fill(screen, area.x, area.y + rowH, (int)feed.squadRows.w, ui, feed.frameColour);
 	const int last = std::min((int)rows.size(), feed.squadScroll + feed.squadShown);
 	for (int place = feed.squadScroll; place < last; ++place)
 	{
 		const Row &row = rows[place];
 		const int y = feed.squadRows.y + (place - feed.squadScroll) * rowH;
+		// (every other row on a ground of its own, the selected one lit; a low value's ground round its cell, apart
+		// from the next row's)
 		if (row.picked) fill(screen, feed.squadRows.x, y, feed.squadRows.w, rowH, feed.rowBack);
-		for (int column = 0; column < COLUMNS; ++column) cell(column, row.cell[column], y + ui, row.colour[column]);
+		else if (place % 2) fill(screen, feed.squadRows.x, y, feed.squadRows.w, rowH, feed.titleBack);
+		for (int column = 0; column < COLUMNS; ++column)
+		{
+			if (row.ground[column] && shown[column] && wide[column] > 0) fill(screen, left[column] - ui, y + ui, wide[column] + 2 * ui, rowH - 2 * ui, row.ground[column]);
+			cell(column, row.cell[column], y + wordsAt, row.colour[column]);
+		}
 	}
 	// The scroll bar: its track, the thumb lit while dragged or under the mouse.
 	if (feed.squadTrack.w > 0)
@@ -2007,6 +2048,13 @@ void FirstPersonMode::feedColours()
 	feed.clockColour = bright(110, 215, 255);
 	feed.dangerColour = bright(245, 75, 60);
 	feed.rowBack = nearestColor(palette, 32, 46, 78);
+	feed.tuColour = bright(90, 235, 90);
+	feed.healthColour = bright(255, 150, 175);
+	feed.energyColour = bright(255, 160, 50);
+	feed.moraleColour = bright(195, 150, 255);
+	feed.lowBack = nearestColor(palette, 205, 120, 0);
+	feed.lowWords = bright(255, 255, 255);
+	feed.criticalBack = nearestColor(palette, 200, 20, 20);
 	if (!feed.writer)
 	{
 		feed.writer.reset(new Text(Options::baseXResolution, FeedWordsH, 0, 0));

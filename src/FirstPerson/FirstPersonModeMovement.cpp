@@ -664,7 +664,7 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	walk.run = run && !walk.strafe;
 	// (with the Live command feed the step plays on the drone's map too, quick enough for the 3D view's pace; a step
 	// off a ledge stays instant, the game's fall taking over)
-	walk.walkPhaseMs = stepsOffLedge ? 0 : feedStepPhaseMs(walk.run, stepX != 0 && stepY != 0);
+	walk.walkPhaseMs = stepsOffLedge ? 0 : feedStepPhaseMs(walk.run, stepX != 0 && stepY != 0, walk.walkPhaseStep);
 	if (walk.walkPhaseMs > 0) walk.instantMove = false;
 	// Walking on past an enemy coming into sight: en passant, or sprinting, in every game (as the
 	// map walks on with Shift, and a run does where the mod's rules say so; a player's report,
