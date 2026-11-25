@@ -371,7 +371,7 @@ en-GB:
   STR_FPS_VOXEL_UNITS: "Voxel units"
   STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
   STR_FPS_COMMAND_FEED: "Live command feed"
-  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map, all live."
+  STR_FPS_COMMAND_FEED_DESC: "Warning - this disables normal ISO mode and presents a \"SWAT style\" command feed instead. Hard and annoying!"
   STR_FPS_UPSCALE_OFF: "Off"
   STR_FPS_UPSCALE_SMOOTH: "Smooth"
   STR_FPS_UPSCALE_DETAIL: "Smooth+"

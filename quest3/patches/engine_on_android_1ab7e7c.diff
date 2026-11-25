@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..cadf060cc
+index 000000000..26e5e2109
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,776 @@
@@ -539,7 +539,7 @@ index 000000000..cadf060cc
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map, all live."
++  STR_FPS_COMMAND_FEED_DESC: "Warning - this disables normal ISO mode and presents a \"SWAT style\" command feed instead. Hard and annoying!"
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -944,7 +944,7 @@ index 000000000..cadf060cc
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..425b9c68d
+index 000000000..2f00a96ad
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,776 @@
@@ -1321,7 +1321,7 @@ index 000000000..425b9c68d
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map, all live."
++  STR_FPS_COMMAND_FEED_DESC: "Warning - this disables normal ISO mode and presents a \"SWAT style\" command feed instead. Hard and annoying!"
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
