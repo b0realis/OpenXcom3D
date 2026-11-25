@@ -1376,7 +1376,7 @@ private:
 	void feedColours();
 	void feedButtons();
 	void placeFeedScreen();
-	void moveGamePanel(int by);
+	void hideGamePanel(bool hide);
 	std::vector<std::pair<BattleUnit*, int>> feedSquad() const;
 	bool feedDrawsGameSurface(const Surface *surface) const;
 	bool feedEdgeSurface(const Surface *surface) const;
