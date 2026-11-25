@@ -1361,12 +1361,16 @@ private:
 	/// Works out which unit each squad button stands for.
 	std::vector<BattleUnit*> squadList() const;
 
-	// The Live command feed (FirstPersonModeFeed.cpp; setting "Live command feed"): the isometric map as a command
-	// post's screens, the soldiers' helmet cameras, the map as a drone's feed and the tactical map.
+	// The Live command feed (FirstPersonModeFeed.cpp; setting "Live command feed"): the battle as a command post's
+	// screens, the soldiers' cards, the equipment window, the 3D view in a window, the map as a drone's feed and the
+	// tactical map.
 	std::unique_ptr<CommandFeed, CommandFeedDeleter> _feed;
+	bool _feedPreferred = true;    // the feed rather than the full 3D view (the 3D key takes turns, see toggleView)
 	bool _feedDispatching = false; // handing an event to the battle without the map (see feedWithoutMap)
+	bool _feedOverlays = false;    // drawing our overlays for the feed: only those it shows (see feedOverlay)
 	bool feedWanted() const;
 	bool feedShown() const;
+	bool feedViewSize(int &width, int &height) const;
 	void updateFeed();
 	void leaveFeed();
 	void layOutFeed();
@@ -1375,11 +1379,15 @@ private:
 	void placeFeedScreen();
 	void moveGamePanel(int by);
 	std::vector<std::pair<BattleUnit*, int>> feedSquad() const;
-	FirstPersonView *makeFeedCamera(int width, int height);
 	bool feedDrawsGameSurface(const Surface *surface) const;
 	bool feedEdgeSurface(const Surface *surface) const;
+	bool feedOverlay(const Surface *surface) const;
+	void blitFeed(SDL_Surface *screen);
 	void blitFeedUnder(SDL_Surface *screen);
 	void blitFeedOver(SDL_Surface *screen);
+	void drawFeedCards(SDL_Surface *screen);
+	void makeFeedEquipment(BattleUnit *unit);
+	void drawFeedItem(SDL_Surface *target, const BattleItem *item, int x, int y, int scale, int shrink);
 	void filterDrone(SDL_Surface *screen, const SDL_Rect &picture);
 	void markSoldiers(SDL_Surface *screen, const SDL_Rect &picture);
 	void drawFeedWindow(SDL_Surface *screen, const SDL_Rect &frame, Uint8 borderColour);
@@ -1387,9 +1395,9 @@ private:
 	bool handleFeedMouse(Action *action);
 	bool handleFeedKey(Action *action);
 	bool feedWithoutMap(Action *action);
-	void pressFeedButton(int index);
+	void pressFeedButton(int index, Action *action);
+	void chooseHand(int hand);
 	void scrollFeed(int by);
-	void feedShareCache(FirstPersonView *owner);
 	void refreshSquad();
 	/// Lays out the squad buttons that are in use.
 	void layoutTopBar();

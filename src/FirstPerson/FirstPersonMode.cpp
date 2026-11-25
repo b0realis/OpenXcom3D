@@ -1147,7 +1147,6 @@ void FirstPersonMode::remakeViewIfResized()
 	_ownSurfaces.insert(newView);
 	_preview->shareCache(newView);
 	_mapCamera->shareCache(newView);
-	feedShareCache(newView);
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
@@ -1196,6 +1195,11 @@ int FirstPersonMode::canvasHeight() const
  */
 void FirstPersonMode::wantedViewSize(int &width, int &height) const
 {
+	// (with the Live command feed: its 3D window's picture, see feedViewSize)
+	if (feedViewSize(width, height))
+	{
+		return;
+	}
 	width = canvasWidth();
 	height = canvasHeight();
 	if (Options::fpsViewResolution == FirstPerson::ViewResolutionDisplay && FirstPerson::canPresentAtDisplaySize())
@@ -1583,6 +1587,16 @@ bool FirstPersonMode::alienTurn3D() const
  */
 void FirstPersonMode::toggleView()
 {
+	// With the Live command feed the feed (the 3D view in its window) and the full 3D view take turns; from the
+	// isometric map (the aliens' turn on it) the key goes to the feed.
+	if (Options::fpsCommandFeed && !vrOn())
+	{
+		_feedPreferred = !_feedPreferred || !isActive();
+		_wants3D = true;
+		rememberChoices();
+		think();
+		return;
+	}
 	_wants3D = !isActive();
 	if (_wants3D && _save->getSide() != FACTION_PLAYER && !alienTurn3D())
 	{
@@ -1647,15 +1661,15 @@ void FirstPersonMode::setActive(bool active)
 	// Swap the view and the map. Mouse look starts on unless the classic HUD wants the cursor,
 	// and the camera is placed on the unit afresh.
 	_view->setVisible(active);
-	_state->_map->setVisible(!active);
+	_state->_map->setVisible(!active || feedWanted()); // (the Live command feed shows the map as its drone's feed)
 	_state->_map->invalidate();
 	_dragLook = false;
-	_mouseLook = active && !_classicHud;
+	_mouseLook = active && !_classicHud && !feedWanted(); // (in the feed's 3D window a click gives it the mouse)
 	_trackedUnit = nullptr; // re-place the camera on the unit
 	relayoutIfNeeded(); // (with the view at the display's size the overlays are laid out for the display in 3D, for the screen over the map)
 
 	// Keep warnings ("not enough time units"...) visible above the panel when the classic HUD is hidden.
-	_state->_warning->setY(active && !_classicHud ? warningY() : _warningY);
+	_state->_warning->setY(active && !_classicHud && !feedWanted() ? warningY() : _warningY);
 }
 
 /**
@@ -2838,7 +2852,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 		if (pressed) toggleMapCamera();
 		return true;
 	}
-	if (!active && handleFeedKey(action))
+	if (handleFeedKey(action))
 	{
 		return true;
 	}
@@ -3085,7 +3099,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		return true;
 	}
 	// The Live command feed's: the mouse's moves (its buttons and wheel below, after our top bar's buttons).
-	if (!active && event.type == SDL_MOUSEMOTION && feedShown())
+	if (event.type == SDL_MOUSEMOTION && feedShown())
 	{
 		return handleFeedMouse(action);
 	}
@@ -3151,7 +3165,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		}
 
 		// The Live command feed's windows, and the map in its drone's window (see handleFeedMouse).
-		if (!active && feedShown())
+		if (feedShown())
 		{
 			return handleFeedMouse(action);
 		}
@@ -3275,6 +3289,12 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 bool FirstPersonMode::blit()
 {
 	SDL_Surface *screen = _game->getScreen()->getSurface();
+	// The Live command feed: the whole screen is its (the 3D view in its window, see blitFeed).
+	if (feedShown())
+	{
+		blitFeed(screen);
+		return true;
+	}
 	const bool full3D = isActive() && !_classicHud;
 
 	// VR mode: the view looks as the head does, whatever turned it during the frame. The desktop's
@@ -3329,23 +3349,13 @@ bool FirstPersonMode::blit()
 		}
 	}
 
-	// The game's own surfaces (in full 3D only its warnings and debug text). With the Live command feed: the map in
-	// the drone's window under them, the feed's windows over them (see blitFeedUnder, blitFeedOver).
-	const bool feed = !isActive() && feedShown();
-	if (feed)
-	{
-		blitFeedUnder(screen);
-	}
+	// The game's own surfaces (in full 3D only its warnings and debug text).
 	for (Surface *surface : _state->_surfaces)
 	{
-		if (!_ownSurfaces.count(surface) && (!full3D || surface == _state->_warning || surface == _state->_txtDebug) && (!feed || feedDrawsGameSurface(surface)))
+		if (!_ownSurfaces.count(surface) && (!full3D || surface == _state->_warning || surface == _state->_txtDebug))
 		{
 			surface->blit(screen);
 		}
-	}
-	if (feed)
-	{
-		blitFeedOver(screen);
 	}
 
 	// Our overlays (see drawOverlays). VR mode with the shell drawing the eyes: the HUD's own
@@ -3375,10 +3385,11 @@ bool FirstPersonMode::blit()
 void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool composing)
 {
 	const bool full3D = isActive() && !_classicHud;
-	const bool enemyButtons = full3D && !hudHidden();
+	const bool enemyButtons = full3D && !hudHidden() && !_feedOverlays;
 	auto shown = [&](const Surface *surface)
 	{
 		return surface != _view && _ownSurfaces.count(const_cast<Surface*>(surface)) && !(hudHidden() && _topBarSurfaces.count(const_cast<Surface*>(surface)))
+			&& (!_feedOverlays || feedOverlay(surface)) // (the Live command feed shows only some, see feedOverlay)
 			&& !(forHud && (surface == _crosshair || surface == _accuracyLine || surface == _scopeCross || surface == _weaponInHand));
 	};
 	if (!_canvas)

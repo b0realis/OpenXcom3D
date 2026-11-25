@@ -2449,7 +2449,9 @@ void FirstPersonMode::updateTopBar(BattleUnit *selected)
 	}
 	_btnHud->setVisible(active);
 	_btnEndTurn->setVisible(active); // the classic HUD has its own
-	_btnView->setText(_state->tr(active ? "STR_FPS_BUTTON_ISO" : "STR_FPS_BUTTON_3D"));
+	// (with the Live command feed the button takes turns between the feed and the full 3D view)
+	const bool feedTurns = Options::fpsCommandFeed && !vrOn();
+	_btnView->setText(_state->tr(feedTurns ? (feedShown() ? "STR_FPS_BUTTON_3D" : "STR_FPS_BUTTON_FEED") : active ? "STR_FPS_BUTTON_ISO" : "STR_FPS_BUTTON_3D"));
 }
 
 /**
@@ -2473,11 +2475,11 @@ TextButton *FirstPersonMode::buttonAt(double x, double y) const
 	// The fixed buttons first, then the squad buttons.
 	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 	{
-		if (inside(button)) return button;
+		if (inside(button) && !(feedShown() && (button == _btnPrev || button == _btnNext))) return button;
 	}
 	for (TextButton *button : _btnSquad)
 	{
-		if (inside(button)) return button;
+		if (inside(button) && !feedShown()) return button; // (the Live command feed's cards stand for them)
 	}
 	return nullptr;
 }
