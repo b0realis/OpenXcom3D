@@ -95,6 +95,7 @@ thread_local std::vector<Uint8> Painted;
 thread_local bool SlantOnly = false; // (a big walker: read along the slant from any height, see project)
 thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
 thread_local bool EarsApart = false; // (a long body the unit table names "ears: apart": see profile)
+thread_local bool Feminine = false; // (a person the unit table names "figure: feminine": see standardBody)
 /// With "ears: apart", how many rows over the front drawing's top a side drawing's ear may reach (see profile).
 const int EarsReach = 4;
 
@@ -658,6 +659,14 @@ constexpr float StdTrunk = 0.6f, StdHead = 0.4f, StdLimb = 0.6f, SplitDip = 0.4f
 	TrunkSquare = 2.5f, SplayMost = 40.0f, FootWide = 0.028f, HeadFull = 2.6f, HeadDome = 0.7f, HeadMost = 0.42f, HeadLong = 1.3f, AnkleReach = 2.5f, LimbRound = 0.75f, LimbLong = 2.5f,
 	CrownShare = 0.5f, HeadFlat = 1.6f, SectionSolid = 0.6f, LimbThick = 2.5f, ShoulderJump = 2.0f, FaceTurn = 0.6f;
 constexpr int HairReach = 4 * VOXELSCALE;
+/// A feminine figure (the unit table's "figure: feminine", see standardBody): the trunk's breadth, by its height from the
+/// hips (0) to the neck (1), times FemHips at the hips, FemWaist at the waist (FemWaistAt), FemChest at the chest
+/// (FemChestAt) and FemShoulders at the shoulders, straight between; its depth times FemDepth; the arms' thickness times
+/// FemLimb, the legs' FemLeg; the shoulder joints in as the shoulders are (the elbows half as far, the hands where they
+/// are: what they hold stays in them). A bust at BustAt of that height: two balls BustApart of the chest's half breadth either side of its middle,
+/// BustSize of it thick (half), standing BustOut of themselves out of the chest's front.
+constexpr float FemHips = 0.95f, FemWaist = 0.68f, FemWaistAt = 0.35f, FemChest = 0.78f, FemChestAt = 0.68f, FemShoulders = 0.62f, FemDepth = 0.85f,
+	FemLimb = 0.62f, FemLeg = 0.72f, BustAt = 0.66f, BustApart = 0.45f, BustSize = 0.42f, BustOut = 0.75f;
 /// A kneeling body's legs (see standardBody, the kneeling legs). ThighShare: a thigh's thickness, half, of the trunk's
 /// half breadth at its foot, within ThighLeast and ThighMost voxels and no more than ThighTall of the body's height; KneeShare, ShinLeast, ShinMost: its knee's of
 /// that, and its shin's, at the ankle; KneelLow: the legs' drawing under this many voxels is the feet and the shin
@@ -704,8 +713,9 @@ void fillBar(std::vector<Uint8> &cells, Uint8 code, const float a[3], const floa
 /// (left, right), where it has them; armsOver: they lie over the body where they touch it (the unit table's arms
 /// outside); legsDrawn: its legs' drawings, to paint its feet by; headBottom: gets the height its head begins at,
 /// over the neck (voxels; very high for a body without a head found), to paint its face and hair by (see makeModel).
-void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const StandardArm arms[2], bool armsOver, const PartFrames &legsDrawn, float &headBottom)
+void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const StandardArm armsDrawn[2], bool armsOver, const PartFrames &legsDrawn, float &headBottom)
 {
+	StandardArm arms[2] = { armsDrawn[0], armsDrawn[1] }; // (as placed; a feminine figure's shoulders come in, see step 4)
 	headBottom = 1e9f;
 	const float V = VOXELSCALE / Cell; // (cells a voxel)
 	std::vector<Section> sections;
@@ -937,6 +947,7 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 	for (int k : path) onPath[k] = 1;
 	const int length = (int)path.size();
 	bool headRound = false;
+	float bust[2][3] = {}, bustRadius = 0.0f; // (a feminine figure's bust: see below and step 6)
 	int headLow = 0, headHigh = 0; // (the head's egg: from this layer to this)
 	float headThick = 0.0f;
 	int neck = -1;
@@ -1094,6 +1105,46 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 				one.xx *= in * in; one.xy *= in * inDeep; one.yy *= inDeep * inDeep;
 			}
 		}
+		// A feminine figure (the unit table's "figure: feminine", by name: the owner, of a gal XPiratez draws broad and
+		// muscular, "lets just make her body leaner, human like and feminine (breasts...)"): the trunk below the neck
+		// narrower at the shoulders, the chest and the waist, as wide at the hips (see FemHips), a little shallower; the
+		// limbs thinner (step 5 and 6); and a bust on the chest (step 6).
+		if (Feminine && neck > (int)(3 * V))
+		{
+			auto breadth = [](float h) {
+				const float heights[5] = { 0.0f, FemWaistAt, FemChestAt, 0.9f, 1.0f }, by[5] = { FemHips, FemWaist, FemChest, FemShoulders, FemShoulders };
+				for (int k = 1; k < 5; ++k) if (h <= heights[k]) return by[k - 1] + (by[k] - by[k - 1]) * (h - heights[k - 1]) / (heights[k] - heights[k - 1]);
+				return FemShoulders;
+			};
+			for (int i = 0; i < neck; ++i)
+			{
+				const float across = breadth((float)i / neck);
+				Section &one = sections[path[i]];
+				one.xx *= across * across; one.xy *= across * FemDepth; one.yy *= FemDepth * FemDepth;
+			}
+			// (the shoulder joints in with the shoulders, from the trunk's middle at their height)
+			for (int arm = 0; arm < 2; ++arm)
+			{
+				if (!arms[arm].any) continue;
+				const int layer = (int)std::floor((arms[arm].shoulder[2] - UpFrom) / Cell);
+				float middle = 0.0f;
+				bool found = false;
+				for (int i = 0; i < length && !found; ++i) if (sections[path[i]].up >= layer) { middle = AcrossFrom + (sections[path[i]].right + 0.5f) * Cell; found = true; }
+				if (!found) continue;
+				const float in = (arms[arm].shoulder[0] - middle) * (1.0f - FemShoulders);
+				arms[arm].shoulder[0] -= in;
+				arms[arm].elbow[0] -= 0.5f * in;
+			}
+			const Section &chest = sections[path[std::clamp((int)std::lround(BustAt * neck), 0, neck - 1)]];
+			const float halfAcross = std::sqrt(std::max(chest.xx, 0.0f)), halfAhead = std::sqrt(std::max(chest.yy, 0.0f)); // (cells)
+			bustRadius = std::max(0.75f * VOXELSCALE, BustSize * halfAcross * Cell);
+			for (int side = 0; side < 2; ++side)
+			{
+				bust[side][0] = AcrossFrom + (chest.right + 0.5f + (side ? 1.0f : -1.0f) * BustApart * halfAcross) * Cell;
+				bust[side][1] = AlongFrom + (chest.ahead + 0.5f) * Cell + halfAhead * Cell + bustRadius * (BustOut - 1.0f);
+				bust[side][2] = UpFrom + (chest.up + 0.5f) * Cell - 0.5f * bustRadius;
+			}
+		}
 		if (!headRound) capEnd(path, true);
 	}
 	// (a short piece beside the head, under its crown: a tuft of hair, the corner of a hat. The head's egg is the head)
@@ -1247,6 +1298,8 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 		}
 		capEnd(chain, true);
 		capEnd(chain, false);
+		// (a feminine figure's legs thinner, see step 4)
+		if (Feminine && isLeg[c]) for (int k : chain) scaleOval(sections[k], FemLeg);
 	}
 	if (feet)
 	{
@@ -1285,12 +1338,14 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 		}
 	};
 	fillSections(VoxelUnitModel::Torso);
+	// (a feminine figure's bust, on the chest: see step 4)
+	for (int side = 0; bustRadius > 0.0f && side < 2; ++side) fillBar(made, VoxelUnitModel::Torso, bust[side], bust[side], bustRadius, bustRadius);
 	for (int arm = 0; arm < 2; ++arm)
 	{
 		const Uint8 part = arm ? VoxelUnitModel::RightArm : VoxelUnitModel::LeftArm;
 		fillSections(part);
 		if (!arms[arm].any) continue;
-		const float upper = arms[arm].radius[0], lower = arms[arm].radius[1];
+		const float upper = arms[arm].radius[0] * (Feminine ? FemLimb : 1.0f), lower = arms[arm].radius[1] * (Feminine ? FemLimb : 1.0f);
 		// (its shoulder joined to the trunk: a bar in to the trunk's middle at that height)
 		{
 			const int layer = (int)std::floor((arms[arm].shoulder[2] - UpFrom) / Cell);
@@ -5611,6 +5666,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	SlantOnly = routine.big && !bigHull;
 	RoundTrunk = (routine.traits & 1) != 0;
 	EarsApart = (routine.traits & 131072) != 0;
+	Feminine = (routine.traits & 1048576) != 0;
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)

@@ -138,6 +138,7 @@ public:
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
 		int boxTank = -1; // (a tank drawn in one picture a side: a hull box and a turret box fitted to its drawings, with its gun: 1; as ever: 0)
+		int feminine = -1; // (a person, a standard humanoid, given a feminine figure: leaner, narrower shoulders and waist, a bust: 1; as drawn: 0)
 		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
@@ -410,7 +411,7 @@ public:
 			for (const auto& entry : units.children())
 			{
 				std::vector<std::string> names;
-				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears, neck;
+				std::string shape, top, sculpt, animation, arms, humanoid, trunk, head, tail, paint, kneel, hover, back, stands, waist, ears, neck, figure;
 				int seeThrough = 0, torsoDepth = 0, flat = 100, flatUnder = 100, legs = 0, barrels = 0;
 				UnitLook look;
 				entry.tryRead("names", names);
@@ -449,6 +450,7 @@ public:
 				if (entry.tryRead("waist", waist)) look.waistDrawn = waist == "drawn" ? 1 : 0;
 				if (entry.tryRead("ears", ears)) look.earsApart = ears == "apart" ? 1 : 0;
 				if (entry.tryRead("neck", neck)) look.neckNone = neck == "none" ? 1 : 0;
+				if (entry.tryRead("figure", figure)) look.feminine = figure == "feminine" ? 1 : 0;
 				if (entry.tryRead("legs", legs)) look.legs = std::clamp(legs, 0, 14);
 				if (entry.tryRead("barrels", barrels)) look.barrels = std::clamp(barrels, 0, 4);
 				if (entry.tryRead("humanoid", humanoid)) look.standard = humanoid == "standard" ? 1 : 0;
@@ -568,6 +570,7 @@ public:
 			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
 			if (entry.second.boxTank != -1) look.boxTank = entry.second.boxTank;
+			if (entry.second.feminine != -1) look.feminine = entry.second.feminine;
 			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;

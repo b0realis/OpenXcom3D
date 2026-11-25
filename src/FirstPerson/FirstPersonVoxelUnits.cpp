@@ -806,6 +806,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 boxed[2] = { 'x', 1 };
 		hashBytes(hash, boxed, 2);
 	}
+	// (a feminine figure, by the unit table: only said of a unit hashed in, as above)
+	if (look.feminine == 1)
+	{
+		const Uint8 figure[2] = { 'f', 1 };
+		hashBytes(hash, figure, 2);
+	}
 	// (beating, by the unit table: only said of a unit hashed in, as above)
 	if (look.animated == 2)
 	{
@@ -907,6 +913,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.neckNone == 1) job->traits |= 262144;
 		// (a tank of two boxes fitted to its drawings, by the unit table: see boxTank in FirstPersonVoxelBodies.cpp)
 		if (look.boxTank == 1 && routine->big) job->traits |= 524288;
+		// (a feminine figure, by the unit table: see standardBody in FirstPersonVoxelBodies.cpp)
+		if (look.feminine == 1) job->traits |= 1048576;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

@@ -324,6 +324,9 @@ firstPerson:
   #           draws them: not one plate across its head), or drawn (as ever: apart only where they are thin)
   #   neck: none (no big head on a narrow torso is looked for: what is drawn under the shoulders is the trunk as drawn,
   #           not a chin and a thin neck under the head; for a body whose arms begin low), or drawn (as ever)
+  #   figure: feminine (a person, "humanoid: standard", made leaner and feminine whatever its drawings' build: the trunk
+  #           narrower at the shoulders, the chest and the waist, as wide at the hips, a little shallower, the arms and
+  #           legs thinner, a bust on the chest; height and pose stay the drawings'), or drawn (as ever)
   # A name of one star, "*", is every unit.
   # A later entry (or a later mod's) overrides what it sets.
   units:
@@ -521,6 +524,10 @@ firstPerson:
     # drawings and painted as the gals are (its sheet's name begins with PIR, as theirs do) it was a lumpy purple loaf,
     # "a lot more goofy" (a player on the forum): a hull box and a turret box fitted to its drawings, with its gun (the
     # owner: "build a good boxy tank model with boxy turret and barrel"); the gals' words taken back
+    # XPiratez's Wench outfit (armour STR_LINGERIE_SET_X_UC on the gals' broad, muscular body, UBERGAL): a leaner,
+    # feminine figure (the owner, of a gal in it: "lets just make her body leaner, human like and feminine (breasts...)")
+    - names: [STR_LINGERIE_SET_X_UC]
+      figure: feminine
     - names: [PIR_TANK.PCK, PIR_TANK_L.PCK]
       shape: tank
       torsoDepth: 0
