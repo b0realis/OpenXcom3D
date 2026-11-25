@@ -1638,10 +1638,10 @@ index 000000000..77cc8bb54
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..b32568f6b
+index 000000000..3213094d6
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,551 @@
+@@ -0,0 +1,557 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -2098,6 +2098,12 @@ index 000000000..b32568f6b
 +    # thin column behind a shallow piece (a player, GitHub issue #259: "just spinal cord between chest and hips"): the
 +    # trunk as drawn down to the hips
 +    - names: [CLICKOR.PCK, ANTMAN_WARRIOR.PCK, ANTMAN_WORKER.PCK]
++      neck: none
++    # XPiratez's government men in helmet and backpack (the Enforcer, the Elite, the Rogue Colonel and Officer: one
++    # drawing in four colourings): the helmet over the narrower shoulders was taken for a big head, and the back under it
++    # cut to a thin neck, a notch between the backpack and the helmet (a player, GitHub issue #264: "my crosshair SHOULD
++    # be on backpack, but its like a chunk was removed")
++    - names: [GOV_2.PCK, GOV_3.PCK, GOV_10.PCK, GOV_11.PCK]
 +      neck: none
 +    # big creatures whose eight drawings together leave a lump with no legs to tell (The X-Com Files' Bullfrog)
 +    # (and set down on the floor: cut so, its feet go and its belly hangs three voxels over the ground; and its back
