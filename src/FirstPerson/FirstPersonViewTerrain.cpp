@@ -1071,6 +1071,66 @@ bool hasNoVoxels(const MapData *mapData, const std::vector<Uint16> &loftData)
 }
 
 /**
+ * The layers of an object's game shape that are a scatter of lone voxels (XPiratez's palm fronds: LOFT template 78, nine
+ * single voxels over the tile, so that a shot now and then meets a leaf; repeated over eight layers they stood as nine
+ * pillars a voxel thin and two thirds of a tile high, green from the art: "why do trees have floating green blocks?",
+ * the owner). Such a layer is no body to draw: its look is made from the art instead (see buildModel). A layer counts
+ * when ScatterLeastPins voxels or more are filled and at least ScatterLoneShare of them touch no other (none of their
+ * eight neighbours in the layer filled): a lamp's single post isn't a scatter. Only runs of ScatterLeastLayers such
+ * layers one over another count.
+ * @param mapData The record.
+ * @param loftData The game's LOFT templates.
+ * @return One bit per layer (layer 0 the lowest) that is a scatter in such a run; 0 if none.
+ */
+Uint16 scatteredLayers(const MapData *mapData, const std::vector<Uint16> &loftData)
+{
+	if (mapData->getObjectType() != O_OBJECT)
+	{
+		return 0;
+	}
+	Uint16 layers = 0;
+	int count = 0;
+	for (int layer = 0; layer < 12; ++layer)
+	{
+		const size_t loftStart = mapData->getLoftID(layer) * 16;
+		if (!mapData->getLoftID(layer) || loftStart + 16 > loftData.size()) continue;
+		auto filled = [&](int x, int y) { return x >= 0 && y >= 0 && x < 16 && y < 16 && (loftData[loftStart + y] & (1 << (15 - x))); };
+		int voxels = 0, lone = 0;
+		for (int y = 0; y < 16; ++y)
+		{
+			for (int x = 0; x < 16; ++x)
+			{
+				if (!filled(x, y)) continue;
+				++voxels;
+				bool touches = false;
+				for (int dy = -1; dy <= 1 && !touches; ++dy)
+					for (int dx = -1; dx <= 1 && !touches; ++dx) touches = (dx || dy) && filled(x + dx, y + dy);
+				if (!touches) ++lone;
+			}
+		}
+		if (voxels >= ScatterLeastPins && lone >= voxels * ScatterLoneShare)
+		{
+			layers |= (Uint16)(1 << layer);
+		}
+	}
+	// (only runs of ScatterLeastLayers such layers one over another: a car or a tower that has the scatter on every other
+	// layer between solid ones, for shots to pass between them, keeps the game's shape)
+	Uint16 runs = 0;
+	for (int layer = 0; layer < 12; )
+	{
+		int end = layer;
+		while (end < 12 && ((layers >> end) & 1)) ++end;
+		if (end - layer >= ScatterLeastLayers)
+		{
+			for (int each = layer; each < end; ++each) runs |= (Uint16)(1 << each);
+			count += end - layer;
+		}
+		layer = end > layer ? end : layer + 1;
+	}
+	return count ? runs : 0;
+}
+
+/**
  * Keeps a window's glass inside its panes. The art draws a wall's top edge, the sill and lintel
  * of a window and the ends of a wall in the same light colours as the glass, and seen through,
  * those would let the sky show through a wall in single pixels (looking down from a roof, say).
@@ -3395,6 +3455,52 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					for (int x = box[0]; x <= box[3]; ++x) shapeRows[z][y] |= (Uint16)(1 << (15 - x));
 	}
 
+	// An object whose game shape is a scatter of lone voxels on some layers (palm fronds, see scatteredLayers): on those
+	// layers it is made from its art instead, as leaves a few voxels deep. Each drawn pixel of the art stands for the
+	// line of voxels the map would see through it (east, south and up together); of that line inside the tile only
+	// those within ScatterLeafHalf steps of its middle are kept, the middle pulled into the tile where the line is
+	// short (the art's top rows lie at the tile's back). From the map's angle the leaves are the art; from the ground
+	// a thin crown of them, no pillars. Shots still meet the game's own scatter.
+	const Uint16 leafLayers = solidShape || cutout ? 0 : scatteredLayers(mapData, *loftData);
+	if (leafLayers)
+	{
+		const int artYOffset = mapData->getYOffset();
+		const int width = sprite->getWidth(), height = sprite->getHeight();
+		std::vector<int> lineFrom((size_t)width * height, INT_MAX), lineTo((size_t)width * height, INT_MIN);
+		auto pixelOf = [&](int x, int y, int z, int &pixel) {
+			const int spriteX = 16 + x - y, spriteY = 24 + (x + y) / 2 - z + artYOffset;
+			if (spriteX < 0 || spriteY < 0 || spriteX >= width || spriteY >= height || !sprite->getPixel(spriteX, spriteY)) return false;
+			pixel = spriteY * width + spriteX;
+			return true;
+		};
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			if (!((leafLayers >> (z / 2)) & 1)) continue;
+			for (int y = 0; y < Position::TileXY; ++y)
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					int pixel = 0;
+					if (!pixelOf(x, y, z, pixel)) continue;
+					lineFrom[pixel] = std::min(lineFrom[pixel], x + y);
+					lineTo[pixel] = std::max(lineTo[pixel], x + y);
+				}
+		}
+		for (int z = 0; z < Position::TileZ; ++z)
+		{
+			if (!((leafLayers >> (z / 2)) & 1)) continue;
+			for (int y = 0; y < Position::TileXY; ++y)
+				for (int x = 0; x < Position::TileXY; ++x)
+				{
+					int pixel = 0;
+					if (!pixelOf(x, y, z, pixel)) continue;
+					// (a step along the line is two in x + y)
+					const int from = lineFrom[pixel], to = lineTo[pixel], half = 2 * ScatterLeafHalf;
+					const int middle = to - from <= 2 * half ? (from + to) / 2 : std::clamp(Position::TileXY, from + half, to - half);
+					if (std::abs(x + y - middle) <= half) shapeRows[z][y] |= (Uint16)(1 << (15 - x));
+				}
+		}
+	}
+
 	// A wall's or door's art with holes in it (a glass door's panes, a fence's gaps, see
 	// findArtHoles): the voxels behind them are seen through. Not a UFO's walls, whose art's
 	// holes are painted over (see findHollowPixels), nor objects (big things drawn tile by tile).
@@ -3488,7 +3594,8 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		}
 		for (int y = 0; y < Position::TileXY; ++y)
 		{
-			const Uint16 loftRow = solidShape ? shapeRows[z][y] : (*loftData)[loftStart + y];
+			const bool leafLayer = (leafLayers >> (z / 2)) & 1; // (made from the art: see leafLayers)
+			const Uint16 loftRow = solidShape || leafLayer ? shapeRows[z][y] : (*loftData)[loftStart + y];
 			if (!loftRow)
 			{
 				continue;
@@ -3522,9 +3629,9 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 					color = sprite->getPixel(spriteX, spriteY + SpriteNudges[nudge]);
 					if (color) break;
 				}
-				if (solidShape && !waterFloor && !sprite->getPixel(spriteX, spriteY))
+				if ((solidShape || leafLayer) && !waterFloor && !sprite->getPixel(spriteX, spriteY))
 				{
-					continue; // a shape the mod gave keeps to the art's outline (see buildShape)
+					continue; // a shape the mod gave keeps to the art's outline (see buildShape), and leaves made from it
 				}
 				if (doorRemains && !sprite->getPixel(spriteX, spriteY))
 				{

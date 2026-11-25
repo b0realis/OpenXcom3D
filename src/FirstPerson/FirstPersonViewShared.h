@@ -449,6 +449,11 @@ const float CropBlockMatch = 0.92f, CropBlockVoxelShare = 0.5f;
 /// pixels green (greener than red and blue by FoliageGreenMargin), its voxels filling FoliageBulkShare of the tile or
 /// more. Drawn leafy on a tile without a floor (carveLeaves): a voxel left out by a fixed pattern with LeafHoleChance
 /// percent by its depth from the surface (1, 2, 3, 4 voxels in), none deeper.
+/// A layer of an object's game shape is a scatter of lone voxels (palm fronds, see scatteredLayers) with at least
+/// ScatterLeastPins voxels, ScatterLoneShare of them touching no other; at least ScatterLeastLayers such layers and the
+/// object is made from its art on them, as leaves ScatterLeafHalf voxels either side of their line's middle.
+const int ScatterLeastPins = 3, ScatterLeastLayers = 5, ScatterLeafHalf = 1;
+const float ScatterLoneShare = 0.9f;
 const float FoliageGreenShare = 0.6f, FoliageBulkShare = 0.4f;
 const int FoliageGreenMargin = 4;
 const int LeafHoleChance[] = { 60, 45, 30, 15 };
