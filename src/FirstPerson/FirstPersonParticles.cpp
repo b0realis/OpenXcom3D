@@ -99,9 +99,15 @@ float FirstPersonParticles::random()
  * lifetime. Each particle ages, is pulled down by its own gravity (a negative gravity makes
  * smoke and bubbles rise), loses some of its speed to drag (air resistance) and moves on by its
  * velocity. Positions are in voxels and velocities in voxels per second.
+ * A piece of a body (CHUNK), given what is solid, meets the world: it moves along one axis at a
+ * time, in steps of at most a voxel (a fast piece doesn't pass through a thin wall), and a step
+ * from an open voxel into a solid one is not taken. Falling onto a floor it bounces a little and
+ * slides to a stop; against a wall or a ceiling it bounces back, losing most of its speed. (One
+ * that starts inside something solid moves freely until it is out.)
  * @param elapsedSeconds Seconds since the last frame.
+ * @param solid Whether the voxel at x, y, z is filled; none: nothing is met.
  */
-void FirstPersonParticles::update(float elapsedSeconds)
+void FirstPersonParticles::update(float elapsedSeconds, const std::function<bool(int, int, int)> &solid)
 {
 	// Age, slow down and move each particle.
 	for (auto &particle : _particles)
@@ -115,7 +121,47 @@ void FirstPersonParticles::update(float elapsedSeconds)
 		for (int axis = 0; axis < 3; ++axis)
 		{
 			particle.vel[axis] *= damping;
-			particle.pos[axis] += particle.vel[axis] * elapsedSeconds;
+		}
+		if (particle.kind != CHUNK || !solid)
+		{
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				particle.pos[axis] += particle.vel[axis] * elapsedSeconds;
+			}
+			continue;
+		}
+		// (the voxel a point is in)
+		auto filled = [&solid](const float at[3]) { return solid((int)std::floor(at[0]), (int)std::floor(at[1]), (int)std::floor(at[2])); };
+		float move[3] = { particle.vel[0] * elapsedSeconds, particle.vel[1] * elapsedSeconds, particle.vel[2] * elapsedSeconds };
+		const float longest = std::max(std::abs(move[0]), std::max(std::abs(move[1]), std::abs(move[2])));
+		const int steps = std::clamp((int)std::ceil(longest), 1, 8);
+		for (int step = 0; step < steps; ++step)
+		{
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				if (move[axis] == 0.0f) continue;
+				float next[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
+				next[axis] += move[axis] / steps;
+				if (!filled(next) || filled(particle.pos))
+				{
+					particle.pos[axis] = next[axis];
+					continue;
+				}
+				// Met: the rest of this frame's move along that axis is lost.
+				move[axis] = 0.0f;
+				if (axis == 2 && particle.vel[2] < 0.0f)
+				{
+					// On a floor: a little bounce (none once it is slow), and the slide slowed.
+					particle.vel[2] = -particle.vel[2] * 0.25f;
+					if (particle.vel[2] < 12.0f) particle.vel[2] = 0.0f;
+					particle.vel[0] *= 0.55f;
+					particle.vel[1] *= 0.55f;
+				}
+				else
+				{
+					particle.vel[axis] = -particle.vel[axis] * 0.3f;
+				}
+			}
 		}
 	}
 	// Remove the expired particles (the others keep their order).

@@ -45,6 +45,8 @@
 /*
  * FirstPersonParticles.h: the particle system of the 3D view.
  */
+#include <algorithm>
+#include <functional>
 #include <vector>
 #include <SDL.h>
 
@@ -71,6 +73,8 @@ public:
 		MOTE,    // Self-lit and steady (a UFO's aura): full brightness for most of its life, fading only at the end.
 		WISP,    // A wisp of the game's smoke, drawn see-through with the smoke (see FirstPersonView::drawSeeThroughSmoke).
 		FLAME,   // A tongue of flame: a round glow its size in voxels across, white-hot at first, reddening and shrinking as it ages.
+		CHUNK,   // A piece of a body blown apart (setting "Obliteration"): lit as LIT, a square as big as it is in the world (not a
+		         // dot of a few pixels at most), landing on the floor and bouncing off walls (see update).
 	};
 	/// Where a particle comes from, so a whole group can be counted and thinned out:
 	/// EFFECT for what the battle makes (shots, impacts, explosions, fire, smoke),
@@ -88,6 +92,8 @@ public:
 		Uint8 size;           // Apparent size at one tile distance, in pixels.
 		Kind kind;            // How it is drawn and lit.
 		Group group;          // Where it comes from.
+		Uint8 burn = 0;       // A piece of a body (CHUNK): the shades it chars by as it flies, as the map burns a unit
+		                      // beyond its overkill over its fall (see FirstPersonView::drawParticles).
 	};
 private:
 	std::vector<Particle> _particles; // The living particles.
@@ -103,12 +109,15 @@ public:
 	void add(const Particle &particle);
 	/// Takes in new particles, or drops every one added (particles off: the battle's effects still run for what isn't a particle).
 	void setAccepting(bool accepting) { _accepting = accepting; }
-	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame.
-	void update(float elapsedSeconds);
+	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame. `solid`, if
+	/// given, says whether a voxel is filled: a CHUNK meets it (lands on it, bounces off it).
+	void update(float elapsedSeconds, const std::function<bool(int, int, int)> &solid = nullptr);
 	/// Removes the particles of a group farther than `radius` (horizontally) from a point, all in voxels.
 	void cull(Group group, float centerX, float centerY, float radius);
 	/// How many particles of a group there are.
 	int count(Group group) const;
+	/// How many more particles there is room for.
+	size_t room() const { return Max - std::min(Max, _particles.size()); }
 	/// All the particles.
 	const std::vector<Particle> &all() const { return _particles; }
 	/// Random number in [0, 1), from the particles' own generator (the game's random numbers are left alone).

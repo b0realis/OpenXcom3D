@@ -4195,6 +4195,112 @@ void FirstPersonMode::blastReached(BattlescapeState *state, const Position &cent
 	}
 }
 
+/// Setting "Obliteration": how steeply the pieces of a body blown apart rise as they fly away from the side struck (the
+/// upward part of the way they go, the part across the map being 1): from a shot or a blow, and from a blast.
+const float ObliterationShotRise = 0.25f, ObliterationBlastRise = 0.6f;
+
+/**
+ * The damage types that burn as they kill (fire, lasers, plasma): what they char of a body blown apart glows as it flies
+ * (setting "Obliteration", see FirstPersonView::burstPieces).
+ * @param type The damage type.
+ * @return True for those.
+ */
+static bool burnsHot(const RuleDamageType *type)
+{
+	return type && (type->ResistType == DT_IN || type->ResistType == DT_LASER || type->ResistType == DT_PLASMA);
+}
+
+/**
+ * Setting "Obliteration" (a player, GitHub issue #257: "it would be SICK to gib a ratman with a sniper"): a hit took a unit
+ * beyond the game's own overkill, its rule for a unit that leaves no corpse (see FirstPerson::unitObliterated). The map
+ * shows it burn black as it falls and leave nothing; the 3D view blows its body apart into its own pieces at the hit (see
+ * FirstPersonView::obliterateUnit), and they char as they fly, as the map chars it over that fall: by the share of its
+ * health the overkill is (all of it: 16 shades, see UnitSprite and BurnShade). The pieces fly away from the side struck, as the game
+ * gives it: from a shot or a blow, the point it met from the unit's middle (pieces go on along the line of fire, across
+ * the map, a little upwards); from a blast, the way to it in tiles (outwards from the blast), or straight up for one at
+ * the unit's feet. One out cold, lying on the floor, bursts from its body there (see FirstPersonView::obliterateBody).
+ * The look only, and only while the 3D view shows: the unit isn't drawn in 3D again either way.
+ * @param state The battlescape screen.
+ * @param unit The unit.
+ * @param relative Where the hit met it, from its middle (see TileEngine::hitUnit).
+ * @param type The hit's damage type.
+ */
+void FirstPersonMode::unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !mode->_view || !unit || !type || !Options::fpsObliteration)
+	{
+		return;
+	}
+	// The way the pieces fly: away from where it was struck, across the map; a shot's a little upwards, a blast's more,
+	// one that met it from right under or over it (a blast at its feet) straight up.
+	float away[3] = { (float)-relative.x, (float)-relative.y, 0.0f };
+	const float across = std::sqrt(away[0] * away[0] + away[1] * away[1]); // (not std::hypot: on floats that is hypotf, which asks for glibc 2.35)
+	if (across < 0.5f)
+	{
+		away[0] = away[1] = 0.0f;
+		away[2] = 1.0f;
+	}
+	else
+	{
+		away[0] /= across;
+		away[1] /= across;
+		away[2] = type->isDirect() ? ObliterationShotRise : ObliterationBlastRise;
+	}
+	const int health = std::max(1, (int)unit->getBaseStats()->health), overkill = unit->getOverKillDamage();
+	const int burn = overkill >= health ? 16 : 16 * overkill / health;
+	const bool effects = mode->isActive();
+	if (unit->getStatus() == STATUS_UNCONSCIOUS)
+	{
+		// (out cold: its body on the floor; one carried has none to burst)
+		for (const BattleItem *item : *mode->_save->getItems())
+		{
+			if (item->getUnit() == unit && item->getTile())
+			{
+				mode->_view->obliterateBody(item, away, burn, burnsHot(type), !type->isDirect(), effects);
+				break;
+			}
+		}
+		mode->_view->hideObliterated(unit);
+		return;
+	}
+	mode->_view->obliterateUnit(unit, away, burn, burnsHot(type), !type->isDirect(), effects);
+}
+
+/**
+ * Setting "Obliteration": a blast destroyed an item lying on the floor (see FirstPerson::itemBlasted). A body (a corpse,
+ * not one out cold: a blast that kills one beyond its overkill bursts it, see unitObliterated) bursts in the 3D view as a
+ * unit does, outwards from where the blast went off (straight up for one under it); the game removes it as ever.
+ * @param state The battlescape screen.
+ * @param item The item.
+ * @param center Where the blast went off, in voxels.
+ * @param type The blast's damage type.
+ */
+void FirstPersonMode::itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type)
+{
+	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (!mode || !mode->_view || !item || !Options::fpsObliteration || item->getRules()->getBattleType() != BT_CORPSE || !item->getTile()
+		|| (item->getUnit() && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS))
+	{
+		return;
+	}
+	const Position at = item->getTile()->getPosition();
+	float away[3] = { at.x * 16.0f + 8.0f - center.x, at.y * 16.0f + 8.0f - center.y, 0.0f };
+	const float across = std::sqrt(away[0] * away[0] + away[1] * away[1]); // (not std::hypot: on floats that is hypotf, which asks for glibc 2.35)
+	if (across < 4.0f)
+	{
+		away[0] = away[1] = 0.0f;
+		away[2] = 1.0f;
+	}
+	else
+	{
+		away[0] /= across;
+		away[1] /= across;
+		away[2] = ObliterationBlastRise;
+	}
+	mode->_view->obliterateBody(item, away, 0, burnsHot(type), true, mode->isActive());
+}
+
 /**
  * Picks the target of the next round of an FPS-style shot, the moment the game fires it: along
  * the crosshair as it points now (the recoil of the rounds before has lifted it), spread at

@@ -72,6 +72,7 @@ class FirstPersonMode;
 class Game;
 class Mod;
 class OptionInfo;
+struct RuleDamageType;
 class RuleItem;
 class SavedBattleGame;
 class State;
@@ -392,6 +393,14 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 /// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
 /// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
 void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt);
+/// Setting "Obliteration": a hit took a unit beyond the game's own overkill (TileEngine::hitUnit, after the damage:
+/// BattleUnit::getOverKillDamage above 0, the game's rule for a unit that leaves no corpse), in either view: in 3D its body
+/// bursts into its pieces, away from the side struck (`relative`, where the hit met it from its middle, as the game gives
+/// it: voxels for a shot or a blow, tiles for a blast), and isn't drawn again.
+void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
+/// Setting "Obliteration": a blast destroyed an item lying on the floor (TileEngine::explode, before it is removed; `center`
+/// where it went off, voxels): a body (a corpse) bursts in 3D as a unit beyond its overkill does, away from the blast.
+void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
 /// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 void noteHealthDamage(int health);
 int lastHealthDamage();
@@ -494,6 +503,8 @@ inline unsigned aimCallOffs() { return 0; }
 inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
+inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, const RuleDamageType *) { }
+inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
 inline void noteHealthDamage(int) { }
 inline int lastHealthDamage() { return 0; }
 inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }

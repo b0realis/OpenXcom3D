@@ -655,6 +655,14 @@ public:
 	bool breakGlassAt(const Position &voxel, const float way[3], bool effects);
 	/// A blast reached these tiles (with the damage it does each): the glass in their windows' openings breaks (see blastGlass).
 	void blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects);
+	/// Setting "Obliteration": a unit beyond the game's overkill (it leaves no corpse) bursts into the pieces of its body,
+	/// thrown `away`, charred by `burn` (the map's, 0..16), glowing (`hot`) from fire and beams (see obliterateUnit); with
+	/// `effects` (the 3D view shows) the pieces fly. It isn't drawn again either way.
+	void obliterateUnit(BattleUnit *unit, const float away[3], int burn, bool hot, bool blast, bool effects);
+	/// Setting "Obliteration": a body lying on the floor (a corpse, or one out cold) bursts the same way (see obliterateBody).
+	void obliterateBody(const BattleItem *item, const float away[3], int burn, bool hot, bool blast, bool effects);
+	/// Setting "Obliteration": a unit blown apart isn't drawn again, nor its body lying on the floor.
+	void hideObliterated(const BattleUnit *unit) { _obliterated.insert(unit); }
 	/// When window glass last broke in sight (0 never), for its sound: where (voxels), and how loud (0..1, returned).
 	Uint32 getGlassBreakTick() const { return _glassBreakTick; }
 	float getGlassBreak(float at[3]) const { std::copy(_glassBreakAt, _glassBreakAt + 3, at); return _glassBreakLoudness; }
@@ -1195,6 +1203,13 @@ private:
 	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
 	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
 	std::unordered_map<const BattleUnit*, UnitWatch> _watchedUnits; // hits and kills, for flinches and hitmarkers
+	std::unordered_set<const BattleUnit*> _obliterated; // units blown apart (setting "Obliteration"): neither they nor their bodies are drawn
+	/// Whether a unit was blown apart (setting "Obliteration", see obliterateUnit).
+	bool isObliterated(const BattleUnit *unit) const { return !_obliterated.empty() && _obliterated.count(unit) != 0; }
+	/// A piece of a body blown apart: where it is (voxels) and its colour.
+	struct BodyPiece { float pos[3]; Uint8 color; };
+	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
+	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size);
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
 	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm

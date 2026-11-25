@@ -550,7 +550,7 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 	const Uint32 now = SDL_GetTicks();
 	for (const BattleUnit *unit : *_save->getUnits())
 	{
-		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()))
+		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()) || isObliterated(unit))
 		{
 			continue;
 		}
@@ -659,7 +659,7 @@ void FirstPersonView::spawnBodyEffects(float elapsedSeconds)
 	const Uint32 now = SDL_GetTicks();
 	for (const BattleUnit *unit : *_save->getUnits())
 	{
-		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode())) continue;
+		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()) || isObliterated(unit)) continue;
 		const int unitSize = unit->getArmor()->getSize();
 		// (Only the units the unit table names "hover: sparks", by their bodies: any big unit that flies had them, a
 		// Xarquid and a Hallucinoid drifting in the sea, a mod's gate, a demon; a player, GitHub issue #245, "hover
@@ -1252,6 +1252,11 @@ void FirstPersonView::brightenGlowBands()
 
 /// How much nearer than it is a tongue of flame is drawn (see drawParticles), voxels.
 const double FlameNearer = 4.0;
+/// The most pixels across a piece of a body is drawn (setting "Obliteration", see drawParticles): one right before the eye.
+const int ChunkPixelsMost = 40;
+/// How long a piece of a body takes to char as far as it will (setting "Obliteration", see drawParticles), seconds: about
+/// as long as the map's fall of a unit beyond its overkill, which it burns over.
+const float ChunkBurnSeconds = 0.8f;
 
 /**
  * Advances the particles by the time since the last frame and spawns the new ones, once per
@@ -1287,7 +1292,14 @@ void FirstPersonView::updateParticles()
 	// Move what's there, then add what this frame brings: the battle's effects (shots,
 	// explosions, fire), dual wield's second round, the UFO devices and lamps, the UFOs' aura
 	// (the UFO lights option), and the air.
-	_particles.update(elapsedSeconds);
+	// (the pieces of a body blown apart meet the world as the view builds it: setting "Obliteration"; beyond the map's
+	// edge there are no voxels, only the flat ground, and nothing falls through the map's bottom)
+	const int mapWidth = _save->getMapSizeX() * 16, mapLength = _save->getMapSizeY() * 16;
+	_particles.update(elapsedSeconds, [this, mapWidth, mapLength](int x, int y, int z) {
+		if (z < 0) return true;
+		if (x < 0 || y < 0 || x >= mapWidth || y >= mapLength) return z < (int)GroundTop;
+		return solidVoxel(x, y, z);
+	});
 	updateFlares(elapsedSeconds);
 	spawnBattleEffects(elapsedSeconds);
 	spawnPartnerEffects();
@@ -1333,23 +1345,40 @@ void FirstPersonView::drawParticles()
 			world[0] += std::sin(phase) * 0.9;
 			world[1] += std::cos(phase * 0.8f) * 0.9;
 		}
+		// A piece of a body is a cube resting on its underside (its point is where it meets the floor): drawn half its
+		// edge higher, at the depth of its front face (half its edge nearer), so the floor before it doesn't hide its foot.
+		const double chunkHalf = particle.kind == P::CHUNK ? particle.size * 0.06 : 0.0; // (a size of 8 is about a voxel)
+		world[2] += chunkHalf;
+		const int margin = particle.kind == P::CHUNK ? ChunkPixelsMost : 4; // (how far off the screen its middle may be, pixels)
 		double screenX, screenY, depth;
 		if (!projectToScreen(world, screenX, screenY, depth)
-			|| screenX < -4 || screenY < -4 || screenX >= width + 4 || screenY >= height + 4)
+			|| screenX < -margin || screenY < -margin || screenX >= width + margin || screenY >= height + margin)
 		{
 			continue;
+		}
+		depth = std::max(0.5, depth - chunkHalf);
+		// A piece of a body chars as it flies, as the map burns a unit beyond its overkill over its fall (UnitSprite's
+		// burn, BurnShade): darker, down to the darkest of its own colour (the map's black, piece after piece, was a
+		// cloud of black squares), and gone, as the map's darkest pixels of it, once its own shade and the burn pass 26.
+		Uint8 baseColor = particle.color;
+		if (particle.kind == P::CHUNK && particle.burn > 0)
+		{
+			const int charred = (particle.color & 15) + (int)std::lround(particle.burn * std::min(1.0f, particle.age / ChunkBurnSeconds));
+			if (charred > 26) continue;
+			baseColor = (Uint8)((particle.color & 0xF0) | std::min(15, charred));
 		}
 		// Its shade (0 brightest .. 15 darkest within its colour group).
 		const float fade = particle.age / particle.life; // how far through its life: 0 new .. 1 gone
 		int shade;
-		if (particle.kind == P::LIT || particle.kind == P::BUBBLE)
+		if (particle.kind == P::LIT || particle.kind == P::BUBBLE || particle.kind == P::CHUNK)
 		{
 			// Lit by the light where it is; an effect's particle (smoke, debris) also darkens
 			// as it ages. Bubbles and specks in the water catch and scatter what light there
 			// is: shade them less.
 			const float scatter = particle.kind == P::BUBBLE ? 0.3f : (_colors.underwater && particle.group == P::WEATHER ? 0.45f : 1.0f);
+			// (a piece of a body keeps its colour as it lies: it is no smoke thinning out)
 			shade = (int)(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f) * scatter
-				+ (particle.group == P::EFFECT ? fade * 4.0f : 0.0f));
+				+ (particle.group == P::EFFECT && particle.kind != P::CHUNK ? fade * 4.0f : 0.0f));
 		}
 		else
 		{
@@ -1366,7 +1395,7 @@ void FirstPersonView::drawParticles()
 				shade += (int)((1.0f - pulse) * 5.0f);
 			}
 		}
-		const Uint8 color = shadeColor(particle.color, shade);
+		const Uint8 color = shadeColor(baseColor, shade);
 		if (particle.kind == P::STREAK)
 		{
 			// A streak (rain): a line from the particle back to where it was 0.03 seconds ago.
@@ -1420,9 +1449,10 @@ void FirstPersonView::drawParticles()
 			continue;
 		}
 		// Its size on the screen in pixels: its size at one tile's distance, shrinking with
-		// distance (bubbles are drawn a bit bigger, up to 9 pixels; the rest up to 6).
+		// distance (bubbles are drawn a bit bigger, up to 9 pixels; the rest up to 6; a piece of a
+		// body as big as it is, a square of its voxels, up to ChunkPixelsMost).
 		const int dotSize = std::clamp((int)std::lround(particle.size * focalLength / depth * (particle.kind == P::BUBBLE ? 0.18 : 0.12)),
-			1, particle.kind == P::BUBBLE ? 9 : 6);
+			1, particle.kind == P::BUBBLE ? 9 : particle.kind == P::CHUNK ? ChunkPixelsMost : 6);
 		if (particle.kind == P::BUBBLE && dotSize >= 3)
 		{
 			// A bubble up close: a ring with a glint on its upper left.
@@ -1455,11 +1485,12 @@ void FirstPersonView::drawParticles()
 			}
 			continue;
 		}
-		// Anything else: a square dot centred on the particle.
+		// Anything else: a square dot centred on the particle (its corners rounded off; a piece of a body's kept: a cube).
 		const int left = (int)screenX - dotSize / 2, top = (int)screenY - dotSize / 2;
+		const bool rounded = dotSize >= 3 && particle.kind != P::CHUNK;
 		if (_gpuRecording)
 		{
-			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (dotSize >= 3 ? 4 : 0));
+			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (rounded ? 4 : 0));
 			if (_gpuRecordOnly) continue;
 		}
 		for (int y = top; y < top + dotSize; ++y)
@@ -1467,7 +1498,7 @@ void FirstPersonView::drawParticles()
 			for (int x = left; x < left + dotSize; ++x)
 			{
 				// Round off the corners (of a dot 3 pixels or more across).
-				if (dotSize >= 3 && (x == left || x == left + dotSize - 1) && (y == top || y == top + dotSize - 1)) continue;
+				if (rounded && (x == left || x == left + dotSize - 1) && (y == top || y == top + dotSize - 1)) continue;
 				if (x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
 				*getRaw(x, y) = color;
 				if (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE) _glowMask[y * width + x] = 1; // sparks, embers and motes bloom too

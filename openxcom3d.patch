@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..e887d0366
+index 000000000..3bd26d8cd
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,730 @@
+@@ -0,0 +1,732 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -556,6 +556,8 @@ index 000000000..e887d0366
 +  STR_FPS_FLASHLIGHT_DESC: "Beam: a spot from your weapon that fades with range. Far light: a light where you aim, as bright at any range."
 +  STR_FPS_FLASHLIGHT_BEAM: "Beam"
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
++  STR_FPS_OBLITERATION: "Obliteration"
++  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -860,10 +862,10 @@ index 000000000..e887d0366
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..720456009
+index 000000000..77cc8bb54
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,730 @@
+@@ -0,0 +1,732 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1292,6 +1294,8 @@ index 000000000..720456009
 +  STR_FPS_FLASHLIGHT_DESC: "Beam: a spot from your weapon that fades with range. Far light: a light where you aim, as bright at any range."
 +  STR_FPS_FLASHLIGHT_BEAM: "Beam"
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
++  STR_FPS_OBLITERATION: "Obliteration"
++  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colors blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -21957,7 +21961,7 @@ index 067c7b3ba..61a8b856f 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..3c527d5d7 100644
+index 6e6846977..089fc1c24 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -22044,7 +22048,7 @@ index 6e6846977..3c527d5d7 100644
  					_save->getBattleGame()->statePushBack(new ProjectileFlyBState(_save->getBattleGame(), action));
  				}
  				return true;
-@@ -3144,30 +3173,35 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+@@ -3144,30 +3173,39 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
  
  	const int healthOrig = target->getHealth();
  	const int stunLevelOrig = target->getStunlevel();
@@ -22058,6 +22062,10 @@ index 6e6846977..3c527d5d7 100644
  	const int healthDamage = healthOrig - target->getHealth();
  	const int stunDamage = target->getStunlevel() - stunLevelOrig;
 +	FirstPerson::unitDamaged(_save->getBattleState(), target, healthDamage, armorOrig - FirstPerson::armorPoints(target), stunDamage, shieldOrig - FirstPerson::shieldPoints(_save->getBattleState(), target), FirstPerson::lastHealthDamage()); // (OpenXcom3D: setting "Damage numbers")
++	if (target->getHealth() <= 0 && target->getOverKillDamage() > 0)
++	{
++		FirstPerson::unitObliterated(_save->getBattleState(), target, relative, type); // (OpenXcom3D: setting "Obliteration", no corpse: the body bursts in 3D)
++	}
  
  	// hit log
  	if (attack.attacker)
@@ -22089,7 +22097,7 @@ index 6e6846977..3c527d5d7 100644
  		}
  	}
  
-@@ -3229,7 +3263,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3229,7 +3267,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -22098,7 +22106,7 @@ index 6e6846977..3c527d5d7 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3280,9 +3314,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3280,9 +3318,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -22118,7 +22126,15 @@ index 6e6846977..3c527d5d7 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -3512,6 +3555,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3448,6 +3495,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+ 						}
+ 						for (auto* bi : toRemove)
+ 						{
++							FirstPerson::itemBlasted(_save->getBattleState(), bi, center, type); // (OpenXcom3D: setting "Obliteration", a body on the floor bursts in 3D)
+ 							_save->removeItem(bi);
+ 						}
+ 
+@@ -3512,6 +3560,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  	// now detonate the tiles affected by explosion
  	if (type->ToTile > 0.0f)
  	{
@@ -22126,7 +22142,7 @@ index 6e6846977..3c527d5d7 100644
  		for (auto& pair : tilesAffected)
  		{
  			if (detonate(pair.first, pair.second))
-@@ -4360,6 +4404,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4360,6 +4409,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -22142,7 +22158,7 @@ index 6e6846977..3c527d5d7 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4379,7 +4432,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4379,7 +4437,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory)
  				{ // store the position of impact
@@ -22151,7 +22167,7 @@ index 6e6846977..3c527d5d7 100644
  				}
  				return true;
  			}
-@@ -4393,13 +4446,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4393,13 +4451,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory != 0)
  				{ // store the position of impact
@@ -22169,7 +22185,7 @@ index 6e6846977..3c527d5d7 100644
  	if (hit)
  	{
  		return result;
-@@ -4422,6 +4478,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
+@@ -4422,6 +4483,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
  {
  	if (target == origin) return V_EMPTY;//just in case
  
@@ -22180,7 +22196,7 @@ index 6e6846977..3c527d5d7 100644
  	int result = V_EMPTY;
  	Position lastPosition = origin;
  	Position nextPosition = lastPosition;
-@@ -4526,7 +4586,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4591,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -22189,7 +22205,7 @@ index 6e6846977..3c527d5d7 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4552,8 +4612,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4552,8 +4617,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		_cacheTileBelow = tileBelow;
   	}
  
@@ -22210,7 +22226,7 @@ index 6e6846977..3c527d5d7 100644
  		return V_EMPTY;
  	}
  
-@@ -4584,12 +4656,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4584,12 +4661,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		}
  	}
  
@@ -22232,7 +22248,7 @@ index 6e6846977..3c527d5d7 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5383,7 +5464,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5383,7 +5469,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -22247,7 +22263,7 @@ index 6e6846977..3c527d5d7 100644
  						{
  							if (dest)
  							{
-@@ -5705,11 +5792,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5705,11 +5797,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -22270,7 +22286,7 @@ index 6e6846977..3c527d5d7 100644
  		{
  			if (voxelType)
  			{
-@@ -5867,6 +5964,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5867,6 +5969,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -22279,7 +22295,7 @@ index 6e6846977..3c527d5d7 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5990,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5995,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -23371,7 +23387,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..e1e3ac0e4 100644
+index a08796ced..3be07c043 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23388,7 +23404,7 @@ index a08796ced..e1e3ac0e4 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail;
++OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -24460,10 +24476,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..0a4a00c5e
+index 000000000..8f139d1c0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2270 @@
+@@ -0,0 +1,2290 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25875,6 +25891,10 @@ index 000000000..0a4a00c5e
 +	// Fire's colours mixed from frame to frame (1.14's "Smoother fire", which had no setting: a
 +	// player looked for it, GitHub issue #146); off, the frames dissolve dot by dot, as before 1.14.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothFire", &fpsSmoothFire, true, "STR_FPS_SMOOTH_FIRE", category));
++	// A unit killed beyond the game's own overkill (its rule for one that leaves no corpse) bursts into the pieces of its
++	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
++	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
 +	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 +	// falls, landings, panic, one's own shots).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
@@ -26402,6 +26422,22 @@ index 000000000..0a4a00c5e
 +}
 +
 +/**
++ * Setting "Obliteration": a unit beyond the game's overkill bursts in 3D (see FirstPersonApi.h, FirstPersonMode::unitObliterated).
++ */
++void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type)
++{
++	FirstPersonMode::unitObliterated(state, unit, relative, type);
++}
++
++/**
++ * Setting "Obliteration": a body on the floor a blast destroyed bursts in 3D (see FirstPersonApi.h, FirstPersonMode::itemBlasted).
++ */
++void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type)
++{
++	FirstPersonMode::itemBlasted(state, item, center, type);
++}
++
++/**
 + * What the hit log adds after a hit's word with the setting "Detailed hit log" (see FirstPersonApi.h; the owner: the
 + * original log "in 3D window exactly", enhanced inside its window, with who was hit, the damage numbers, and kills and
 + * knock-outs). The game's own log says only 0, hit (up to a fifth of the unit's full health) or HIT for each unit a
@@ -26736,10 +26772,10 @@ index 000000000..0a4a00c5e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..71ebf548a
+index 000000000..f4b17c4d8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,552 @@
+@@ -0,0 +1,563 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -26814,6 +26850,7 @@ index 000000000..71ebf548a
 +class Game;
 +class Mod;
 +class OptionInfo;
++struct RuleDamageType;
 +class RuleItem;
 +class SavedBattleGame;
 +class State;
@@ -27134,6 +27171,14 @@ index 000000000..71ebf548a
 +/// (the side struck), the stun it took and what its energy shield lost, to rise over it in 3D and on
 +/// the map if the squad sees it (see FirstPersonDamageNumbers.cpp).
 +void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt);
++/// Setting "Obliteration": a hit took a unit beyond the game's own overkill (TileEngine::hitUnit, after the damage:
++/// BattleUnit::getOverKillDamage above 0, the game's rule for a unit that leaves no corpse), in either view: in 3D its body
++/// bursts into its pieces, away from the side struck (`relative`, where the hit met it from its middle, as the game gives
++/// it: voxels for a shot or a blow, tiles for a blast), and isn't drawn again.
++void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
++/// Setting "Obliteration": a blast destroyed an item lying on the floor (TileEngine::explode, before it is removed; `center`
++/// where it went off, voxels): a body (a corpse) bursts in 3D as a unit beyond its overkill does, away from the blast.
++void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
 +/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 +void noteHealthDamage(int health);
 +int lastHealthDamage();
@@ -27236,6 +27281,8 @@ index 000000000..71ebf548a
 +inline void reactionFiredAt(BattlescapeState *, const BattleUnit *) { }
 +inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 +inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
++inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, const RuleDamageType *) { }
++inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
 +inline void noteHealthDamage(int) { }
 +inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
@@ -41999,10 +42046,10 @@ index 000000000..c1bf4e1ad
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..2b84fe6f5
+index 000000000..e66b491b8
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1610 @@
+@@ -0,0 +1,1615 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -42085,6 +42132,7 @@ index 000000000..2b84fe6f5
 +struct PathfindingStep;
 +class InteractiveSurface;
 +class NumberText;
++struct RuleDamageType;
 +class SavedBattleGame;
 +class Surface;
 +class Tile;
@@ -42197,6 +42245,10 @@ index 000000000..2b84fe6f5
 +	static void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
 +	/// A blast reached these tiles (see FirstPerson::blastReached): the glass in their windows' openings breaks in the 3D view.
 +	static void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
++	/// Setting "Obliteration": a unit beyond the game's overkill bursts in the 3D view (see FirstPerson::unitObliterated).
++	static void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
++	/// Setting "Obliteration": a body on the floor a blast destroyed bursts in the 3D view (see FirstPerson::itemBlasted).
++	static void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
 +	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 +	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 +	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -50826,10 +50878,10 @@ index 000000000..54d05d340
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..ff42cf7f7
+index 000000000..3001d61a1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5667 @@
+@@ -0,0 +1,5773 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -55025,6 +55077,112 @@ index 000000000..ff42cf7f7
 +	{
 +		mode->_view->blastGlass(center, tiles, mode->isActive());
 +	}
++}
++
++/// Setting "Obliteration": how steeply the pieces of a body blown apart rise as they fly away from the side struck (the
++/// upward part of the way they go, the part across the map being 1): from a shot or a blow, and from a blast.
++const float ObliterationShotRise = 0.25f, ObliterationBlastRise = 0.6f;
++
++/**
++ * The damage types that burn as they kill (fire, lasers, plasma): what they char of a body blown apart glows as it flies
++ * (setting "Obliteration", see FirstPersonView::burstPieces).
++ * @param type The damage type.
++ * @return True for those.
++ */
++static bool burnsHot(const RuleDamageType *type)
++{
++	return type && (type->ResistType == DT_IN || type->ResistType == DT_LASER || type->ResistType == DT_PLASMA);
++}
++
++/**
++ * Setting "Obliteration" (a player, GitHub issue #257: "it would be SICK to gib a ratman with a sniper"): a hit took a unit
++ * beyond the game's own overkill, its rule for a unit that leaves no corpse (see FirstPerson::unitObliterated). The map
++ * shows it burn black as it falls and leave nothing; the 3D view blows its body apart into its own pieces at the hit (see
++ * FirstPersonView::obliterateUnit), and they char as they fly, as the map chars it over that fall: by the share of its
++ * health the overkill is (all of it: 16 shades, see UnitSprite and BurnShade). The pieces fly away from the side struck, as the game
++ * gives it: from a shot or a blow, the point it met from the unit's middle (pieces go on along the line of fire, across
++ * the map, a little upwards); from a blast, the way to it in tiles (outwards from the blast), or straight up for one at
++ * the unit's feet. One out cold, lying on the floor, bursts from its body there (see FirstPersonView::obliterateBody).
++ * The look only, and only while the 3D view shows: the unit isn't drawn in 3D again either way.
++ * @param state The battlescape screen.
++ * @param unit The unit.
++ * @param relative Where the hit met it, from its middle (see TileEngine::hitUnit).
++ * @param type The hit's damage type.
++ */
++void FirstPersonMode::unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !mode->_view || !unit || !type || !Options::fpsObliteration)
++	{
++		return;
++	}
++	// The way the pieces fly: away from where it was struck, across the map; a shot's a little upwards, a blast's more,
++	// one that met it from right under or over it (a blast at its feet) straight up.
++	float away[3] = { (float)-relative.x, (float)-relative.y, 0.0f };
++	const float across = std::sqrt(away[0] * away[0] + away[1] * away[1]); // (not std::hypot: on floats that is hypotf, which asks for glibc 2.35)
++	if (across < 0.5f)
++	{
++		away[0] = away[1] = 0.0f;
++		away[2] = 1.0f;
++	}
++	else
++	{
++		away[0] /= across;
++		away[1] /= across;
++		away[2] = type->isDirect() ? ObliterationShotRise : ObliterationBlastRise;
++	}
++	const int health = std::max(1, (int)unit->getBaseStats()->health), overkill = unit->getOverKillDamage();
++	const int burn = overkill >= health ? 16 : 16 * overkill / health;
++	const bool effects = mode->isActive();
++	if (unit->getStatus() == STATUS_UNCONSCIOUS)
++	{
++		// (out cold: its body on the floor; one carried has none to burst)
++		for (const BattleItem *item : *mode->_save->getItems())
++		{
++			if (item->getUnit() == unit && item->getTile())
++			{
++				mode->_view->obliterateBody(item, away, burn, burnsHot(type), !type->isDirect(), effects);
++				break;
++			}
++		}
++		mode->_view->hideObliterated(unit);
++		return;
++	}
++	mode->_view->obliterateUnit(unit, away, burn, burnsHot(type), !type->isDirect(), effects);
++}
++
++/**
++ * Setting "Obliteration": a blast destroyed an item lying on the floor (see FirstPerson::itemBlasted). A body (a corpse,
++ * not one out cold: a blast that kills one beyond its overkill bursts it, see unitObliterated) bursts in the 3D view as a
++ * unit does, outwards from where the blast went off (straight up for one under it); the game removes it as ever.
++ * @param state The battlescape screen.
++ * @param item The item.
++ * @param center Where the blast went off, in voxels.
++ * @param type The blast's damage type.
++ */
++void FirstPersonMode::itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type)
++{
++	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
++	if (!mode || !mode->_view || !item || !Options::fpsObliteration || item->getRules()->getBattleType() != BT_CORPSE || !item->getTile()
++		|| (item->getUnit() && item->getUnit()->getStatus() == STATUS_UNCONSCIOUS))
++	{
++		return;
++	}
++	const Position at = item->getTile()->getPosition();
++	float away[3] = { at.x * 16.0f + 8.0f - center.x, at.y * 16.0f + 8.0f - center.y, 0.0f };
++	const float across = std::sqrt(away[0] * away[0] + away[1] * away[1]); // (not std::hypot: on floats that is hypotf, which asks for glibc 2.35)
++	if (across < 4.0f)
++	{
++		away[0] = away[1] = 0.0f;
++		away[2] = 1.0f;
++	}
++	else
++	{
++		away[0] /= across;
++		away[1] /= across;
++		away[2] = ObliterationBlastRise;
++	}
++	mode->_view->obliterateBody(item, away, 0, burnsHot(type), true, mode->isActive());
 +}
 +
 +/**
@@ -60294,10 +60452,10 @@ index 000000000..1c27a32b2
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.cpp b/src/FirstPerson/FirstPersonParticles.cpp
 new file mode 100644
-index 000000000..154fd87a8
+index 000000000..a6b76c652
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.cpp
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,262 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -60399,9 +60557,15 @@ index 000000000..154fd87a8
 + * lifetime. Each particle ages, is pulled down by its own gravity (a negative gravity makes
 + * smoke and bubbles rise), loses some of its speed to drag (air resistance) and moves on by its
 + * velocity. Positions are in voxels and velocities in voxels per second.
++ * A piece of a body (CHUNK), given what is solid, meets the world: it moves along one axis at a
++ * time, in steps of at most a voxel (a fast piece doesn't pass through a thin wall), and a step
++ * from an open voxel into a solid one is not taken. Falling onto a floor it bounces a little and
++ * slides to a stop; against a wall or a ceiling it bounces back, losing most of its speed. (One
++ * that starts inside something solid moves freely until it is out.)
 + * @param elapsedSeconds Seconds since the last frame.
++ * @param solid Whether the voxel at x, y, z is filled; none: nothing is met.
 + */
-+void FirstPersonParticles::update(float elapsedSeconds)
++void FirstPersonParticles::update(float elapsedSeconds, const std::function<bool(int, int, int)> &solid)
 +{
 +	// Age, slow down and move each particle.
 +	for (auto &particle : _particles)
@@ -60415,7 +60579,47 @@ index 000000000..154fd87a8
 +		for (int axis = 0; axis < 3; ++axis)
 +		{
 +			particle.vel[axis] *= damping;
-+			particle.pos[axis] += particle.vel[axis] * elapsedSeconds;
++		}
++		if (particle.kind != CHUNK || !solid)
++		{
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				particle.pos[axis] += particle.vel[axis] * elapsedSeconds;
++			}
++			continue;
++		}
++		// (the voxel a point is in)
++		auto filled = [&solid](const float at[3]) { return solid((int)std::floor(at[0]), (int)std::floor(at[1]), (int)std::floor(at[2])); };
++		float move[3] = { particle.vel[0] * elapsedSeconds, particle.vel[1] * elapsedSeconds, particle.vel[2] * elapsedSeconds };
++		const float longest = std::max(std::abs(move[0]), std::max(std::abs(move[1]), std::abs(move[2])));
++		const int steps = std::clamp((int)std::ceil(longest), 1, 8);
++		for (int step = 0; step < steps; ++step)
++		{
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				if (move[axis] == 0.0f) continue;
++				float next[3] = { particle.pos[0], particle.pos[1], particle.pos[2] };
++				next[axis] += move[axis] / steps;
++				if (!filled(next) || filled(particle.pos))
++				{
++					particle.pos[axis] = next[axis];
++					continue;
++				}
++				// Met: the rest of this frame's move along that axis is lost.
++				move[axis] = 0.0f;
++				if (axis == 2 && particle.vel[2] < 0.0f)
++				{
++					// On a floor: a little bounce (none once it is slow), and the slide slowed.
++					particle.vel[2] = -particle.vel[2] * 0.25f;
++					if (particle.vel[2] < 12.0f) particle.vel[2] = 0.0f;
++					particle.vel[0] *= 0.55f;
++					particle.vel[1] *= 0.55f;
++				}
++				else
++				{
++					particle.vel[axis] = -particle.vel[axis] * 0.3f;
++				}
++			}
 +		}
 +	}
 +	// Remove the expired particles (the others keep their order).
@@ -60516,10 +60720,10 @@ index 000000000..154fd87a8
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.h b/src/FirstPerson/FirstPersonParticles.h
 new file mode 100644
-index 000000000..34a1dd4f7
+index 000000000..ceb9fd4d9
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.h
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,134 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -60567,6 +60771,8 @@ index 000000000..34a1dd4f7
 +/*
 + * FirstPersonParticles.h: the particle system of the 3D view.
 + */
++#include <algorithm>
++#include <functional>
 +#include <vector>
 +#include <SDL.h>
 +
@@ -60593,6 +60799,8 @@ index 000000000..34a1dd4f7
 +		MOTE,    // Self-lit and steady (a UFO's aura): full brightness for most of its life, fading only at the end.
 +		WISP,    // A wisp of the game's smoke, drawn see-through with the smoke (see FirstPersonView::drawSeeThroughSmoke).
 +		FLAME,   // A tongue of flame: a round glow its size in voxels across, white-hot at first, reddening and shrinking as it ages.
++		CHUNK,   // A piece of a body blown apart (setting "Obliteration"): lit as LIT, a square as big as it is in the world (not a
++		         // dot of a few pixels at most), landing on the floor and bouncing off walls (see update).
 +	};
 +	/// Where a particle comes from, so a whole group can be counted and thinned out:
 +	/// EFFECT for what the battle makes (shots, impacts, explosions, fire, smoke),
@@ -60610,6 +60818,8 @@ index 000000000..34a1dd4f7
 +		Uint8 size;           // Apparent size at one tile distance, in pixels.
 +		Kind kind;            // How it is drawn and lit.
 +		Group group;          // Where it comes from.
++		Uint8 burn = 0;       // A piece of a body (CHUNK): the shades it chars by as it flies, as the map burns a unit
++		                      // beyond its overkill over its fall (see FirstPersonView::drawParticles).
 +	};
 +private:
 +	std::vector<Particle> _particles; // The living particles.
@@ -60625,12 +60835,15 @@ index 000000000..34a1dd4f7
 +	void add(const Particle &particle);
 +	/// Takes in new particles, or drops every one added (particles off: the battle's effects still run for what isn't a particle).
 +	void setAccepting(bool accepting) { _accepting = accepting; }
-+	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame.
-+	void update(float elapsedSeconds);
++	/// Moves particles along and removes the expired ones; `elapsedSeconds` is the time since the last frame. `solid`, if
++	/// given, says whether a voxel is filled: a CHUNK meets it (lands on it, bounces off it).
++	void update(float elapsedSeconds, const std::function<bool(int, int, int)> &solid = nullptr);
 +	/// Removes the particles of a group farther than `radius` (horizontally) from a point, all in voxels.
 +	void cull(Group group, float centerX, float centerY, float radius);
 +	/// How many particles of a group there are.
 +	int count(Group group) const;
++	/// How many more particles there is room for.
++	size_t room() const { return Max - std::min(Max, _particles.size()); }
 +	/// All the particles.
 +	const std::vector<Particle> &all() const { return _particles; }
 +	/// Random number in [0, 1), from the particles' own generator (the game's random numbers are left alone).
@@ -63870,10 +64083,10 @@ index 000000000..d43f8ffe8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..aa66e4f77
+index 000000000..0608fdf1d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,933 @@
+@@ -0,0 +1,934 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -64069,6 +64282,7 @@ index 000000000..aa66e4f77
 +	_ufoDoorOpening.clear();
 +	_flares.clear();
 +	_watchedUnits.clear();
++	_obliterated.clear();
 +	_decals.clear();
 +	_scorches.clear();
 +	_burningLastFrame.clear();
@@ -64809,10 +65023,10 @@ index 000000000..aa66e4f77
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..95fc848cf
+index 000000000..ace7f5a17
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1944 @@
+@@ -0,0 +1,1959 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -65470,6 +65684,14 @@ index 000000000..95fc848cf
 +	bool breakGlassAt(const Position &voxel, const float way[3], bool effects);
 +	/// A blast reached these tiles (with the damage it does each): the glass in their windows' openings breaks (see blastGlass).
 +	void blastGlass(const Position &center, const std::map<Tile*, int> &tiles, bool effects);
++	/// Setting "Obliteration": a unit beyond the game's overkill (it leaves no corpse) bursts into the pieces of its body,
++	/// thrown `away`, charred by `burn` (the map's, 0..16), glowing (`hot`) from fire and beams (see obliterateUnit); with
++	/// `effects` (the 3D view shows) the pieces fly. It isn't drawn again either way.
++	void obliterateUnit(BattleUnit *unit, const float away[3], int burn, bool hot, bool blast, bool effects);
++	/// Setting "Obliteration": a body lying on the floor (a corpse, or one out cold) bursts the same way (see obliterateBody).
++	void obliterateBody(const BattleItem *item, const float away[3], int burn, bool hot, bool blast, bool effects);
++	/// Setting "Obliteration": a unit blown apart isn't drawn again, nor its body lying on the floor.
++	void hideObliterated(const BattleUnit *unit) { _obliterated.insert(unit); }
 +	/// When window glass last broke in sight (0 never), for its sound: where (voxels), and how loud (0..1, returned).
 +	Uint32 getGlassBreakTick() const { return _glassBreakTick; }
 +	float getGlassBreak(float at[3]) const { std::copy(_glassBreakAt, _glassBreakAt + 3, at); return _glassBreakLoudness; }
@@ -66010,6 +66232,13 @@ index 000000000..95fc848cf
 +	Uint32 _unitLastTick = 0;                           // when the units' glides were last advanced
 +	struct UnitWatch { int health; int stun; bool out; bool dead; Uint32 hitTick; float push[2]; };
 +	std::unordered_map<const BattleUnit*, UnitWatch> _watchedUnits; // hits and kills, for flinches and hitmarkers
++	std::unordered_set<const BattleUnit*> _obliterated; // units blown apart (setting "Obliteration"): neither they nor their bodies are drawn
++	/// Whether a unit was blown apart (setting "Obliteration", see obliterateUnit).
++	bool isObliterated(const BattleUnit *unit) const { return !_obliterated.empty() && _obliterated.count(unit) != 0; }
++	/// A piece of a body blown apart: where it is (voxels) and its colour.
++	struct BodyPiece { float pos[3]; Uint8 color; };
++	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
++	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size);
 +	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 +	bool _hitMarkKill = false;                          // and whether that hit killed it
 +	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
@@ -66759,10 +66988,10 @@ index 000000000..95fc848cf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewEffects.cpp b/src/FirstPerson/FirstPersonViewEffects.cpp
 new file mode 100644
-index 000000000..42e6cb91b
+index 000000000..02f5b575d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewEffects.cpp
-@@ -0,0 +1,1481 @@
+@@ -0,0 +1,1512 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -67315,7 +67544,7 @@ index 000000000..42e6cb91b
 +	const Uint32 now = SDL_GetTicks();
 +	for (const BattleUnit *unit : *_save->getUnits())
 +	{
-+		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()))
++		if (unit->getFire() <= 0 || unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()) || isObliterated(unit))
 +		{
 +			continue;
 +		}
@@ -67424,7 +67653,7 @@ index 000000000..42e6cb91b
 +	const Uint32 now = SDL_GetTicks();
 +	for (const BattleUnit *unit : *_save->getUnits())
 +	{
-+		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode())) continue;
++		if (unit->isOut() || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()) || isObliterated(unit)) continue;
 +		const int unitSize = unit->getArmor()->getSize();
 +		// (Only the units the unit table names "hover: sparks", by their bodies: any big unit that flies had them, a
 +		// Xarquid and a Hallucinoid drifting in the sea, a mod's gate, a demon; a player, GitHub issue #245, "hover
@@ -68017,6 +68246,11 @@ index 000000000..42e6cb91b
 +
 +/// How much nearer than it is a tongue of flame is drawn (see drawParticles), voxels.
 +const double FlameNearer = 4.0;
++/// The most pixels across a piece of a body is drawn (setting "Obliteration", see drawParticles): one right before the eye.
++const int ChunkPixelsMost = 40;
++/// How long a piece of a body takes to char as far as it will (setting "Obliteration", see drawParticles), seconds: about
++/// as long as the map's fall of a unit beyond its overkill, which it burns over.
++const float ChunkBurnSeconds = 0.8f;
 +
 +/**
 + * Advances the particles by the time since the last frame and spawns the new ones, once per
@@ -68052,7 +68286,14 @@ index 000000000..42e6cb91b
 +	// Move what's there, then add what this frame brings: the battle's effects (shots,
 +	// explosions, fire), dual wield's second round, the UFO devices and lamps, the UFOs' aura
 +	// (the UFO lights option), and the air.
-+	_particles.update(elapsedSeconds);
++	// (the pieces of a body blown apart meet the world as the view builds it: setting "Obliteration"; beyond the map's
++	// edge there are no voxels, only the flat ground, and nothing falls through the map's bottom)
++	const int mapWidth = _save->getMapSizeX() * 16, mapLength = _save->getMapSizeY() * 16;
++	_particles.update(elapsedSeconds, [this, mapWidth, mapLength](int x, int y, int z) {
++		if (z < 0) return true;
++		if (x < 0 || y < 0 || x >= mapWidth || y >= mapLength) return z < (int)GroundTop;
++		return solidVoxel(x, y, z);
++	});
 +	updateFlares(elapsedSeconds);
 +	spawnBattleEffects(elapsedSeconds);
 +	spawnPartnerEffects();
@@ -68098,23 +68339,40 @@ index 000000000..42e6cb91b
 +			world[0] += std::sin(phase) * 0.9;
 +			world[1] += std::cos(phase * 0.8f) * 0.9;
 +		}
++		// A piece of a body is a cube resting on its underside (its point is where it meets the floor): drawn half its
++		// edge higher, at the depth of its front face (half its edge nearer), so the floor before it doesn't hide its foot.
++		const double chunkHalf = particle.kind == P::CHUNK ? particle.size * 0.06 : 0.0; // (a size of 8 is about a voxel)
++		world[2] += chunkHalf;
++		const int margin = particle.kind == P::CHUNK ? ChunkPixelsMost : 4; // (how far off the screen its middle may be, pixels)
 +		double screenX, screenY, depth;
 +		if (!projectToScreen(world, screenX, screenY, depth)
-+			|| screenX < -4 || screenY < -4 || screenX >= width + 4 || screenY >= height + 4)
++			|| screenX < -margin || screenY < -margin || screenX >= width + margin || screenY >= height + margin)
 +		{
 +			continue;
++		}
++		depth = std::max(0.5, depth - chunkHalf);
++		// A piece of a body chars as it flies, as the map burns a unit beyond its overkill over its fall (UnitSprite's
++		// burn, BurnShade): darker, down to the darkest of its own colour (the map's black, piece after piece, was a
++		// cloud of black squares), and gone, as the map's darkest pixels of it, once its own shade and the burn pass 26.
++		Uint8 baseColor = particle.color;
++		if (particle.kind == P::CHUNK && particle.burn > 0)
++		{
++			const int charred = (particle.color & 15) + (int)std::lround(particle.burn * std::min(1.0f, particle.age / ChunkBurnSeconds));
++			if (charred > 26) continue;
++			baseColor = (Uint8)((particle.color & 0xF0) | std::min(15, charred));
 +		}
 +		// Its shade (0 brightest .. 15 darkest within its colour group).
 +		const float fade = particle.age / particle.life; // how far through its life: 0 new .. 1 gone
 +		int shade;
-+		if (particle.kind == P::LIT || particle.kind == P::BUBBLE)
++		if (particle.kind == P::LIT || particle.kind == P::BUBBLE || particle.kind == P::CHUNK)
 +		{
 +			// Lit by the light where it is; an effect's particle (smoke, debris) also darkens
 +			// as it ages. Bubbles and specks in the water catch and scatter what light there
 +			// is: shade them less.
 +			const float scatter = particle.kind == P::BUBBLE ? 0.3f : (_colors.underwater && particle.group == P::WEATHER ? 0.45f : 1.0f);
++			// (a piece of a body keeps its colour as it lies: it is no smoke thinning out)
 +			shade = (int)(std::clamp(lightAt(particle.pos[0], particle.pos[1], particle.pos[2]), 0.0f, 15.0f) * scatter
-+				+ (particle.group == P::EFFECT ? fade * 4.0f : 0.0f));
++				+ (particle.group == P::EFFECT && particle.kind != P::CHUNK ? fade * 4.0f : 0.0f));
 +		}
 +		else
 +		{
@@ -68131,7 +68389,7 @@ index 000000000..42e6cb91b
 +				shade += (int)((1.0f - pulse) * 5.0f);
 +			}
 +		}
-+		const Uint8 color = shadeColor(particle.color, shade);
++		const Uint8 color = shadeColor(baseColor, shade);
 +		if (particle.kind == P::STREAK)
 +		{
 +			// A streak (rain): a line from the particle back to where it was 0.03 seconds ago.
@@ -68185,9 +68443,10 @@ index 000000000..42e6cb91b
 +			continue;
 +		}
 +		// Its size on the screen in pixels: its size at one tile's distance, shrinking with
-+		// distance (bubbles are drawn a bit bigger, up to 9 pixels; the rest up to 6).
++		// distance (bubbles are drawn a bit bigger, up to 9 pixels; the rest up to 6; a piece of a
++		// body as big as it is, a square of its voxels, up to ChunkPixelsMost).
 +		const int dotSize = std::clamp((int)std::lround(particle.size * focalLength / depth * (particle.kind == P::BUBBLE ? 0.18 : 0.12)),
-+			1, particle.kind == P::BUBBLE ? 9 : 6);
++			1, particle.kind == P::BUBBLE ? 9 : particle.kind == P::CHUNK ? ChunkPixelsMost : 6);
 +		if (particle.kind == P::BUBBLE && dotSize >= 3)
 +		{
 +			// A bubble up close: a ring with a glint on its upper left.
@@ -68220,11 +68479,12 @@ index 000000000..42e6cb91b
 +			}
 +			continue;
 +		}
-+		// Anything else: a square dot centred on the particle.
++		// Anything else: a square dot centred on the particle (its corners rounded off; a piece of a body's kept: a cube).
 +		const int left = (int)screenX - dotSize / 2, top = (int)screenY - dotSize / 2;
++		const bool rounded = dotSize >= 3 && particle.kind != P::CHUNK;
 +		if (_gpuRecording)
 +		{
-+			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (dotSize >= 3 ? 4 : 0));
++			gpuRecordDot(left, top, dotSize, dotSize, depth, color, (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE ? 1 : 0) | (rounded ? 4 : 0));
 +			if (_gpuRecordOnly) continue;
 +		}
 +		for (int y = top; y < top + dotSize; ++y)
@@ -68232,7 +68492,7 @@ index 000000000..42e6cb91b
 +			for (int x = left; x < left + dotSize; ++x)
 +			{
 +				// Round off the corners (of a dot 3 pixels or more across).
-+				if (dotSize >= 3 && (x == left || x == left + dotSize - 1) && (y == top || y == top + dotSize - 1)) continue;
++				if (rounded && (x == left || x == left + dotSize - 1) && (y == top || y == top + dotSize - 1)) continue;
 +				if (x < 0 || y < 0 || x >= width || y >= height || depth >= _depthBuffer[y * width + x]) continue;
 +				*getRaw(x, y) = color;
 +				if (particle.kind == P::GLOW || particle.kind == P::BLINK || particle.kind == P::MOTE) _glowMask[y * width + x] = 1; // sparks, embers and motes bloom too
@@ -77086,10 +77346,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..1f27da62e
+index 000000000..afdc00847
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4616 @@
+@@ -0,0 +1,4937 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -78619,6 +78879,326 @@ index 000000000..1f27da62e
 +	}
 +}
 +
++/// Setting "Obliteration": how many pieces a body one tile big bursts into (a big unit's, of four tiles, four times as many).
++const int ObliterationPieces = 300;
++/// Setting "Obliteration": the particles a burst leaves the rest of the battle's effects at the least (it takes fewer
++/// pieces when the system is that full).
++const size_t ObliterationRoomKept = 1500;
++/// Setting "Obliteration": the shade (within its colour's group) from which a picture's pixel is taken for its dark outline,
++/// not for the body (see obliterateUnit).
++const int OutlineShade = 13;
++
++/**
++ * Setting "Obliteration": whether a unit's body bleeds as it bursts, or throws sparks and smoke: flesh, unless it is a
++ * vehicle (a hull: tanks, hover tanks, the Cyberdisc, TFTD's tanks, turrets; see FirstPerson::hullLayBack) or its armour
++ * is named immune to bleeding (the big mods' robots and drones). (Not the game's own test, BattleUnit::isWoundable: without
++ * the option that makes aliens bleed it takes every alien for one that doesn't, and a Sectoid burst into sparks.)
++ * @param unit The unit.
++ * @return True for flesh.
++ */
++static bool bleedsWhenBurst(const BattleUnit *unit)
++{
++	return FirstPerson::hullLayBack(unit) <= 0.0 && !unit->getArmor()->getBleedImmune(false);
++}
++
++/**
++ * Setting "Obliteration": a unit taken beyond the game's own overkill, its rule for a unit that leaves no corpse (see
++ * FirstPersonMode::unitObliterated), bursts into the pieces of its body as the view draws it: the cubes of its voxel body
++ * (setting "Voxel units"), turned as it faces; else the pixels of its picture on its card, turned to the eye as drawn,
++ * given a little depth. Each piece keeps its colour (a head's pieces are skin and hair, a Muton's green), charred as the
++ * map chars it; see burstPieces for how they fly. One out of the squad's sight, or the one looked through, shows nothing,
++ * and with particles off nothing flies. It isn't drawn again either way (see isObliterated): the game takes it down and
++ * leaves no body, as on the map.
++ * @param unit The unit.
++ * @param away The way the pieces fly: away from the side struck (see FirstPersonMode::unitObliterated).
++ * @param burn How much the hit chars them: the map's burn, 0 to 16 shades.
++ * @param hot Fire, a laser or plasma: what it chars glows as it flies.
++ * @param blast A blast's (they fly harder).
++ * @param effects The 3D view shows: the pieces fly.
++ */
++void FirstPersonView::obliterateUnit(BattleUnit *unit, const float away[3], int burn, bool hot, bool blast, bool effects)
++{
++	_obliterated.insert(unit);
++	if (!effects || !_particlesOn || Options::fpsParticles == 0 || unit == _cameraUnit || (!unit->getVisible() && !_save->getDebugMode()))
++	{
++		return;
++	}
++	const int size = unit->getArmor()->getSize();
++	const int wanted = ObliterationPieces * size * size;
++	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
++	// Where its feet are drawn (it eases between the game's steps, and a body is lifted to its float height: see
++	// drawUnits); a unit not drawn of late, the middle of its tiles.
++	double feet[3];
++	double lift = 0.0;
++	auto glide = _unitGlides.find(unit);
++	if (glide != _unitGlides.end() && SDL_GetTicks() - glide->second.seen < 250)
++	{
++		std::copy(glide->second.pos, glide->second.pos + 3, feet);
++		lift = glide->second.lift;
++	}
++	else
++	{
++		const Position at = unit->getPosition();
++		const Tile *tile = _save->getTile(at);
++		feet[0] = at.x * 16.0 + 8.0 * size;
++		feet[1] = at.y * 16.0 + 8.0 * size;
++		feet[2] = at.z * 24.0 - (tile ? tile->getTerrainLevel() : 0);
++	}
++	feet[2] = standingHeight(feet) + lift;
++	std::vector<BodyPiece> pieces;
++	pieces.reserve(wanted);
++	const VoxelUnitModel *body = Options::fpsVoxelUnits && _voxelUnits ? _voxelUnits->lastBody(unit) : nullptr;
++	if (body && !body->right.empty() && body->colours.size() >= body->right.size() * 16)
++	{
++		// Its voxel body as it stood, turned the way it faced (last seen well: see drawUnits), each piece a cube of it at
++		// random (not what it held: that falls as the game drops it), in the cube's colour.
++		auto well = _facingsWell.find(unit);
++		const double angle = (well != _facingsWell.end() ? well->second : unit->getDirection()) * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
++		const double measure = body->unit * unitScale;
++		const size_t cubes = std::min(body->right.size(), body->addedFrom);
++		for (int piece = 0; piece < wanted && cubes > 0; ++piece)
++		{
++			size_t k = 0;
++			for (int tries = 0; tries < 4; ++tries)
++			{
++				k = std::min(cubes - 1, (size_t)(_particles.random() * cubes));
++				if (body->part.empty() || body->part[k] != VoxelUnitModel::Item) break;
++			}
++			if (!body->part.empty() && body->part[k] == VoxelUnitModel::Item) continue;
++			const Uint8 color = body->colours[k * 16];
++			if (!color) continue;
++			pieces.push_back({ { (float)(feet[0] + (body->right[k] * cosine + body->ahead[k] * sine) * measure),
++				(float)(feet[1] + (body->right[k] * sine - body->ahead[k] * cosine) * measure), (float)(feet[2] + body->up[k] * measure) }, color });
++		}
++	}
++	else
++	{
++		// Its picture on its card, square to the eye across the map (see FirstPerson::mirrorCard): a picture pixel is
++		// SpritePixelX of the card's scale across and the scale up; the art below the feet only for a unit drawn in the
++		// air (on a floor it lies flat there). Each piece a pixel of it at random, a little before or behind the card.
++		FirstPerson::MirrorCard card;
++		if (FirstPerson::mirrorCard(_save, unit, card))
++		{
++			card.anchor[0] = feet[0];
++			card.anchor[1] = feet[1];
++			double towardsX = _steadyEye[0] - card.anchor[0], towardsY = _steadyEye[1] - card.anchor[1];
++			if (std::hypot(towardsX, towardsY) < 1.0)
++			{
++				towardsX = towardsY = 1.0; // (straight above it: from the south-east, as the map shows it)
++			}
++			const double length = std::hypot(towardsX, towardsY);
++			towardsX /= length;
++			towardsY /= length;
++			const int side = ((3 - FirstPerson::unitViewRotation(_steadyEye, card.anchor)) % 8 + 8) % 8;
++			const std::vector<Uint8> &picture = FirstPerson::spriteColorsOf(_save, unit, side);
++			// (not the drawing's dark outline, its darkest shades: it is no part of the body, and its pieces were all black)
++			std::vector<int> drawn;
++			for (int pixel = 0; pixel < (int)picture.size(); ++pixel)
++			{
++				if (picture[pixel] && (picture[pixel] & 15) < OutlineShade && (card.rowsBelow || pixel / SpriteBufferSize < card.anchorY)) drawn.push_back(pixel);
++			}
++			for (int piece = 0; piece < wanted && !drawn.empty(); ++piece)
++			{
++				const int pixel = drawn[std::min(drawn.size() - 1, (size_t)(_particles.random() * drawn.size()))];
++				const double across = (pixel % SpriteBufferSize + _particles.random() - card.anchorX) * SpritePixelX * card.scale;
++				const double depth = _particles.random(-2.5f, 2.5f) * size;
++				pieces.push_back({ { (float)(card.anchor[0] + towardsY * across + towardsX * depth), (float)(card.anchor[1] - towardsX * across + towardsY * depth),
++					(float)(card.anchor[2] + (card.anchorY - pixel / SpriteBufferSize - _particles.random()) * card.scale) }, picture[pixel] });
++			}
++		}
++	}
++	const float middle[3] = { (float)feet[0], (float)feet[1], (float)(feet[2] + 0.5 * unit->getHeight() * unitScale) };
++	burstPieces(pieces, middle, away, burn, hot, blast, bleedsWhenBurst(unit), size);
++}
++
++/**
++ * Setting "Obliteration": a body lying on the floor bursts the same way (see obliterateUnit): a corpse a blast destroyed
++ * (see FirstPersonMode::itemBlasted), or one out cold a hit took beyond its overkill. Its pieces come from its voxel body
++ * lying as it fell (setting "Voxel units", a unit one tile big), else from its picture as the map draws it on the floor
++ * (the item's floor sprite, composed as drawFloorItems does): the art below the middle of the floor's diamond lying flat
++ * on the floor, back where the isometric view puts each pixel (a pixel across the diamond is half a voxel along each of x
++ * and y; one down it, a voxel along both), the rest standing on the diamond's middle line. Only on a tile the squad sees.
++ * @param item The body (the item on the floor).
++ * @param away The way the pieces fly (see obliterateUnit).
++ * @param burn How much the hit chars them, 0 to 16 shades.
++ * @param hot Fire, a laser or plasma: what it chars glows.
++ * @param blast A blast's.
++ * @param effects The 3D view shows: the pieces fly.
++ */
++void FirstPersonView::obliterateBody(const BattleItem *item, const float away[3], int burn, bool hot, bool blast, bool effects)
++{
++	const Tile *tile = item->getTile();
++	if (!effects || !tile || !_particlesOn || Options::fpsParticles == 0 || (tile->getVisible() <= 0 && !_save->getDebugMode()))
++	{
++		return;
++	}
++	const Position at = tile->getPosition();
++	double ground[3] = { at.x * 16.0 + 8.0, at.y * 16.0 + 8.0, at.z * 24.0 - tile->getTerrainLevel() };
++	ground[2] = standingHeight(ground);
++	const double itemScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
++	const BattleUnit *owner = item->getUnit();
++	std::vector<BodyPiece> pieces;
++	pieces.reserve(ObliterationPieces);
++	const VoxelUnitModel *body = Options::fpsVoxelUnits && _voxelUnits && owner && owner->getArmor()->getSize() == 1 ? _voxelUnits->lastBody(owner) : nullptr;
++	const VoxelUnitModel::FallShape *lying = body ? body->fallAt(1.0) : nullptr;
++	if (lying && !lying->right.empty() && lying->colour.size() >= lying->right.size())
++	{
++		auto well = _facingsWell.find(owner);
++		const double angle = (well != _facingsWell.end() ? well->second : owner->getDirection()) * Pi / 4.0, cosine = std::cos(angle), sine = std::sin(angle);
++		const double measure = body->unit * itemScale;
++		for (int piece = 0; piece < ObliterationPieces; ++piece)
++		{
++			const size_t k = std::min(lying->right.size() - 1, (size_t)(_particles.random() * lying->right.size()));
++			if (!lying->colour[k]) continue;
++			pieces.push_back({ { (float)(ground[0] + (lying->right[k] * cosine + lying->ahead[k] * sine) * measure),
++				(float)(ground[1] + (lying->right[k] * sine - lying->ahead[k] * cosine) * measure), (float)(ground[2] + lying->up[k] * measure) }, lying->colour[k] });
++		}
++	}
++	else
++	{
++		ItemSprite itemSprite(_spriteBuffer, _game->getMod(), _save, _save->getAnimFrame());
++		_spriteBuffer->clear();
++		itemSprite.draw(item, 16, 8, 0); // (the floor diamond's middle at 32, 40, as drawFloorItems composes it)
++		std::vector<int> drawn;
++		for (int y = 0; y < SpriteBufferSize; ++y)
++		{
++			for (int x = 0; x < SpriteBufferSize; ++x)
++			{
++				const Uint8 color = _spriteBuffer->getPixel(x, y);
++				if (color && (color & 15) < OutlineShade) drawn.push_back(y * SpriteBufferSize + x); // (not its dark outline)
++			}
++		}
++		for (int piece = 0; piece < ObliterationPieces && !drawn.empty(); ++piece)
++		{
++			const int pixel = drawn[std::min(drawn.size() - 1, (size_t)(_particles.random() * drawn.size()))];
++			const double across = pixel % SpriteBufferSize + _particles.random() - 32.0, down = pixel / SpriteBufferSize + _particles.random() - 40.0;
++			const bool flat = down >= 0.0;
++			const double alongX = flat ? down + across / 2.0 : across / 2.0, alongY = flat ? down - across / 2.0 : -across / 2.0;
++			const double height = flat ? _particles.random(0.3f, 2.5f) : -down * itemScale;
++			pieces.push_back({ { (float)(ground[0] + alongX * itemScale), (float)(ground[1] + alongY * itemScale), (float)(ground[2] + height) },
++				_spriteBuffer->getPixel(pixel % SpriteBufferSize, pixel / SpriteBufferSize) });
++		}
++		_spriteBuffer->clear();
++	}
++	const float middle[3] = { (float)ground[0], (float)ground[1], (float)ground[2] + 3.0f };
++	burstPieces(pieces, middle, away, burn, hot, blast, owner ? bleedsWhenBurst(owner) : true, 1);
++}
++
++/**
++ * Setting "Obliteration": throws the pieces of a body out (see obliterateUnit, obliterateBody). Each piece flies away from
++ * the side struck, and out from the body's middle, and a little up, faster from a blast; it falls, bounces off walls and
++ * lands on the floor, where it lies for a few seconds and goes (see FirstPersonParticles::CHUNK). The pieces fly out in
++ * the body's colours and char as they go, as the map burns a unit beyond its overkill over its fall (each piece by any
++ * part of the burn, so some stay their colour: see drawParticles), down to its colour's darkest, gone beyond 26 shades;
++ * from fire, a laser or plasma one that chars that far throws off a glowing ember. A body that bleeds also sprays drops of
++ * blood, which land as the pieces do, and leaves a red mist hanging; a machine throws sparks and smoke. Fewer pieces when
++ * the particle system is near full (ObliterationRoomKept stay for the rest).
++ * @param pieces The pieces: where each is and its colour.
++ * @param middle The middle of the body, in voxels.
++ * @param away The way the pieces fly.
++ * @param burn How much they are charred, 0 to 16 shades.
++ * @param hot Fire, a laser or plasma.
++ * @param blast A blast's: they fly harder.
++ * @param flesh A body that bleeds (else a machine's).
++ * @param size The body's size in tiles across: 1, or 2 for a big unit.
++ */
++void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size)
++{
++	typedef FirstPersonParticles P;
++	const float strength = blast ? 1.3f : 1.0f;
++	const size_t room = _particles.room() > ObliterationRoomKept ? _particles.room() - ObliterationRoomKept : 0;
++	const size_t extras = (size_t)(90 * size * size);
++	const size_t taken = std::min(pieces.size(), room > extras ? room - extras : 0);
++	// A random way in all directions (spread evenly over a sphere), for the pieces at the body's very middle and the spray.
++	auto anyWay = [this](float way[3]) {
++		const float yaw = _particles.random(0.0f, 6.2831853f), z = _particles.random(-1.0f, 1.0f), flat = std::sqrt(std::max(0.0f, 1.0f - z * z));
++		way[0] = flat * std::cos(yaw); way[1] = flat * std::sin(yaw); way[2] = z;
++	};
++	for (size_t index = 0; index < taken; ++index)
++	{
++		// (an even share of all the pieces when not all fit)
++		const BodyPiece &piece = pieces[taken == pieces.size() ? index : index * pieces.size() / taken];
++		float out[3] = { piece.pos[0] - middle[0], piece.pos[1] - middle[1], piece.pos[2] - middle[2] };
++		const float length = std::sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2]);
++		if (length < 0.5f) anyWay(out);
++		else for (float &component : out) component /= length;
++		P::Particle chunk;
++		std::copy(piece.pos, piece.pos + 3, chunk.pos);
++		// (out from the middle less steeply up and down than across: a body bursts more to the sides than up)
++		const float along = _particles.random(30.0f, 110.0f) * strength, spread = _particles.random(15.0f, 50.0f) * strength;
++		out[2] *= 0.6f;
++		for (int axis = 0; axis < 3; ++axis) chunk.vel[axis] = away[axis] * along + out[axis] * spread + _particles.random(-10.0f, 10.0f);
++		chunk.vel[2] += _particles.random(5.0f, 30.0f) * strength;
++		chunk.age = 0.0f;
++		chunk.life = _particles.random(2.0f, 4.0f);
++		chunk.gravity = 190.0f;
++		chunk.drag = 0.4f;
++		chunk.size = (Uint8)_particles.random(5.0f, size > 1 ? 18.99f : 12.99f); // (8 is about a voxel)
++		chunk.kind = P::CHUNK;
++		chunk.group = P::EFFECT;
++		chunk.color = piece.color;
++		// (charred as it flies, each piece by any part of the burn, some hardly, some all the way: see drawParticles)
++		chunk.burn = (Uint8)std::lround(burn * _particles.random());
++		_particles.add(chunk);
++		if ((piece.color & 15) + chunk.burn > 15 && hot && _particles.random() < 0.5f)
++		{
++			// (an ember off it, glowing in the fire's colours and drifting as it cools)
++			P::Particle ember = chunk;
++			for (float &component : ember.vel) component *= 0.5f;
++			ember.life = _particles.random(0.5f, 1.3f); ember.gravity = 40.0f; ember.drag = 1.2f;
++			ember.color = _colors.fire[(int)_particles.random(0.0f, 2.99f)]; ember.size = (Uint8)_particles.random(2.0f, 3.99f); ember.kind = P::GLOW;
++			_particles.add(ember);
++		}
++	}
++	if (taken == 0)
++	{
++		return;
++	}
++	const int tiles = size * size;
++	if (flesh)
++	{
++		// Drops of blood, thrown the way the pieces go and every way, landing as the pieces do; and a red mist hanging
++		// where the body was, fading within a second.
++		for (int drop = 0; drop < 80 * tiles; ++drop)
++		{
++			P::Particle blood;
++			float way[3];
++			anyWay(way);
++			const float along = _particles.random(20.0f, 90.0f) * strength, spread = _particles.random(10.0f, 50.0f);
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				blood.pos[axis] = middle[axis] + _particles.random(-3.0f, 3.0f) * size;
++				blood.vel[axis] = away[axis] * along + way[axis] * spread;
++			}
++			blood.vel[2] += _particles.random(5.0f, 35.0f);
++			blood.age = 0.0f; blood.life = _particles.random(1.2f, 2.6f); blood.gravity = 200.0f; blood.drag = 0.5f;
++			blood.color = _colors.blood[drop & 1]; blood.size = (Uint8)_particles.random(3.0f, 6.99f); blood.kind = P::CHUNK; blood.group = P::EFFECT;
++			_particles.add(blood);
++		}
++		for (int puff = 0; puff < 20 * tiles; ++puff)
++		{
++			P::Particle mist;
++			for (int axis = 0; axis < 3; ++axis)
++			{
++				mist.pos[axis] = middle[axis] + _particles.random(-4.0f, 4.0f) * size;
++				mist.vel[axis] = away[axis] * _particles.random(5.0f, 20.0f) + _particles.random(-8.0f, 8.0f);
++			}
++			mist.age = 0.0f; mist.life = _particles.random(0.5f, 1.1f); mist.gravity = -3.0f; mist.drag = 2.0f;
++			mist.color = shadeColor(_colors.blood[1], (int)_particles.random(0.0f, 3.99f)); mist.size = (Uint8)_particles.random(6.0f, 8.99f);
++			mist.kind = P::LIT; mist.group = P::EFFECT;
++			_particles.add(mist);
++		}
++	}
++	else
++	{
++		// A machine: sparks every way, falling, and a puff of smoke rising.
++		const Uint8 sparkColors[2] = { _colors.spark, _colors.fire[1] };
++		_particles.burst(middle, 45 * tiles, P::GLOW, P::EFFECT, sparkColors, 2, 40, 120, 0.4f, 150, 0.6f, 0.3f, 0.8f, 2);
++		const Uint8 smokeColors[2] = { _colors.smoke, shadeColor(_colors.smoke, 2) };
++		_particles.burst(middle, 12 * tiles, P::LIT, P::EFFECT, smokeColors, 2, 3, 12, 0.7f, -8, 0.8f, 1.5f, 3.0f, 6);
++	}
++}
++
 +/**
 + * Draws the visible units as billboards: the game's own unit sprites, standing where the unit
 + * is, turned to show the side facing the camera. Walking units glide between tiles, and every
@@ -78700,6 +79280,7 @@ index 000000000..1f27da62e
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
 +		if (WatchedAlone != -1 && unit->getId() != WatchedAlone) continue; // (the developer's camera on one unit: see arenaStep)
++		if (isObliterated(unit)) continue; // (setting "Obliteration": blown apart, see obliterateUnit)
 +		// Only units still in the fight (not dead or unconscious), not the one looked through,
 +		// and in sight (any unit in debug mode). And one down a moment ago with "Quick deaths",
 +		// still falling (on its own, see FirstPerson::quickFallPhase): drawn in that fall. And one
@@ -79259,7 +79840,7 @@ index 000000000..1f27da62e
 +	const bool debug = _save->getDebugMode();
 +	for (BattleUnit *unit : *_save->getUnits())
 +	{
-+		if (unit->isOut() || !unit->getTile() || (!debug && !unit->getVisible()))
++		if (unit->isOut() || !unit->getTile() || (!debug && !unit->getVisible()) || isObliterated(unit))
 +		{
 +			continue;
 +		}
@@ -79835,7 +80416,7 @@ index 000000000..1f27da62e
 +			continue;
 +		}
 +		BattleItem *item = tile->getTopItem();
-+		if (!item)
++		if (!item || (item->getUnit() && isObliterated(item->getUnit()))) // (one out cold blown apart: see obliterateBody)
 +		{
 +			continue;
 +		}
@@ -105708,7 +106289,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..9de1ef006
+index 000000000..7443e3f44
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1357 @@
@@ -106090,7 +106671,7 @@ index 000000000..9de1ef006
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsObliteration", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },

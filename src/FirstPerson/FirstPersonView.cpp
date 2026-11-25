@@ -193,6 +193,7 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_ufoDoorOpening.clear();
 	_flares.clear();
 	_watchedUnits.clear();
+	_obliterated.clear();
 	_decals.clear();
 	_scorches.clear();
 	_burningLastFrame.clear();

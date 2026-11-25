@@ -80,6 +80,7 @@ class Game;
 struct PathfindingStep;
 class InteractiveSurface;
 class NumberText;
+struct RuleDamageType;
 class SavedBattleGame;
 class Surface;
 class Tile;
@@ -192,6 +193,10 @@ public:
 	static void roundPassed(BattlescapeState *state, const Position &voxel, const Position &from);
 	/// A blast reached these tiles (see FirstPerson::blastReached): the glass in their windows' openings breaks in the 3D view.
 	static void blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles);
+	/// Setting "Obliteration": a unit beyond the game's overkill bursts in the 3D view (see FirstPerson::unitObliterated).
+	static void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
+	/// Setting "Obliteration": a body on the floor a blast destroyed bursts in the 3D view (see FirstPerson::itemBlasted).
+	static void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).

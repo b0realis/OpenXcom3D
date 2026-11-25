@@ -1409,6 +1409,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	// Fire's colours mixed from frame to frame (1.14's "Smoother fire", which had no setting: a
 	// player looked for it, GitHub issue #146); off, the frames dissolve dot by dot, as before 1.14.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsSmoothFire", &fpsSmoothFire, true, "STR_FPS_SMOOTH_FIRE", category));
+	// A unit killed beyond the game's own overkill (its rule for one that leaves no corpse) bursts into the pieces of its
+	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
+	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
 	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 	// falls, landings, panic, one's own shots).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
@@ -1933,6 +1937,22 @@ void unitStruck(BattlescapeState *state, const BattleUnit *unit, int healthBefor
 void unitDamaged(BattlescapeState *state, const BattleUnit *unit, int healthLost, int armorLost, int stunTaken, int shieldLost, int healthDealt)
 {
 	FirstPersonMode::unitDamaged(state, unit, healthLost, armorLost, stunTaken, shieldLost, healthDealt);
+}
+
+/**
+ * Setting "Obliteration": a unit beyond the game's overkill bursts in 3D (see FirstPersonApi.h, FirstPersonMode::unitObliterated).
+ */
+void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type)
+{
+	FirstPersonMode::unitObliterated(state, unit, relative, type);
+}
+
+/**
+ * Setting "Obliteration": a body on the floor a blast destroyed bursts in 3D (see FirstPersonApi.h, FirstPersonMode::itemBlasted).
+ */
+void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type)
+{
+	FirstPersonMode::itemBlasted(state, item, center, type);
 }
 
 /**
