@@ -1395,6 +1395,7 @@ private:
 	bool handleFeedKey(Action *action);
 	bool feedWithoutMap(Action *action);
 	void pressFeedButton(int index, Action *action);
+	void flyFeedTo();
 
 	void refreshSquad();
 	/// Lays out the squad buttons that are in use.

@@ -1623,7 +1623,7 @@ void FirstPersonMode::setActive(bool active)
 		_save->getPathfinding()->setFlightCost(nullptr, -1); // by the rules on the isometric map
 		endVault();
 		BattleUnit *viewedUnit = _save->getSide() == FACTION_PLAYER ? _save->getSelectedUnit() : _lastPlayerUnit;
-		if (viewedUnit && !viewedUnit->isOut())
+		if (viewedUnit && !viewedUnit->isOut() && !feedWanted()) // (the Live command feed's drone stays where it was flown)
 		{
 			_state->_map->getCamera()->centerOnPosition(viewedUnit->getPosition());
 		}

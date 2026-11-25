@@ -125,6 +125,10 @@ const int FeedCornerLength = 4;
 /// The drone floats (stabiliser off): this many pixels (times the magnification) at the most either way, its sways
 /// this many milliseconds round.
 const int FeedSwayMost = 3;
+/// The drone's arrows at its picture's edges: this long and this deep (times the magnification), this far in; held,
+/// it flies this many pixels a second. FLY TO glides to the soldier in this many milliseconds. The level buttons at the
+/// right are this big.
+const int FeedArrowLong = 14, FeedArrowDeep = 7, FeedArrowInset = 3, FeedFlySpeed = 260, FeedFlyMs = 700, FeedLevelButton = 12;
 const double FeedSwayPeriods[4] = { 5300.0, 2100.0, 6900.0, 2900.0 };
 
 /// An SDL rectangle from ints (SDL 1.2's are 16-bit).
@@ -179,7 +183,8 @@ struct CommandFeed
 	enum Maximised { MAX_NONE, MAX_DRONE };
 	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 	/// lit (a switch that is on).
-	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY };
+	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
+		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY };
 	/// How the drone sees: black and white; night vision, all of it green (realistic) or the units and items in their own
 	/// colours (enhanced); thermal, the units, explosions and fire white hot on a cool grey world.
 	enum Vision { VISION_PLAIN, VISION_NIGHT, VISION_NIGHT_PLUS, VISION_THERMAL };
@@ -195,7 +200,13 @@ struct CommandFeed
 	int width = 0, height = 0, top = -1, soldiers = -1, ui = 1;
 	SDL_Rect inventory{}, inventoryPicture{}, inventoryShown{}, view{}, viewPicture{}, drone{}, dronePicture{}, map{}, mapPicture{}, bigFrame{}, bigPicture{};
 	std::vector<Button> buttons;
-	const BattleUnit *followed = nullptr;
+	// Flying the drone: the arrow held (one of FB_MOVE_*, else none), and a glide to a soldier (FLY TO): from where to
+	// where (the map's offsets), since when; the mouse's last point (to light what it is over); the last frame's time.
+	int moving = -1;
+	bool gliding = false;
+	Position glideFrom, glideTo;
+	Uint32 glideStart = 0, lastFrame = 0;
+	int mouseX = -1, mouseY = -1;
 	Maximised maximised = MAX_NONE;
 	// The minimap: the tactical map in its window (made again only for another window).
 	std::unique_ptr<FirstPersonMapState> minimap;
@@ -228,6 +239,7 @@ struct CommandFeed
 	bool paletteKnown = false;
 	Uint8 grey[3][256], green[3][256], cool[3][256], hot[3][256], snow[8];
 	Uint8 black = 0, frameColour = 0, frameLit = 0, titleBack = 0, wordsColour = 0, dimColour = 0, liveColour = 0, hudColour = 0, pickedColour = 0;
+	Uint8 purple = 0, purpleLit = 0;
 	std::unique_ptr<Text> writer;
 	Uint32 noise = 0x9E3779B9u;
 	/// The snow's and the tears' dice.
@@ -255,19 +267,49 @@ namespace
 bool droneButton(CommandFeed::ButtonKind kind)
 {
 	return kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
-		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX;
+		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_MOVE_UP
+		|| kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT || kind == CommandFeed::FB_LEVEL_UP
+		|| kind == CommandFeed::FB_LEVEL_DOWN;
+}
+
+/// Is a button one of the drone's arrows at its picture's edges?
+bool moveArrow(CommandFeed::ButtonKind kind)
+{
+	return kind == CommandFeed::FB_MOVE_UP || kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT;
+}
+
+/// A filled triangle in a box, pointing up, down, left or right (0 to 3).
+void triangle(SDL_Surface *screen, const SDL_Rect &box, int pointing, Uint8 colour)
+{
+	if (pointing < 2)
+	{
+		for (int row = 0; row < box.h; ++row)
+		{
+			const int depth = pointing == 0 ? row : box.h - 1 - row, half = (int)box.w * (depth + 1) / (2 * box.h);
+			fill(screen, box.x + box.w / 2 - half, box.y + row, std::max(1, 2 * half), 1, colour);
+		}
+	}
+	else
+	{
+		for (int column = 0; column < box.w; ++column)
+		{
+			const int depth = pointing == 2 ? column : box.w - 1 - column, half = (int)box.h * (depth + 1) / (2 * box.w);
+			fill(screen, box.x + column, box.y + box.h / 2 - half, 1, std::max(1, 2 * half), colour);
+		}
+	}
 }
 
 }
 
 /**
- * Does the Live command feed take the screen? With its setting on, unless the player went to the full 3D view (the 3D
- * key, or the 3D window's button: see toggleView); never in VR mode, whose headset shows the 3D view.
+ * Does the Live command feed take the screen? With its setting on, unless the player went to the full 3D view in their
+ * turn (the 3D key, or the 3D window's button: see toggleView; the enemy's turn is always watched in the feed, the owner:
+ * "On enemy turn it goes to normal 3d enemy turn"); never in VR mode, whose headset shows the 3D view.
  * @return True if so.
  */
 bool FirstPersonMode::feedWanted() const
 {
-	return Options::fpsCommandFeed && _feedPreferred && !vrOn();
+	return Options::fpsCommandFeed && (_feedPreferred || _save->getSide() != FACTION_PLAYER) && !vrOn();
 }
 
 /**
@@ -344,16 +386,33 @@ void FirstPersonMode::updateFeed()
 	}
 	map->setMaskTarget(masked ? feed.mask.get() : nullptr, feed.vision == CommandFeed::VISION_NIGHT_PLUS);
 
-	// The drone follows the soldier looked through: on them when another is looked through, and again when they walk
-	// out of its picture (the map follows only the aliens it sees).
-	BattleUnit *looked = isActive() && _trackedUnit ? _trackedUnit : (selected && selected->getFaction() == FACTION_PLAYER ? selected : nullptr);
-	Camera *camera = _state->_map->getCamera();
-	if (looked && !looked->isOut() && looked->getTile()
-		&& (looked != feed.followed || !camera->isOnScreen(looked->getPosition(), true, looked->getArmor()->getSize() - 1, false)))
+	// The drone stays where the player flies it (the owner: "Otherwise it stays as player set it"): an arrow held flies it
+	// that way; FLY TO glides it to the soldier (see flyFeedTo).
+	Camera *camera = map->getCamera();
+	const Uint32 now = SDL_GetTicks();
+	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
+	feed.lastFrame = now;
+	if (feed.moving >= 0 && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 	{
-		camera->centerOnPosition(looked->getPosition(), false);
+		feed.moving = -1; // (let go somewhere the feed didn't hear)
 	}
-	feed.followed = looked;
+	if (feed.moving >= 0)
+	{
+		const int step = (int)std::lround(FeedFlySpeed * feed.ui * seconds);
+		const int byX = feed.moving == CommandFeed::FB_MOVE_LEFT ? step : feed.moving == CommandFeed::FB_MOVE_RIGHT ? -step : 0;
+		const int byY = feed.moving == CommandFeed::FB_MOVE_UP ? step : feed.moving == CommandFeed::FB_MOVE_DOWN ? -step : 0;
+		if (byX || byY) camera->scrollXY(byX, byY, true);
+		feed.gliding = false;
+	}
+	if (feed.gliding)
+	{
+		const double done = std::min(1.0, (now - feed.glideStart) / (double)FeedFlyMs), eased = done * done * (3.0 - 2.0 * done);
+		const Position at = camera->getMapOffset();
+		const int wantX = (int)std::lround(feed.glideFrom.x + (feed.glideTo.x - feed.glideFrom.x) * eased);
+		const int wantY = (int)std::lround(feed.glideFrom.y + (feed.glideTo.y - feed.glideFrom.y) * eased);
+		if (wantX != at.x || wantY != at.y) camera->scrollXY(wantX - at.x, wantY - at.y, true);
+		if (done >= 1.0) feed.gliding = false;
+	}
 
 	// The crosshair (and the words beside it, placed by it: see updateCrosshair) in the middle of the 3D window.
 	const SDL_Rect &picture = feed.viewPicture;
@@ -401,7 +460,8 @@ void FirstPersonMode::leaveFeed()
 	feed.inventoryKey.clear();
 	feed.maximised = CommandFeed::MAX_NONE;
 	feed.width = 0; // (laid out again when it comes back)
-	feed.followed = nullptr;
+	feed.moving = -1;
+	feed.gliding = false;
 	feed.pressedOnDrone = feed.overDrone = false;
 	feed.on = false;
 }
@@ -477,8 +537,9 @@ void FirstPersonMode::layOutFeed()
 }
 
 /**
- * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's stabiliser,
- * night vision (realistic, then enhanced), thermal, names, boxes and all over the screen; the minimap's all over the screen; the 3D window's, which goes to the full 3D
+ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FLY TO,
+ * stabiliser, night vision (realistic, then enhanced), thermal, names, boxes and all over the screen, and on its picture
+ * the arrows at its edges (held: it flies that way) and the level buttons at its right; the minimap's all over the screen; the 3D window's, which goes to the full 3D
  * view; the inventory window's, which opens the game's inventory screen.
  */
 void FirstPersonMode::feedButtons()
@@ -506,6 +567,18 @@ void FirstPersonMode::feedButtons()
 	add(CommandFeed::FB_NIGHT, drone, right, _state->tr(feed.vision == CommandFeed::VISION_NIGHT_PLUS ? "STR_FPS_FEED_NIGHT_PLUS" : "STR_FPS_FEED_NIGHT"),
 		feed.vision == CommandFeed::VISION_NIGHT || feed.vision == CommandFeed::VISION_NIGHT_PLUS);
 	add(CommandFeed::FB_STABILISER, drone, right, _state->tr("STR_FPS_FEED_STABILISER"), feed.stabiliser);
+	add(CommandFeed::FB_FLY_TO, drone, right, _state->tr("STR_FPS_FEED_FLY_TO"), feed.gliding);
+	// (the arrows at the drone picture's edges, and the level buttons at its right under the top one)
+	const SDL_Rect &picture = feed.dronePictureNow();
+	const int along = FeedArrowLong * ui, deep = FeedArrowDeep * ui, arrowInset = FeedArrowInset * ui, levelSide = FeedLevelButton * ui;
+	const int middleX = picture.x + picture.w / 2, middleY = picture.y + picture.h / 2;
+	feed.buttons.push_back({ CommandFeed::FB_MOVE_UP, makeRect(middleX - along / 2, picture.y + arrowInset, along, deep), std::string(), 0, false });
+	feed.buttons.push_back({ CommandFeed::FB_MOVE_DOWN, makeRect(middleX - along / 2, picture.y + picture.h - arrowInset - deep, along, deep), std::string(), 1, false });
+	feed.buttons.push_back({ CommandFeed::FB_MOVE_LEFT, makeRect(picture.x + arrowInset, middleY - along / 2, deep, along), std::string(), 2, false });
+	feed.buttons.push_back({ CommandFeed::FB_MOVE_RIGHT, makeRect(picture.x + picture.w - arrowInset - deep, middleY - along / 2, deep, along), std::string(), 3, false });
+	const int levelX = picture.x + picture.w - arrowInset - levelSide, levelY = picture.y + arrowInset + deep + 4 * ui;
+	feed.buttons.push_back({ CommandFeed::FB_LEVEL_UP, makeRect(levelX, levelY, levelSide, levelSide), std::string(), 0, true });
+	feed.buttons.push_back({ CommandFeed::FB_LEVEL_DOWN, makeRect(levelX, levelY + levelSide + FeedWordsH * ui + 2 * ui, levelSide, levelSide), std::string(), 1, true });
 	if (feed.maximised == CommandFeed::MAX_DRONE)
 	{
 		return;
@@ -779,6 +852,20 @@ void FirstPersonMode::blitFeedUnder(SDL_Surface *screen)
 	fill(screen, picture.x, picture.y, picture.w, picture.h, feed.black);
 	SDL_SetClipRect(screen, &picture);
 	Map *map = _state->_map;
+	if (map->showsHiddenMovement())
+	{
+		// (the aliens' turn with nothing of it seen: the drone's own screen, not the map's box)
+		for (int speck = 0; speck < picture.w * picture.h / FeedSnowEvery; ++speck)
+		{
+			const Uint32 dice = feed.random();
+			fill(screen, picture.x + (int)(dice % (Uint32)std::max(1, (int)picture.w)), picture.y + (int)((dice >> 12) % (Uint32)std::max(1, (int)picture.h)), feed.ui, feed.ui, feed.snow[(dice >> 28) & 7]);
+		}
+		const std::string words = _state->tr("STR_HIDDEN_MOVEMENT");
+		feed.writer->setText(words);
+		feedWrite(screen, words, picture.x + (picture.w - feed.writer->getTextWidth() * feed.ui) / 2, picture.y + (picture.h - FeedWordsH * feed.ui) / 2, feed.wordsColour, 0, true);
+		SDL_SetClipRect(screen, nullptr);
+		return;
+	}
 	map->setX(feed.swayX);
 	map->setY(feed.swayY);
 	map->blit(screen);
@@ -952,6 +1039,29 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 	for (const CommandFeed::Button &button : feed.buttons)
 	{
 		if (feed.maximised != CommandFeed::MAX_NONE && !droneButton(button.kind)) continue;
+		if (moveArrow(button.kind))
+		{
+			// (discreet: a triangle alone, lit under the mouse or held)
+			const bool over = inside(button.box, feed.mouseX, feed.mouseY) || feed.moving == button.kind;
+			triangle(screen, button.box, button.value, over ? feed.frameLit : feed.frameColour);
+			continue;
+		}
+		if (button.kind == CommandFeed::FB_LEVEL_UP || button.kind == CommandFeed::FB_LEVEL_DOWN)
+		{
+			// (purple, as the isometric view's level buttons stand out; the level looked at between them)
+			const bool over = inside(button.box, feed.mouseX, feed.mouseY);
+			fill(screen, button.box.x, button.box.y, button.box.w, button.box.h, feed.titleBack);
+			outline(screen, button.box, ui, over ? feed.purpleLit : feed.purple);
+			const int margin = 3 * ui;
+			triangle(screen, makeRect(button.box.x + margin, button.box.y + margin, button.box.w - 2 * margin, button.box.h - 2 * margin), button.value, over ? feed.purpleLit : feed.purple);
+			if (button.kind == CommandFeed::FB_LEVEL_UP)
+			{
+				const std::string level = std::to_string(_state->_map->getCamera()->getViewLevel() + 1);
+				feed.writer->setText(level);
+				feedWrite(screen, level, button.box.x + (button.box.w - feed.writer->getTextWidth() * ui) / 2, button.box.y + button.box.h + ui, feed.purpleLit, 0, true);
+			}
+			continue;
+		}
 		const Uint8 colour = button.lit ? feed.frameLit : feed.frameColour;
 		fill(screen, button.box.x, button.box.y, button.box.w, button.box.h, feed.titleBack);
 		outline(screen, button.box, ui, colour);
@@ -1056,6 +1166,12 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 			details->button.y = (decltype(details->button.y))std::max(0, (int)details->button.y - byY);
 		}
 	};
+	feed.mouseX = x;
+	feed.mouseY = y;
+	if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
+	{
+		feed.moving = -1; // (an arrow let go)
+	}
 	if (feed.pressedOnDrone)
 	{
 		if (event.type == SDL_MOUSEBUTTONUP) feed.pressedOnDrone = false;
@@ -1117,6 +1233,31 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 }
 
 /**
+ * FLY TO: the drone glides to the soldier looked through (the selected one; in the aliens' turn the one the 3D window
+ * shows), on their level at once and across in FeedFlyMs, smoothly.
+ */
+void FirstPersonMode::flyFeedTo()
+{
+	CommandFeed &feed = *_feed;
+	const BattleUnit *unit = isActive() && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
+	if (!unit || unit->isOut() || !unit->getTile())
+	{
+		return;
+	}
+	Camera *camera = _state->_map->getCamera();
+	const Position from = camera->getMapOffset();
+	camera->centerOnPosition(unit->getPosition(), false);
+	const Position to = camera->getMapOffset();
+	camera->setMapOffset(Position(from.x, from.y, to.z));
+	camera->scrollXY(0, 0, true); // (its middle and the map's bounds again)
+	feed.glideFrom = camera->getMapOffset();
+	feed.glideTo = to;
+	feed.glideStart = SDL_GetTicks();
+	feed.gliding = true;
+	feed.moving = -1;
+}
+
+/**
  * One of the feed's buttons pressed (with the buttons' click).
  * @param index The button's place in the list.
  * @param action The click (the game's inventory button wants it).
@@ -1125,7 +1266,7 @@ void FirstPersonMode::pressFeedButton(int index, Action *action)
 {
 	CommandFeed &feed = *_feed;
 	const CommandFeed::Button button = feed.buttons[index];
-	if (TextButton::soundPress) TextButton::soundPress->play(Mix_GroupAvailable(0));
+	if (TextButton::soundPress && !moveArrow(button.kind)) TextButton::soundPress->play(Mix_GroupAvailable(0)); // (an arrow flies quietly)
 	if (button.kind == CommandFeed::FB_NIGHT || button.kind == CommandFeed::FB_THERMAL)
 	{
 		_state->_map->invalidate(); // (its mask drawn for the new vision, see updateFeed)
@@ -1139,6 +1280,13 @@ void FirstPersonMode::pressFeedButton(int index, Action *action)
 		break;
 	case CommandFeed::FB_THERMAL: feed.vision = feed.vision == CommandFeed::VISION_THERMAL ? CommandFeed::VISION_PLAIN : CommandFeed::VISION_THERMAL; break;
 	case CommandFeed::FB_STABILISER: feed.stabiliser = !feed.stabiliser; break;
+	case CommandFeed::FB_FLY_TO: flyFeedTo(); break;
+	case CommandFeed::FB_MOVE_UP: case CommandFeed::FB_MOVE_DOWN: case CommandFeed::FB_MOVE_LEFT: case CommandFeed::FB_MOVE_RIGHT:
+		feed.moving = button.kind; // (flies while held, see updateFeed)
+		feed.gliding = false;
+		return;
+	case CommandFeed::FB_LEVEL_UP: _state->_map->getCamera()->up(); break;
+	case CommandFeed::FB_LEVEL_DOWN: _state->_map->getCamera()->down(); break;
 	case CommandFeed::FB_NAMES: feed.names = !feed.names; break;
 	case CommandFeed::FB_BOXES: feed.boxes = !feed.boxes; break;
 	case CommandFeed::FB_DRONE_MAX: feed.maximised = feed.maximised == CommandFeed::MAX_DRONE ? CommandFeed::MAX_NONE : CommandFeed::MAX_DRONE; break;
@@ -1230,6 +1378,8 @@ void FirstPersonMode::feedColours()
 	feed.liveColour = nearestColor(palette, 230, 30, 30);
 	feed.hudColour = bright(90, 235, 90);
 	feed.pickedColour = bright(250, 215, 60);
+	feed.purple = bright(150, 70, 220);
+	feed.purpleLit = bright(215, 140, 255);
 	if (!feed.writer)
 	{
 		feed.writer.reset(new Text(Options::baseXResolution, FeedWordsH, 0, 0));

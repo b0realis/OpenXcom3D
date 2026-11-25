@@ -2570,7 +2570,10 @@ void FirstPersonMode::selectUnit(BattleUnit *unit)
 	// Select them, as BattlescapeState's next-soldier button does.
 	_save->setSelectedUnit(unit);
 	_state->updateSoldierInfo();
-	_state->_map->getCamera()->centerOnPosition(unit->getPosition());
+	if (!feedShown()) // (the Live command feed's drone stays where the player flies it: FLY TO goes to the soldier)
+	{
+		_state->_map->getCamera()->centerOnPosition(unit->getPosition());
+	}
 	_state->_battleGame->cancelAllActions();
 	_state->_battleGame->getCurrentAction()->actor = unit;
 	_state->_battleGame->setupCursor();
