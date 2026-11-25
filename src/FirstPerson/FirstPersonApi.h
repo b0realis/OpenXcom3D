@@ -148,6 +148,9 @@ FirstPersonMode *create(Game *game, BattlescapeState *state);
 void destroy(FirstPersonMode *mode);
 /// The per-frame update: camera, movement, HUD. Called from the screen's think().
 void think(FirstPersonMode *mode);
+/// Each frame before the battle's own think (after the player's input and the map's scrolling): the Live command
+/// feed's drone held where the player left it, its DYNAMIC off. Called from the screen's think().
+void beforeBattleThink(FirstPersonMode *mode);
 /// Gets the first look at an event (keys, mouse); returns true if it used it, and the screen
 /// then leaves it alone. Called from the screen's handle().
 bool handle(FirstPersonMode *mode, Action *action);
@@ -481,6 +484,7 @@ inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }
 inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 inline void destroy(FirstPersonMode *) { }
 inline void think(FirstPersonMode *) { }
+inline void beforeBattleThink(FirstPersonMode *) { }
 inline bool handle(FirstPersonMode *, Action *) { return false; }
 inline bool blit(FirstPersonMode *) { return false; }
 inline bool wantsMouseCapture(const FirstPersonMode *) { return false; }

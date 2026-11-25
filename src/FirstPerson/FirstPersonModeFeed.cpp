@@ -192,7 +192,7 @@ struct CommandFeed
 	enum Maximised { MAX_NONE, MAX_DRONE };
 	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 	/// lit (a switch that is on).
-	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
+	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_DYNAMIC, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
 		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY, FB_TAB_SQUAD, FB_TAB_INVENTORY };
 	/// The window at the top left: the squad's table or the selected soldier's inventory (the player's choice).
 	enum Tab { TAB_SQUAD, TAB_INVENTORY };
@@ -220,6 +220,13 @@ struct CommandFeed
 	// level buttons work while following).
 	const BattleUnit *followedUnit = nullptr;
 	int followedZ = -1;
+	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on, as on the isometric map), or it stays
+	// where the player left it (off); off, where it was before the battle's think this frame (noted, see
+	// beforeBattleThink), and the map told not to go after shots (to tell back when it comes on again); where it was at
+	// the end of the last frame, and whether the battle put a screen over it then (the next turn's, which centres the
+	// map on the soldier as it goes).
+	bool dynamic = true, held = false, projectileHeld = false, screenFromBattle = false;
+	Position heldAt, endAt;
 	Position glideFrom, glideTo;
 	Uint32 glideStart = 0, lastFrame = 0;
 	int mouseX = -1, mouseY = -1;
@@ -297,7 +304,7 @@ namespace
 bool droneButton(CommandFeed::ButtonKind kind)
 {
 	return kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
-		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_MOVE_UP
+		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_DYNAMIC || kind == CommandFeed::FB_MOVE_UP
 		|| kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT || kind == CommandFeed::FB_LEVEL_UP
 		|| kind == CommandFeed::FB_LEVEL_DOWN;
 }
@@ -404,6 +411,33 @@ void FirstPersonMode::updateFeed()
 		_feed.reset(new CommandFeed());
 	}
 	CommandFeed &feed = *_feed;
+	// DYNAMIC off (the owner: "On keeps, off stays as player positioned"): what the battle itself did with the map's
+	// camera this frame (after a soldier walking, a shot, an explosion, the aliens in their turn, a turn's start) is
+	// taken back, before the layout (which keeps the middle of the drone's picture for another window). The player's own
+	// moves came before the battle's think and stay (the arrows, the level buttons and keys, the map's scrolling and
+	// wheel, the tactical map; FLY TO and FOLLOW below). The map no longer goes after a shot either (Map::draw would move
+	// its camera with the bullet), until DYNAMIC is on again (not in the middle of a shot: its own end tells it again).
+	Camera *droneCamera = _state->_map->getCamera();
+	if (feed.held)
+	{
+		feed.held = false;
+		const Position moved = droneCamera->getMapOffset();
+		if (moved.x != feed.heldAt.x || moved.y != feed.heldAt.y || moved.z != feed.heldAt.z)
+		{
+			droneCamera->setMapOffset(feed.heldAt);
+			droneCamera->scrollXY(0, 0, true); // (its middle tile again, the cursor on its tile, the map drawn again)
+		}
+	}
+	if (!feed.dynamic)
+	{
+		_state->_map->setFollowProjectile(false);
+		feed.projectileHeld = true;
+	}
+	else if (feed.projectileHeld && !_state->_map->getProjectile())
+	{
+		_state->_map->setFollowProjectile(true);
+		feed.projectileHeld = false;
+	}
 	feed.on = true;
 	_wants3D = true; // (the 3D view plays in its window: up as soon as there is a soldier to look through, see think)
 	feedColours();
@@ -432,8 +466,8 @@ void FirstPersonMode::updateFeed()
 	}
 	map->setMaskTarget(masked ? feed.mask.get() : nullptr, feed.vision == CommandFeed::VISION_NIGHT_PLUS);
 
-	// The drone stays where the player flies it (the owner: "Otherwise it stays as player set it"): an arrow held flies it
-	// that way; FLY TO glides it to the soldier (see flyFeedTo).
+	// The player flies the drone (the owner: "Otherwise it stays as player set it"; the battle's own camera moves only with
+	// DYNAMIC on, see above): an arrow held flies it that way; FLY TO glides it to the soldier (see flyFeedTo).
 	Camera *camera = map->getCamera();
 	const Uint32 now = SDL_GetTicks();
 	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
@@ -525,11 +559,36 @@ void FirstPersonMode::updateFeed()
 		updateFeedSquad();
 	}
 
+	// (where the drone is at the end of the frame; a screen the battle's think put over it, see beforeBattleThink)
+	feed.endAt = camera->getMapOffset();
+	feed.screenFromBattle = !_game->isState(_state);
 	// The minimap's frame (its clock, drawn again as the battle goes on).
 	if (feed.minimap && feed.maximised == CommandFeed::MAX_NONE)
 	{
 		feed.minimap->think();
 	}
+}
+
+/**
+ * Each frame before the battle's own think (see FirstPerson::beforeBattleThink): with the feed up and its DYNAMIC off,
+ * where the drone is now, the player's moves made (their input and the map's own scrolling come before): what the
+ * battle does with the map's camera after this is taken back (see updateFeed). After a screen the battle's think put up
+ * (the next turn's centres the map on the soldier as it closes), where it was before that screen.
+ */
+void FirstPersonMode::beforeBattleThink()
+{
+	if (!_feed)
+	{
+		return;
+	}
+	CommandFeed &feed = *_feed;
+	feed.held = feed.on && !feed.dynamic;
+	if (feed.held)
+	{
+		// (a screen the battle put up, the next turn's, centred the map as it went: that was the battle's too)
+		feed.heldAt = feed.screenFromBattle ? feed.endAt : _state->_map->getCamera()->getMapOffset();
+	}
+	feed.screenFromBattle = false;
 }
 
 /**
@@ -551,6 +610,12 @@ void FirstPersonMode::leaveFeed()
 		feed.cameraWindow = SDL_Rect{};
 	}
 	camera->stopMouseScrolling();
+	if (feed.projectileHeld)
+	{
+		_state->_map->setFollowProjectile(true); // (DYNAMIC off held it: the map goes after shots again)
+		feed.projectileHeld = false;
+	}
+	feed.held = false;
 	_state->_mouseOverIcons = false; // (the map's cursor back, see handleFeedMouse)
 	_mouseLook = isActive() && !_classicHud; // (as setActive has it out of the feed)
 	_state->_map->invalidate();
@@ -645,7 +710,7 @@ void FirstPersonMode::layOutFeed()
 }
 
 /**
- * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FOLLOW, FLY TO,
+ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's DYNAMIC, FOLLOW, FLY TO,
  * stabiliser, night vision (realistic, then enhanced), thermal, names, boxes and all over the screen, and on its picture
  * the arrows at its edges (held: it flies that way) and the level buttons at its right; the minimap's all over the screen; the 3D window's, which goes to the full 3D
  * view; the top left window's tabs (the squad, the inventory) and its button which opens the game's inventory screen.
@@ -677,6 +742,7 @@ void FirstPersonMode::feedButtons()
 	add(CommandFeed::FB_STABILISER, drone, right, _state->tr("STR_FPS_FEED_STABILISER"), feed.stabiliser);
 	add(CommandFeed::FB_FLY_TO, drone, right, _state->tr("STR_FPS_FEED_FLY_TO"), feed.gliding);
 	add(CommandFeed::FB_FOLLOW, drone, right, _state->tr("STR_FPS_FEED_FOLLOW"), feed.follow);
+	add(CommandFeed::FB_DYNAMIC, drone, right, _state->tr("STR_FPS_FEED_DYNAMIC"), feed.dynamic);
 	// (the arrows at the drone picture's edges, and the level buttons at its right under the top one)
 	const SDL_Rect &picture = feed.dronePictureNow();
 	const int along = FeedArrowLong * ui, deep = FeedArrowDeep * ui, arrowInset = FeedArrowInset * ui, levelSide = FeedLevelButton * ui;
@@ -1107,10 +1173,12 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 		}
 		return x + feedWrite(screen, words, x, frame.y + wordsY, colour, std::max(1, roomFrom(frame, x)));
 	};
-	// (more of a title, a little after where its words ended, in a colour of its own; none if there is no room)
+	// (more of a title, a little after where its words ended, in a colour of its own: whole or not at all, a turn or a
+	// time cut short tells nothing)
 	auto titleAfter = [&](const SDL_Rect &frame, int after, const std::string &words, Uint8 colour) {
 		const int x = after + 6 * ui, room = roomFrom(frame, x);
-		return room > 4 * ui ? x + feedWrite(screen, words, x, frame.y + wordsY, colour, room) : after;
+		feed.writer->setText(words);
+		return feed.writer->getTextWidth() * ui <= room ? x + feedWrite(screen, words, x, frame.y + wordsY, colour, room) : after;
 	};
 
 	if (feed.maximised == CommandFeed::MAX_NONE)
@@ -1490,6 +1558,7 @@ void FirstPersonMode::pressFeedButton(int index, Action *action)
 	case CommandFeed::FB_STABILISER: feed.stabiliser = !feed.stabiliser; break;
 	case CommandFeed::FB_FLY_TO: flyFeedTo(); break;
 	case CommandFeed::FB_FOLLOW: feed.follow = !feed.follow; break;
+	case CommandFeed::FB_DYNAMIC: feed.dynamic = !feed.dynamic; break; // (off: held from the next frame, see beforeBattleThink)
 	case CommandFeed::FB_MOVE_UP: case CommandFeed::FB_MOVE_DOWN: case CommandFeed::FB_MOVE_LEFT: case CommandFeed::FB_MOVE_RIGHT:
 		feed.moving = button.kind; // (flies while held, see updateFeed)
 		feed.gliding = false;

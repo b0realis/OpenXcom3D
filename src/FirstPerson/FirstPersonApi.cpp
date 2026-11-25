@@ -389,6 +389,20 @@ void think(FirstPersonMode *mode)
 }
 
 /**
+ * Each frame before the battle's own think, after the player's input and the map's scrolling: the Live command feed's
+ * drone noted where the player left it (its DYNAMIC off: the battle's own camera moves are taken back, see
+ * FirstPersonMode::updateFeed), if there is a mode.
+ * @param mode The mode, or nullptr.
+ */
+void beforeBattleThink(FirstPersonMode *mode)
+{
+	if (mode)
+	{
+		mode->beforeBattleThink();
+	}
+}
+
+/**
  * Gives the first-person mode the first look at an input event (keys, mouse), before the
  * battlescape screen handles it.
  * @param mode The mode, or nullptr.

@@ -139,6 +139,8 @@ public:
 	void toggleView();
 	/// Per-frame update.
 	void think();
+	/// Each frame before the battle's own think: the Live command feed's drone held where the player left it (DYNAMIC off).
+	void beforeBattleThink();
 	/// Handles an event first; returns true if it was consumed.
 	bool handle(Action *action);
 	/// Draws the whole battlescape screen its own way: the 3D view, the game's surfaces (only its

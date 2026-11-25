@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..34d1db379
+index 000000000..cadf060cc
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,775 @@
+@@ -0,0 +1,776 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -653,6 +653,7 @@ index 000000000..34d1db379
 +  STR_FPS_FEED_STABILISER: "STAB"
 +  STR_FPS_FEED_FLY_TO: "FLY TO"
 +  STR_FPS_FEED_FOLLOW: "FOLLOW"
++  STR_FPS_FEED_DYNAMIC: "DYNAMIC"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
@@ -905,10 +906,10 @@ index 000000000..34d1db379
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..c7c6884cb
+index 000000000..425b9c68d
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,775 @@
+@@ -0,0 +1,776 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1434,6 +1435,7 @@ index 000000000..c7c6884cb
 +  STR_FPS_FEED_STABILISER: "STAB"
 +  STR_FPS_FEED_FLY_TO: "FLY TO"
 +  STR_FPS_FEED_FOLLOW: "FOLLOW"
++  STR_FPS_FEED_DYNAMIC: "DYNAMIC"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
@@ -19752,7 +19754,7 @@ index 1951ba749..45aa0e792 100644
  						{
  							iter = craftInv->erase(iter);
 diff --git a/src/Battlescape/BattlescapeState.cpp b/src/Battlescape/BattlescapeState.cpp
-index 7cd494130..c344c26d4 100644
+index 7cd494130..1dbc69094 100644
 --- a/src/Battlescape/BattlescapeState.cpp
 +++ b/src/Battlescape/BattlescapeState.cpp
 @@ -22,6 +22,7 @@
@@ -19791,7 +19793,15 @@ index 7cd494130..c344c26d4 100644
  	delete _animTimer;
  	delete _gameTimer;
  	delete _battleGame;
-@@ -872,6 +880,7 @@ void BattlescapeState::think()
+@@ -865,6 +873,7 @@ void BattlescapeState::think()
+ 		if (_popups.empty())
+ 		{
+ 			State::think();
++			FirstPerson::beforeBattleThink(_firstPerson); // OpenXcom3D add-on (the Live command feed's drone held: its DYNAMIC off)
+ 			int ret = _battleGame->think();
+ 			if (ret > -1)
+ 			{
+@@ -872,6 +881,7 @@ void BattlescapeState::think()
  			}
  			_animTimer->think(this, 0);
  			_gameTimer->think(this, 0);
@@ -19799,7 +19809,7 @@ index 7cd494130..c344c26d4 100644
  			if (popped)
  			{
  				_battleGame->handleNonTargetAction();
-@@ -913,14 +922,30 @@ void BattlescapeState::mapOver(Action *action)
+@@ -913,14 +923,30 @@ void BattlescapeState::mapOver(Action *action)
  			return;
  		}
  
@@ -19833,7 +19843,7 @@ index 7cd494130..c344c26d4 100644
  		}
  
  		// Check the threshold
-@@ -1189,6 +1214,7 @@ void BattlescapeState::btnShowMapClick(Action *)
+@@ -1189,6 +1215,7 @@ void BattlescapeState::btnShowMapClick(Action *)
  	//MiniMapState
  	if (allowButtons())
  	{
@@ -19841,7 +19851,7 @@ index 7cd494130..c344c26d4 100644
  		int maxShade = _map->reShadeMinimap(7); // 7 = vanilla
  		_game->pushState (new MiniMapState (_map->getCamera(), _save, maxShade));
  	}
-@@ -1545,6 +1571,11 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
+@@ -1545,6 +1572,11 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
  {
  	if (playableUnitSelected())
  	{
@@ -19853,7 +19863,7 @@ index 7cd494130..c344c26d4 100644
  		// concession for touch devices:
  		// click on the item to cancel action, and don't pop up a menu to select a new one
  		// TODO: wrap this in an IFDEF ?
-@@ -1594,6 +1625,11 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
+@@ -1594,6 +1626,11 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
  {
  	if (playableUnitSelected())
  	{
@@ -19865,7 +19875,7 @@ index 7cd494130..c344c26d4 100644
  		// concession for touch devices:
  		// click on the item to cancel action, and don't pop up a menu to select a new one
  		// TODO: wrap this in an IFDEF ?
-@@ -2111,6 +2147,7 @@ void BattlescapeState::drawHandsItems()
+@@ -2111,6 +2148,7 @@ void BattlescapeState::drawHandsItems()
  	}
  	drawItem(leftHandItem, _btnLeftHandItem, _numAmmoLeft, _numMedikitLeft, _numTwoHandedIndicatorLeft, left, left2);
  	drawItem(rightHandItem, _btnRightHandItem, _numAmmoRight, _numMedikitRight, _numTwoHandedIndicatorRight, right, right2);
@@ -19873,7 +19883,7 @@ index 7cd494130..c344c26d4 100644
  }
  
  /**
-@@ -2282,7 +2319,13 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
+@@ -2282,7 +2320,13 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
  	{
  		_barMana->setMax(battleUnit->getBaseStats()->mana);
  		_barMana->setValue(battleUnit->getMana());
@@ -19887,7 +19897,7 @@ index 7cd494130..c344c26d4 100644
  
  	toggleKneelButton(battleUnit);
  
-@@ -2547,6 +2590,25 @@ void BattlescapeState::animate()
+@@ -2547,6 +2591,25 @@ void BattlescapeState::animate()
  	}
  }
  
@@ -19913,7 +19923,7 @@ index 7cd494130..c344c26d4 100644
  /**
   * Handles the battle game state.
   */
-@@ -2698,6 +2760,11 @@ inline void BattlescapeState::handle(Action *action)
+@@ -2698,6 +2761,11 @@ inline void BattlescapeState::handle(Action *action)
  {
  	if (!_firstInit)
  	{
@@ -19925,7 +19935,7 @@ index 7cd494130..c344c26d4 100644
  		if (_game->getCursor()->getVisible() || ((action->getDetails()->type == SDL_MOUSEBUTTONDOWN || action->getDetails()->type == SDL_MOUSEBUTTONUP) && _game->isRightClick(action)))
  		{
  			State::handle(action);
-@@ -4078,6 +4145,7 @@ void BattlescapeState::resize(int &dX, int &dY)
+@@ -4078,6 +4146,7 @@ void BattlescapeState::resize(int &dX, int &dY)
  	{
  		pos += dX;
  	}
@@ -24986,10 +24996,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..c219815f7
+index 000000000..6a345e188
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2412 @@
+@@ -0,0 +1,2426 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25377,6 +25387,20 @@ index 000000000..c219815f7
 +	if (mode)
 +	{
 +		mode->think();
++	}
++}
++
++/**
++ * Each frame before the battle's own think, after the player's input and the map's scrolling: the Live command feed's
++ * drone noted where the player left it (its DYNAMIC off: the battle's own camera moves are taken back, see
++ * FirstPersonMode::updateFeed), if there is a mode.
++ * @param mode The mode, or nullptr.
++ */
++void beforeBattleThink(FirstPersonMode *mode)
++{
++	if (mode)
++	{
++		mode->beforeBattleThink();
 +	}
 +}
 +
@@ -27404,10 +27428,10 @@ index 000000000..c219815f7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..5630d5113
+index 000000000..5b692639e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,575 @@
+@@ -0,0 +1,579 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27558,6 +27582,9 @@ index 000000000..5630d5113
 +void destroy(FirstPersonMode *mode);
 +/// The per-frame update: camera, movement, HUD. Called from the screen's think().
 +void think(FirstPersonMode *mode);
++/// Each frame before the battle's own think (after the player's input and the map's scrolling): the Live command
++/// feed's drone held where the player left it, its DYNAMIC off. Called from the screen's think().
++void beforeBattleThink(FirstPersonMode *mode);
 +/// Gets the first look at an event (keys, mouse); returns true if it used it, and the screen
 +/// then leaves it alone. Called from the screen's handle().
 +bool handle(FirstPersonMode *mode, Action *action);
@@ -27891,6 +27918,7 @@ index 000000000..5630d5113
 +inline FirstPersonMode *create(Game *, BattlescapeState *) { return nullptr; }
 +inline void destroy(FirstPersonMode *) { }
 +inline void think(FirstPersonMode *) { }
++inline void beforeBattleThink(FirstPersonMode *) { }
 +inline bool handle(FirstPersonMode *, Action *) { return false; }
 +inline bool blit(FirstPersonMode *) { return false; }
 +inline bool wantsMouseCapture(const FirstPersonMode *) { return false; }
@@ -42882,10 +42910,10 @@ index 000000000..91e85b624
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..71e99b38d
+index 000000000..f29b49147
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1671 @@
+@@ -0,0 +1,1673 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43027,6 +43055,8 @@ index 000000000..71e99b38d
 +	void toggleView();
 +	/// Per-frame update.
 +	void think();
++	/// Each frame before the battle's own think: the Live command feed's drone held where the player left it (DYNAMIC off).
++	void beforeBattleThink();
 +	/// Handles an event first; returns true if it was consumed.
 +	bool handle(Action *action);
 +	/// Draws the whole battlescape screen its own way: the 3D view, the game's surfaces (only its
@@ -45561,10 +45591,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..cc7562ddf
+index 000000000..4da246de0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,2099 @@
+@@ -0,0 +1,2168 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45759,7 +45789,7 @@ index 000000000..cc7562ddf
 +	enum Maximised { MAX_NONE, MAX_DRONE };
 +	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 +	/// lit (a switch that is on).
-+	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
++	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_DYNAMIC, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
 +		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY, FB_TAB_SQUAD, FB_TAB_INVENTORY };
 +	/// The window at the top left: the squad's table or the selected soldier's inventory (the player's choice).
 +	enum Tab { TAB_SQUAD, TAB_INVENTORY };
@@ -45787,6 +45817,13 @@ index 000000000..cc7562ddf
 +	// level buttons work while following).
 +	const BattleUnit *followedUnit = nullptr;
 +	int followedZ = -1;
++	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on, as on the isometric map), or it stays
++	// where the player left it (off); off, where it was before the battle's think this frame (noted, see
++	// beforeBattleThink), and the map told not to go after shots (to tell back when it comes on again); where it was at
++	// the end of the last frame, and whether the battle put a screen over it then (the next turn's, which centres the
++	// map on the soldier as it goes).
++	bool dynamic = true, held = false, projectileHeld = false, screenFromBattle = false;
++	Position heldAt, endAt;
 +	Position glideFrom, glideTo;
 +	Uint32 glideStart = 0, lastFrame = 0;
 +	int mouseX = -1, mouseY = -1;
@@ -45864,7 +45901,7 @@ index 000000000..cc7562ddf
 +bool droneButton(CommandFeed::ButtonKind kind)
 +{
 +	return kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
-+		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_MOVE_UP
++		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_DYNAMIC || kind == CommandFeed::FB_MOVE_UP
 +		|| kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT || kind == CommandFeed::FB_LEVEL_UP
 +		|| kind == CommandFeed::FB_LEVEL_DOWN;
 +}
@@ -45971,6 +46008,33 @@ index 000000000..cc7562ddf
 +		_feed.reset(new CommandFeed());
 +	}
 +	CommandFeed &feed = *_feed;
++	// DYNAMIC off (the owner: "On keeps, off stays as player positioned"): what the battle itself did with the map's
++	// camera this frame (after a soldier walking, a shot, an explosion, the aliens in their turn, a turn's start) is
++	// taken back, before the layout (which keeps the middle of the drone's picture for another window). The player's own
++	// moves came before the battle's think and stay (the arrows, the level buttons and keys, the map's scrolling and
++	// wheel, the tactical map; FLY TO and FOLLOW below). The map no longer goes after a shot either (Map::draw would move
++	// its camera with the bullet), until DYNAMIC is on again (not in the middle of a shot: its own end tells it again).
++	Camera *droneCamera = _state->_map->getCamera();
++	if (feed.held)
++	{
++		feed.held = false;
++		const Position moved = droneCamera->getMapOffset();
++		if (moved.x != feed.heldAt.x || moved.y != feed.heldAt.y || moved.z != feed.heldAt.z)
++		{
++			droneCamera->setMapOffset(feed.heldAt);
++			droneCamera->scrollXY(0, 0, true); // (its middle tile again, the cursor on its tile, the map drawn again)
++		}
++	}
++	if (!feed.dynamic)
++	{
++		_state->_map->setFollowProjectile(false);
++		feed.projectileHeld = true;
++	}
++	else if (feed.projectileHeld && !_state->_map->getProjectile())
++	{
++		_state->_map->setFollowProjectile(true);
++		feed.projectileHeld = false;
++	}
 +	feed.on = true;
 +	_wants3D = true; // (the 3D view plays in its window: up as soon as there is a soldier to look through, see think)
 +	feedColours();
@@ -45999,8 +46063,8 @@ index 000000000..cc7562ddf
 +	}
 +	map->setMaskTarget(masked ? feed.mask.get() : nullptr, feed.vision == CommandFeed::VISION_NIGHT_PLUS);
 +
-+	// The drone stays where the player flies it (the owner: "Otherwise it stays as player set it"): an arrow held flies it
-+	// that way; FLY TO glides it to the soldier (see flyFeedTo).
++	// The player flies the drone (the owner: "Otherwise it stays as player set it"; the battle's own camera moves only with
++	// DYNAMIC on, see above): an arrow held flies it that way; FLY TO glides it to the soldier (see flyFeedTo).
 +	Camera *camera = map->getCamera();
 +	const Uint32 now = SDL_GetTicks();
 +	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
@@ -46092,11 +46156,36 @@ index 000000000..cc7562ddf
 +		updateFeedSquad();
 +	}
 +
++	// (where the drone is at the end of the frame; a screen the battle's think put over it, see beforeBattleThink)
++	feed.endAt = camera->getMapOffset();
++	feed.screenFromBattle = !_game->isState(_state);
 +	// The minimap's frame (its clock, drawn again as the battle goes on).
 +	if (feed.minimap && feed.maximised == CommandFeed::MAX_NONE)
 +	{
 +		feed.minimap->think();
 +	}
++}
++
++/**
++ * Each frame before the battle's own think (see FirstPerson::beforeBattleThink): with the feed up and its DYNAMIC off,
++ * where the drone is now, the player's moves made (their input and the map's own scrolling come before): what the
++ * battle does with the map's camera after this is taken back (see updateFeed). After a screen the battle's think put up
++ * (the next turn's centres the map on the soldier as it closes), where it was before that screen.
++ */
++void FirstPersonMode::beforeBattleThink()
++{
++	if (!_feed)
++	{
++		return;
++	}
++	CommandFeed &feed = *_feed;
++	feed.held = feed.on && !feed.dynamic;
++	if (feed.held)
++	{
++		// (a screen the battle put up, the next turn's, centred the map as it went: that was the battle's too)
++		feed.heldAt = feed.screenFromBattle ? feed.endAt : _state->_map->getCamera()->getMapOffset();
++	}
++	feed.screenFromBattle = false;
 +}
 +
 +/**
@@ -46118,6 +46207,12 @@ index 000000000..cc7562ddf
 +		feed.cameraWindow = SDL_Rect{};
 +	}
 +	camera->stopMouseScrolling();
++	if (feed.projectileHeld)
++	{
++		_state->_map->setFollowProjectile(true); // (DYNAMIC off held it: the map goes after shots again)
++		feed.projectileHeld = false;
++	}
++	feed.held = false;
 +	_state->_mouseOverIcons = false; // (the map's cursor back, see handleFeedMouse)
 +	_mouseLook = isActive() && !_classicHud; // (as setActive has it out of the feed)
 +	_state->_map->invalidate();
@@ -46212,7 +46307,7 @@ index 000000000..cc7562ddf
 +}
 +
 +/**
-+ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FOLLOW, FLY TO,
++ * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's DYNAMIC, FOLLOW, FLY TO,
 + * stabiliser, night vision (realistic, then enhanced), thermal, names, boxes and all over the screen, and on its picture
 + * the arrows at its edges (held: it flies that way) and the level buttons at its right; the minimap's all over the screen; the 3D window's, which goes to the full 3D
 + * view; the top left window's tabs (the squad, the inventory) and its button which opens the game's inventory screen.
@@ -46244,6 +46339,7 @@ index 000000000..cc7562ddf
 +	add(CommandFeed::FB_STABILISER, drone, right, _state->tr("STR_FPS_FEED_STABILISER"), feed.stabiliser);
 +	add(CommandFeed::FB_FLY_TO, drone, right, _state->tr("STR_FPS_FEED_FLY_TO"), feed.gliding);
 +	add(CommandFeed::FB_FOLLOW, drone, right, _state->tr("STR_FPS_FEED_FOLLOW"), feed.follow);
++	add(CommandFeed::FB_DYNAMIC, drone, right, _state->tr("STR_FPS_FEED_DYNAMIC"), feed.dynamic);
 +	// (the arrows at the drone picture's edges, and the level buttons at its right under the top one)
 +	const SDL_Rect &picture = feed.dronePictureNow();
 +	const int along = FeedArrowLong * ui, deep = FeedArrowDeep * ui, arrowInset = FeedArrowInset * ui, levelSide = FeedLevelButton * ui;
@@ -46674,10 +46770,12 @@ index 000000000..cc7562ddf
 +		}
 +		return x + feedWrite(screen, words, x, frame.y + wordsY, colour, std::max(1, roomFrom(frame, x)));
 +	};
-+	// (more of a title, a little after where its words ended, in a colour of its own; none if there is no room)
++	// (more of a title, a little after where its words ended, in a colour of its own: whole or not at all, a turn or a
++	// time cut short tells nothing)
 +	auto titleAfter = [&](const SDL_Rect &frame, int after, const std::string &words, Uint8 colour) {
 +		const int x = after + 6 * ui, room = roomFrom(frame, x);
-+		return room > 4 * ui ? x + feedWrite(screen, words, x, frame.y + wordsY, colour, room) : after;
++		feed.writer->setText(words);
++		return feed.writer->getTextWidth() * ui <= room ? x + feedWrite(screen, words, x, frame.y + wordsY, colour, room) : after;
 +	};
 +
 +	if (feed.maximised == CommandFeed::MAX_NONE)
@@ -47057,6 +47155,7 @@ index 000000000..cc7562ddf
 +	case CommandFeed::FB_STABILISER: feed.stabiliser = !feed.stabiliser; break;
 +	case CommandFeed::FB_FLY_TO: flyFeedTo(); break;
 +	case CommandFeed::FB_FOLLOW: feed.follow = !feed.follow; break;
++	case CommandFeed::FB_DYNAMIC: feed.dynamic = !feed.dynamic; break; // (off: held from the next frame, see beforeBattleThink)
 +	case CommandFeed::FB_MOVE_UP: case CommandFeed::FB_MOVE_DOWN: case CommandFeed::FB_MOVE_LEFT: case CommandFeed::FB_MOVE_RIGHT:
 +		feed.moving = button.kind; // (flies while held, see updateFeed)
 +		feed.gliding = false;
