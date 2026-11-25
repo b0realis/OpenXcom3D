@@ -242,6 +242,7 @@ SETTINGS = [
     ]),
     ('Experimental', [
         ('Voxel units (experimental)', 'NO', 'YES / NO', 'Experimental, the last setting under Advanced. YES: units are 3D bodies of little cubes made from their own sprites, walking and going down as their frames show. NO: the game\'s pictures. Tell us what looks wrong: <a href="https://github.com/b0realis/OpenXcom3D/issues">open an issue</a> with a screenshot and, if you can, the save.', 'What shots hit is set by Realistic hitboxes: NO the original shapes, YES the whole body.'),
+        ('Live command feed (experimental)', 'NO', 'YES / NO', 'Experimental. YES: the isometric view as a command post: the soldiers\' helmet cameras in a row along the top (a click selects, arrows scroll), the map below as a drone\'s feed in black and white with static (NV, names and boxes on buttons), the tactical map beside it; each window can be shown all over the screen. NO: the isometric map as ever.', 'Not in VR mode. On the original 320x200 screen there is no room for the tactical map.'),
     ]),
 ]
 

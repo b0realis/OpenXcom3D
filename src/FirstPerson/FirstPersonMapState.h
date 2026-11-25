@@ -116,6 +116,10 @@ public:
 		bool hasPanelColours = false;
 		Uint8 nameColour = 0, healthColour = 0, timeColour = 0, weaponColour = 0;
 		std::function<std::string(BattleUnit*, bool)> weaponWords;
+		/// Shown in a window of another screen (the Live command feed's minimap; a width of 0: all over the screen, a
+		/// screen of its own): there it never closes (no OK; the right button does nothing), keeps a zoom of its own,
+		/// follows the selected soldier and is drawn again as the battle goes on; its keys are the battle's.
+		SDL_Rect window = { 0, 0, 0, 0 };
 	};
 	/// Creates the tactical map.
 	FirstPersonMapState(Camera *camera, SavedBattleGame *save, int maxShade, const Setup &setup);
@@ -163,6 +167,8 @@ private:
 	std::string _hint;                   // how the map is worked (the help's words with no button under the pointer)
 	int _helpRows = 1;                   // the rows the longest help needs on this screen: kept free over the bottom line while it shows
 	int _level = 0, _terrainLevel = -1;
+	int _zoom = 1;                         // the zoom shown (the full map's is kept for the next time: see Zoom)
+	const BattleUnit *_followed = nullptr; // in a window: the selected soldier it was last centred on
 	double _centreX = 0.0, _centreY = 0.0; // the tile in the middle of the screen
 	int _frame = 0;                        // the animation's (the items blink, the selected dot beats)
 	bool _dirty = true;
@@ -190,6 +196,7 @@ private:
 	const BattleUnit *_helmetLooksAt = nullptr;
 
 	int cell() const;
+	bool embedded() const { return _setup.window.w > 0; }
 	int big(int pixels) const { return pixels * _ui; }
 	void updateReach();
 	void drawReach(int originX, int originY);

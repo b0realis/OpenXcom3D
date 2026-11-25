@@ -116,9 +116,10 @@ const int StatusGap = 8;
  */
 FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, int maxShade, const Setup &setup) : _camera(camera), _save(save), _maxShade(maxShade), _setup(setup)
 {
-	const int width = Options::baseXResolution, height = Options::baseYResolution;
+	// (all over the screen, or in the window it is given: see Setup::window)
+	const int width = embedded() ? setup.window.w : Options::baseXResolution, height = embedded() ? setup.window.h : Options::baseYResolution;
 	_ui = std::max(1, setup.uiScale);
-	_view = new InteractiveSurface(width, height, 0, 0);
+	_view = new InteractiveSurface(width, height, embedded() ? setup.window.x : 0, embedded() ? setup.window.y : 0);
 	save->setPaletteByDepth(this);
 	add(_view);
 	_tiles = _game->getMod()->getSurfaceSet("SCANG.DAT");
@@ -155,9 +156,11 @@ FirstPersonMapState::FirstPersonMapState(Camera *camera, SavedBattleGame *save, 
 	_level = std::clamp(camera->getViewLevel(), 0, save->getMapSizeZ() - 1);
 	if (Zoom <= 0)
 	{
-		Zoom = Options::fpsMapZoom > 0 ? Options::fpsMapZoom : std::min(width, height) / (40 * CellPixels);
+		Zoom = Options::fpsMapZoom > 0 ? Options::fpsMapZoom : std::min(Options::baseXResolution, Options::baseYResolution) / (40 * CellPixels);
 	}
 	Zoom = std::clamp(Zoom, 1, ZoomMost * _ui);
+	// (in a window: its own, at first the biggest at which a 40 tile map fits it)
+	_zoom = embedded() ? std::clamp(std::min(width, height) / (40 * CellPixels), 1, ZoomMost * _ui) : Zoom;
 	const BattleUnit *selected = save->getSelectedUnit();
 	if (selected && !selected->isOut())
 	{
@@ -211,7 +214,7 @@ FirstPersonMapState::~FirstPersonMapState()
  */
 int FirstPersonMapState::cell() const
 {
-	return CellPixels * Zoom;
+	return CellPixels * _zoom;
 }
 
 /**
@@ -235,6 +238,8 @@ void FirstPersonMapState::layOut()
 	int x = big(ButtonGap), y = big(ButtonGap), closeLeft = _view->getWidth();
 	for (const Said &said : all)
 	{
+		// (in a window no OK: it never closes; with no helmet camera, no button for it)
+		if ((said.kind == BUTTON_CLOSE && embedded()) || (said.kind == BUTTON_CAMERA && !(_setup.makeCamera && _setup.aimCamera))) continue;
 		Button button;
 		button.kind = said.kind;
 		button.words = tr(said.words);
@@ -673,7 +678,7 @@ void FirstPersonMapState::draw()
 {
 	_dirty = false;
 	if (_terrainLevel != _level) rebuildTerrain();
-	const int width = _view->getWidth(), height = _view->getHeight(), zoom = Zoom, size = cell();
+	const int width = _view->getWidth(), height = _view->getHeight(), zoom = _zoom, size = cell();
 	const int mapWide = _save->getMapSizeX() * CellPixels, mapHigh = _save->getMapSizeY() * CellPixels;
 	const int originX = (int)std::lround(width / 2.0 - _centreX * size), originY = (int)std::lround(height / 2.0 - _centreY * size);
 	// The tiles: each pixel of the little pictures a square of the zoom's side; off the map, a dark blue.
@@ -994,8 +999,12 @@ void FirstPersonMapState::changeLevel(int by)
  */
 void FirstPersonMapState::changeZoom(int by)
 {
-	Zoom = std::clamp(Zoom + by, 1, ZoomMost * _ui);
-	Options::fpsMapZoom = Zoom; // (kept with the options: see Zoom)
+	_zoom = std::clamp(_zoom + by, 1, ZoomMost * _ui);
+	if (!embedded())
+	{
+		Zoom = _zoom;
+		Options::fpsMapZoom = Zoom; // (kept with the options: see Zoom)
+	}
 	_dirty = true;
 }
 
@@ -1058,6 +1067,7 @@ void FirstPersonMapState::nextSoldier(int by)
  */
 void FirstPersonMapState::close()
 {
+	if (embedded()) return; // (in a window it never closes: see Setup::window)
 	_camera->setViewLevel(_level);
 	_camera->centerOnPosition(Position((int)std::floor(_centreX), (int)std::floor(_centreY), _level), false);
 	_game->popState();
@@ -1166,14 +1176,15 @@ void FirstPersonMapState::handle(Action *action)
 	{
 		const int by = event->button.button == SDL_BUTTON_WHEELUP ? 1 : -1;
 		// (where the wheel turned, as the view was told of it; never told: where the pointer was last, else the middle)
-		const int x = action->getAbsoluteXMouse() >= 0 ? (int)std::floor(action->getAbsoluteXMouse()) : _mouseX;
-		const int y = action->getAbsoluteYMouse() >= 0 ? (int)std::floor(action->getAbsoluteYMouse()) : _mouseY;
+		// (on the map's own surface: in a window, off its corner)
+		const int x = action->getAbsoluteXMouse() >= 0 ? (int)std::floor(action->getAbsoluteXMouse()) - _view->getX() : _mouseX;
+		const int y = action->getAbsoluteYMouse() >= 0 ? (int)std::floor(action->getAbsoluteYMouse()) - _view->getY() : _mouseY;
 		// (the setting "Tactical map: wheel changes level" swaps the two: a player, GitHub issue #215)
 		if (_game->isCtrlPressed() != Options::fpsMapWheelLevels) changeLevel(by);
 		else if (x >= 0 && y >= 0) zoomAt(by, x, y);
 		else changeZoom(by);
 	}
-	else if (event->type == SDL_KEYDOWN)
+	else if (event->type == SDL_KEYDOWN && !embedded()) // (in a window the keys are the battle's)
 	{
 		const SDLKey key = event->key.keysym.sym;
 		const double step = std::max(1.0, big(24) / (double)cell());
@@ -1200,7 +1211,7 @@ void FirstPersonMapState::handle(Action *action)
 void FirstPersonMapState::animate()
 {
 	_frame = (_frame + 1) % 8;
-	if (_frame % 2 == 0) _dirty = true;
+	if (_frame % 2 == 0 || embedded()) _dirty = true; // (in a window the battle goes on under it: the units move)
 }
 
 /**
@@ -1210,6 +1221,15 @@ void FirstPersonMapState::think()
 {
 	State::think();
 	_clock->think(this, 0);
+	// In a window: the soldier selected now in the middle, on their level, each time another is selected (ours only:
+	// in the aliens' turn the alien acting is the selected unit, and it may be one nobody sees).
+	const BattleUnit *selected = _save->getSelectedUnit();
+	if (embedded() && selected != _followed && selected && selected->getFaction() == FACTION_PLAYER && !selected->isOut() && selected->getTile())
+	{
+		_followed = selected;
+		centreOn(selected);
+		_level = std::clamp((int)selected->getPosition().z, 0, _save->getMapSizeZ() - 1);
+	}
 	updateReach();
 	updateHelmet();
 	if (_dirty) draw();

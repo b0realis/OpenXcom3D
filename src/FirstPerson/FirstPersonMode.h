@@ -58,6 +58,7 @@
 #include "FirstPersonDamageNumbers.h"
 #include "FirstPersonVoxelModel.h"
 #include "FirstPersonVr.h"
+#include "FirstPersonMapState.h"
 
 namespace OpenXcom
 {
@@ -87,6 +88,12 @@ class Tile;
 class VoxelUnits;
 class Text;
 class TextButton;
+struct CommandFeed;
+/// Deletes the Live command feed's state (made and known in FirstPersonModeFeed.cpp only).
+struct CommandFeedDeleter
+{
+	void operator()(CommandFeed *feed) const;
+};
 
 /**
  * Everything the OpenXcom3D first-person mode adds to the battlescape screen:
@@ -107,6 +114,8 @@ class TextButton;
  *   FirstPersonModeWeaponInHand.cpp   the weapon drawn in the soldier's hands
  *   FirstPersonModeHud.cpp            the top bar, the squad buttons, the info panel, the
  *                                     soldier card and the banner
+ *   FirstPersonModeFeed.cpp           the Live command feed: the isometric view as a command
+ *                                     post's screens
  *   FirstPersonModeSoldierStates.cpp  getting hurt, burning, going down, breaking down
  *
  * The 3D picture itself is drawn by FirstPersonView.
@@ -213,6 +222,8 @@ public:
 	static bool noclipFloats(BattlescapeState *state, const BattleUnit *unit);
 	/// The map asked for: the tactical map, from the 3D view with its setting on (see FirstPerson::tacticalMap).
 	static bool openTacticalMap(BattlescapeState *state);
+	void showTacticalMap();
+	FirstPersonMapState::Setup tacticalMapSetup(bool helmetCamera);
 	/// Where the next round of an FPS-style shot goes: along the crosshair, with a spread.
 	void freeAimTarget(const BattleAction &action, Position &target);
 
@@ -1347,6 +1358,36 @@ private:
 	void updateBanner(bool playerTurn);
 	/// Works out which unit each squad button stands for.
 	std::vector<BattleUnit*> squadList() const;
+
+	// The Live command feed (FirstPersonModeFeed.cpp; setting "Live command feed"): the isometric map as a command
+	// post's screens, the soldiers' helmet cameras, the map as a drone's feed and the tactical map.
+	std::unique_ptr<CommandFeed, CommandFeedDeleter> _feed;
+	bool _feedDispatching = false; // handing an event to the battle without the map (see feedWithoutMap)
+	bool feedWanted() const;
+	bool feedShown() const;
+	void updateFeed();
+	void leaveFeed();
+	void layOutFeed();
+	void feedColours();
+	void feedButtons();
+	void placeFeedScreen();
+	void moveGamePanel(int by);
+	std::vector<std::pair<BattleUnit*, int>> feedSquad() const;
+	FirstPersonView *makeFeedCamera(int width, int height);
+	bool feedDrawsGameSurface(const Surface *surface) const;
+	bool feedEdgeSurface(const Surface *surface) const;
+	void blitFeedUnder(SDL_Surface *screen);
+	void blitFeedOver(SDL_Surface *screen);
+	void filterDrone(SDL_Surface *screen, const SDL_Rect &picture);
+	void markSoldiers(SDL_Surface *screen, const SDL_Rect &picture);
+	void drawFeedWindow(SDL_Surface *screen, const SDL_Rect &frame, Uint8 borderColour);
+	int feedWrite(SDL_Surface *screen, const std::string &text, int x, int y, Uint8 colour, int room = 0, bool backed = false);
+	bool handleFeedMouse(Action *action);
+	bool handleFeedKey(Action *action);
+	bool feedWithoutMap(Action *action);
+	void pressFeedButton(int index);
+	void scrollFeed(int by);
+	void feedShareCache(FirstPersonView *owner);
 	void refreshSquad();
 	/// Lays out the squad buttons that are in use.
 	void layoutTopBar();

@@ -1472,6 +1472,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
+	// The isometric map as a command post's screens (see CommandFeed; the owner: "Live command feed - herein the iso mode
+	// is replaced with realistic combat dashboard"): the soldiers' helmet cameras in a row along the top, the map below as
+	// a drone's feed, black and white with static, and the tactical map beside it. Experimental, off by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsCommandFeed", &fpsCommandFeed, false, "STR_FPS_COMMAND_FEED", category));
 	// The bodies twice as fine: a quarter of a voxel a cell, from the sprites enlarged twice (the owner: "Lets go with 2x").
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsMuzzleFlash", &fpsMuzzleFlash, true, "STR_FPS_MUZZLE_FLASH", category));
 	// The flashlight: 0 a beam from the weapon, a spot on the crosshair that fades with the distance; 1 a light where

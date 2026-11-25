@@ -1526,7 +1526,7 @@ void FirstPersonMode::updateSoldierCard()
 		unit = _squadUnits[_hoveredSquadButton];
 		cardButton = _hoveredSquadButton;
 	}
-	else if (_alertUnit && SDL_GetTicks() < _alertUntil)
+	else if (_alertUnit && SDL_GetTicks() < _alertUntil && !feedWanted()) // (the Live command feed shows it in its row)
 	{
 		// A popped-up camera: under the soldier's squad button if it shows, else the first.
 		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
@@ -1798,11 +1798,35 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 	{
 		return false;
 	}
-	BattleUnit *unit = mode->_save->getSelectedUnit();
+	mode->showTacticalMap();
+	return true;
+}
+
+/**
+ * Opens the tactical map all over the screen (see openTacticalMap; and the Live command feed's minimap maximised),
+ * around the selected soldier.
+ */
+void FirstPersonMode::showTacticalMap()
+{
+	BattleUnit *unit = _save->getSelectedUnit();
 	if (unit)
 	{
-		state->_map->getCamera()->centerOnPosition(unit->getPosition());
+		_state->_map->getCamera()->centerOnPosition(unit->getPosition());
 	}
+	_game->pushState(new FirstPersonMapState(_state->_map->getCamera(), _save, _state->_map->reShadeMinimap(7), tacticalMapSetup(true)));
+}
+
+/**
+ * What the 3D view hands the tactical map (see FirstPersonMapState::Setup): the squad in its buttons' order, the way
+ * the view looks, how a soldier is selected, the overlays' magnification, the panel's colours and weapon words, and a
+ * helmet camera of the 3D view's own kind if wanted.
+ * @param helmetCamera True to give it one (all over the screen), false not (the Live command feed's minimap).
+ * @return The setup.
+ */
+FirstPersonMapState::Setup FirstPersonMode::tacticalMapSetup(bool helmetCamera)
+{
+	FirstPersonMode *mode = this;
+	BattleUnit *unit = _save->getSelectedUnit();
 	FirstPersonMapState::Setup setup;
 	// (the squad's numbers as the 3D view's buttons have them; from the isometric view, where the buttons may never
 	// have been made, the same list)
@@ -1830,6 +1854,10 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 		ammo.erase(std::remove(ammo.begin(), ammo.end(), Unicode::TOK_COLOR_FLIP), ammo.end());
 		return ammo.empty() ? name : name + " " + ammo;
 	};
+	if (!helmetCamera)
+	{
+		return setup;
+	}
 	setup.makeCamera = [mode](State *screen, int width, int height) -> Surface* {
 		FirstPersonView *camera = new FirstPersonView(mode->_game, width, height, 0, 0);
 		screen->add(camera);
@@ -1845,8 +1873,7 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 	setup.aimCamera = [mode](Surface *camera, BattleUnit *soldier, const BattleUnit *lookAt) {
 		mode->aimHelmetCamera(static_cast<FirstPersonView*>(camera), soldier, lookAt);
 	};
-	mode->_game->pushState(new FirstPersonMapState(state->_map->getCamera(), mode->_save, state->_map->reShadeMinimap(7), setup));
-	return true;
+	return setup;
 }
 
 /**
@@ -1863,7 +1890,7 @@ bool FirstPersonMode::openTacticalMap(BattlescapeState *state)
 void FirstPersonMode::updateMapCamera()
 {
 	BattleUnit *unit = _save->getSelectedUnit();
-	const bool show = Options::fpsMapCamera > 0 && !isActive() && _save->getSide() == FACTION_PLAYER
+	const bool show = Options::fpsMapCamera > 0 && !isActive() && !feedWanted() && _save->getSide() == FACTION_PLAYER
 		&& unit && unit->getFaction() == FACTION_PLAYER && unit->getTile();
 	if (show && (Options::fpsMapCamera != _mapCameraSize || canvasWidth() != _mapCameraCanvasWidth))
 	{

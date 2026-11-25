@@ -1147,6 +1147,7 @@ void FirstPersonMode::remakeViewIfResized()
 	_ownSurfaces.insert(newView);
 	_preview->shareCache(newView);
 	_mapCamera->shareCache(newView);
+	feedShareCache(newView);
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
@@ -2552,6 +2553,7 @@ void FirstPersonMode::think()
 	updateSoldierCard();
 	updateMapCamera(); // (after the card: a squad button's soldier cam wins)
 	placeGameLine(); // (after the map camera: under its window while it shows)
+	updateFeed(); // (the Live command feed, in the map's place with its setting on)
 	watchMapLayers();
 	updateMusic(now);
 	updateMapAim();
@@ -2731,6 +2733,11 @@ void FirstPersonMode::updateLastPlayerUnit(bool playerTurn, BattleUnit *selected
  */
 bool FirstPersonMode::handle(Action *action)
 {
+	// (an event the Live command feed hands the battle without the map: the battle's, see feedWithoutMap)
+	if (_feedDispatching)
+	{
+		return false;
+	}
 	const SDL_Event &event = *action->getDetails();
 	const bool active = isActive();
 
@@ -2829,6 +2836,10 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	if (!active && key == Options::keyFpsHideHud)
 	{
 		if (pressed) toggleMapCamera();
+		return true;
+	}
+	if (!active && handleFeedKey(action))
+	{
 		return true;
 	}
 	// The grab key (no key until the player gives it one) works in both views too.
@@ -3073,6 +3084,11 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 	{
 		return true;
 	}
+	// The Live command feed's: the mouse's moves (its buttons and wheel below, after our top bar's buttons).
+	if (!active && event.type == SDL_MOUSEMOTION && feedShown())
+	{
+		return handleFeedMouse(action);
+	}
 
 	if (isMouseButtonOrWheel(event))
 	{
@@ -3132,6 +3148,12 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 				}
 			}
 			return true;
+		}
+
+		// The Live command feed's windows, and the map in its drone's window (see handleFeedMouse).
+		if (!active && feedShown())
+		{
+			return handleFeedMouse(action);
 		}
 
 		// On the isometric map, the map camera: a left click on it goes to the 3D view (the
@@ -3307,13 +3329,23 @@ bool FirstPersonMode::blit()
 		}
 	}
 
-	// The game's own surfaces (in full 3D only its warnings and debug text).
+	// The game's own surfaces (in full 3D only its warnings and debug text). With the Live command feed: the map in
+	// the drone's window under them, the feed's windows over them (see blitFeedUnder, blitFeedOver).
+	const bool feed = !isActive() && feedShown();
+	if (feed)
+	{
+		blitFeedUnder(screen);
+	}
 	for (Surface *surface : _state->_surfaces)
 	{
-		if (!_ownSurfaces.count(surface) && (!full3D || surface == _state->_warning || surface == _state->_txtDebug))
+		if (!_ownSurfaces.count(surface) && (!full3D || surface == _state->_warning || surface == _state->_txtDebug) && (!feed || feedDrawsGameSurface(surface)))
 		{
 			surface->blit(screen);
 		}
+	}
+	if (feed)
+	{
+		blitFeedOver(screen);
 	}
 
 	// Our overlays (see drawOverlays). VR mode with the shell drawing the eyes: the HUD's own
