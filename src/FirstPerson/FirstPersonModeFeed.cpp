@@ -343,6 +343,22 @@ bool FirstPersonMode::feedViewSize(int &width, int &height) const
 }
 
 /**
+ * Where the 3D view's picture stands on the game's screen while the feed shows it in its window: for what is drawn over
+ * a point of the view (the target's name under the crosshair, see canvasPixelX).
+ * @param picture Set to the picture's place on the screen.
+ * @return True if the feed shows the view in its window (else it is left alone).
+ */
+bool FirstPersonMode::feedViewPicture(SDL_Rect &picture) const
+{
+	if (!feedShown() || _feed->maximised != CommandFeed::MAX_NONE || _feed->viewPicture.w <= 0 || _feed->viewPicture.h <= 0)
+	{
+		return false;
+	}
+	picture = _feed->viewPicture;
+	return true;
+}
+
+/**
  * Each frame (see think): the Live command feed, when wanted, laid out for the screen and the squad; the battle's
  * screen put right for it (the map shown in the drone's window while the 3D view plays in its own, the game's panel
  * under the drone, the map's camera in the drone's window, following the soldier looked through); the crosshair in the

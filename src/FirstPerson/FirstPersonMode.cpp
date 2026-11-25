@@ -1300,12 +1300,16 @@ double FirstPersonMode::aimPixelShift() const
 /// The canvas pixel a pixel of the view lies in, across.
 int FirstPersonMode::canvasPixelX(int viewPixel) const
 {
+	SDL_Rect picture;
+	if (feedViewPicture(picture)) return (int)std::lround(toCanvasX(picture.x + (double)viewPixel * picture.w / _view->getWidth())); // (the Live command feed's 3D window)
 	return (int)((long long)viewPixel * canvasWidth() / _view->getWidth());
 }
 
 /// The same, down.
 int FirstPersonMode::canvasPixelY(int viewPixel) const
 {
+	SDL_Rect picture;
+	if (feedViewPicture(picture)) return (int)std::lround(toCanvasY(picture.y + (double)viewPixel * picture.h / _view->getHeight())); // (the Live command feed's 3D window)
 	return (int)((long long)viewPixel * canvasHeight() / _view->getHeight());
 }
 

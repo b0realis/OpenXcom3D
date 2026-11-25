@@ -1370,6 +1370,7 @@ private:
 	bool feedWanted() const;
 	bool feedShown() const;
 	bool feedViewSize(int &width, int &height) const;
+	bool feedViewPicture(SDL_Rect &picture) const;
 	void updateFeed();
 	void leaveFeed();
 	void layOutFeed();

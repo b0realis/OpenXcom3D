@@ -39147,10 +39147,10 @@ index 000000000..ffd2a5028
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..cc7379a50
+index 000000000..76aa0fde0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3682 @@
+@@ -0,0 +1,3686 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -40453,12 +40453,16 @@ index 000000000..cc7379a50
 +/// The canvas pixel a pixel of the view lies in, across.
 +int FirstPersonMode::canvasPixelX(int viewPixel) const
 +{
++	SDL_Rect picture;
++	if (feedViewPicture(picture)) return (int)std::lround(toCanvasX(picture.x + (double)viewPixel * picture.w / _view->getWidth())); // (the Live command feed's 3D window)
 +	return (int)((long long)viewPixel * canvasWidth() / _view->getWidth());
 +}
 +
 +/// The same, down.
 +int FirstPersonMode::canvasPixelY(int viewPixel) const
 +{
++	SDL_Rect picture;
++	if (feedViewPicture(picture)) return (int)std::lround(toCanvasY(picture.y + (double)viewPixel * picture.h / _view->getHeight())); // (the Live command feed's 3D window)
 +	return (int)((long long)viewPixel * canvasHeight() / _view->getHeight());
 +}
 +
@@ -42835,10 +42839,10 @@ index 000000000..cc7379a50
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..df7ae4913
+index 000000000..cb898cbe7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1665 @@
+@@ -0,0 +1,1666 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44211,6 +44215,7 @@ index 000000000..df7ae4913
 +	bool feedWanted() const;
 +	bool feedShown() const;
 +	bool feedViewSize(int &width, int &height) const;
++	bool feedViewPicture(SDL_Rect &picture) const;
 +	void updateFeed();
 +	void leaveFeed();
 +	void layOutFeed();
@@ -45508,10 +45513,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..d2e4c5505
+index 000000000..ce57c8267
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,1646 @@
+@@ -0,0 +1,1662 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45853,6 +45858,22 @@ index 000000000..d2e4c5505
 +	}
 +	width = _feed->viewPicture.w;
 +	height = _feed->viewPicture.h;
++	return true;
++}
++
++/**
++ * Where the 3D view's picture stands on the game's screen while the feed shows it in its window: for what is drawn over
++ * a point of the view (the target's name under the crosshair, see canvasPixelX).
++ * @param picture Set to the picture's place on the screen.
++ * @return True if the feed shows the view in its window (else it is left alone).
++ */
++bool FirstPersonMode::feedViewPicture(SDL_Rect &picture) const
++{
++	if (!feedShown() || _feed->maximised != CommandFeed::MAX_NONE || _feed->viewPicture.w <= 0 || _feed->viewPicture.h <= 0)
++	{
++		return false;
++	}
++	picture = _feed->viewPicture;
 +	return true;
 +}
 +
