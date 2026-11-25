@@ -1269,9 +1269,21 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 	char clock[16] = "";
 	const std::time_t seconds = std::time(nullptr);
 	if (const std::tm *local = std::localtime(&seconds)) std::strftime(clock, sizeof(clock), "%H:%M:%S", local);
-	// (its name, the turn and the clock, each in its own colour)
-	const int afterName = titleWords(drone, _state->tr("STR_FPS_FEED_DRONE"), feed.wordsColour, true);
-	titleAfter(drone, titleAfter(drone, afterName, _state->tr("STR_FPS_FEED_TURN").arg(_save->getTurn()), feed.turnColour), clock, feed.clockColour);
+	titleWords(drone, _state->tr("STR_FPS_FEED_DRONE"), feed.wordsColour, true);
+	// (the turn and the clock on the picture at its top left, as a camera writes them on its own picture, each in its own
+	// colour, on a dark ground that keeps them read over any map; still, as the camera's words are, when the drone floats)
+	{
+		const SDL_Rect &picture = feed.dronePictureNow();
+		const std::string turn = _state->tr("STR_FPS_FEED_TURN").arg(_save->getTurn());
+		feed.writer->setText(turn);
+		const int turnW = feed.writer->getTextWidth() * ui;
+		feed.writer->setText(clock);
+		const int clockW = feed.writer->getTextWidth() * ui, gap = 6 * ui;
+		const int x = picture.x + 5 * ui, y = picture.y + 5 * ui;
+		fill(screen, x - 2 * ui, y - 2 * ui, std::min(turnW + gap + clockW + 4 * ui, (int)picture.w - 6 * ui), FeedWordsH * ui + 3 * ui, feed.titleBack);
+		feedWrite(screen, turn, x, y, feed.turnColour);
+		feedWrite(screen, clock, x + turnW + gap, y, feed.clockColour);
+	}
 
 	// The minimap.
 	if (feed.maximised == CommandFeed::MAX_NONE && feed.map.w > 0)
