@@ -2000,6 +2000,14 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// is drawn by the program without them, and the few that want a mirror again by the one with them.
 	// (OPENXCOM3D_GPU_ONE_GO_MIRRORS: in one go, as it was; for comparing the two.)
 	static const bool oneGoMirrors = getenv("OPENXCOM3D_GPU_ONE_GO_MIRRORS") != nullptr;
+	// (Mesa's driver for AMD's cards, radeonsi, the Steam Deck's: in two goes a paddy's mirror went out a second or two
+	// after the 3D view opened, and in one go it stays (a player, GitHub issue #261, who tried both). Its frames are drawn
+	// in one go.)
+	if (!mirrorGoesBroken && frame.reflections && context.name().find("radeonsi") != std::string::npos)
+	{
+		mirrorGoesBroken = true;
+		Log(LOG_INFO) << "OpenXcom3D GPU: Mesa's AMD driver (radeonsi): \"Reflections\" in one go";
+	}
 	bool mirrorGoes = frame.reflections && frame.palette && !output.results && !foveaNow && !oneGoMirrors && !mirrorGoesBroken
 		&& !(resolveProgram && frame.samples >= 2);
 	Program *mirrorProgram = mirrorGoes ? programFor(frame, false, false, 2) : nullptr;
