@@ -1054,7 +1054,8 @@ bool FirstPersonMode::canvasTargetWhen(bool active, int &width, int &height) con
 {
 	width = Options::baseXResolution;
 	height = Options::baseYResolution;
-	if (!active || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
+	// (not with the Live command feed: it draws all of the game's screen itself, the 3D view in its window, see blitFeed)
+	if (!active || feedWanted() || Options::fpsViewResolution != FirstPerson::ViewResolutionDisplay || !FirstPerson::canPresentAtDisplaySize())
 	{
 		return false;
 	}
@@ -3117,6 +3118,10 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		action->setMouseAction(eventX, eventY, 0, 0);
 		const double mouseX = action->getAbsoluteXMouse(), mouseY = action->getAbsoluteYMouse();
 		TextButton *buttonUnderCursor = buttonAt(toCanvasX(mouseX), toCanvasY(mouseY)); // our buttons are on the canvas
+		if (buttonUnderCursor && feedShown() && !feedOverlay(buttonUnderCursor))
+		{
+			buttonUnderCursor = nullptr; // (one the Live command feed doesn't show, under its windows: not clicked)
+		}
 
 		// Let every button see the release, so none stays drawn pressed.
 		if (event.type == SDL_MOUSEBUTTONUP)

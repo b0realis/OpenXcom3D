@@ -1396,6 +1396,11 @@ private:
 	bool handleFeedKey(Action *action);
 	bool feedWithoutMap(Action *action);
 	void pressFeedButton(int index, Action *action);
+	void updateFeedSquad();
+	void drawFeedSquad(SDL_Surface *screen);
+	void feedSquadMouse(int x, int y, int wheel, bool leftPress);
+	void releaseFeedItem();
+	BattleUnit *feedLookedUnit() const;
 	void flyFeedTo();
 
 	void refreshSquad();

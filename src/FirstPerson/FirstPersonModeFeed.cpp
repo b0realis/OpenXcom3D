@@ -132,6 +132,12 @@ const int FeedArrowLong = 14, FeedArrowDeep = 7, FeedArrowInset = 3, FeedFlySpee
 /// FOLLOW: the drone closes this share of the way to its soldier each second (smoothly, as the time between frames
 /// allows), and stops short of a pixel.
 const double FeedFollowRate = 5.0;
+/// The inventory window's picture is made again at the inventory's own animation's pace (its items pulse, its warnings
+/// fade), at once when it changed (another soldier, an item held or moved, a click there).
+const Uint32 FeedInventoryEveryMs = 100;
+/// The squad tab's table: a row this high (times the magnification) under a line of column heads, its scroll bar this
+/// wide, its columns this far apart, a name at least this wide (else health, energy and morale go, morale first).
+const int FeedRowH = 10, FeedScrollW = 4, FeedColumnGap = 4, FeedNameLeast = 36;
 const double FeedSwayPeriods[4] = { 5300.0, 2100.0, 6900.0, 2900.0 };
 
 /// An SDL rectangle from ints (SDL 1.2's are 16-bit).
@@ -187,7 +193,9 @@ struct CommandFeed
 	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 	/// lit (a switch that is on).
 	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
-		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY };
+		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY, FB_TAB_SQUAD, FB_TAB_INVENTORY };
+	/// The window at the top left: the squad's table or the selected soldier's inventory (the player's choice).
+	enum Tab { TAB_SQUAD, TAB_INVENTORY };
 	/// How the drone sees: black and white; night vision, all of it green (realistic) or the units and items in their own
 	/// colours (enhanced); thermal, the units, explosions and fire white hot on a cool grey world.
 	enum Vision { VISION_PLAIN, VISION_NIGHT, VISION_NIGHT_PLUS, VISION_THERMAL };
@@ -206,7 +214,12 @@ struct CommandFeed
 	// Flying the drone: the arrow held (one of FB_MOVE_*, else none), and a glide to a soldier (FLY TO): from where to
 	// where (the map's offsets), since when; the mouse's last point (to light what it is over); the last frame's time.
 	int moving = -1;
+	double flyRest = 0.0;
 	bool gliding = false, follow = false;
+	// FOLLOW: whom it followed last frame and on which level (their level is taken again only when either changes: the
+	// level buttons work while following).
+	const BattleUnit *followedUnit = nullptr;
+	int followedZ = -1;
 	Position glideFrom, glideTo;
 	Uint32 glideStart = 0, lastFrame = 0;
 	int mouseX = -1, mouseY = -1;
@@ -222,6 +235,20 @@ struct CommandFeed
 	std::vector<int> inventoryColumns, inventoryRows;
 	BattleUnit *inventoryUnit = nullptr;
 	std::string inventoryKey;
+	Uint32 inventoryDrawn = 0;
+	bool inventoryTouched = false, noInventory = false;
+	Position inventoryAt;
+	// The squad tab: its first row shown, its scroll bar's thumb dragged (from where, at which row), the soldier last kept
+	// in sight; this frame's squad (as the squad buttons number it), the rows' place, how many show, the bar's track and
+	// thumb.
+	Tab tab = TAB_SQUAD;
+	int squadScroll = 0;
+	bool squadDragging = false;
+	int dragFromY = 0, dragFromScroll = 0;
+	const BattleUnit *squadSeen = nullptr;
+	std::vector<BattleUnit*> squadUnits;
+	SDL_Rect squadRows{}, squadTrack{}, squadThumb{};
+	int squadShown = 1;
 	// The drone's switches: how it sees, the stabiliser (off: it floats a little), the soldiers' names, the boxes round
 	// them; how far it floats this frame; what of the map's picture is units, items and effects (see Map::setMaskTarget).
 	Vision vision = VISION_PLAIN;
@@ -242,7 +269,7 @@ struct CommandFeed
 	bool paletteKnown = false;
 	Uint8 grey[3][256], green[3][256], cool[3][256], hot[3][256], snow[8];
 	Uint8 black = 0, frameColour = 0, frameLit = 0, titleBack = 0, wordsColour = 0, dimColour = 0, liveColour = 0, hudColour = 0, pickedColour = 0;
-	Uint8 purple = 0, purpleLit = 0;
+	Uint8 purple = 0, purpleLit = 0, turnColour = 0, clockColour = 0, dangerColour = 0, rowBack = 0;
 	std::unique_ptr<Text> writer;
 	Uint32 noise = 0x9E3779B9u;
 	/// The snow's and the tears' dice.
@@ -411,13 +438,27 @@ void FirstPersonMode::updateFeed()
 	const Uint32 now = SDL_GetTicks();
 	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
 	feed.lastFrame = now;
-	if (feed.moving >= 0 && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+	// (a button let go somewhere the feed didn't hear: an arrow, the squad table's thumb, a press on the drone)
+	const Uint8 buttons = SDL_GetMouseState(nullptr, nullptr);
+	if (!(buttons & SDL_BUTTON(SDL_BUTTON_LEFT)))
 	{
-		feed.moving = -1; // (let go somewhere the feed didn't hear)
+		feed.moving = -1;
+		feed.squadDragging = false;
+	}
+	if (!(buttons & (SDL_BUTTON(SDL_BUTTON_LEFT) | SDL_BUTTON(SDL_BUTTON_MIDDLE) | SDL_BUTTON(SDL_BUTTON_RIGHT))))
+	{
+		feed.pressedOnDrone = false;
+	}
+	if (feed.moving < 0)
+	{
+		feed.flyRest = 0.0;
 	}
 	if (feed.moving >= 0)
 	{
-		const int step = (int)std::lround(FeedFlySpeed * feed.ui * seconds);
+		// (whole pixels, the rest carried to the next frame: the same speed at any frame rate)
+		feed.flyRest += FeedFlySpeed * feed.ui * seconds;
+		const int step = (int)feed.flyRest;
+		feed.flyRest -= step;
 		const int byX = feed.moving == CommandFeed::FB_MOVE_LEFT ? step : feed.moving == CommandFeed::FB_MOVE_RIGHT ? -step : 0;
 		const int byY = feed.moving == CommandFeed::FB_MOVE_UP ? step : feed.moving == CommandFeed::FB_MOVE_DOWN ? -step : 0;
 		if (byX || byY) camera->scrollXY(byX, byY, true);
@@ -435,18 +476,29 @@ void FirstPersonMode::updateFeed()
 	// FOLLOW (the owner: "a button to always follow the selected soldier"): in the player's turn the drone keeps after
 	// the soldier in the 3D window, on their level, closing the way smoothly (the selected one, another when another is
 	// selected). Not in the enemy's turn: the game's own camera goes after the aliens then.
-	const BattleUnit *followed = isActive() && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
+	const BattleUnit *followed = feedLookedUnit();
 	if (feed.follow && !feed.gliding && feed.moving < 0 && _save->getSide() == FACTION_PLAYER && followed && followed->getFaction() == FACTION_PLAYER
 		&& !followed->isOut() && followed->getTile())
 	{
 		const Position at = camera->getMapOffset();
 		camera->centerOnPosition(followed->getPosition(), false);
 		const Position target = camera->getMapOffset();
-		camera->setMapOffset(Position(at.x, at.y, target.z));
+		const bool newLevel = followed != feed.followedUnit || followed->getPosition().z != feed.followedZ;
+		camera->setMapOffset(Position(at.x, at.y, newLevel ? target.z : at.z));
+		feed.followedUnit = followed;
+		feed.followedZ = followed->getPosition().z;
 		const double share = std::min(1.0, seconds * FeedFollowRate);
-		const int byX = (int)std::lround((target.x - at.x) * share), byY = (int)std::lround((target.y - at.y) * share);
-		// (the last pixels at once, not crawled over)
-		camera->scrollXY(std::abs(target.x - at.x) <= 1 ? target.x - at.x : byX, std::abs(target.y - at.y) <= 1 ? target.y - at.y : byY, true);
+		// (at least a pixel a frame, the last at once: it arrives at any frame rate)
+		auto toward = [share](int distance) {
+			if (std::abs(distance) <= 1) return distance;
+			const int by = (int)std::lround(distance * share);
+			return by != 0 ? by : (distance > 0 ? 1 : -1);
+		};
+		camera->scrollXY(toward(target.x - at.x), toward(target.y - at.y), true);
+	}
+	else
+	{
+		feed.followedUnit = nullptr;
 	}
 
 	// The crosshair (and the words beside it, placed by it: see updateCrosshair) in the middle of the 3D window.
@@ -454,7 +506,24 @@ void FirstPersonMode::updateFeed()
 	_crosshair->setX((int)std::lround(toCanvasX(picture.x + picture.w / 2.0)) - CrosshairSize / 2);
 	_crosshair->setY((int)std::lround(toCanvasY(picture.y + picture.h / 2.0)) - CrosshairSize / 2);
 
-	updateFeedInventory(selected && selected->getFaction() == FACTION_PLAYER && !selected->isOut() && selected->getTile() ? selected : nullptr);
+	// (the inventory window's soldier: the one selected; in the aliens' turn the one the 3D window looks through, else the
+	// last the player had: shown, its items not moved, see feedInventoryMouse)
+	BattleUnit *owner = selected;
+	if (_save->getSide() != FACTION_PLAYER)
+	{
+		owner = isActive() && _trackedUnit && _trackedUnit->getFaction() == FACTION_PLAYER ? _trackedUnit : _lastPlayerUnit;
+	}
+	// (only a soldier with an inventory, as the game's inventory button has it: not a tank)
+	const bool up = owner && owner->getFaction() == FACTION_PLAYER && !owner->isOut() && owner->getTile();
+	feed.noInventory = up && !owner->hasInventory();
+	if (feed.tab == CommandFeed::TAB_INVENTORY)
+	{
+		updateFeedInventory(up && !feed.noInventory ? owner : nullptr);
+	}
+	else
+	{
+		updateFeedSquad();
+	}
 
 	// The minimap's frame (its clock, drawn again as the battle goes on).
 	if (feed.minimap && feed.maximised == CommandFeed::MAX_NONE)
@@ -482,6 +551,9 @@ void FirstPersonMode::leaveFeed()
 		feed.cameraWindow = SDL_Rect{};
 	}
 	camera->stopMouseScrolling();
+	_state->_mouseOverIcons = false; // (the map's cursor back, see handleFeedMouse)
+	_mouseLook = isActive() && !_classicHud; // (as setActive has it out of the feed)
+	_state->_map->invalidate();
 	_state->_map->setVisible(!isActive());
 	_state->_warning->setX(feed.warningX);
 	_state->_warning->setY(isActive() && !_classicHud ? warningY() : _warningY);
@@ -489,7 +561,7 @@ void FirstPersonMode::leaveFeed()
 	_crosshair->setY(canvasHeight() / 2 - CrosshairSize / 2);
 	feed.minimap.reset();
 	feed.minimapWindow = SDL_Rect{};
-	if (feed.inventoryGrid) feed.inventoryGrid->setSelectedItem(nullptr); // (an item picked up goes back where it was)
+	releaseFeedItem(); // (an item picked up goes back where it was)
 	feed.inventoryGrid.reset();
 	feed.inventoryUnit = nullptr;
 	feed.inventoryKey.clear();
@@ -497,6 +569,7 @@ void FirstPersonMode::leaveFeed()
 	feed.width = 0; // (laid out again when it comes back)
 	feed.moving = -1;
 	feed.gliding = false;
+	feed.squadDragging = false;
 	feed.pressedOnDrone = feed.overDrone = false;
 	feed.on = false;
 }
@@ -575,7 +648,7 @@ void FirstPersonMode::layOutFeed()
  * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's FOLLOW, FLY TO,
  * stabiliser, night vision (realistic, then enhanced), thermal, names, boxes and all over the screen, and on its picture
  * the arrows at its edges (held: it flies that way) and the level buttons at its right; the minimap's all over the screen; the 3D window's, which goes to the full 3D
- * view; the inventory window's, which opens the game's inventory screen.
+ * view; the top left window's tabs (the squad, the inventory) and its button which opens the game's inventory screen.
  */
 void FirstPersonMode::feedButtons()
 {
@@ -628,6 +701,17 @@ void FirstPersonMode::feedButtons()
 	add(CommandFeed::FB_VIEW_MAX, feed.view, viewRight, "", false);
 	int inventoryRight = feed.inventory.x + feed.inventory.w - border;
 	add(CommandFeed::FB_INVENTORY, feed.inventory, inventoryRight, "", false);
+	// (the top left window's tabs, at the left of its title line)
+	int tabLeft = feed.inventory.x + border + 2 * ui;
+	for (const CommandFeed::ButtonKind tab : { CommandFeed::FB_TAB_SQUAD, CommandFeed::FB_TAB_INVENTORY })
+	{
+		const std::string words = _state->tr(tab == CommandFeed::FB_TAB_SQUAD ? "STR_FPS_FEED_SQUAD" : "STR_FPS_FEED_INVENTORY");
+		feed.writer->setText(words);
+		const int wide = std::max(side, feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui);
+		const bool lit = (tab == CommandFeed::FB_TAB_SQUAD) == (feed.tab == CommandFeed::TAB_SQUAD);
+		feed.buttons.push_back({ tab, makeRect(tabLeft, feed.inventory.y + border + inset, wide, side), words, 0, lit });
+		tabLeft += wide + inset;
+	}
 }
 
 /**
@@ -718,18 +802,40 @@ void FirstPersonMode::updateFeedInventory(BattleUnit *unit)
 		feed.doll->setPalette(_state->getPalette());
 		feed.inventoryUnit = nullptr;
 		feed.inventoryKey.clear();
+		feed.inventoryDrawn = 0;
 	}
 	Inventory &grid = *feed.inventoryGrid;
+	// (made again only at the inventory's pace or when it changed: see FeedInventoryEveryMs)
+	const Uint32 now = SDL_GetTicks();
+	const bool due = unit != feed.inventoryUnit || grid.getSelectedItem() || feed.inventoryTouched || feed.inventoryDrawn == 0
+		|| now - feed.inventoryDrawn >= FeedInventoryEveryMs;
+	// (its own animation: in its time unit mode it steps the battle's animation, which the map steps already)
+	auto thinkGrid = [&grid]() {
+		grid.setTuMode(false);
+		grid.think();
+		grid.setTuMode(true);
+	};
+	if (!due)
+	{
+		if (unit) thinkGrid();
+		return;
+	}
+	feed.inventoryDrawn = std::max<Uint32>(1, now);
+	feed.inventoryTouched = false;
 	if (unit != feed.inventoryUnit)
 	{
-		grid.setSelectedItem(nullptr); // (an item held goes back where it was)
+		// (another soldier, or none: the grid on them first (a fallen soldier's items aren't drawn: their tile is gone),
+		// then an item held goes back where it was)
+		grid.setSelectedUnit(unit, unit != nullptr);
+		if (grid.getSelectedItem()) grid.setSelectedItem(nullptr);
 		feed.inventoryUnit = unit;
 		feed.inventoryKey.clear();
-		if (unit)
-		{
-			grid.setSelectedUnit(unit, true);
-			drawFeedDoll(unit);
-		}
+		if (unit) drawFeedDoll(unit);
+	}
+	// (an item held when its soldier walked off: back, the picture of the ground it came from no longer theirs)
+	if (unit && grid.getSelectedItem() && unit->getPosition() != feed.inventoryAt)
+	{
+		grid.setSelectedItem(nullptr);
 	}
 	if (unit && !grid.getSelectedItem())
 	{
@@ -751,11 +857,16 @@ void FirstPersonMode::updateFeedInventory(BattleUnit *unit)
 		{
 			const bool first = feed.inventoryKey.empty();
 			feed.inventoryKey = key.str();
+			feed.inventoryAt = at;
 			grid.setSelectedUnit(unit, false);
-			if (!first) _state->updateSoldierInfo(); // (moved in the window: the panel's hands and time units again)
+			if (!first)
+			{
+				grid.arrangeGround(0); // (the ground's items in their places again: they or the soldier moved)
+				_state->updateSoldierInfo(); // (moved in the window: the panel's hands and time units again)
+			}
 		}
 	}
-	grid.think();
+	if (unit) thinkGrid();
 
 	// The screen's picture: its background, the figure, the inventory (its grid, items, the item held, its warnings).
 	Surface &screen = *feed.inventoryScreen;
@@ -784,9 +895,14 @@ void FirstPersonMode::feedInventoryMouse(Action *action, int x, int y)
 		return;
 	}
 	const int pictureX = feed.inventoryColumns[x - feed.inventoryShown.x], pictureY = feed.inventoryRows[y - feed.inventoryShown.y];
+	feed.inventoryTouched = true; // (its picture made again next frame)
 	// The buttons the background draws, as on the inventory's screen (a left press): the soldier before or the next
 	// (selected for the 3D window too), unload the weapon held, more of the ground (Shift: back).
 	const SDL_Event &details = *action->getDetails();
+	if (details.type == SDL_MOUSEBUTTONDOWN)
+	{
+		_state->_battleGame->cancelAllActions(); // (as the game's inventory button does first)
+	}
 	if (details.type == SDL_MOUSEBUTTONDOWN && details.button.button == SDL_BUTTON_LEFT)
 	{
 		auto on = [&](const int box[4]) { return pictureX >= box[0] && pictureY >= box[1] && pictureX < box[0] + box[2] && pictureY < box[1] + box[3]; };
@@ -972,6 +1088,15 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 	CommandFeed &feed = *_feed;
 	const int ui = feed.ui, border = FeedBorder * ui, titleH = FeedTitleH * ui, wordsY = border + (titleH - FeedWordsH * ui) / 2 + ui;
 	const bool blink = SDL_GetTicks() % 1000 < 600;
+	// (a title's room from a point: up to the first button right of it in its line)
+	auto roomFrom = [&](const SDL_Rect &frame, int x) {
+		int room = frame.x + frame.w - border - x;
+		for (const CommandFeed::Button &button : feed.buttons)
+		{
+			if (button.box.y == frame.y + border + FeedButtonInset * ui && button.box.x >= x && button.box.x < frame.x + frame.w) room = std::min(room, button.box.x - x - 2 * ui);
+		}
+		return room;
+	};
 	// (a title's words: after the live dot, up to the first button)
 	auto titleWords = [&](const SDL_Rect &frame, const std::string &words, Uint8 colour, bool dot) {
 		int x = frame.x + border + 2 * ui;
@@ -980,22 +1105,36 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 			if (blink) fill(screen, x, frame.y + border + titleH / 2 - 2 * ui, 4 * ui, 4 * ui, feed.liveColour);
 			x += 6 * ui;
 		}
-		int room = frame.x + frame.w - border - x;
-		for (const CommandFeed::Button &button : feed.buttons)
-		{
-			if (button.box.y == frame.y + border + FeedButtonInset * ui && button.box.x >= x && button.box.x < frame.x + frame.w) room = std::min(room, button.box.x - x - 2 * ui);
-		}
-		return x + feedWrite(screen, words, x, frame.y + wordsY, colour, room);
+		return x + feedWrite(screen, words, x, frame.y + wordsY, colour, std::max(1, roomFrom(frame, x)));
+	};
+	// (more of a title, a little after where its words ended, in a colour of its own; none if there is no room)
+	auto titleAfter = [&](const SDL_Rect &frame, int after, const std::string &words, Uint8 colour) {
+		const int x = after + 6 * ui, room = roomFrom(frame, x);
+		return room > 4 * ui ? x + feedWrite(screen, words, x, frame.y + wordsY, colour, room) : after;
 	};
 
 	if (feed.maximised == CommandFeed::MAX_NONE)
 	{
-		// The inventory window: the inventory's screen scaled into it, titled with the soldier's time units.
+		// The window at the top left: its tabs (see feedButtons), then the squad's table titled with how many are up, or
+		// the inventory's screen scaled into it, titled with the soldier's time units.
 		drawFeedWindow(screen, feed.inventory, feed.frameColour);
+		int afterTabs = feed.inventory.x + border + 2 * ui;
+		for (const CommandFeed::Button &button : feed.buttons)
+		{
+			if (button.kind == CommandFeed::FB_TAB_SQUAD || button.kind == CommandFeed::FB_TAB_INVENTORY) afterTabs = std::max(afterTabs, button.box.x + (int)button.box.w);
+		}
 		const BattleUnit *owner = feed.inventoryUnit;
-		titleWords(feed.inventory, owner ? std::string(_state->tr("STR_FPS_FEED_INVENTORY_TU").arg(owner->getTimeUnits())) : std::string(_state->tr("STR_FPS_FEED_INVENTORY")),
-			feed.wordsColour, false);
 		const SDL_Rect &area = feed.inventoryPicture;
+		if (feed.tab == CommandFeed::TAB_SQUAD)
+		{
+			int up = 0;
+			for (const BattleUnit *unit : feed.squadUnits) if (!unit->isOut() && unit->getFaction() == FACTION_PLAYER) ++up;
+			titleAfter(feed.inventory, afterTabs, _state->tr("STR_FPS_FEED_SQUAD_UP").arg(up).arg((int)feed.squadUnits.size()), feed.dimColour);
+			drawFeedSquad(screen);
+		}
+		else
+		{
+		if (owner) titleAfter(feed.inventory, afterTabs, _state->tr("STR_FPS_FEED_TU").arg(owner->getTimeUnits()), feed.wordsColour);
 		fill(screen, area.x, area.y, area.w, area.h, feed.black);
 		if (owner && feed.inventoryScreen)
 		{
@@ -1012,15 +1151,16 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 		}
 		else
 		{
-			const std::string words = _state->tr("STR_FPS_FEED_NO_SOLDIER");
+			const std::string words = _state->tr(feed.noInventory ? "STR_FPS_FEED_NO_INVENTORY" : "STR_FPS_FEED_NO_SOLDIER");
 			feed.writer->setText(words);
 			feedWrite(screen, words, area.x + (area.w - feed.writer->getTextWidth() * ui) / 2, area.y + (area.h - FeedWordsH * ui) / 2, feed.dimColour);
+		}
 		}
 
 		// The 3D window: the 3D view at the window's size, or no signal.
 		const bool plays = isActive() && _view->getVisible();
 		drawFeedWindow(screen, feed.view, plays && wantsMouseCapture() ? feed.frameLit : feed.frameColour);
-		const BattleUnit *looked = plays && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
+		const BattleUnit *looked = feedLookedUnit();
 		std::string title = looked ? looked->getName(_game->getLanguage(), false) : std::string();
 		for (const auto &member : feedSquad()) if (member.first == looked) title = std::to_string(member.second) + " " + title;
 		const int after = titleWords(feed.view, title + "  " + std::string(_state->tr("STR_FPS_FEED_LIVE")), feed.wordsColour, true);
@@ -1036,7 +1176,8 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 			if (hintW > 0) feedWrite(screen, hint, after + 4 * ui + hintRoom - hintW, feed.view.y + wordsY, wantsMouseCapture() ? feed.hudColour : feed.pickedColour, hintRoom);
 			_view->drawIfAsked();
 			SDL_Rect where = feed.viewPicture;
-			SDL_BlitSurface(_view->getSurface(), nullptr, screen, &where);
+			SDL_Rect from = makeRect(0, 0, std::min(_view->getWidth(), (int)feed.viewPicture.w), std::min(_view->getHeight(), (int)feed.viewPicture.h));
+			SDL_BlitSurface(_view->getSurface(), &from, screen, &where); // (no further than its window: a frame after the layout changed)
 		}
 		else
 		{
@@ -1060,7 +1201,9 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 	char clock[16] = "";
 	const std::time_t seconds = std::time(nullptr);
 	if (const std::tm *local = std::localtime(&seconds)) std::strftime(clock, sizeof(clock), "%H:%M:%S", local);
-	titleWords(drone, _state->tr("STR_FPS_FEED_DRONE").arg(_save->getTurn()).arg(clock), feed.wordsColour, true);
+	// (its name, the turn and the clock, each in its own colour)
+	const int afterName = titleWords(drone, _state->tr("STR_FPS_FEED_DRONE"), feed.wordsColour, true);
+	titleAfter(drone, titleAfter(drone, afterName, _state->tr("STR_FPS_FEED_TURN").arg(_save->getTurn()), feed.turnColour), clock, feed.clockColour);
 
 	// The minimap.
 	if (feed.maximised == CommandFeed::MAX_NONE && feed.map.w > 0)
@@ -1208,13 +1351,40 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 	{
 		feed.moving = -1; // (an arrow let go)
 	}
+	if (feed.squadDragging)
+	{
+		// (the squad table's thumb follows the mouse wherever it goes until the button comes up)
+		if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) feed.squadDragging = false;
+		else if (event.type == SDL_MOUSEMOTION) feedSquadMouse(x, y, 0, false);
+		return true;
+	}
+	const bool onDrone = inside(feed.dronePictureNow(), x, y);
 	if (feed.pressedOnDrone)
 	{
+		// (the map's until the button comes up; let go off the drone's picture, not an order on a tile hidden there: the
+		// game takes the mouse to be over its panel, see below)
+		if (_state->_mouseOverIcons == onDrone)
+		{
+			_state->_mouseOverIcons = !onDrone;
+			_state->_map->invalidate();
+		}
 		if (event.type == SDL_MOUSEBUTTONUP) feed.pressedOnDrone = false;
 		toMap();
 		return false;
 	}
-	const bool onDrone = inside(feed.dronePictureNow(), x, y);
+	// The map's cursor shows only with the mouse on the drone's picture, off its buttons: elsewhere the game is told the
+	// mouse is over its panel, as on the isometric map, which hides the cursor (and keeps its clicks off the map).
+	bool onButton = false;
+	for (const CommandFeed::Button &each : feed.buttons)
+	{
+		if ((feed.maximised == CommandFeed::MAX_NONE || droneButton(each.kind)) && inside(each.box, x, y)) onButton = true;
+	}
+	const bool offMap = !onDrone || onButton;
+	if (_state->_mouseOverIcons != offMap)
+	{
+		_state->_mouseOverIcons = offMap;
+		_state->_map->invalidate();
+	}
 	if (!onDrone && feed.overDrone)
 	{
 		_state->_map->getCamera()->stopMouseScrolling(); // (it scrolled at the window's edge: the mouse left it)
@@ -1223,7 +1393,8 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 
 	for (Surface *surface : _state->_surfaces)
 	{
-		if (feedEdgeSurface(surface) && surface->getVisible() && x >= surface->getX() && y >= surface->getY() && x < surface->getX() + surface->getWidth() && y < surface->getY() + surface->getHeight())
+		// (OXCE's touch buttons: the debug words' line, over the top left window's title, takes no clicks)
+		if (feedEdgeSurface(surface) && surface != _state->_txtDebug && surface->getVisible() && x >= surface->getX() && y >= surface->getY() && x < surface->getX() + surface->getWidth() && y < surface->getY() + surface->getHeight())
 		{
 			return feedWithoutMap(action);
 		}
@@ -1247,7 +1418,8 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 		}
 		if (inside(feed.inventory, x, y))
 		{
-			if (inside(feed.inventoryPicture, x, y) && wheel == 0) feedInventoryMouse(action, x, y);
+			if (feed.tab == CommandFeed::TAB_SQUAD) feedSquadMouse(x, y, wheel, leftPress);
+			else if (inside(feed.inventoryPicture, x, y) && wheel == 0) feedInventoryMouse(action, x, y);
 			return true;
 		}
 		if (inside(feed.view, x, y))
@@ -1275,7 +1447,7 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 void FirstPersonMode::flyFeedTo()
 {
 	CommandFeed &feed = *_feed;
-	const BattleUnit *unit = isActive() && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
+	const BattleUnit *unit = feedLookedUnit();
 	if (!unit || unit->isOut() || !unit->getTile())
 	{
 		return;
@@ -1330,14 +1502,275 @@ void FirstPersonMode::pressFeedButton(int index, Action *action)
 	case CommandFeed::FB_DRONE_MAX: feed.maximised = feed.maximised == CommandFeed::MAX_DRONE ? CommandFeed::MAX_NONE : CommandFeed::MAX_DRONE; break;
 	case CommandFeed::FB_MAP_MAX: showTacticalMap(); break;
 	case CommandFeed::FB_VIEW_MAX: toggleView(); return; // (to the full 3D view: the feed is let go of)
+	case CommandFeed::FB_TAB_SQUAD: case CommandFeed::FB_TAB_INVENTORY:
+		releaseFeedItem();
+		feed.tab = button.kind == CommandFeed::FB_TAB_SQUAD ? CommandFeed::TAB_SQUAD : CommandFeed::TAB_INVENTORY;
+		feed.inventoryDrawn = 0; // (made again at once: the soldier's items may have changed meanwhile)
+		feed.squadDragging = false;
+		break;
 	case CommandFeed::FB_INVENTORY:
-		if (feed.inventoryGrid) feed.inventoryGrid->setSelectedItem(nullptr); // (an item held goes back first)
+		releaseFeedItem(); // (an item held goes back first)
 		_state->btnInventoryClick(action); // (the game's inventory screen)
 		return;
 	}
 	feedButtons();
 }
 
+
+/**
+ * The soldier the feed looks through (the 3D window's title, FLY TO, FOLLOW): the one the 3D view is with; else the one
+ * selected in our turn, the last we had in the aliens' (never the alien acting: that would give it away).
+ * @return The soldier, or null.
+ */
+BattleUnit *FirstPersonMode::feedLookedUnit() const
+{
+	if (isActive() && _trackedUnit)
+	{
+		return _trackedUnit;
+	}
+	BattleUnit *unit = _save->getSide() == FACTION_PLAYER ? _save->getSelectedUnit() : _lastPlayerUnit;
+	return unit && unit->getFaction() == FACTION_PLAYER ? unit : nullptr;
+}
+
+/**
+ * An item held in the inventory window goes back where it was (its soldier fallen: the grid lets go of them first, their
+ * items aren't drawn without their tile).
+ */
+void FirstPersonMode::releaseFeedItem()
+{
+	CommandFeed &feed = *_feed;
+	if (!feed.inventoryGrid)
+	{
+		return;
+	}
+	Inventory &grid = *feed.inventoryGrid;
+	if (grid.getSelectedUnit() && !grid.getSelectedUnit()->getTile())
+	{
+		grid.setSelectedUnit(nullptr, false);
+		feed.inventoryUnit = nullptr;
+	}
+	if (grid.getSelectedItem())
+	{
+		grid.setSelectedItem(nullptr);
+	}
+}
+
+/**
+ * Each frame, the squad tab's table (see drawFeedSquad): the whole squad as the squad buttons number it (the fallen too),
+ * how many rows show under the column heads, the scroll bar when they don't all fit (its thumb as big as the share
+ * shown), and the selected soldier's row kept in sight when another is selected.
+ */
+void FirstPersonMode::updateFeedSquad()
+{
+	CommandFeed &feed = *_feed;
+	const int ui = feed.ui, rowH = FeedRowH * ui;
+	feed.squadUnits = squadList();
+	const SDL_Rect &area = feed.inventoryPicture;
+	const int total = (int)feed.squadUnits.size();
+	const int rowsTop = area.y + rowH + ui, rowsHigh = std::max(0, area.y + (int)area.h - rowsTop);
+	feed.squadShown = std::max(1, rowsHigh / rowH);
+	const bool scrolls = total > feed.squadShown;
+	const int barW = scrolls ? FeedScrollW * ui : 0;
+	feed.squadRows = makeRect(area.x, rowsTop, area.w - barW - (scrolls ? ui : 0), rowsHigh);
+	const BattleUnit *selected = _save->getSelectedUnit();
+	if (selected != feed.squadSeen)
+	{
+		feed.squadSeen = selected;
+		for (int row = 0; row < total; ++row)
+		{
+			if (feed.squadUnits[row] != selected) continue;
+			if (row < feed.squadScroll) feed.squadScroll = row;
+			else if (row >= feed.squadScroll + feed.squadShown) feed.squadScroll = row - feed.squadShown + 1;
+		}
+	}
+	feed.squadScroll = std::clamp(feed.squadScroll, 0, std::max(0, total - feed.squadShown));
+	if (scrolls)
+	{
+		feed.squadTrack = makeRect(area.x + area.w - barW, rowsTop, barW, rowsHigh);
+		const int thumbH = std::min(rowsHigh, std::max(4 * ui, rowsHigh * feed.squadShown / total));
+		const int thumbY = rowsTop + (rowsHigh - thumbH) * feed.squadScroll / std::max(1, total - feed.squadShown);
+		feed.squadThumb = makeRect(feed.squadTrack.x, thumbY, barW, thumbH);
+	}
+	else
+	{
+		feed.squadTrack = feed.squadThumb = SDL_Rect{};
+	}
+}
+
+/**
+ * The squad tab: a table of the whole squad, a row each, under the column heads: the number (as on the squad buttons),
+ * the name, the time units left of the most, health (of the most), energy, morale and the state (OK, wounded, bleeding,
+ * down, dead, panicking, berserk, turned against us, ours by mind control); the selected soldier's row lit, the fallen
+ * dim, worrying values in warm colours. Columns as wide as their head or widest value; too narrow a window leaves out
+ * morale, then energy, then health. The scroll bar at the right when the rows don't all fit.
+ * @param screen The game's screen.
+ */
+void FirstPersonMode::drawFeedSquad(SDL_Surface *screen)
+{
+	CommandFeed &feed = *_feed;
+	const int ui = feed.ui, rowH = FeedRowH * ui, gap = FeedColumnGap * ui;
+	const SDL_Rect &area = feed.inventoryPicture;
+	fill(screen, area.x, area.y, area.w, area.h, feed.black);
+	if (feed.squadUnits.empty())
+	{
+		const std::string words = _state->tr("STR_FPS_FEED_NO_SOLDIER");
+		feed.writer->setText(words);
+		feedWrite(screen, words, area.x + (area.w - feed.writer->getTextWidth() * ui) / 2, area.y + (area.h - FeedWordsH * ui) / 2, feed.dimColour);
+		return;
+	}
+	enum { COL_NUMBER, COL_NAME, COL_TU, COL_HEALTH, COL_ENERGY, COL_MORALE, COL_STATE, COLUMNS };
+	struct Row { std::string cell[COLUMNS]; Uint8 colour[COLUMNS]; bool picked; };
+	const BattleUnit *selected = _save->getSelectedUnit();
+	// (a value's colour: time units green, amber under half, red at none; the others plain, amber when down, red under a third)
+	auto level = [&](int value, int most, bool timeUnits) {
+		if (most <= 0) return feed.wordsColour;
+		if (timeUnits) return value <= 0 ? feed.dangerColour : value * 2 < most ? feed.turnColour : feed.hudColour;
+		return value * 3 <= most ? feed.dangerColour : value < most ? feed.turnColour : feed.wordsColour;
+	};
+	std::vector<Row> rows;
+	rows.reserve(feed.squadUnits.size());
+	for (size_t place = 0; place < feed.squadUnits.size(); ++place)
+	{
+		const BattleUnit *unit = feed.squadUnits[place];
+		const UnitStats *most = unit->getBaseStats();
+		Row row;
+		row.picked = unit == selected;
+		const bool out = unit->isOut();
+		row.cell[COL_NUMBER] = std::to_string(place + 1);
+		row.cell[COL_NAME] = unit->getName(_game->getLanguage(), false);
+		row.cell[COL_TU] = std::to_string(unit->getTimeUnits()) + "/" + std::to_string(most->tu);
+		row.cell[COL_HEALTH] = std::to_string(unit->getHealth()) + "/" + std::to_string(most->health);
+		row.cell[COL_ENERGY] = std::to_string(unit->getEnergy());
+		row.cell[COL_MORALE] = std::to_string(unit->getMorale());
+		const char *state = "STR_FPS_FEED_STATE_OK";
+		Uint8 stateColour = feed.hudColour;
+		if (out && unit->getHealth() <= 0) { state = "STR_FPS_FEED_STATE_DEAD"; stateColour = feed.dimColour; }
+		else if (out) { state = "STR_FPS_FEED_STATE_DOWN"; stateColour = feed.turnColour; }
+		else if (unit->getOriginalFaction() == FACTION_PLAYER && unit->getFaction() != FACTION_PLAYER) { state = "STR_FPS_FEED_STATE_TURNED"; stateColour = feed.dangerColour; }
+		else if (unit->getOriginalFaction() != FACTION_PLAYER) { state = "STR_FPS_FEED_STATE_CONTROLLED"; stateColour = feed.clockColour; }
+		else if (unit->getStatus() == STATUS_PANICKING) { state = "STR_FPS_FEED_STATE_PANIC"; stateColour = feed.dangerColour; }
+		else if (unit->getStatus() == STATUS_BERSERK) { state = "STR_FPS_FEED_STATE_BERSERK"; stateColour = feed.dangerColour; }
+		else if (unit->getFatalWounds() > 0) { state = "STR_FPS_FEED_STATE_BLEEDING"; stateColour = feed.dangerColour; }
+		else if (unit->getHealth() < most->health) { state = "STR_FPS_FEED_STATE_WOUNDED"; stateColour = feed.turnColour; }
+		row.cell[COL_STATE] = _state->tr(state);
+		const Uint8 plain = out ? feed.dimColour : feed.wordsColour;
+		row.colour[COL_NUMBER] = row.colour[COL_NAME] = row.picked ? feed.pickedColour : plain;
+		row.colour[COL_TU] = out ? feed.dimColour : level(unit->getTimeUnits(), most->tu, true);
+		row.colour[COL_HEALTH] = out ? feed.dimColour : level(unit->getHealth(), most->health, false);
+		row.colour[COL_ENERGY] = out ? feed.dimColour : level(unit->getEnergy(), most->stamina, false);
+		row.colour[COL_MORALE] = out ? feed.dimColour : level(unit->getMorale(), 100, false);
+		row.colour[COL_STATE] = stateColour;
+		rows.push_back(row);
+	}
+	// The columns: as wide as their head or widest value; morale, energy and health left out (in that order) while the
+	// name wouldn't have FeedNameLeast.
+	const char *heads[COLUMNS] = { "#", "STR_FPS_FEED_COLUMN_NAME", "STR_FPS_FEED_COLUMN_TU", "STR_FPS_FEED_COLUMN_HEALTH", "STR_FPS_FEED_COLUMN_ENERGY",
+		"STR_FPS_FEED_COLUMN_MORALE", "STR_FPS_FEED_COLUMN_STATE" };
+	std::string head[COLUMNS];
+	int wide[COLUMNS];
+	bool shown[COLUMNS];
+	auto measure = [&](const std::string &words) { feed.writer->setText(words); return feed.writer->getTextWidth() * ui; };
+	for (int column = 0; column < COLUMNS; ++column)
+	{
+		head[column] = column == COL_NUMBER ? std::string(heads[column]) : std::string(_state->tr(heads[column]));
+		wide[column] = measure(head[column]);
+		if (column != COL_NAME) for (const Row &row : rows) wide[column] = std::max(wide[column], measure(row.cell[column]));
+		shown[column] = true;
+	}
+	const int room = (int)feed.squadRows.w - 4 * ui;
+	auto others = [&]() {
+		int sum = 0;
+		for (int column = 0; column < COLUMNS; ++column) if (shown[column] && column != COL_NAME) sum += wide[column] + gap;
+		return sum;
+	};
+	for (const int optional : { (int)COL_MORALE, (int)COL_ENERGY, (int)COL_HEALTH })
+	{
+		if (room - others() >= FeedNameLeast * ui) break;
+		shown[optional] = false;
+	}
+	wide[COL_NAME] = std::max(0, room - others());
+	int left[COLUMNS];
+	int x = area.x + 2 * ui;
+	for (int column = 0; column < COLUMNS; ++column)
+	{
+		left[column] = x;
+		if (shown[column]) x += wide[column] + gap;
+	}
+	// (numbers to the right of their column, words to the left; a cell's words cut short to its column)
+	auto cell = [&](int column, const std::string &words, int y, Uint8 colour) {
+		if (!shown[column] || wide[column] <= 0) return;
+		const bool number = column == COL_NUMBER || column == COL_TU || column == COL_HEALTH || column == COL_ENERGY || column == COL_MORALE;
+		const int at = number ? left[column] + wide[column] - measure(words) : left[column];
+		feedWrite(screen, words, at, y, colour, wide[column]);
+	};
+	for (int column = 0; column < COLUMNS; ++column) cell(column, head[column], area.y + ui, feed.dimColour);
+	fill(screen, area.x, area.y + rowH, (int)feed.squadRows.w, ui, feed.frameColour);
+	const int last = std::min((int)rows.size(), feed.squadScroll + feed.squadShown);
+	for (int place = feed.squadScroll; place < last; ++place)
+	{
+		const Row &row = rows[place];
+		const int y = feed.squadRows.y + (place - feed.squadScroll) * rowH;
+		if (row.picked) fill(screen, feed.squadRows.x, y, feed.squadRows.w, rowH, feed.rowBack);
+		for (int column = 0; column < COLUMNS; ++column) cell(column, row.cell[column], y + ui, row.colour[column]);
+	}
+	// The scroll bar: its track, the thumb lit while dragged or under the mouse.
+	if (feed.squadTrack.w > 0)
+	{
+		fill(screen, feed.squadTrack.x, feed.squadTrack.y, feed.squadTrack.w, feed.squadTrack.h, feed.frameColour);
+		const bool lit = feed.squadDragging || inside(feed.squadThumb, feed.mouseX, feed.mouseY);
+		fill(screen, feed.squadThumb.x, feed.squadThumb.y, feed.squadThumb.w, feed.squadThumb.h, lit ? feed.frameLit : feed.dimColour);
+	}
+}
+
+/**
+ * The mouse on the squad tab: the wheel scrolls its rows; a left press on the scroll bar's thumb drags it (it follows
+ * the mouse until the button comes up, see handleFeedMouse), on its track a page up or down; on a row it selects that
+ * soldier, as their squad button does (one who is up and ours, in our turn).
+ * @param x, y Where it is on the game's screen.
+ * @param wheel The wheel's notch (see wheelStep), 0 for none.
+ * @param leftPress True for a left press.
+ */
+void FirstPersonMode::feedSquadMouse(int x, int y, int wheel, bool leftPress)
+{
+	CommandFeed &feed = *_feed;
+	const int total = (int)feed.squadUnits.size(), most = std::max(0, total - feed.squadShown);
+	if (feed.squadDragging)
+	{
+		const int travel = std::max(1, (int)feed.squadTrack.h - (int)feed.squadThumb.h);
+		feed.squadScroll = std::clamp(feed.dragFromScroll + (int)std::lround((y - feed.dragFromY) * (double)most / travel), 0, most);
+		return;
+	}
+	if (wheel != 0)
+	{
+		feed.squadScroll = std::clamp(feed.squadScroll + wheel, 0, most);
+		return;
+	}
+	if (!leftPress)
+	{
+		return;
+	}
+	if (feed.squadThumb.w > 0 && inside(feed.squadThumb, x, y))
+	{
+		feed.squadDragging = true;
+		feed.dragFromY = y;
+		feed.dragFromScroll = feed.squadScroll;
+		return;
+	}
+	if (feed.squadTrack.w > 0 && inside(feed.squadTrack, x, y))
+	{
+		feed.squadScroll = std::clamp(feed.squadScroll + (y < feed.squadThumb.y ? -feed.squadShown : feed.squadShown), 0, most);
+		return;
+	}
+	if (inside(feed.squadRows, x, y))
+	{
+		const int place = feed.squadScroll + (y - feed.squadRows.y) / (FeedRowH * feed.ui);
+		if (place >= 0 && place < total)
+		{
+			if (TextButton::soundPress) TextButton::soundPress->play(Mix_GroupAvailable(0));
+			selectUnit(feed.squadUnits[place]);
+		}
+	}
+}
 
 /**
  * The squad as the row of cameras shows it: the soldiers who are up and on the map, in the squad buttons' order, each
@@ -1418,6 +1851,10 @@ void FirstPersonMode::feedColours()
 	feed.pickedColour = bright(250, 215, 60);
 	feed.purple = bright(150, 70, 220);
 	feed.purpleLit = bright(215, 140, 255);
+	feed.turnColour = bright(250, 185, 60);
+	feed.clockColour = bright(110, 215, 255);
+	feed.dangerColour = bright(245, 75, 60);
+	feed.rowBack = nearestColor(palette, 32, 46, 78);
 	if (!feed.writer)
 	{
 		feed.writer.reset(new Text(Options::baseXResolution, FeedWordsH, 0, 0));
