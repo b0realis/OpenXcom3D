@@ -79,6 +79,7 @@
 #include "../Engine/Game.h"
 #include "../Engine/Language.h"
 #include "../Engine/Options.h"
+#include "../Engine/Screen.h"
 #include "../Engine/Sound.h"
 #include "../Interface/Bar.h"
 #include "../Interface/BattlescapeButton.h"
@@ -233,6 +234,8 @@ struct CommandFeed
 	Maximised maximised = MAX_NONE;
 	// The minimap: the tactical map in its window (made again only for another window).
 	std::unique_ptr<FirstPersonMapState> minimap;
+	// The feed's own screen in the palette, when the game's is in full colour (see blitFeed).
+	std::unique_ptr<Surface> paletteScreen;
 	SDL_Rect minimapWindow{};
 	// The inventory window: the game's own inventory (its grid and items, moved by the mouse as on its screen), drawn
 	// with the screen's background and the soldier's figure into a picture of the screen's size, shown scaled into the
@@ -1127,10 +1130,27 @@ void FirstPersonMode::drawFeedWindow(SDL_Surface *screen, const SDL_Rect &frame,
 /**
  * The whole screen with the feed (see blit): the drone's picture with the game's own surfaces over it (its panel),
  * then the feed's windows over those, then our top bar and the 3D window's crosshair.
- * @param screen The game's screen.
+ * All of the feed is drawn in the palette's colours (its windows, words, the drone's filters on the map's pixels). The
+ * game's screen is in full colour with the engine's OpenGL output, its 32-bit scalers, or a display opened in full
+ * colour for True colour (FirstPerson::wantsFullColorDisplay): there the feed is drawn onto a screen of its own in the
+ * palette, as the game's would be, and that onto the game's in one go (a player's report from a Mac: the windows were
+ * all blue, the palette's numbers taken for a blue, and the drone in colour).
+ * @param gameScreen The game's screen.
  */
-void FirstPersonMode::blitFeed(SDL_Surface *screen)
+void FirstPersonMode::blitFeed(SDL_Surface *gameScreen)
 {
+	CommandFeed &feed = *_feed;
+	SDL_Surface *screen = gameScreen;
+	if (gameScreen->format->BytesPerPixel != 1)
+	{
+		if (!feed.paletteScreen || feed.paletteScreen->getWidth() != gameScreen->w || feed.paletteScreen->getHeight() != gameScreen->h)
+		{
+			feed.paletteScreen.reset(new Surface(gameScreen->w, gameScreen->h, 0, 0));
+			SDL_SetColorKey(feed.paletteScreen->getSurface(), 0, 0); // (all of it goes over: colour 0 too, as on the game's 8-bit screen)
+		}
+		feed.paletteScreen->setPalette(_game->getScreen()->getPalette()); // (the colours the game's screen shows)
+		screen = feed.paletteScreen->getSurface();
+	}
 	blitFeedUnder(screen);
 	for (Surface *surface : _state->_surfaces)
 	{
@@ -1140,6 +1160,10 @@ void FirstPersonMode::blitFeed(SDL_Surface *screen)
 	_feedOverlays = true;
 	drawOverlays(screen, false, false);
 	_feedOverlays = false;
+	if (screen != gameScreen)
+	{
+		SDL_BlitSurface(screen, nullptr, gameScreen, nullptr);
+	}
 }
 
 /**
@@ -1290,7 +1314,7 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 	{
 		drawFeedWindow(screen, feed.map, feed.frameColour);
 		titleWords(feed.map, _state->tr("STR_FPS_FEED_MAP"), feed.wordsColour, false);
-		if (feed.minimap) feed.minimap->blit();
+		if (feed.minimap) feed.minimap->blitOnto(screen);
 	}
 
 	// The title lines' buttons: their words or signs (all over the screen: a square; back: a square in a square), lit

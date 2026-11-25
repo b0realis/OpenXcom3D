@@ -129,6 +129,9 @@ public:
 	void handle(Action *action) override;
 	/// The animation's clock.
 	void think() override;
+	/// Draws the map onto a surface of the screen's size (in a window: the Live command feed's own screen, see
+	/// FirstPersonMode::blitFeed).
+	void blitOnto(SDL_Surface *target);
 
 private:
 	/// A button of the map: what it does, its place, its words.

@@ -1215,6 +1215,19 @@ void FirstPersonMapState::animate()
 }
 
 /**
+ * Draws the map onto a surface of the screen's size, as State::blit draws it onto the game's screen: in a window, onto
+ * the Live command feed's own screen when the game's is in full colour (see FirstPersonMode::blitFeed).
+ * @param target The surface.
+ */
+void FirstPersonMapState::blitOnto(SDL_Surface *target)
+{
+	for (Surface *surface : _surfaces)
+	{
+		surface->blit(target);
+	}
+}
+
+/**
  * Every frame: the clock, and the map drawn again if anything changed.
  */
 void FirstPersonMapState::think()
