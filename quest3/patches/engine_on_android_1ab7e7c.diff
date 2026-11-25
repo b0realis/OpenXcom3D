@@ -1646,10 +1646,10 @@ index 000000000..5ed8465d6
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..b2a7c10d6
+index 000000000..74e5b75d3
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,600 @@
+@@ -0,0 +1,635 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -2176,9 +2176,44 @@ index 000000000..b2a7c10d6
 +    # drawings and painted as the gals are (its sheet's name begins with PIR, as theirs do) it was a lumpy purple loaf,
 +    # "a lot more goofy" (a player on the forum): a hull box and a turret box fitted to its drawings, with its gun (the
 +    # owner: "build a good boxy tank model with boxy turret and barrel"); the gals' words taken back
-+    # XPiratez's Wench outfit (armour STR_LINGERIE_SET_X_UC on the gals' broad, muscular body, UBERGAL): a leaner,
-+    # feminine figure (the owner, of a gal in it: "lets just make her body leaner, human like and feminine (breasts...)")
-+    - names: [STR_LINGERIE_SET_X_UC]
++    # XPiratez's gals' outfits (every armour drawn on the gals' layered body, `layersDefaultPrefix: UBERGAL`, 145 of
++    # them): a leaner, feminine figure, the gals drawn broad and muscular (the owner, of a gal in the Wench outfit: "lets
++    # just make her body leaner, human like and feminine (breasts...)", and then: "All oufits"). Only people are made so
++    # ("humanoid: standard": the gals proper); the other races (cat girls, gnomes, hybrids..., each on a body of its
++    # own) stay as they were
++    - names: [STR_ADVENTURER_OUTFIT_UC, STR_AGGRESSOR_ARMOR_UC, STR_AMAZON_ARMOR_SEA_UC, STR_AMAZON_ARMOR_UC,
++        STR_ANNIHILATOR_ARMOR_SEA_UC, STR_ANNIHILATOR_ARMOR_SPACE_UC, STR_ANNIHILATOR_ARMOR_UC,
++        STR_ARMOR_SAINT_FAKE_UC, STR_ARMOR_SAINT_UC, STR_ARRANCAR_ARMOR_UC, STR_ASSASSIN_UC, STR_ASSAULT_2_UC,
++        STR_ASSAULT_UC, STR_BARBARIAN_ARMOR_S_UC, STR_BARBARIAN_ARMOR_UC, STR_BARBARIAN_FURS_UC,
++        STR_BARBARIAN_RAGS_UC, STR_BASIC_ARMOR_UC, STR_BIKINI_SEA_UC, STR_BIKINI_UC, STR_BIO_SUIT_ADV_SEA_UC,
++        STR_BIO_SUIT_ADV_UC, STR_BIO_SUIT_NECRO_SEA_UC, STR_BIO_SUIT_NECRO_UC, STR_BLITZ_ARMOR_SEA_UC,
++        STR_BLITZ_ARMOR_UC, STR_BRAINER_OUTFIT_SEA_UC, STR_BRAINER_OUTFIT_UC, STR_BRUTE_ARMOR_UC,
++        STR_CARBON_ARMOR_UC, STR_CHAIN_MAIL_A_UC, STR_CHAIN_MAIL_UC, STR_CHILLER_SEA_UC, STR_CHILLER_UC,
++        STR_CLOTHING_UC, STR_CRYSTALISK_ARMOR_SEA_UC, STR_CRYSTALISK_ARMOR_UC, STR_DEFENDER_DMG_UC, STR_DEFENDER_UC,
++        STR_DEMONIC_ARMOR_SEA_UC, STR_DEMONIC_ARMOR_UC, STR_FLYING_SUIT_UC, STR_FORCE_ARMOR_SEA_UC,
++        STR_FORCE_ARMOR_UC, STR_GANGER_OUTFIT_UC, STR_GLITTER_ARMOR_UC, STR_GRAVBALL_OUTFIT_UC, STR_GRAV_ARMOR_UC,
++        STR_GUARDIAN_UC, STR_GYM_OUTFIT_UC, STR_HEAVY_KEVLAR_ARMOR_UC, STR_HERMIT_UC, STR_HOBO_DRESS_UC,
++        STR_HOLOSUIT_UC, STR_HOVERBIKE_ARMOR_UC, STR_HYENA_RIDER_ARMOR_UC, STR_INFERNA_ARMOR_A_UC,
++        STR_INFERNA_ARMOR_SEA_UC, STR_INFERNA_ARMOR_UC, STR_IRONMAN_ARMOR_SPACE_UC, STR_IRONMAN_ARMOR_UC,
++        STR_KEVLAR_ARMOR_UC, STR_LEATHER_ARMOR_UC, STR_LINGERIE_BRA_UC, STR_LINGERIE_SET_UC, STR_LINGERIE_SET_X_UC,
++        STR_LINGERIE_TEDDY_UC, STR_LOOTED_RAIDER_BOSS_ARMOR_UC, STR_MAGE_ROBE_UC, STR_MAGICAL_GIRL_OUTFIT_SEA_UC,
++        STR_MAGICAL_GIRL_OUTFIT_UC, STR_MARTYR_OUTFIT_DREAMLAND_UC, STR_MARTYR_OUTFIT_UC, STR_MEIDO_OUTFIT_UC,
++        STR_METAL_ARMOR_UC, STR_MONOKINI_SHELL_SEA_UC, STR_MONOKINI_SHELL_UC, STR_MUSCLE_ARMOR_UC,
++        STR_NIGHTGOWN_DREAMLAND_UC, STR_NIGHTGOWN_UC, STR_NIGHT_OPS_ARMOR_UC, STR_NURSE_OUTFIT_ADV_UC,
++        STR_NURSE_OUTFIT_UC, STR_PARTY_DRESS_UC, STR_PATIENT_OUTFIT_UC, STR_PERSONAL_ARMOR_UC,
++        STR_PIR_CASTAWAY_ARMOR_UC, STR_PIR_CHAINS_UC, STR_PIR_GREMRIN_DREAMLAND_UC, STR_PIR_GREMRIN_UC,
++        STR_PIR_MINX_UC, STR_PIR_NUDE_DREAMLAND_UC, STR_PIR_NUDE_SEA_UC, STR_PIR_NUDE_UC, STR_PIR_OFFICER_UC,
++        STR_PIR_ROBBER_UC, STR_PIR_ROGUE_UC, STR_PIR_SLAVE_ARMOR_FAKE_UC, STR_PIR_SLAVE_ARMOR_UC,
++        STR_PIR_SPECTRE_DREAMLAND_UC, STR_PIR_STORM_ARMOR_UC, STR_PIR_SWASHBUCKLER_UC, STR_PIR_TOPLESS_UC,
++        STR_PLATE_MAIL_A_UC, STR_PLATE_MAIL_UC, STR_POWER_SUIT_ADV_EVA_SEA_UC, STR_POWER_SUIT_ADV_EVA_UC,
++        STR_POWER_SUIT_ADV_UC, STR_POWER_SUIT_UC, STR_POWER_SUIT_WRECKED_UC, STR_RAGS_UC, STR_REVENANT_ARMOR_UC,
++        STR_RUNT_OUTFIT_UC, STR_SAILOR_UNIFORM_UC, STR_SAVAGE_ARMOR_UC, STR_SCALE_MAIL_A_UC, STR_SCALE_MAIL_UC,
++        STR_SCOUT_OUTFIT_UC, STR_SHADOW_PIRATE_OUTFIT_DREAMLAND_UC, STR_SHADOW_PIRATE_OUTFIT_UC, STR_SMOKEY_ARMOR_UC,
++        STR_SMOKEY_MK2_ARMOR_UC, STR_SNIPER_ARMOR_UC, STR_SORCERESS_ARMOR_SEA_UC, STR_SORCERESS_ARMOR_SPACE_UC,
++        STR_SORCERESS_ARMOR_UC, STR_SP_AMBER_UC, STR_SP_BABYDOLL_FAKE_UC, STR_SP_BABYDOLL_UC, STR_SWIFTSUIT_SEA_UC,
++        STR_SWIFTSUIT_UC, STR_SWIMSUIT_SEA_UC, STR_SWIMSUIT_UC, STR_TAC_ARMOR_UC, STR_TAC_FULL_ARMOR_UC,
++        STR_TAC_VEST_UC, STR_THEBAN_DRESS_SEA_UC, STR_THEBAN_DRESS_UC, STR_THIEF_ARMOR_UC, STR_TOPLESS_SEA_UC,
++        STR_VAMPY_ROBE_UC, STR_VOODOO_ARMOR_UC, STR_WHITE_DRESS_UC, STR_ZORTRIUM_SUIT_SEA_UC, STR_ZORTRIUM_SUIT_UC]
 +      figure: feminine
 +    - names: [PIR_TANK.PCK, PIR_TANK_L.PCK]
 +      shape: tank
@@ -24594,10 +24629,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..38672f1bf
+index 000000000..bf899a6d1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2357 @@
+@@ -0,0 +1,2376 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25175,6 +25210,10 @@ index 000000000..38672f1bf
 +
 +}
 +
++/// Setting "Obliteration in UFO and TFTD": a unit's health must go below minus this share of its full health for it to
++/// leave no corpse (see overKillShare).
++const float ClassicOverKill = 0.75f;
++
 +/**
 + * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
 + * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
@@ -25183,11 +25222,12 @@ index 000000000..38672f1bf
 + * @param mod The game's rules.
 + * @return True if some item has overkill.
 + */
++static bool ClassicOverkillHere = false; // (the last mod a hit was asked of has no overkill of its own: the setting holds, see overKillShare)
 +static bool modHasOverkill(const Mod *mod)
 +{
 +	static const Mod *known = nullptr;
 +	static bool has = false;
-+	if (mod == known) return has;
++	if (mod == known) { ClassicOverkillHere = !has; return has; }
 +	known = mod;
 +	has = false;
 +	for (const std::string &name : mod->getItemsList())
@@ -25204,7 +25244,21 @@ index 000000000..38672f1bf
 +			break;
 +		}
 +	}
++	ClassicOverkillHere = !has;
 +	return has;
++}
++
++/**
++ * Setting "Obliteration in UFO and TFTD": how far below 0 a unit's health must go, as a share of its full health, for
++ * it to leave no corpse (BattleUnit::getOverKillDamage): with the setting, where it holds (see overkillDamageType),
++ * ClassicOverKill (the owner: "Make it 75%"; OXCE's 0.5 for every armour of the original games made a plasma squad
++ * lose most corpses; XPiratez's armours have 0.75 to 1, The X-Com Files' 1.5); else the armour's own.
++ * @param armorShare The unit's armour's share.
++ * @return The share to go by.
++ */
++float overKillShare(float armorShare)
++{
++	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
 +}
 +
 +/**
@@ -25213,8 +25267,8 @@ index 000000000..38672f1bf
 + * an explosion's, a laser's and plasma's damage types (TFTD's Gauss is the laser's, Sonic the plasma's) don't ignore
 + * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
 + * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
-+ * a stun): a unit they take below minus its armour's overkill share of its health (OXCE's 0.5 for every armour of the
-+ * original games) dies leaving no corpse, as the map burns it, and with "Obliteration" bursts in 3D.
++ * a stun): a unit they take below minus ClassicOverKill of its health (see overKillShare) dies leaving no corpse, as
++ * the map burns it, and with "Obliteration" bursts in 3D.
 + * @param mod The game's rules.
 + * @param type The hit's damage type.
 + * @param scratch Room for an altered copy.
@@ -25222,9 +25276,9 @@ index 000000000..38672f1bf
 + */
 +const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
 +{
-+	if (!Options::fpsObliterationClassic || !type || !mod || !type->IgnoreOverKill) return type;
++	if (!Options::fpsObliterationClassic || !type || !mod) return type;
++	if (modHasOverkill(mod) || !type->IgnoreOverKill) return type; // (also notes whether the setting holds here: see overKillShare)
 +	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
-+	if (modHasOverkill(mod)) return type;
 +	scratch = *type;
 +	scratch.IgnoreOverKill = false;
 +	return &scratch;
@@ -26072,7 +26126,7 @@ index 000000000..38672f1bf
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
 +	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
 +	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
-+	// obliteration for og games also"): a unit they take past minus half its health leaves no corpse (and with
++	// obliteration for og games also"): a unit they take past minus three quarters of its health (the owner: "Make it 75%") leaves no corpse (and with
 +	// "Obliteration" bursts in 3D). Only where no loaded mod gives any weapon overkill of its own. Off by default: it
 +	// changes the games' rules (corpses lost). See overkillDamageType.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliterationClassic", &fpsObliterationClassic, false, "STR_FPS_OBLITERATION_CLASSIC", category));
@@ -26957,10 +27011,10 @@ index 000000000..38672f1bf
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..822cb4d9f
+index 000000000..1863ee05d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,567 @@
+@@ -0,0 +1,571 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27367,6 +27421,9 @@ index 000000000..822cb4d9f
 +/// Setting "Obliteration in UFO and TFTD": the damage type a hit goes by, an original game's explosion, laser or plasma
 +/// with overkill (scratch holds the copy). See FirstPersonApi.cpp.
 +const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch);
++/// Setting "Obliteration in UFO and TFTD": the share of its full health a unit's health must go below for it to leave no
++/// corpse (BattleUnit::getOverKillDamage): the setting's own where it holds, else the armour's.
++float overKillShare(float armorShare);
 +/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 +void noteHealthDamage(int health);
 +int lastHealthDamage();
@@ -27472,6 +27529,7 @@ index 000000000..822cb4d9f
 +inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, const RuleDamageType *) { }
 +inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
 +inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageType *type, RuleDamageType &) { return type; }
++inline float overKillShare(float armorShare) { return armorShare; }
 +inline void noteHealthDamage(int) { }
 +inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
@@ -109795,7 +109853,7 @@ index 0a825f760..a753621bb 100644
  	/// Name of class used in script.
  	static constexpr const char *ScriptName = "BattleItem";
 diff --git a/src/Savegame/BattleUnit.cpp b/src/Savegame/BattleUnit.cpp
-index e6e2195ce..09baf1867 100644
+index e6e2195ce..76ea61d85 100644
 --- a/src/Savegame/BattleUnit.cpp
 +++ b/src/Savegame/BattleUnit.cpp
 @@ -55,6 +55,7 @@
@@ -109855,6 +109913,15 @@ index e6e2195ce..09baf1867 100644
  	double ox = point.x - _pos.x;
  	double oy = point.y - _pos.y;
  	double angle = atan2(ox, -oy);
+@@ -1605,7 +1627,7 @@ int BattleUnit::getMorale() const
+  */
+ int BattleUnit::getOverKillDamage() const
+ {
+-	return std::max(-_health - (int)(_stats.health * _armor->getOverKill()), 0);
++	return std::max(-_health - (int)(_stats.health * FirstPerson::overKillShare(_armor->getOverKill())), 0); // (OpenXcom3D: setting "Obliteration in UFO and TFTD", its own share)
+ }
+ 
+ /**
 @@ -1629,6 +1651,11 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
  	{
  		return 0;

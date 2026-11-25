@@ -575,6 +575,10 @@ bool hiddenAs(const std::string &id, HiddenAs &as)
 
 }
 
+/// Setting "Obliteration in UFO and TFTD": a unit's health must go below minus this share of its full health for it to
+/// leave no corpse (see overKillShare).
+const float ClassicOverKill = 0.75f;
+
 /**
  * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
  * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
@@ -583,11 +587,12 @@ bool hiddenAs(const std::string &id, HiddenAs &as)
  * @param mod The game's rules.
  * @return True if some item has overkill.
  */
+static bool ClassicOverkillHere = false; // (the last mod a hit was asked of has no overkill of its own: the setting holds, see overKillShare)
 static bool modHasOverkill(const Mod *mod)
 {
 	static const Mod *known = nullptr;
 	static bool has = false;
-	if (mod == known) return has;
+	if (mod == known) { ClassicOverkillHere = !has; return has; }
 	known = mod;
 	has = false;
 	for (const std::string &name : mod->getItemsList())
@@ -604,7 +609,21 @@ static bool modHasOverkill(const Mod *mod)
 			break;
 		}
 	}
+	ClassicOverkillHere = !has;
 	return has;
+}
+
+/**
+ * Setting "Obliteration in UFO and TFTD": how far below 0 a unit's health must go, as a share of its full health, for
+ * it to leave no corpse (BattleUnit::getOverKillDamage): with the setting, where it holds (see overkillDamageType),
+ * ClassicOverKill (the owner: "Make it 75%"; OXCE's 0.5 for every armour of the original games made a plasma squad
+ * lose most corpses; XPiratez's armours have 0.75 to 1, The X-Com Files' 1.5); else the armour's own.
+ * @param armorShare The unit's armour's share.
+ * @return The share to go by.
+ */
+float overKillShare(float armorShare)
+{
+	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
 }
 
 /**
@@ -613,8 +632,8 @@ static bool modHasOverkill(const Mod *mod)
  * an explosion's, a laser's and plasma's damage types (TFTD's Gauss is the laser's, Sonic the plasma's) don't ignore
  * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
  * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
- * a stun): a unit they take below minus its armour's overkill share of its health (OXCE's 0.5 for every armour of the
- * original games) dies leaving no corpse, as the map burns it, and with "Obliteration" bursts in 3D.
+ * a stun): a unit they take below minus ClassicOverKill of its health (see overKillShare) dies leaving no corpse, as
+ * the map burns it, and with "Obliteration" bursts in 3D.
  * @param mod The game's rules.
  * @param type The hit's damage type.
  * @param scratch Room for an altered copy.
@@ -622,9 +641,9 @@ static bool modHasOverkill(const Mod *mod)
  */
 const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
 {
-	if (!Options::fpsObliterationClassic || !type || !mod || !type->IgnoreOverKill) return type;
+	if (!Options::fpsObliterationClassic || !type || !mod) return type;
+	if (modHasOverkill(mod) || !type->IgnoreOverKill) return type; // (also notes whether the setting holds here: see overKillShare)
 	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
-	if (modHasOverkill(mod)) return type;
 	scratch = *type;
 	scratch.IgnoreOverKill = false;
 	return &scratch;
@@ -1472,7 +1491,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
 	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
 	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
-	// obliteration for og games also"): a unit they take past minus half its health leaves no corpse (and with
+	// obliteration for og games also"): a unit they take past minus three quarters of its health (the owner: "Make it 75%") leaves no corpse (and with
 	// "Obliteration" bursts in 3D). Only where no loaded mod gives any weapon overkill of its own. Off by default: it
 	// changes the games' rules (corpses lost). See overkillDamageType.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliterationClassic", &fpsObliterationClassic, false, "STR_FPS_OBLITERATION_CLASSIC", category));
