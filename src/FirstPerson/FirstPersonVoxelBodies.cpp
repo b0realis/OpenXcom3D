@@ -665,7 +665,7 @@ constexpr int HairReach = 4 * VOXELSCALE;
 /// FemLimb, the legs' FemLeg; the shoulder joints in as the shoulders are (the elbows half as far, the hands where they
 /// are: what they hold stays in them). A bust at BustAt of that height: two balls BustApart of the chest's half breadth either side of its middle,
 /// BustSize of it thick (half), standing BustOut of themselves out of the chest's front.
-constexpr float FemHips = 0.95f, FemWaist = 0.84f, FemWaistAt = 0.35f, FemChest = 0.78f, FemChestAt = 0.68f, FemShoulders = 0.62f, FemDepth = 0.85f,
+constexpr float FemHips = 0.95f, FemWaist = 1.0f, FemWaistAt = 0.35f, FemChest = 0.78f, FemChestAt = 0.68f, FemShoulders = 0.62f, FemDepth = 0.85f,
 	FemLimb = 0.62f, FemLeg = 0.72f, BustAt = 0.66f, BustApart = 0.45f, BustSize = 0.42f, BustOut = 0.75f;
 /// A kneeling body's legs (see standardBody, the kneeling legs). ThighShare: a thigh's thickness, half, of the trunk's
 /// half breadth at its foot, within ThighLeast and ThighMost voxels and no more than ThighTall of the body's height; KneeShare, ShinLeast, ShinMost: its knee's of
@@ -1107,8 +1107,9 @@ void standardBody(std::vector<Uint8> &owner, bool whole, bool stands, const Stan
 		}
 		// A feminine figure (the unit table's "figure: feminine", by name: the owner, of a gal XPiratez draws broad and
 		// muscular, "lets just make her body leaner, human like and feminine (breasts...)"): the trunk below the neck
-		// narrower at the shoulders, the chest and the waist, as wide at the hips (see FemHips), a little shallower; the
-		// limbs thinner (step 5 and 6); and a bust on the chest (step 6).
+		// narrower at the shoulders and the chest, the waist as drawn (narrower it was too narrow: "Make it even wider
+		// 100%"), nearly as wide at the hips (see FemHips), a little shallower; the limbs thinner (step 5 and 6); and a
+		// bust on the chest (step 6).
 		if (Feminine && neck > (int)(3 * V))
 		{
 			auto breadth = [](float h) {
