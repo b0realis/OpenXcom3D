@@ -554,7 +554,8 @@ void FirstPersonMode::resumeFacingStep(BattleUnit *unit)
  * applies: the time units and energy are paid, doors open, stairs are climbed, mines go off,
  * units on both sides spot each other, reaction fire comes, and a soldier who steps into the
  * air falls. The walk is an "instant move" (no step animation on the map); the 3D view moves
- * the camera smoothly on its own.
+ * the camera smoothly on its own. With the Live command feed up, the drone's map shows the step
+ * walked, as quick as the 3D view's pace needs (see feedStepPhaseMs).
  * The camera's tile becomes the destination at once, and the step stays pending until the game
  * has walked it (see updateCamera).
  * @param stepX The step's direction along x (east is positive): -1, 0 or 1.
@@ -661,6 +662,10 @@ bool FirstPersonMode::commitStep(BattleUnit *unit, int stepX, int stepY)
 	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
 	walk.run = run && !walk.strafe;
+	// (with the Live command feed the step plays on the drone's map too, quick enough for the 3D view's pace; a step
+	// off a ledge stays instant, the game's fall taking over)
+	walk.walkPhaseMs = stepsOffLedge ? 0 : feedStepPhaseMs(walk.run, stepX != 0 && stepY != 0);
+	if (walk.walkPhaseMs > 0) walk.instantMove = false;
 	// Walking on past an enemy coming into sight: en passant, or sprinting, in every game (as the
 	// map walks on with Shift, and a run does where the mod's rules say so; a player's report,
 	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).

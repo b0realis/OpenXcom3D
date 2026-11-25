@@ -19682,15 +19682,16 @@ index b7e1111f3..3ab35ac63 100644
  	}
  	else
 diff --git a/src/Battlescape/BattlescapeGame.h b/src/Battlescape/BattlescapeGame.h
-index 7af613cc7..03b3cc0bb 100644
+index 7af613cc7..b8ca8c600 100644
 --- a/src/Battlescape/BattlescapeGame.h
 +++ b/src/Battlescape/BattlescapeGame.h
-@@ -90,6 +90,15 @@ struct BattleAction : BattleActionCost
+@@ -90,6 +90,16 @@ struct BattleAction : BattleActionCost
  	bool sprayTargeting; // Used to separate waypoint checks between confirm firing mode and the "spray" autoshot
  	BattleActionOrigin relativeOrigin = BattleActionOrigin::CENTRE; // preferred origin voxel (centre, left or right)
  	int terrainMeleeTilePart = 0; // terrain melee
 +	Position targetVoxel = Position(-1, -1, -1); // exact point to aim at (first-person crosshair); x < 0 = pick one on the target tile
 +	bool instantMove = false; // walk without the step animation (first-person view)
++	int walkPhaseMs = 0; // a step phase's milliseconds, 0: the game's own pace (first-person view: the Live command feed's map shows the 3D view's steps)
 +	bool freeAim = false; // FPS-style shot (first-person view): each round goes where the view aims it, no accuracy roll
 +	bool eyeOrigin = false; // the shot leaves from the 3D eye's place across the tile, as an FPS-style one does, the rest the game's (first-person view option: close range)
 +	bool forced = false; // forced shot (first-person view options): as with Ctrl held for force fire (an arcing shot at the target tile, whatever its curve meets; a straight one at targetVoxel, whatever is in the way)
@@ -23536,7 +23537,7 @@ index 599d9a24f..4ea0dc947 100644
  
  } //namespace OpenXcom
 diff --git a/src/Battlescape/UnitWalkBState.cpp b/src/Battlescape/UnitWalkBState.cpp
-index bc5f08f46..5ddf353f4 100644
+index bc5f08f46..62a3664ce 100644
 --- a/src/Battlescape/UnitWalkBState.cpp
 +++ b/src/Battlescape/UnitWalkBState.cpp
 @@ -97,7 +97,7 @@ void UnitWalkBState::think()
@@ -23557,6 +23558,26 @@ index bc5f08f46..5ddf353f4 100644
  			_unit->keepWalking(_parent->getSave(), onScreenBoundary); // advances the phase
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
+@@ -519,6 +519,11 @@ void UnitWalkBState::postPathProcedures()
+  */
+ void UnitWalkBState::setNormalWalkSpeed()
+ {
++	if (_action.walkPhaseMs > 0)
++	{
++		_parent->setStateInterval(_action.walkPhaseMs); // (OpenXcom3D: the 3D view's step at its own pace, see FirstPersonMode::feedStepPhaseMs)
++		return;
++	}
+ 	if (_unit->getFaction() == FACTION_PLAYER)
+ 		_parent->setStateInterval(Options::battleXcomSpeed);
+ 	else
+@@ -531,6 +536,7 @@ void UnitWalkBState::setNormalWalkSpeed()
+  */
+ void UnitWalkBState::playMovementSound()
+ {
++	if (_action.walkPhaseMs > 0) return; // (OpenXcom3D: a step of the 3D view's, which plays its footsteps itself)
+ 	int size = _unit->getArmor()->getSize() - 1;
+ 	if ((!_unit->getVisible() && !_parent->getSave()->getDebugMode()) || !_parent->getMap()->getCamera()->isOnScreen(_unit->getPosition(), true, size, false)) return;
+ 
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
 index 839f80345..af6c59715 100644
 --- a/src/CMakeLists.txt
@@ -42926,10 +42947,10 @@ index 000000000..91e85b624
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..f29b49147
+index 000000000..470301e38
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1673 @@
+@@ -0,0 +1,1674 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44307,6 +44328,7 @@ index 000000000..f29b49147
 +	bool feedViewPicture(SDL_Rect &picture) const;
 +	void updateFeed();
 +	void leaveFeed();
++	int feedStepPhaseMs(bool run, bool diagonal) const;
 +	void layOutFeed();
 +	void feedColours();
 +	void feedButtons();
@@ -45607,10 +45629,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..8a0edf799
+index 000000000..be87a4974
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,2204 @@
+@@ -0,0 +1,2251 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45834,15 +45856,17 @@ index 000000000..8a0edf799
 +	// level buttons work while following).
 +	const BattleUnit *followedUnit = nullptr;
 +	int followedZ = -1;
-+	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on, as on the isometric map), or it stays
-+	// where the player left it (off); off, where it was before the battle's think this frame (noted, see
++	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on: as on the isometric map), or it stays
++	// where the player left it (off, at first: the owner, "If you dont have dynamic option in the feed the view should not
++	// follow shots! Only in dynamic that replicates iso mode"); off, where it was before the battle's think this frame (noted, see
 +	// beforeBattleThink), and the map told not to go after shots (to tell back when it comes on again); where it was at
 +	// the end of the last frame, and whether the battle put a screen over it then (the next turn's, which centres the
 +	// map on the soldier as it goes).
-+	bool dynamic = true, held = false, projectileHeld = false, screenFromBattle = false;
++	bool dynamic = false, held = false, projectileHeld = false, screenFromBattle = false;
 +	Position heldAt, endAt;
 +	Position glideFrom, glideTo;
 +	Uint32 glideStart = 0, lastFrame = 0;
++	double frameMs = 1000.0 / 60; // (a frame's time, smoothed: how quick a step can play on the map, see feedStepPhaseMs)
 +	int mouseX = -1, mouseY = -1;
 +	Maximised maximised = MAX_NONE;
 +	// The minimap: the tactical map in its window (made again only for another window).
@@ -46088,6 +46112,7 @@ index 000000000..8a0edf799
 +	const Uint32 now = SDL_GetTicks();
 +	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
 +	feed.lastFrame = now;
++	if (seconds > 0.0) feed.frameMs += (seconds * 1000.0 - feed.frameMs) * 0.1;
 +	// (a button let go somewhere the feed didn't hear: an arrow, the squad table's thumb, a press on the drone)
 +	const Uint8 buttons = SDL_GetMouseState(nullptr, nullptr);
 +	if (!(buttons & SDL_BUTTON(SDL_BUTTON_LEFT)))
@@ -46205,6 +46230,37 @@ index 000000000..8a0edf799
 +		feed.heldAt = feed.screenFromBattle ? feed.endAt : _state->_map->getCamera()->getMapOffset();
 +	}
 +	feed.screenFromBattle = false;
++}
++
++/**
++ * A step the 3D view walks, with the feed up: how quick its walk plays on the drone's map (the owner: "the camera feed
++ * does not show animations. They can be faster animations to conform to 3d no problem - just they must be shown!"; the
++ * 3D view's steps are instant moves, see commitStep). The game walks a step in about 10 of its ticks (a diagonal one in
++ * 18: twice the phases), at most one a frame; the 3D eye crosses the tile (and StepLead over the next edge) at the
++ * walking pace, and the next step waits for the game's walk to end. So the ticks come every frame or every few, as
++ * many as still end the walk in time (never slower than the game's own walking speed); a screen too slow for that
++ * (a sprint's diagonal steps at 60 frames a second) keeps the instant step, and the 3D walk never waits.
++ * @param run Whether the step is run (the sprint's pace).
++ * @param diagonal Whether it is a diagonal step.
++ * @return A step phase's milliseconds, or 0 for an instant step.
++ */
++int FirstPersonMode::feedStepPhaseMs(bool run, bool diagonal) const
++{
++	if (!feedShown() || vrOn())
++	{
++		return 0;
++	}
++	const double voxelsPerMs = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (run ? SprintPace : 1.0) / 1000.0;
++	const double inTime = ((diagonal ? 16.0 * 1.4142 : 16.0) + StepLead) / voxelsPerMs * 0.9; // (a little to spare)
++	const int ticks = diagonal ? 18 : 10;
++	const double frame = std::max(1.0, _feed->frameMs);
++	int frames = (int)std::floor(inTime / (ticks * frame)); // (frames a tick)
++	frames = std::min(frames, std::max(1, (int)std::lround(Options::battleXcomSpeed / frame)));
++	if (frames < 1)
++	{
++		return 0;
++	}
++	return std::max(1, (int)std::lround((frames - 0.5) * frame)); // (the battle's timer then ticks every so many frames)
 +}
 +
 +/**
@@ -46988,18 +47044,31 @@ index 000000000..8a0edf799
 +}
 +
 +/**
-+ * A key while the feed shows: Escape puts the drone's picture all over the screen back, or lets go of the mouse the 3D
-+ * window has (both its press and its release are then the feed's). The rest are the battle's and the 3D view's.
++ * A key while the feed shows: the options key (Escape) opens the battle's options, as on the isometric map (the owner:
++ * "Even in feed esc should go to options menu"; its button, on the game's panel, is hidden in the feed), letting go of
++ * the mouse the 3D window has first. A cancel key of its own (bound apart from the options key) puts the drone's
++ * picture all over the screen back, or lets go of that mouse. Both a press and its release are then the feed's. The rest
++ * are the battle's and the 3D view's.
 + * @param action The key.
 + * @return True if it was the feed's.
 + */
 +bool FirstPersonMode::handleFeedKey(Action *action)
 +{
-+	if (!feedShown() || action->getDetails()->key.keysym.sym != Options::keyCancel)
++	const SDLKey key = action->getDetails()->key.keysym.sym;
++	if (!feedShown() || key == SDLK_UNKNOWN || (key != Options::keyBattleOptions && key != Options::keyCancel))
 +	{
 +		return false;
 +	}
 +	const bool down = action->getDetails()->type == SDL_KEYDOWN;
++	if (key == Options::keyBattleOptions)
++	{
++		if (down)
++		{
++			if (_mouseLook) setMouseLook(false);
++			_state->btnHelpClick(action);
++		}
++		return true;
++	}
 +	if (_feed->maximised != CommandFeed::MAX_NONE)
 +	{
 +		if (down) _feed->maximised = CommandFeed::MAX_NONE;
@@ -50663,10 +50732,10 @@ index 000000000..736b43fc4
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..a6112a26c
+index 000000000..3b79dba9f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2858 @@
+@@ -0,0 +1,2863 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -51223,7 +51292,8 @@ index 000000000..a6112a26c
 + * applies: the time units and energy are paid, doors open, stairs are climbed, mines go off,
 + * units on both sides spot each other, reaction fire comes, and a soldier who steps into the
 + * air falls. The walk is an "instant move" (no step animation on the map); the 3D view moves
-+ * the camera smoothly on its own.
++ * the camera smoothly on its own. With the Live command feed up, the drone's map shows the step
++ * walked, as quick as the 3D view's pace needs (see feedStepPhaseMs).
 + * The camera's tile becomes the destination at once, and the step stays pending until the game
 + * has walked it (see updateCamera).
 + * @param stepX The step's direction along x (east is positive): -1, 0 or 1.
@@ -51330,6 +51400,10 @@ index 000000000..a6112a26c
 +	walk.instantMove = true; // No step animation: the 3D view moves smoothly on its own.
 +	walk.strafe = pathfinding->getStrafeMove(); // the sidestep above, if the game allows it here
 +	walk.run = run && !walk.strafe;
++	// (with the Live command feed the step plays on the drone's map too, quick enough for the 3D view's pace; a step
++	// off a ledge stays instant, the game's fall taking over)
++	walk.walkPhaseMs = stepsOffLedge ? 0 : feedStepPhaseMs(walk.run, stepX != 0 && stepY != 0);
++	if (walk.walkPhaseMs > 0) walk.instantMove = false;
 +	// Walking on past an enemy coming into sight: en passant, or sprinting, in every game (as the
 +	// map walks on with Shift, and a run does where the mod's rules say so; a player's report,
 +	// GitHub issue #118). Being shot at still stops the walk (see stopWalkUnderFire).

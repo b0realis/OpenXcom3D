@@ -221,15 +221,17 @@ struct CommandFeed
 	// level buttons work while following).
 	const BattleUnit *followedUnit = nullptr;
 	int followedZ = -1;
-	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on, as on the isometric map), or it stays
-	// where the player left it (off); off, where it was before the battle's think this frame (noted, see
+	// DYNAMIC: the battle's own moves of the map's camera move the drone too (on: as on the isometric map), or it stays
+	// where the player left it (off, at first: the owner, "If you dont have dynamic option in the feed the view should not
+	// follow shots! Only in dynamic that replicates iso mode"); off, where it was before the battle's think this frame (noted, see
 	// beforeBattleThink), and the map told not to go after shots (to tell back when it comes on again); where it was at
 	// the end of the last frame, and whether the battle put a screen over it then (the next turn's, which centres the
 	// map on the soldier as it goes).
-	bool dynamic = true, held = false, projectileHeld = false, screenFromBattle = false;
+	bool dynamic = false, held = false, projectileHeld = false, screenFromBattle = false;
 	Position heldAt, endAt;
 	Position glideFrom, glideTo;
 	Uint32 glideStart = 0, lastFrame = 0;
+	double frameMs = 1000.0 / 60; // (a frame's time, smoothed: how quick a step can play on the map, see feedStepPhaseMs)
 	int mouseX = -1, mouseY = -1;
 	Maximised maximised = MAX_NONE;
 	// The minimap: the tactical map in its window (made again only for another window).
@@ -475,6 +477,7 @@ void FirstPersonMode::updateFeed()
 	const Uint32 now = SDL_GetTicks();
 	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
 	feed.lastFrame = now;
+	if (seconds > 0.0) feed.frameMs += (seconds * 1000.0 - feed.frameMs) * 0.1;
 	// (a button let go somewhere the feed didn't hear: an arrow, the squad table's thumb, a press on the drone)
 	const Uint8 buttons = SDL_GetMouseState(nullptr, nullptr);
 	if (!(buttons & SDL_BUTTON(SDL_BUTTON_LEFT)))
@@ -592,6 +595,37 @@ void FirstPersonMode::beforeBattleThink()
 		feed.heldAt = feed.screenFromBattle ? feed.endAt : _state->_map->getCamera()->getMapOffset();
 	}
 	feed.screenFromBattle = false;
+}
+
+/**
+ * A step the 3D view walks, with the feed up: how quick its walk plays on the drone's map (the owner: "the camera feed
+ * does not show animations. They can be faster animations to conform to 3d no problem - just they must be shown!"; the
+ * 3D view's steps are instant moves, see commitStep). The game walks a step in about 10 of its ticks (a diagonal one in
+ * 18: twice the phases), at most one a frame; the 3D eye crosses the tile (and StepLead over the next edge) at the
+ * walking pace, and the next step waits for the game's walk to end. So the ticks come every frame or every few, as
+ * many as still end the walk in time (never slower than the game's own walking speed); a screen too slow for that
+ * (a sprint's diagonal steps at 60 frames a second) keeps the instant step, and the 3D walk never waits.
+ * @param run Whether the step is run (the sprint's pace).
+ * @param diagonal Whether it is a diagonal step.
+ * @return A step phase's milliseconds, or 0 for an instant step.
+ */
+int FirstPersonMode::feedStepPhaseMs(bool run, bool diagonal) const
+{
+	if (!feedShown() || vrOn())
+	{
+		return 0;
+	}
+	const double voxelsPerMs = std::clamp(Options::fpsWalkSpeed, 1, 8) * 16.0 * (run ? SprintPace : 1.0) / 1000.0;
+	const double inTime = ((diagonal ? 16.0 * 1.4142 : 16.0) + StepLead) / voxelsPerMs * 0.9; // (a little to spare)
+	const int ticks = diagonal ? 18 : 10;
+	const double frame = std::max(1.0, _feed->frameMs);
+	int frames = (int)std::floor(inTime / (ticks * frame)); // (frames a tick)
+	frames = std::min(frames, std::max(1, (int)std::lround(Options::battleXcomSpeed / frame)));
+	if (frames < 1)
+	{
+		return 0;
+	}
+	return std::max(1, (int)std::lround((frames - 0.5) * frame)); // (the battle's timer then ticks every so many frames)
 }
 
 /**
@@ -1375,18 +1409,31 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 }
 
 /**
- * A key while the feed shows: Escape puts the drone's picture all over the screen back, or lets go of the mouse the 3D
- * window has (both its press and its release are then the feed's). The rest are the battle's and the 3D view's.
+ * A key while the feed shows: the options key (Escape) opens the battle's options, as on the isometric map (the owner:
+ * "Even in feed esc should go to options menu"; its button, on the game's panel, is hidden in the feed), letting go of
+ * the mouse the 3D window has first. A cancel key of its own (bound apart from the options key) puts the drone's
+ * picture all over the screen back, or lets go of that mouse. Both a press and its release are then the feed's. The rest
+ * are the battle's and the 3D view's.
  * @param action The key.
  * @return True if it was the feed's.
  */
 bool FirstPersonMode::handleFeedKey(Action *action)
 {
-	if (!feedShown() || action->getDetails()->key.keysym.sym != Options::keyCancel)
+	const SDLKey key = action->getDetails()->key.keysym.sym;
+	if (!feedShown() || key == SDLK_UNKNOWN || (key != Options::keyBattleOptions && key != Options::keyCancel))
 	{
 		return false;
 	}
 	const bool down = action->getDetails()->type == SDL_KEYDOWN;
+	if (key == Options::keyBattleOptions)
+	{
+		if (down)
+		{
+			if (_mouseLook) setMouseLook(false);
+			_state->btnHelpClick(action);
+		}
+		return true;
+	}
 	if (_feed->maximised != CommandFeed::MAX_NONE)
 	{
 		if (down) _feed->maximised = CommandFeed::MAX_NONE;

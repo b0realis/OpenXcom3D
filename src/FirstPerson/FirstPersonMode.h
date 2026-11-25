@@ -1375,6 +1375,7 @@ private:
 	bool feedViewPicture(SDL_Rect &picture) const;
 	void updateFeed();
 	void leaveFeed();
+	int feedStepPhaseMs(bool run, bool diagonal) const;
 	void layOutFeed();
 	void feedColours();
 	void feedButtons();
