@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..8aac1423d
+index 000000000..d4b330b6c
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,755 @@
+@@ -0,0 +1,751 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -539,7 +539,7 @@ index 000000000..8aac1423d
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: soldiers' cards, equipment, the 3D view in a window, the map as a drone's feed and the tactical map."
++  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map, all live."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -687,12 +687,8 @@ index 000000000..8aac1423d
 +  STR_FPS_FEED_NIGHT: "NV"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
-+  STR_FPS_FEED_EQUIPMENT: "EQUIPMENT"
-+  STR_FPS_FEED_RIGHT: "RIGHT"
-+  STR_FPS_FEED_LEFT: "LEFT"
-+  STR_FPS_FEED_BUILT_IN: "BUILT-IN"
-+  STR_FPS_FEED_EMPTY: "EMPTY"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
++  STR_FPS_FEED_INVENTORY_TU: "INVENTORY  TU {0}"
 +  STR_FPS_FEED_NO_SOLDIER: "NO SOLDIER"
 +  STR_FPS_FEED_NO_SIGNAL: "NO SIGNAL"
 +  STR_FPS_FEED_CLICK_TO_PLAY: "CLICK TO PLAY"
@@ -923,10 +919,10 @@ index 000000000..8aac1423d
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..389f20f35
+index 000000000..9e504397a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,755 @@
+@@ -0,0 +1,751 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1300,7 +1296,7 @@ index 000000000..389f20f35
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
 +  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: soldiers' cards, equipment, the 3D view in a window, the map as a drone's feed and the tactical map."
++  STR_FPS_COMMAND_FEED_DESC: "The battle as a command post: the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map, all live."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -1448,12 +1444,8 @@ index 000000000..389f20f35
 +  STR_FPS_FEED_NIGHT: "NV"
 +  STR_FPS_FEED_NAMES: "ID"
 +  STR_FPS_FEED_BOXES: "BOX"
-+  STR_FPS_FEED_EQUIPMENT: "EQUIPMENT"
-+  STR_FPS_FEED_RIGHT: "RIGHT"
-+  STR_FPS_FEED_LEFT: "LEFT"
-+  STR_FPS_FEED_BUILT_IN: "BUILT-IN"
-+  STR_FPS_FEED_EMPTY: "EMPTY"
 +  STR_FPS_FEED_INVENTORY: "INVENTORY"
++  STR_FPS_FEED_INVENTORY_TU: "INVENTORY  TU {0}"
 +  STR_FPS_FEED_NO_SOLDIER: "NO SOLDIER"
 +  STR_FPS_FEED_NO_SIGNAL: "NO SIGNAL"
 +  STR_FPS_FEED_CLICK_TO_PLAY: "CLICK TO PLAY"
@@ -42777,10 +42769,10 @@ index 000000000..825d39805
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..e54e76a4b
+index 000000000..1d41510c0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1666 @@
+@@ -0,0 +1,1664 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -44145,8 +44137,7 @@ index 000000000..e54e76a4b
 +	std::vector<BattleUnit*> squadList() const;
 +
 +	// The Live command feed (FirstPersonModeFeed.cpp; setting "Live command feed"): the battle as a command post's
-+	// screens, the soldiers' cards, the equipment window, the 3D view in a window, the map as a drone's feed and the
-+	// tactical map.
++	// screens, the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map.
 +	std::unique_ptr<CommandFeed, CommandFeedDeleter> _feed;
 +	bool _feedPreferred = true;    // the feed rather than the full 3D view (the 3D key takes turns, see toggleView)
 +	bool _feedDispatching = false; // handing an event to the battle without the map (see feedWithoutMap)
@@ -44168,9 +44159,9 @@ index 000000000..e54e76a4b
 +	void blitFeed(SDL_Surface *screen);
 +	void blitFeedUnder(SDL_Surface *screen);
 +	void blitFeedOver(SDL_Surface *screen);
-+	void drawFeedCards(SDL_Surface *screen);
-+	void makeFeedEquipment(BattleUnit *unit);
-+	void drawFeedItem(SDL_Surface *target, const BattleItem *item, int x, int y, int scale, int shrink);
++	void drawFeedDoll(BattleUnit *unit);
++	void updateFeedInventory(BattleUnit *unit);
++	void feedInventoryMouse(Action *action, int x, int y);
 +	void filterDrone(SDL_Surface *screen, const SDL_Rect &picture);
 +	void markSoldiers(SDL_Surface *screen, const SDL_Rect &picture);
 +	void drawFeedWindow(SDL_Surface *screen, const SDL_Rect &frame, Uint8 borderColour);
@@ -44179,8 +44170,7 @@ index 000000000..e54e76a4b
 +	bool handleFeedKey(Action *action);
 +	bool feedWithoutMap(Action *action);
 +	void pressFeedButton(int index, Action *action);
-+	void chooseHand(int hand);
-+	void scrollFeed(int by);
++
 +	void refreshSquad();
 +	/// Lays out the squad buttons that are in use.
 +	void layoutTopBar();
@@ -45451,10 +45441,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..d75127798
+index 000000000..c4ddf48f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,1454 @@
+@@ -0,0 +1,1343 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45502,13 +45492,14 @@ index 000000000..d75127798
 +/*
 + * FirstPersonModeFeed.cpp: the Live command feed (setting "Live command feed", experimental): the battle as a command
 + * post's screens. The owner's design (police tactical units' helmet cameras streaming to a command post), and then:
-+ * "a list of scrollable cards ... and only one larger selected window ... on top left a smaller window dedicated to
-+ * equipment of selected soldier ... you could control the soldier in his larger selected window and drone feed and tac
-+ * map would update in real time", "let it be performant!". A strip of the soldiers' cards along the top; the equipment
-+ * window and the selected soldier's 3D view under it, where the soldier is played as in the full 3D view (the view made
-+ * at the window's size: the only 3D view drawn); below, the battle's own map as a drone's feed (black and white with
-+ * static, or night vision; each soldier's number and name over them, a box round each), with the game's panel under
-+ * it, and the tactical map beside it. The drone and the tactical map go on as the soldier moves and fires.
++ * "only one larger selected window ... you could control the soldier in his larger selected window and drone feed and
++ * tac map would update in real time", "let it be performant!", "Equipment windows should be just inventory! And always
++ * keep the small buttons on the top with soldier mini cam Cards". Under the top bar (its squad buttons, their cards with
++ * the helmet camera) the selected soldier's inventory (the game's own, items moved there as on its screen) and their 3D
++ * view in a window, where the soldier is played as in the full 3D view (the view made at the window's size: the only
++ * 3D view drawn); below, the battle's own map as a drone's feed (black and white with static, or night vision; each
++ * soldier's number and name over them, a box round each), with the game's panel under it, and the tactical map beside
++ * it. The drone, the tactical map and the inventory go on as the soldier moves and fires.
 + */
 +#include "FirstPersonMode.h"
 +#include <algorithm>
@@ -45527,6 +45518,7 @@ index 000000000..d75127798
 +#include "RuleFirstPerson.h"
 +#include "../Battlescape/BattlescapeGame.h"
 +#include "../Battlescape/BattlescapeState.h"
++#include "../Battlescape/Inventory.h"
 +#include "../Battlescape/Camera.h"
 +#include "../Battlescape/Map.h"
 +#include "../Battlescape/WarningMessage.h"
@@ -45535,19 +45527,20 @@ index 000000000..d75127798
 +#include "../Engine/Language.h"
 +#include "../Engine/Options.h"
 +#include "../Engine/Sound.h"
-+#include "../Engine/SurfaceSet.h"
-+#include "../Engine/Unicode.h"
++#include "../Interface/Bar.h"
 +#include "../Interface/BattlescapeButton.h"
++#include "../Interface/NumberText.h"
 +#include "../Interface/Text.h"
 +#include "../Interface/TextButton.h"
 +#include "../Mod/Armor.h"
 +#include "../Mod/Mod.h"
 +#include "../Mod/RuleInventory.h"
-+#include "../Mod/RuleItem.h"
-+#include "../Mod/Unit.h"
++#include "../Mod/RuleSoldier.h"
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
++#include "../Savegame/Soldier.h"
++#include "../Savegame/Tile.h"
 +#include "FirstPersonModeShared.h"
 +
 +namespace OpenXcom
@@ -45559,12 +45552,14 @@ index 000000000..d75127798
 +/// The windows' borders are this thick, their title lines this high, the gaps between the helmet cameras this wide
 +/// (all times the screen's magnification); a line of words is this high, a title's button this far inside its line.
 +const int FeedBorder = 1, FeedTitleH = 11, FeedGap = 2, FeedWordsH = 9, FeedButtonInset = 1, FeedButtonPad = 3;
-+/// The arrows at the ends of the strip of cards are this wide; a card is this big.
-+const int FeedArrowW = 12, FeedCardW = 96, FeedCardH = 30;
-+/// The equipment window and the 3D view's reach this share of the screen's height down.
-+const double FeedUpperShare = 0.55;
-+/// An item's inventory picture is this big (BIGOBS.PCK).
-+const int FeedItemW = 32, FeedItemH = 48;
++/// The inventory window and the 3D view's reach this share of the screen's height down; the inventory window takes at
++/// most this share of the width; the inventory's screen is this big (the game's: its slots' places are set for it).
++const double FeedUpperShare = 0.55, FeedInventoryShare = 0.45;
++const int FeedInventoryScreenW = 320, FeedInventoryScreenH = 200;
++/// The buttons the inventory screen's background draws (InventoryState's): the soldier before and the next, unload,
++/// and the ground's scroll; x, y, width, height on its screen.
++const int FeedInventoryPrevious[4] = { 273, 1, 23, 22 }, FeedInventoryNext[4] = { 297, 1, 23, 22 }, FeedInventoryUnload[4] = { 288, 32, 32, 25 },
++	FeedInventoryGround[4] = { 289, 137, 32, 15 };
 +/// The drone's window takes this share of the screen's width, the minimap the rest, if that is at least FeedMapLeast
 +/// wide (else the drone has it all).
 +const double FeedDroneShare = 0.6;
@@ -45618,16 +45613,16 @@ index 000000000..d75127798
 +}
 +
 +/**
-+ * The Live command feed's state (see FirstPersonMode::updateFeed): where its windows are, the cards' soldiers, the
-+ * equipment window's picture, the minimap, the drone's switches, what of the battle's screen it changed, and its colours.
++ * The Live command feed's state (see FirstPersonMode::updateFeed): where its windows are, the inventory window's
++ * inventory and picture, the minimap, the drone's switches, what of the battle's screen it changed, and its colours.
 + */
 +struct CommandFeed
 +{
 +	/// Which window is all over the screen (the 3D view's: the full 3D view, out of the feed).
 +	enum Maximised { MAX_NONE, MAX_DRONE };
-+	/// A button: what it does, its place on the screen, its words (none: a drawn sign), its value (a hand, a fire mode),
-+	/// and whether it shows lit (a switch that is on, the hand or mode in use).
-+	enum ButtonKind { FB_NIGHT, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_MAP_MAX, FB_VIEW_MAX, FB_LEFT, FB_RIGHT, FB_HAND, FB_MODE, FB_INVENTORY };
++	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
++	/// lit (a switch that is on).
++	enum ButtonKind { FB_NIGHT, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY };
 +	struct Button
 +	{
 +		ButtonKind kind;
@@ -45636,29 +45631,23 @@ index 000000000..d75127798
 +		int value;
 +		bool lit;
 +	};
-+	/// A soldier's card in the strip: whom, their number in the squad, where.
-+	struct Card
-+	{
-+		BattleUnit *unit;
-+		int number;
-+		SDL_Rect box;
-+	};
-+
 +	// The layout and what it was made for (the screen's size, the top bar's foot, the squad's count).
 +	int width = 0, height = 0, top = -1, soldiers = -1, ui = 1;
-+	SDL_Rect strip{}, equipment{}, equipmentPicture{}, view{}, viewPicture{}, drone{}, dronePicture{}, map{}, mapPicture{}, bigFrame{}, bigPicture{};
-+	int cardsShown = 0, cardsLeft = 0, first = 0;
-+	std::vector<Card> cards;
-+	std::vector<Button> buttons, equipmentButtons;
-+	const BattleUnit *selected = nullptr, *alerted = nullptr, *followed = nullptr;
++	SDL_Rect inventory{}, inventoryPicture{}, inventoryShown{}, view{}, viewPicture{}, drone{}, dronePicture{}, map{}, mapPicture{}, bigFrame{}, bigPicture{};
++	std::vector<Button> buttons;
++	const BattleUnit *followed = nullptr;
 +	Maximised maximised = MAX_NONE;
 +	// The minimap: the tactical map in its window (made again only for another window).
 +	std::unique_ptr<FirstPersonMapState> minimap;
 +	SDL_Rect minimapWindow{};
-+	// The equipment window's picture, drawn again only when what it shows changed (its key), and a frame for an item's
-+	// inventory picture.
-+	std::unique_ptr<Surface> equipmentSurface, itemPicture;
-+	std::string equipmentKey;
++	// The inventory window: the game's own inventory (its grid and items, moved by the mouse as on its screen), drawn
++	// with the screen's background and the soldier's figure into a picture of the screen's size, shown scaled into the
++	// window (source columns and rows for each shown one); whose, and what of theirs it was last arranged for.
++	std::unique_ptr<Inventory> inventoryGrid;
++	std::unique_ptr<Surface> inventoryScreen, doll;
++	std::vector<int> inventoryColumns, inventoryRows;
++	BattleUnit *inventoryUnit = nullptr;
++	std::string inventoryKey;
 +	// The drone's switches: night vision (else black and white), the soldiers' names, the boxes round them.
 +	bool nightVision = false, names = true, boxes = true;
 +	// What it changed on the battle's screen: the game's panel moved this far (under the drone), the map's camera in
@@ -45674,7 +45663,6 @@ index 000000000..d75127798
 +	bool paletteKnown = false;
 +	Uint8 grey[3][256], green[3][256], snow[8];
 +	Uint8 black = 0, frameColour = 0, frameLit = 0, titleBack = 0, wordsColour = 0, dimColour = 0, liveColour = 0, hudColour = 0, pickedColour = 0;
-+	Uint8 timeColour = 0, healthColour = 0, energyColour = 0, barBack = 0;
 +	std::unique_ptr<Text> writer;
 +	Uint32 noise = 0x9E3779B9u;
 +	/// The snow's and the tears' dice.
@@ -45735,9 +45723,9 @@ index 000000000..d75127798
 +/**
 + * Each frame (see think): the Live command feed, when wanted, laid out for the screen and the squad; the battle's
 + * screen put right for it (the map shown in the drone's window while the 3D view plays in its own, the game's panel
-+ * under the drone, the map's camera in the drone's window, following the soldier looked through); the strip of cards
-+ * brought to the selected soldier (and to one the aliens' turn pops a camera up for); the crosshair in the 3D window's
-+ * middle; the equipment window's picture; the minimap's frame. Not wanted: the battle's screen as it was.
++ * under the drone, the map's camera in the drone's window, following the soldier looked through); the crosshair in the
++ * 3D window's middle; the inventory window's soldier and items; the minimap's frame. Not wanted: the battle's screen as
++ * it was.
 + */
 +void FirstPersonMode::updateFeed()
 +{
@@ -45764,32 +45752,7 @@ index 000000000..d75127798
 +	}
 +	_state->_warning->setY(_warningY);
 +
-+	// The strip: from its first soldier shown; brought to the selected soldier when another is selected, and to one the
-+	// aliens' turn pops a camera up for (see alienTurnMapCameras: its card says why).
-+	const std::vector<std::pair<BattleUnit*, int>> squad = feedSquad();
-+	const int count = (int)squad.size(), shown = feed.cardsShown;
-+	auto bringIn = [&](const BattleUnit *unit) {
-+		for (int place = 0; place < count; ++place)
-+		{
-+			if (squad[place].first != unit) continue;
-+			if (place < feed.first) feed.first = place;
-+			if (place >= feed.first + shown) feed.first = place - shown + 1;
-+		}
-+	};
 +	BattleUnit *selected = _save->getSelectedUnit();
-+	if (selected != feed.selected)
-+	{
-+		feed.selected = selected;
-+		bringIn(selected);
-+	}
-+	const BattleUnit *alerted = _alertUnit && SDL_GetTicks() < _alertUntil ? _alertUnit : nullptr;
-+	if (alerted != feed.alerted)
-+	{
-+		feed.alerted = alerted;
-+		bringIn(alerted);
-+	}
-+	feed.first = std::clamp(feed.first, 0, std::max(0, count - shown));
-+
 +	feedButtons();
 +	placeFeedScreen();
 +
@@ -45809,7 +45772,7 @@ index 000000000..d75127798
 +	_crosshair->setX((int)std::lround(toCanvasX(picture.x + picture.w / 2.0)) - CrosshairSize / 2);
 +	_crosshair->setY((int)std::lround(toCanvasY(picture.y + picture.h / 2.0)) - CrosshairSize / 2);
 +
-+	makeFeedEquipment(selected && selected->getFaction() == FACTION_PLAYER && !selected->isOut() ? selected : nullptr);
++	updateFeedInventory(selected && selected->getFaction() == FACTION_PLAYER && !selected->isOut() && selected->getTile() ? selected : nullptr);
 +
 +	// The minimap's frame (its clock, drawn again as the battle goes on).
 +	if (feed.minimap && feed.maximised == CommandFeed::MAX_NONE)
@@ -45843,8 +45806,10 @@ index 000000000..d75127798
 +	_crosshair->setY(canvasHeight() / 2 - CrosshairSize / 2);
 +	feed.minimap.reset();
 +	feed.minimapWindow = SDL_Rect{};
-+	feed.equipmentSurface.reset();
-+	feed.equipmentKey.clear();
++	if (feed.inventoryGrid) feed.inventoryGrid->setSelectedItem(nullptr); // (an item picked up goes back where it was)
++	feed.inventoryGrid.reset();
++	feed.inventoryUnit = nullptr;
++	feed.inventoryKey.clear();
 +	feed.maximised = CommandFeed::MAX_NONE;
 +	feed.width = 0; // (laid out again when it comes back)
 +	feed.followed = nullptr;
@@ -45854,10 +45819,9 @@ index 000000000..d75127798
 +
 +/**
 + * Lays the feed out for the screen (in the game's screen pixels), again only when the screen, the top bar's foot or
-+ * the squad's count changed: the strip of soldiers' cards under the top bar (as many as fit, with arrows at its ends
-+ * when the squad has more); under it, down to FeedUpperShare of the screen, the equipment window at the left (a third
-+ * of the width) and the 3D view's window; below, the drone's window at the left and the minimap's at the right (if
-+ * there is room), and the drone's picture all over the screen. The minimap is made for its window.
++ * the squad's count changed: under the top bar, down to FeedUpperShare of the screen, the inventory window at the left
++ * and the 3D view's window; below, the drone's window at the left and the minimap's at the right (if there is room),
++ * and the drone's picture all over the screen. The minimap is made for its window.
 + */
 +void FirstPersonMode::layOutFeed()
 +{
@@ -45876,27 +45840,24 @@ index 000000000..d75127798
 +	feed.ui = uiScaleFor(width, height);
 +	const int ui = feed.ui, border = FeedBorder * ui, titleH = FeedTitleH * ui, gap = FeedGap * ui;
 +
-+	// The strip of cards: as many as fit, with arrows when the squad has more.
-+	const int cardW = FeedCardW * ui, cardH = FeedCardH * ui;
-+	feed.strip = makeRect(0, top, width, cardH);
-+	int arrows = 0;
-+	int shown = std::min(soldiers, std::max(1, (width + gap) / (cardW + gap)));
-+	if (soldiers > shown)
-+	{
-+		arrows = FeedArrowW * ui + gap;
-+		shown = std::min(soldiers, std::max(1, (width - 2 * arrows + gap) / (cardW + gap)));
-+	}
-+	feed.cardsShown = shown;
-+	feed.cardsLeft = arrows + (width - 2 * arrows - (shown * cardW + std::max(0, shown - 1) * gap)) / 2;
-+
-+	// The equipment window and the 3D view's.
-+	const int upperTop = top + cardH + gap;
++	// The inventory window and the 3D view's, under the top bar down to FeedUpperShare of the screen: the inventory as
++	// wide as its screen's picture shows whole at the height there (at most FeedInventoryShare of the width).
++	const int upperTop = top + gap;
 +	const int upperBottom = std::max(upperTop + 4 * titleH, (int)(height * FeedUpperShare));
-+	const int equipmentW = width / 3;
-+	feed.equipment = makeRect(0, upperTop, equipmentW, upperBottom - upperTop);
-+	feed.equipmentPicture = makeRect(border, upperTop + border + titleH, equipmentW - 2 * border, upperBottom - upperTop - 2 * border - titleH);
-+	feed.view = makeRect(equipmentW, upperTop, width - equipmentW, upperBottom - upperTop);
-+	feed.viewPicture = makeRect(equipmentW + border, upperTop + border + titleH, width - equipmentW - 2 * border, upperBottom - upperTop - 2 * border - titleH);
++	const int pictureH = upperBottom - upperTop - 2 * border - titleH;
++	const int inventoryW = std::min((int)(width * FeedInventoryShare), pictureH * FeedInventoryScreenW / FeedInventoryScreenH + 2 * border);
++	feed.inventory = makeRect(0, upperTop, inventoryW, upperBottom - upperTop);
++	feed.inventoryPicture = makeRect(border, upperTop + border + titleH, inventoryW - 2 * border, pictureH);
++	feed.view = makeRect(inventoryW, upperTop, width - inventoryW, upperBottom - upperTop);
++	feed.viewPicture = makeRect(inventoryW + border, upperTop + border + titleH, width - inventoryW - 2 * border, pictureH);
++	// (the inventory's screen scaled to fit its window whole, in the middle; the source pixel of each shown one)
++	const double scale = std::min(feed.inventoryPicture.w / (double)FeedInventoryScreenW, feed.inventoryPicture.h / (double)FeedInventoryScreenH);
++	const int shownW = std::max(1, (int)(FeedInventoryScreenW * scale)), shownH = std::max(1, (int)(FeedInventoryScreenH * scale));
++	feed.inventoryShown = makeRect(feed.inventoryPicture.x + (feed.inventoryPicture.w - shownW) / 2, feed.inventoryPicture.y + (feed.inventoryPicture.h - shownH) / 2, shownW, shownH);
++	feed.inventoryColumns.resize(shownW);
++	feed.inventoryRows.resize(shownH);
++	for (int column = 0; column < shownW; ++column) feed.inventoryColumns[column] = std::min(FeedInventoryScreenW - 1, (int)(column / scale));
++	for (int row = 0; row < shownH; ++row) feed.inventoryRows[row] = std::min(FeedInventoryScreenH - 1, (int)(row / scale));
 +
 +	// The drone's window and the minimap's: the drone's at least as wide as the game's panel under it.
 +	const int middle = upperBottom + gap;
@@ -45909,7 +45870,6 @@ index 000000000..d75127798
 +	feed.mapPicture = droneW < width ? makeRect(droneW + border, middle + border + titleH, width - droneW - 2 * border, height - middle - 2 * border - titleH) : SDL_Rect{};
 +	feed.bigFrame = makeRect(0, top, width, height - top);
 +	feed.bigPicture = makeRect(border, top + border + titleH, width - 2 * border, height - top - border - titleH);
-+	feed.equipmentKey.clear(); // (drawn again for its window)
 +
 +	// The minimap: the tactical map in its window, without its helmet camera (made again only for another window: a
 +	// soldier falling keeps its zoom and level).
@@ -45930,7 +45890,7 @@ index 000000000..d75127798
 +/**
 + * The feed's buttons for this frame, in the windows' title lines (filled from the right): the drone's night vision,
 + * names, boxes and all over the screen; the minimap's all over the screen; the 3D window's, which goes to the full 3D
-+ * view; the equipment window's INVENTORY; the strip's arrows; and the equipment window's own (see makeFeedEquipment).
++ * view; the inventory window's, which opens the game's inventory screen.
 + */
 +void FirstPersonMode::feedButtons()
 +{
@@ -45965,17 +45925,8 @@ index 000000000..d75127798
 +	}
 +	int viewRight = feed.view.x + feed.view.w - border;
 +	add(CommandFeed::FB_VIEW_MAX, feed.view, viewRight, "", false);
-+	int equipmentRight = feed.equipment.x + feed.equipment.w - border;
-+	add(CommandFeed::FB_INVENTORY, feed.equipment, equipmentRight, _state->tr("STR_FPS_FEED_INVENTORY"), true);
-+	// (the strip's arrows, when the squad has more soldiers than cards)
-+	if (feed.soldiers > feed.cardsShown)
-+	{
-+		const int arrowW = FeedArrowW * ui;
-+		feed.buttons.push_back({ CommandFeed::FB_LEFT, makeRect(0, feed.strip.y, arrowW, feed.strip.h), "<", 0, feed.first > 0 });
-+		feed.buttons.push_back({ CommandFeed::FB_RIGHT, makeRect(feed.width - arrowW, feed.strip.y, arrowW, feed.strip.h), ">", 0,
-+			feed.first + feed.cardsShown < feed.soldiers });
-+	}
-+	feed.buttons.insert(feed.buttons.end(), feed.equipmentButtons.begin(), feed.equipmentButtons.end());
++	int inventoryRight = feed.inventory.x + feed.inventory.w - border;
++	add(CommandFeed::FB_INVENTORY, feed.inventory, inventoryRight, "", false);
 +}
 +
 +/**
@@ -46004,222 +45955,176 @@ index 000000000..d75127798
 +}
 +
 +/**
-+ * An item's inventory picture (the game's own, BIGOBS.PCK, with the item's colours and frame) drawn on a surface,
-+ * magnified or made smaller by whole steps.
-+ * @param target Where to draw it.
-+ * @param item The item.
-+ * @param x, y Its top left corner.
-+ * @param scale Pixels a picture pixel takes (the feed's magnification).
-+ * @param shrink Picture pixels a drawn pixel stands for (1: whole; 2: half its size).
++ * Draws the soldier's figure as the game's inventory screen draws it (see InventoryState::init): a soldier's armour by
++ * their look (its layers, or its picture for their gender and look), anyone else's armour's picture.
++ * @param unit The soldier.
 + */
-+void FirstPersonMode::drawFeedItem(SDL_Surface *target, const BattleItem *item, int x, int y, int scale, int shrink)
++void FirstPersonMode::drawFeedDoll(BattleUnit *unit)
 +{
 +	CommandFeed &feed = *_feed;
-+	SurfaceSet *pictures = _game->getMod()->getSurfaceSet("BIGOBS.PCK");
-+	if (!item || !pictures)
++	feed.doll->clear();
++	Mod *mod = _game->getMod();
++	const Soldier *soldier = unit->getGeoscapeSoldier();
++	if (soldier && soldier->getArmor()->hasLayersDefinition())
 +	{
++		for (const auto &layer : soldier->getArmorLayers())
++		{
++			if (Surface *picture = mod->getSurface(layer, false)) picture->blitNShade(feed.doll.get(), 0, 0);
++		}
 +		return;
 +	}
-+	if (!feed.itemPicture)
++	Surface *picture = nullptr;
++	if (soldier)
 +	{
-+		feed.itemPicture.reset(new Surface(FeedItemW, FeedItemH, 0, 0));
-+	}
-+	Surface &picture = *feed.itemPicture;
-+	picture.setPalette(_state->getPalette());
-+	picture.clear();
-+	item->getRules()->drawHandSprite(pictures, &picture, item, _save);
-+	for (int pictureY = 0; pictureY < FeedItemH; pictureY += shrink)
-+	{
-+		for (int pictureX = 0; pictureX < FeedItemW; pictureX += shrink)
++		const std::string look = soldier->getArmor()->getSpriteInventory(), gender = soldier->getGender() == GENDER_MALE ? "M" : "F";
++		for (int bit = 0; bit <= RuleSoldier::LookVariantBits && !picture; ++bit)
 +		{
-+			const Uint8 pixel = picture.getPixel(pictureX, pictureY);
-+			if (pixel) fill(target, x + pictureX / shrink * scale, y + pictureY / shrink * scale, scale, scale, pixel);
++			std::ostringstream name;
++			name << look << gender << (int)soldier->getLook() + (soldier->getLookVariant() & (RuleSoldier::LookVariantMask >> bit)) * 4 << ".SPK";
++			picture = mod->getSurface(name.str(), false);
 +		}
++		if (!picture) picture = mod->getSurface(look + ".SPK", false);
++		if (!picture) picture = mod->getSurface(look, false);
 +	}
++	else
++	{
++		const std::string look = unit->getArmor()->getSpriteInventory();
++		picture = mod->getSurface(look, false);
++		if (!picture) picture = mod->getSurface(look + ".SPK", false);
++		if (!picture) picture = mod->getSurface(look + "M0.SPK", false);
++	}
++	if (picture) picture->blitNShade(feed.doll.get(), 0, 0);
 +}
 +
 +/**
-+ * The equipment window's picture for a soldier, drawn again only when what it shows changed (the soldier, their items
-+ * and rounds, the hand and fire mode in use, whether they can act): the two hands (and the built-in weapon, if any),
-+ * each with the item's inventory picture, its name and rounds, the hand in use lit (a click uses it); the fire modes of
-+ * the weapon in use (a click picks one); the other items carried, small. Its buttons are kept for the clicks (see
-+ * feedButtons; INVENTORY, the game's inventory, is in the window's title line).
++ * Keeps the inventory window's inventory on the soldier: the game's own inventory (made the first time, in the battle's
++ * time unit mode: moving an item costs what it costs on its screen), set on the soldier when another is selected (with
++ * their figure), and arranged again when their items or the ground under them changed (not while an item is held).
++ * Then the screen's picture: its background, the figure, the inventory over them.
 + * @param unit The soldier (null: none to show).
 + */
-+void FirstPersonMode::makeFeedEquipment(BattleUnit *unit)
++void FirstPersonMode::updateFeedInventory(BattleUnit *unit)
 +{
 +	CommandFeed &feed = *_feed;
-+	const SDL_Rect &area = feed.equipmentPicture;
-+	std::ostringstream key;
-+	key << area.x << ',' << area.y << ',' << area.w << ',' << area.h << ' ' << (unit ? unit->getId() : -1);
-+	if (unit)
++	if (!feed.inventoryGrid)
 +	{
-+		key << ' ' << activeHand(unit) << ' ' << (int)_fireMode << ' ' << canAct();
++		feed.inventoryGrid.reset(new Inventory(_game, FeedInventoryScreenW, FeedInventoryScreenH, 0, 0, false));
++		feed.inventoryGrid->setPalette(_state->getPalette());
++		feed.inventoryGrid->setTuMode(true);
++		feed.inventoryGrid->draw();
++		feed.inventoryScreen.reset(new Surface(FeedInventoryScreenW, FeedInventoryScreenH, 0, 0));
++		feed.doll.reset(new Surface(FeedInventoryScreenW, FeedInventoryScreenH, 0, 0));
++		feed.inventoryScreen->setPalette(_state->getPalette());
++		feed.doll->setPalette(_state->getPalette());
++		feed.inventoryUnit = nullptr;
++		feed.inventoryKey.clear();
++	}
++	Inventory &grid = *feed.inventoryGrid;
++	if (unit != feed.inventoryUnit)
++	{
++		grid.setSelectedItem(nullptr); // (an item held goes back where it was)
++		feed.inventoryUnit = unit;
++		feed.inventoryKey.clear();
++		if (unit)
++		{
++			grid.setSelectedUnit(unit, true);
++			drawFeedDoll(unit);
++		}
++	}
++	if (unit && !grid.getSelectedItem())
++	{
++		// (what the inventory shows: the soldier's items in their places and their rounds, the ground's items)
++		std::ostringstream key;
++		const Position at = unit->getPosition();
++		key << at.x << ',' << at.y << ',' << at.z;
 +		for (const BattleItem *item : *unit->getInventory())
 +		{
 +			const BattleItem *ammo = item->getAmmoForSlot(0);
 +			key << ' ' << item->getId() << ':' << (item->getSlot() ? item->getSlot()->getId() : std::string()) << ':' << item->getSlotX() << ':' << item->getSlotY()
 +				<< ':' << (ammo ? ammo->getAmmoQuantity() : item->getAmmoQuantity());
 +		}
-+	}
-+	if (feed.equipmentSurface && key.str() == feed.equipmentKey)
-+	{
-+		return;
-+	}
-+	feed.equipmentKey = key.str();
-+	feed.equipmentSurface.reset(new Surface(std::max(1, (int)area.w), std::max(1, (int)area.h), 0, 0));
-+	feed.equipmentSurface->setPalette(_state->getPalette());
-+	SDL_Surface *picture = feed.equipmentSurface->getSurface();
-+	fill(picture, 0, 0, area.w, area.h, feed.titleBack);
-+	feed.equipmentButtons.clear();
-+	const int ui = feed.ui, pad = 2 * ui, lineH = FeedWordsH * ui;
-+	if (!unit)
-+	{
-+		feedWrite(picture, _state->tr("STR_FPS_FEED_NO_SOLDIER"), pad, pad, feed.dimColour);
-+		return;
-+	}
-+	// (a button of the window: drawn here, its place kept on the screen)
-+	auto button = [&](CommandFeed::ButtonKind kind, int value, const SDL_Rect &box, const std::string &words, bool lit) {
-+		fill(picture, box.x, box.y, box.w, box.h, feed.black);
-+		outline(picture, box, ui, lit ? feed.frameLit : feed.frameColour);
-+		if (!words.empty())
++		if (Tile *ground = unit->getTile())
 +		{
-+			feed.writer->setText(words);
-+			const int wide = std::min((int)box.w - 2 * ui, feed.writer->getTextWidth() * ui);
-+			feedWrite(picture, words, box.x + (box.w - wide) / 2, box.y + (box.h - lineH) / 2 + ui, lit ? feed.wordsColour : feed.dimColour, box.w - 2 * ui);
++			for (const BattleItem *item : *ground->getInventory()) key << " g" << item->getId();
 +		}
-+		feed.equipmentButtons.push_back({ kind, makeRect(area.x + box.x, area.y + box.y, box.w, box.h), std::string(), value, lit });
-+	};
++		if (key.str() != feed.inventoryKey)
++		{
++			const bool first = feed.inventoryKey.empty();
++			feed.inventoryKey = key.str();
++			grid.setSelectedUnit(unit, false);
++			if (!first) _state->updateSoldierInfo(); // (moved in the window: the panel's hands and time units again)
++		}
++	}
++	grid.think();
 +
-+	// The hands (and the built-in weapon): the item's picture, its name and rounds.
-+	BattleType specialType;
-+	std::vector<int> hands = { 0, 1 };
-+	if (unit->getSpecialIconWeapon(specialType)) hands.push_back(2);
-+	const int used = activeHand(unit);
-+	const int slotW = (area.w - pad * ((int)hands.size() + 1)) / (int)hands.size(), slotH = FeedItemH * ui + 2 * pad;
-+	int y = pad;
-+	for (size_t place = 0; place < hands.size(); ++place)
++	// The screen's picture: its background, the figure, the inventory (its grid, items, the item held, its warnings).
++	Surface &screen = *feed.inventoryScreen;
++	screen.clear();
++	if (Surface *background = _game->getMod()->getSurface("TAC01.SCR", false)) background->blitNShade(&screen, 0, 0);
++	if (unit)
 +	{
-+		const int hand = hands[place];
-+		const SDL_Rect box = makeRect(pad + (int)place * (slotW + pad), y, slotW, slotH);
-+		BattleItem *item = handWeapon(unit, hand);
-+		button(CommandFeed::FB_HAND, hand, box, std::string(), hand == used);
-+		const int pictureW = std::min(FeedItemW * ui, (int)box.w / 2);
-+		if (item) drawFeedItem(picture, item, box.x + pad, box.y + pad, ui, 1);
-+		const int wordsX = box.x + pad + pictureW + pad, room = box.x + box.w - pad - wordsX;
-+		static const char *handNames[] = { "STR_FPS_FEED_RIGHT", "STR_FPS_FEED_LEFT", "STR_FPS_FEED_BUILT_IN" };
-+		feedWrite(picture, _state->tr(handNames[hand]), wordsX, box.y + pad, hand == used ? feed.pickedColour : feed.dimColour, room);
-+		if (item)
-+		{
-+			feedWrite(picture, itemLabel(item), wordsX, box.y + pad + lineH + ui, feed.wordsColour, room);
-+			bool loaded = true;
-+			std::string rounds = ammoLabel(unit, item, BA_NONE, loaded, nullptr);
-+			rounds.erase(std::remove(rounds.begin(), rounds.end(), Unicode::TOK_COLOR_FLIP), rounds.end());
-+			if (!rounds.empty()) feedWrite(picture, rounds, wordsX, box.y + pad + 2 * (lineH + ui), loaded ? feed.hudColour : feed.liveColour, room);
-+		}
-+		else
-+		{
-+			feedWrite(picture, _state->tr("STR_FPS_FEED_EMPTY"), wordsX, box.y + pad + lineH + ui, feed.dimColour, room);
-+		}
-+	}
-+	y += slotH + pad;
-+
-+	// The fire modes of the weapon in use (its name as the crosshair's line has it).
-+	static const struct { BattleActionType mode; const char *name; } modeNames[] = {
-+		{ BA_SNAPSHOT, "STR_FPS_MODE_SNAP" }, { BA_AIMEDSHOT, "STR_FPS_MODE_AIMED" }, { BA_AUTOSHOT, "STR_FPS_MODE_AUTO" },
-+		{ BA_THROW, "STR_FPS_MODE_THROW" }, { BA_LAUNCH, "STR_FPS_MODE_LAUNCH" }, { BA_HIT, "STR_FPS_MODE_MELEE" },
-+		{ BA_PANIC, "STR_FPS_MODE_PANIC" }, { BA_MINDCONTROL, "STR_FPS_MODE_MIND_CONTROL" }, { BA_USE, "STR_FPS_MODE_USE" },
-+		{ BA_PRIME, "STR_FPS_MODE_PRIME" }, { BA_UNPRIME, "STR_FPS_MODE_UNPRIME" } };
-+	BattleItem *weapon = activeWeapon(unit);
-+	int x = pad;
-+	const int modeH = lineH + 2 * ui;
-+	for (const BattleActionType mode : weapon ? fireModesFor(unit, weapon) : std::vector<BattleActionType>())
-+	{
-+		std::string words;
-+		for (const auto &entry : modeNames) if (entry.mode == mode) words = _state->tr(entry.name);
-+		const std::string renamed = renamedAction(weapon->getRules(), mode);
-+		if (!renamed.empty()) words = renamed;
-+		if (words.empty()) continue;
-+		feed.writer->setText(words);
-+		const int wide = feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui;
-+		if (x + wide > area.w - pad && x > pad)
-+		{
-+			x = pad;
-+			y += modeH + ui;
-+		}
-+		button(CommandFeed::FB_MODE, (int)mode, makeRect(x, y, std::min(wide, (int)area.w - 2 * pad), modeH), words, mode == _fireMode);
-+		x += wide + ui;
-+	}
-+	if (x > pad) y += modeH + pad;
-+
-+	// The other items carried, small, as many as there is room for (INVENTORY is in the window's title line).
-+	const int iconW = FeedItemW / 2 * ui, iconH = FeedItemH / 2 * ui;
-+	const int columns = std::max(1, (area.w - pad) / (iconW + ui)), rows = std::max(0, (area.h - pad - y) / (iconH + ui));
-+	std::vector<const BattleItem*> carried;
-+	for (const BattleItem *item : *unit->getInventory())
-+	{
-+		if (item == unit->getRightHandWeapon() || item == unit->getLeftHandWeapon() || (item->getSlot() && item->getSlot()->getType() == INV_HAND)) continue;
-+		carried.push_back(item);
-+	}
-+	const int room = columns * rows;
-+	for (int place = 0; place < (int)carried.size() && place < room; ++place)
-+	{
-+		const bool last = place == room - 1 && (int)carried.size() > room;
-+		const int iconX = pad + (place % columns) * (iconW + ui), iconY = y + (place / columns) * (iconH + ui);
-+		if (last)
-+		{
-+			feedWrite(picture, "+" + std::to_string((int)carried.size() - room + 1), iconX, iconY + (iconH - lineH) / 2, feed.dimColour);
-+			break;
-+		}
-+		fill(picture, iconX, iconY, iconW, iconH, feed.black);
-+		drawFeedItem(picture, carried[place], iconX, iconY, ui, 2);
++		feed.doll->blitNShade(&screen, 0, 0);
++		grid.blit(screen.getSurface());
 +	}
 +}
 +
 +/**
-+ * Draws the strip of soldiers' cards: each the soldier's number and name (the selected one's lit), bars of their time
-+ * units, health and energy, and the weapon in use; framed red, and saying why, for a soldier the aliens' turn pops a
-+ * camera up for. The cards' places are kept for the clicks.
-+ * @param screen The game's screen.
++ * Hands a mouse event in the inventory window to the inventory, at the point of its screen's picture under it (the
++ * picture is shown scaled): its clicks pick an item up and put it down as on its screen, and the buttons its background
++ * draws work as there (OK aside: the window stays). Only in the player's turn, with the game taking orders; else
++ * nothing.
++ * @param action The mouse's event.
++ * @param x, y Where it is on the game's screen.
 + */
-+void FirstPersonMode::drawFeedCards(SDL_Surface *screen)
++void FirstPersonMode::feedInventoryMouse(Action *action, int x, int y)
 +{
 +	CommandFeed &feed = *_feed;
-+	const int ui = feed.ui, pad = 2 * ui, lineH = FeedWordsH * ui, cardW = FeedCardW * ui, gap = FeedGap * ui;
-+	const std::vector<std::pair<BattleUnit*, int>> squad = feedSquad();
-+	const BattleUnit *alerted = _alertUnit && SDL_GetTicks() < _alertUntil && !_alertText.empty() ? _alertUnit : nullptr;
-+	feed.cards.clear();
-+	for (int card = 0; card < feed.cardsShown && feed.first + card < (int)squad.size(); ++card)
++	if (!feed.inventoryGrid || !feed.inventoryUnit || !canAct() || !inside(feed.inventoryShown, x, y) || feed.inventoryColumns.empty())
 +	{
-+		BattleUnit *unit = squad[feed.first + card].first;
-+		const SDL_Rect box = makeRect(feed.cardsLeft + card * (cardW + gap), feed.strip.y, cardW, feed.strip.h);
-+		feed.cards.push_back({ unit, squad[feed.first + card].second, box });
-+		const bool selected = unit == _save->getSelectedUnit();
-+		fill(screen, box.x, box.y, box.w, box.h, feed.titleBack);
-+		outline(screen, box, ui, unit == alerted ? feed.liveColour : selected ? feed.frameLit : feed.frameColour);
-+		const int room = box.w - 2 * pad;
-+		feedWrite(screen, std::to_string(squad[feed.first + card].second) + " " + unit->getName(_game->getLanguage(), false), box.x + pad, box.y + pad,
-+			selected ? feed.pickedColour : feed.wordsColour, room);
-+		// (the bars: time units, health, energy, each against its full value)
-+		const UnitStats *full = unit->getBaseStats();
-+		const int values[3] = { unit->getTimeUnits(), unit->getHealth(), unit->getEnergy() }, most[3] = { full->tu, full->health, full->stamina };
-+		const Uint8 colours[3] = { feed.timeColour, feed.healthColour, feed.energyColour };
-+		for (int bar = 0; bar < 3; ++bar)
++		return;
++	}
++	const int pictureX = feed.inventoryColumns[x - feed.inventoryShown.x], pictureY = feed.inventoryRows[y - feed.inventoryShown.y];
++	// The buttons the background draws, as on the inventory's screen (a left press): the soldier before or the next
++	// (selected for the 3D window too), unload the weapon held, more of the ground (Shift: back).
++	const SDL_Event &details = *action->getDetails();
++	if (details.type == SDL_MOUSEBUTTONDOWN && details.button.button == SDL_BUTTON_LEFT)
++	{
++		auto on = [&](const int box[4]) { return pictureX >= box[0] && pictureY >= box[1] && pictureX < box[0] + box[2] && pictureY < box[1] + box[3]; };
++		if (on(FeedInventoryPrevious) || on(FeedInventoryNext))
 +		{
-+			const int barY = box.y + pad + lineH + ui + bar * 3 * ui, length = most[bar] > 0 ? room * std::clamp(values[bar], 0, most[bar]) / most[bar] : 0;
-+			fill(screen, box.x + pad, barY, room, 2 * ui, feed.barBack);
-+			fill(screen, box.x + pad, barY, length, 2 * ui, colours[bar]);
++			feed.inventoryGrid->setSelectedItem(nullptr);
++			if (BattleUnit *other = on(FeedInventoryNext) ? _save->selectNextPlayerUnit(false, false, true) : _save->selectPreviousPlayerUnit(false, false, true))
++			{
++				selectUnit(other);
++			}
++			return;
 +		}
-+		const int lowerY = box.y + pad + lineH + 10 * ui;
-+		if (unit == alerted)
++		if (on(FeedInventoryUnload))
 +		{
-+			feedWrite(screen, _state->tr(_alertText), box.x + pad, lowerY, feed.liveColour, room);
++			if (feed.inventoryGrid->unload(false)) _game->getMod()->getSoundByDepth(0, Mod::ITEM_DROP)->play();
++			return;
 +		}
-+		else if (const BattleItem *weapon = activeWeapon(unit))
++		if (on(FeedInventoryGround))
 +		{
-+			feedWrite(screen, itemLabel(weapon), box.x + pad, lowerY, feed.dimColour, room);
++			feed.inventoryGrid->arrangeGround(_game->isShiftPressed() ? -1 : 1);
++			return;
 +		}
 +	}
++	SDL_Event event = details;
++	const Uint16 eventX = (Uint16)std::lround(pictureX * action->getXScale() + action->getLeftBlackBand());
++	const Uint16 eventY = (Uint16)std::lround(pictureY * action->getYScale() + action->getTopBlackBand());
++	if (event.type == SDL_MOUSEMOTION)
++	{
++		event.motion.x = eventX;
++		event.motion.y = eventY;
++	}
++	else
++	{
++		event.button.x = eventX;
++		event.button.y = eventY;
++	}
++	Action scaled(&event, action->getXScale(), action->getYScale(), action->getTopBlackBand(), action->getLeftBlackBand());
++	feed.inventoryGrid->handle(&scaled, _state);
 +}
 +
 +/**
@@ -46234,9 +46139,10 @@ index 000000000..d75127798
 +}
 +
 +/**
-+ * Which of our own overlays show with the feed (see drawOverlays): the top bar without the squad's buttons (the strip
-+ * of cards stands for them), and in the 3D window, while the 3D view plays there, the crosshair and the words beside
-+ * it (the shot, its odds and cost, the range, the unit pointed at): the rest of the 3D HUD the windows show.
++ * Which of our own overlays show with the feed (see drawOverlays): the top bar with the squad's buttons, the soldier
++ * card a squad button shows (with its helmet camera) and the soldier cam, and in the 3D window, while the 3D view plays
++ * there, the crosshair and the words beside it (the shot, its odds and cost, the range, the unit pointed at): the rest
++ * of the 3D HUD the windows show.
 + * @param surface Our surface.
 + * @return True if it shows.
 + */
@@ -46245,8 +46151,16 @@ index 000000000..d75127798
 +	Surface *own = const_cast<Surface*>(surface);
 +	if (_topBarSurfaces.count(own))
 +	{
-+		return own != _btnPrev && own != _btnNext && std::find(_btnSquad.begin(), _btnSquad.end(), own) == _btnSquad.end()
-+			&& std::find(_squadIcons.begin(), _squadIcons.end(), own) == _squadIcons.end();
++		return true;
++	}
++	if (own == _card || own == _preview || own == _cardName || own == _cardWeapon || own == _cardStatus || own == _cardSignal || own == _cardRank || own == _cardIcon
++		|| own == _soldierCam || own == _soldierCamFrame || own == _soldierCamDot || own == _txtSoldierCam || own == _soldierCamRank)
++	{
++		return true;
++	}
++	for (int stat = 0; stat < 4; ++stat)
++	{
++		if (own == _cardNumbers[stat] || own == _cardBars[stat]) return true;
 +	}
 +	const bool viewPlays = isActive() && _feed->maximised == CommandFeed::MAX_NONE;
 +	return viewPlays && (own == _crosshair || own == _txtMode || own == _txtShot || own == _txtDamage || own == _txtRange || own == _txtAimOff
@@ -46306,8 +46220,7 @@ index 000000000..d75127798
 +}
 +
 +/**
-+ * Draws the feed's windows over the battle's screen: the strip of cards and its arrows; the equipment window; the 3D
-+ * window (titled with the soldier looked through, a red dot that blinks, and whether the mouse plays there: the 3D view
++ * Draws the feed's windows over the battle's screen: the inventory window; the 3D window (titled with the soldier looked through, a red dot that blinks, and whether the mouse plays there: the 3D view
 + * itself, drawn at the window's size, or "NO SIGNAL" while it isn't up); the drone's frame and title (the turn and the
 + * time); the minimap; or the drone's picture all over the screen. Then the battle's buttons at the screen's edges,
 + * over all of it.
@@ -46336,22 +46249,37 @@ index 000000000..d75127798
 +
 +	if (feed.maximised == CommandFeed::MAX_NONE)
 +	{
-+		drawFeedCards(screen);
-+
-+		// The equipment window.
-+		const BattleUnit *selected = _save->getSelectedUnit();
-+		drawFeedWindow(screen, feed.equipment, feed.frameColour);
-+		titleWords(feed.equipment, _state->tr("STR_FPS_FEED_EQUIPMENT"), feed.wordsColour, false);
-+		if (feed.equipmentSurface)
++		// The inventory window: the inventory's screen scaled into it, titled with the soldier's time units.
++		drawFeedWindow(screen, feed.inventory, feed.frameColour);
++		const BattleUnit *owner = feed.inventoryUnit;
++		titleWords(feed.inventory, owner ? std::string(_state->tr("STR_FPS_FEED_INVENTORY_TU").arg(owner->getTimeUnits())) : std::string(_state->tr("STR_FPS_FEED_INVENTORY")),
++			feed.wordsColour, false);
++		const SDL_Rect &area = feed.inventoryPicture;
++		fill(screen, area.x, area.y, area.w, area.h, feed.black);
++		if (owner && feed.inventoryScreen)
 +		{
-+			SDL_Rect where = feed.equipmentPicture;
-+			SDL_BlitSurface(feed.equipmentSurface->getSurface(), nullptr, screen, &where);
++			const SDL_Surface *source = feed.inventoryScreen->getSurface();
++			const SDL_Rect &shown = feed.inventoryShown;
++			for (int row = 0; row < (int)shown.h; ++row)
++			{
++				const int targetY = shown.y + row;
++				if (targetY < 0 || targetY >= screen->h) continue;
++				const Uint8 *from = (const Uint8 *)source->pixels + (size_t)feed.inventoryRows[row] * source->pitch;
++				Uint8 *to = (Uint8 *)screen->pixels + (size_t)targetY * screen->pitch + shown.x;
++				for (int column = 0; column < (int)shown.w && shown.x + column < screen->w; ++column) to[column] = from[feed.inventoryColumns[column]];
++			}
++		}
++		else
++		{
++			const std::string words = _state->tr("STR_FPS_FEED_NO_SOLDIER");
++			feed.writer->setText(words);
++			feedWrite(screen, words, area.x + (area.w - feed.writer->getTextWidth() * ui) / 2, area.y + (area.h - FeedWordsH * ui) / 2, feed.dimColour);
 +		}
 +
 +		// The 3D window: the 3D view at the window's size, or no signal.
 +		const bool plays = isActive() && _view->getVisible();
 +		drawFeedWindow(screen, feed.view, plays && wantsMouseCapture() ? feed.frameLit : feed.frameColour);
-+		const BattleUnit *looked = plays && _trackedUnit ? _trackedUnit : selected;
++		const BattleUnit *looked = plays && _trackedUnit ? _trackedUnit : _save->getSelectedUnit();
 +		std::string title = looked ? looked->getName(_game->getLanguage(), false) : std::string();
 +		for (const auto &member : feedSquad()) if (member.first == looked) title = std::to_string(member.second) + " " + title;
 +		const int after = titleWords(feed.view, title + "  " + std::string(_state->tr("STR_FPS_FEED_LIVE")), feed.wordsColour, true);
@@ -46402,15 +46330,12 @@ index 000000000..d75127798
 +	}
 +
 +	// The title lines' buttons: their words or signs (all over the screen: a square; back: a square in a square), lit
-+	// when on (the equipment window drew its own).
++	// when on.
 +	for (const CommandFeed::Button &button : feed.buttons)
 +	{
-+		if (button.kind == CommandFeed::FB_HAND || button.kind == CommandFeed::FB_MODE) continue;
 +		if (feed.maximised != CommandFeed::MAX_NONE && button.kind != CommandFeed::FB_NIGHT && button.kind != CommandFeed::FB_NAMES && button.kind != CommandFeed::FB_BOXES
 +			&& button.kind != CommandFeed::FB_DRONE_MAX) continue;
-+		const bool arrow = button.kind == CommandFeed::FB_LEFT || button.kind == CommandFeed::FB_RIGHT;
-+		if (arrow && !button.lit) continue; // (an arrow that can't scroll further isn't shown)
-+		const Uint8 colour = button.lit && !arrow ? feed.frameLit : feed.frameColour;
++		const Uint8 colour = button.lit ? feed.frameLit : feed.frameColour;
 +		fill(screen, button.box.x, button.box.y, button.box.w, button.box.h, feed.titleBack);
 +		outline(screen, button.box, ui, colour);
 +		if (!button.words.empty())
@@ -46470,9 +46395,9 @@ index 000000000..d75127798
 + * buttons had theirs:
 + *  - a press on the drone's picture is the map's until the button comes up (a drag scrolls on past the window);
 + *  - the battle's buttons at the screen's edges, theirs;
-+ *  - the feed's buttons (the windows', the equipment's): a left press works one;
++ *  - the feed's buttons (in the windows' title lines): a left press works one;
 + *  - the minimap: its own (all the tactical map's buttons, its drag and wheel);
-+ *  - the strip of cards: a left click selects the soldier, the wheel scrolls it;
++ *  - the inventory window: the inventory's (items picked up and put down, in the player's turn);
 + *  - the 3D window: a left click gives it the mouse (the soldier plays there as in the full 3D view);
 + *  - the drone's picture: the map's and the panel's, as on the isometric map;
 + *  - anywhere else, the battle's without the map (see feedWithoutMap), and the map stops scrolling at its edge.
@@ -46535,23 +46460,9 @@ index 000000000..d75127798
 +			feed.minimap->handle(action);
 +			return true;
 +		}
-+		if (inside(feed.strip, x, y))
++		if (inside(feed.inventory, x, y))
 +		{
-+			if (wheel != 0)
-+			{
-+				scrollFeed(-wheel);
-+			}
-+			else if (leftPress)
-+			{
-+				for (const CommandFeed::Card &card : feed.cards)
-+				{
-+					if (inside(card.box, x, y)) selectUnit(card.unit);
-+				}
-+			}
-+			return true;
-+		}
-+		if (inside(feed.equipment, x, y))
-+		{
++			if (inside(feed.inventoryPicture, x, y) && wheel == 0) feedInventoryMouse(action, x, y);
 +			return true;
 +		}
 +		if (inside(feed.view, x, y))
@@ -46589,42 +46500,14 @@ index 000000000..d75127798
 +	case CommandFeed::FB_DRONE_MAX: feed.maximised = feed.maximised == CommandFeed::MAX_DRONE ? CommandFeed::MAX_NONE : CommandFeed::MAX_DRONE; break;
 +	case CommandFeed::FB_MAP_MAX: showTacticalMap(); break;
 +	case CommandFeed::FB_VIEW_MAX: toggleView(); return; // (to the full 3D view: the feed is let go of)
-+	case CommandFeed::FB_LEFT: scrollFeed(-1); break;
-+	case CommandFeed::FB_RIGHT: scrollFeed(1); break;
-+	case CommandFeed::FB_HAND: chooseHand(button.value); break;
-+	case CommandFeed::FB_MODE: selectFireMode((BattleActionType)button.value); break;
-+	case CommandFeed::FB_INVENTORY: _state->btnInventoryClick(action); return;
++	case CommandFeed::FB_INVENTORY:
++		if (feed.inventoryGrid) feed.inventoryGrid->setSelectedItem(nullptr); // (an item held goes back first)
++		_state->btnInventoryClick(action); // (the game's inventory screen)
++		return;
 +	}
 +	feedButtons();
 +}
 +
-+/**
-+ * Uses the item in one hand (or the built-in weapon), as the hand key's turn does (see switchHand): picked in the
-+ * equipment window.
-+ * @param hand 0 right, 1 left, 2 the built-in weapon.
-+ */
-+void FirstPersonMode::chooseHand(int hand)
-+{
-+	BattleUnit *unit = _save->getSelectedUnit();
-+	if (!unit || !canAct() || !handWeapon(unit, hand) || activeHand(unit) == hand)
-+	{
-+		return;
-+	}
-+	_state->_battleGame->cancelCurrentAction();
-+	endHitLogPick();
-+	_chosenHand[unit] = hand;
-+	_fireModeWeapon = nullptr; // (a fresh fire mode for what is in that hand)
-+}
-+
-+/**
-+ * Scrolls the strip of cards through the squad.
-+ * @param by Soldiers on (less than 0: back).
-+ */
-+void FirstPersonMode::scrollFeed(int by)
-+{
-+	CommandFeed &feed = *_feed;
-+	feed.first = std::clamp(feed.first + by, 0, std::max(0, feed.soldiers - feed.cardsShown));
-+}
 +
 +/**
 + * The squad as the row of cameras shows it: the soldiers who are up and on the map, in the squad buttons' order, each
@@ -46691,10 +46574,6 @@ index 000000000..d75127798
 +	feed.liveColour = nearestColor(palette, 230, 30, 30);
 +	feed.hudColour = bright(90, 235, 90);
 +	feed.pickedColour = bright(250, 215, 60);
-+	feed.timeColour = bright(60, 200, 70);
-+	feed.healthColour = bright(230, 50, 50);
-+	feed.energyColour = bright(240, 160, 40);
-+	feed.barBack = nearestColor(palette, 40, 44, 56);
 +	if (!feed.writer)
 +	{
 +		feed.writer.reset(new Text(Options::baseXResolution, FeedWordsH, 0, 0));
@@ -46911,7 +46790,7 @@ index 000000000..d75127798
 +}
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..f0126f240
+index 000000000..87f735ac7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
 @@ -0,0 +1,2837 @@
@@ -48443,7 +48322,7 @@ index 000000000..f0126f240
 +		unit = _squadUnits[_hoveredSquadButton];
 +		cardButton = _hoveredSquadButton;
 +	}
-+	else if (_alertUnit && SDL_GetTicks() < _alertUntil && !feedWanted()) // (the Live command feed shows it in its row)
++	else if (_alertUnit && SDL_GetTicks() < _alertUntil)
 +	{
 +		// A popped-up camera: under the soldier's squad button if it shows, else the first.
 +		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
@@ -49392,11 +49271,11 @@ index 000000000..f0126f240
 +	// The fixed buttons first, then the squad buttons.
 +	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 +	{
-+		if (inside(button) && !(feedShown() && (button == _btnPrev || button == _btnNext))) return button;
++		if (inside(button)) return button;
 +	}
 +	for (TextButton *button : _btnSquad)
 +	{
-+		if (inside(button) && !feedShown()) return button; // (the Live command feed's cards stand for them)
++		if (inside(button)) return button;
 +	}
 +	return nullptr;
 +}

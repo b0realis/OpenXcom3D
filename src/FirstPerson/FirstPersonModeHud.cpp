@@ -1526,7 +1526,7 @@ void FirstPersonMode::updateSoldierCard()
 		unit = _squadUnits[_hoveredSquadButton];
 		cardButton = _hoveredSquadButton;
 	}
-	else if (_alertUnit && SDL_GetTicks() < _alertUntil && !feedWanted()) // (the Live command feed shows it in its row)
+	else if (_alertUnit && SDL_GetTicks() < _alertUntil)
 	{
 		// A popped-up camera: under the soldier's squad button if it shows, else the first.
 		for (size_t button = 0; button < _squadUnits.size() && button < _btnSquad.size(); ++button)
@@ -2475,11 +2475,11 @@ TextButton *FirstPersonMode::buttonAt(double x, double y) const
 	// The fixed buttons first, then the squad buttons.
 	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 	{
-		if (inside(button) && !(feedShown() && (button == _btnPrev || button == _btnNext))) return button;
+		if (inside(button)) return button;
 	}
 	for (TextButton *button : _btnSquad)
 	{
-		if (inside(button) && !feedShown()) return button; // (the Live command feed's cards stand for them)
+		if (inside(button)) return button;
 	}
 	return nullptr;
 }

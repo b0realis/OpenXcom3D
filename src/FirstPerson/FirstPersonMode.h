@@ -1362,8 +1362,7 @@ private:
 	std::vector<BattleUnit*> squadList() const;
 
 	// The Live command feed (FirstPersonModeFeed.cpp; setting "Live command feed"): the battle as a command post's
-	// screens, the soldiers' cards, the equipment window, the 3D view in a window, the map as a drone's feed and the
-	// tactical map.
+	// screens, the soldier's inventory, the 3D view in a window, the map as a drone's feed and the tactical map.
 	std::unique_ptr<CommandFeed, CommandFeedDeleter> _feed;
 	bool _feedPreferred = true;    // the feed rather than the full 3D view (the 3D key takes turns, see toggleView)
 	bool _feedDispatching = false; // handing an event to the battle without the map (see feedWithoutMap)
@@ -1385,9 +1384,9 @@ private:
 	void blitFeed(SDL_Surface *screen);
 	void blitFeedUnder(SDL_Surface *screen);
 	void blitFeedOver(SDL_Surface *screen);
-	void drawFeedCards(SDL_Surface *screen);
-	void makeFeedEquipment(BattleUnit *unit);
-	void drawFeedItem(SDL_Surface *target, const BattleItem *item, int x, int y, int scale, int shrink);
+	void drawFeedDoll(BattleUnit *unit);
+	void updateFeedInventory(BattleUnit *unit);
+	void feedInventoryMouse(Action *action, int x, int y);
 	void filterDrone(SDL_Surface *screen, const SDL_Rect &picture);
 	void markSoldiers(SDL_Surface *screen, const SDL_Rect &picture);
 	void drawFeedWindow(SDL_Surface *screen, const SDL_Rect &frame, Uint8 borderColour);
@@ -1396,8 +1395,7 @@ private:
 	bool handleFeedKey(Action *action);
 	bool feedWithoutMap(Action *action);
 	void pressFeedButton(int index, Action *action);
-	void chooseHand(int hand);
-	void scrollFeed(int by);
+
 	void refreshSquad();
 	/// Lays out the squad buttons that are in use.
 	void layoutTopBar();
