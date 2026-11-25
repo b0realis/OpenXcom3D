@@ -430,6 +430,8 @@ en-US:
   STR_FPS_FLASHLIGHT_FAR: "Far light"
   STR_FPS_OBLITERATION: "Obliteration"
   STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
+  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
+  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
   STR_FPS_SMOOTH_FIRE: "Smooth fire"
   STR_FPS_SMOOTH_FIRE_DESC: "Flames' colors blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
   STR_FPS_HIT_FLASH: "Hit flash"

@@ -576,6 +576,61 @@ bool hiddenAs(const std::string &id, HiddenAs &as)
 }
 
 /**
+ * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
+ * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
+ * IgnoreOverKill: false`)? The original games' own damage types all ignore it. (Not every item: one that hurts no one
+ * keeps a damage type nobody set, which ignores nothing.) Found once a mod.
+ * @param mod The game's rules.
+ * @return True if some item has overkill.
+ */
+static bool modHasOverkill(const Mod *mod)
+{
+	static const Mod *known = nullptr;
+	static bool has = false;
+	if (mod == known) return has;
+	known = mod;
+	has = false;
+	for (const std::string &name : mod->getItemsList())
+	{
+		const RuleItem *item = mod->getItem(name);
+		if (!item) continue;
+		const BattleType battle = item->getBattleType();
+		const bool hurts = battle == BT_FIREARM || battle == BT_AMMO || battle == BT_GRENADE || battle == BT_PROXIMITYGRENADE || battle == BT_MELEE;
+		const RuleDamageType *damage = item->getDamageType(), *melee = item->getMeleeType();
+		if ((hurts && item->getPower() > 0 && damage && !damage->IgnoreOverKill) || (item->getMeleePower() > 0 && melee && !melee->IgnoreOverKill))
+		{
+			Log(LOG_VERBOSE) << "OpenXcom3D: \"Obliteration in UFO and TFTD\" stays out: " << name << " has overkill of its own (the loaded mods set it)";
+			has = true;
+			break;
+		}
+	}
+	return has;
+}
+
+/**
+ * Setting "Obliteration in UFO and TFTD": the damage type a hit goes by (see TileEngine::hitUnit). With the setting on,
+ * where no loaded mod gives any weapon overkill of its own (the original games, and mods that leave it as they have it),
+ * an explosion's, a laser's and plasma's damage types (TFTD's Gauss is the laser's, Sonic the plasma's) don't ignore
+ * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
+ * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
+ * a stun): a unit they take below minus its armour's overkill share of its health (OXCE's 0.5 for every armour of the
+ * original games) dies leaving no corpse, as the map burns it, and with "Obliteration" bursts in 3D.
+ * @param mod The game's rules.
+ * @param type The hit's damage type.
+ * @param scratch Room for an altered copy.
+ * @return The type to go by: the hit's own, or the copy with overkill.
+ */
+const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
+{
+	if (!Options::fpsObliterationClassic || !type || !mod || !type->IgnoreOverKill) return type;
+	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
+	if (modHasOverkill(mod)) return type;
+	scratch = *type;
+	scratch.IgnoreOverKill = false;
+	return &scratch;
+}
+
+/**
  * Whether the 3D VIEW tab leaves a setting out (see HiddenSettings; none with OPENXCOM3D_ALL_SETTINGS=1).
  * @param id The setting's option.
  */
@@ -1415,6 +1470,12 @@ void createOptions(std::vector<OptionInfo> &options)
 	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
 	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
+	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
+	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
+	// obliteration for og games also"): a unit they take past minus half its health leaves no corpse (and with
+	// "Obliteration" bursts in 3D). Only where no loaded mod gives any weapon overkill of its own. Off by default: it
+	// changes the games' rules (corpses lost). See overkillDamageType.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliterationClassic", &fpsObliterationClassic, false, "STR_FPS_OBLITERATION_CLASSIC", category));
 	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 	// falls, landings, panic, one's own shots).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));

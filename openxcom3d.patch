@@ -124,10 +124,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..94d7df28b
+index 000000000..113fa64d9
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,734 @@
+@@ -0,0 +1,736 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -560,6 +560,8 @@ index 000000000..94d7df28b
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_OBLITERATION: "Obliteration"
 +  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
++  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
++  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -864,10 +866,10 @@ index 000000000..94d7df28b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..5298897a5
+index 000000000..5ed8465d6
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,734 @@
+@@ -0,0 +1,736 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1300,6 +1302,8 @@ index 000000000..5298897a5
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_OBLITERATION: "Obliteration"
 +  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
++  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
++  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colors blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -22007,7 +22011,7 @@ index 067c7b3ba..61a8b856f 100644
  public:
  	/// Creates a new ProjectileFly class
 diff --git a/src/Battlescape/TileEngine.cpp b/src/Battlescape/TileEngine.cpp
-index 6e6846977..089fc1c24 100644
+index 6e6846977..c52e10fd9 100644
 --- a/src/Battlescape/TileEngine.cpp
 +++ b/src/Battlescape/TileEngine.cpp
 @@ -43,6 +43,7 @@
@@ -22094,7 +22098,12 @@ index 6e6846977..089fc1c24 100644
  					_save->getBattleGame()->statePushBack(new ProjectileFlyBState(_save->getBattleGame(), action));
  				}
  				return true;
-@@ -3144,30 +3173,39 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+@@ -3141,33 +3170,44 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
+ 	{
+ 		return false;
+ 	}
++	RuleDamageType overkillType; // (OpenXcom3D: setting "Obliteration in UFO and TFTD", the original games' explosions, lasers and plasma with overkill)
++	type = FirstPerson::overkillDamageType(_save->getMod(), type, overkillType);
  
  	const int healthOrig = target->getHealth();
  	const int stunLevelOrig = target->getStunlevel();
@@ -22143,7 +22152,7 @@ index 6e6846977..089fc1c24 100644
  		}
  	}
  
-@@ -3229,7 +3267,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3229,7 +3269,7 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  	}
  
  	voxelCheckFlush();
@@ -22152,7 +22161,7 @@ index 6e6846977..089fc1c24 100644
  	const int damage = type->getRandomDamage(power);
  	const int tileFinalDamage = type->getTileFinalDamage(type->getRandomDamageForTile(power, damage));
  	if (part >= V_FLOOR && part <= V_OBJECT)
-@@ -3280,9 +3318,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
+@@ -3280,9 +3320,18 @@ void TileEngine::hit(BattleActionAttack attack, Position center, int power, cons
  			}
  			const int sz = bu->getArmor()->getSize() * 8;
  			const Position target = bu->getPosition().toVoxel() + Position(sz,sz, bu->getFloatHeight() - tile->getTerrainLevel());
@@ -22172,7 +22181,7 @@ index 6e6846977..089fc1c24 100644
  			if (bu->getFire())
  			{
  				effectGenerated = 2;
-@@ -3448,6 +3495,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3448,6 +3497,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  						}
  						for (auto* bi : toRemove)
  						{
@@ -22180,7 +22189,7 @@ index 6e6846977..089fc1c24 100644
  							_save->removeItem(bi);
  						}
  
-@@ -3512,6 +3560,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
+@@ -3512,6 +3562,7 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power,
  	// now detonate the tiles affected by explosion
  	if (type->ToTile > 0.0f)
  	{
@@ -22188,7 +22197,7 @@ index 6e6846977..089fc1c24 100644
  		for (auto& pair : tilesAffected)
  		{
  			if (detonate(pair.first, pair.second))
-@@ -4360,6 +4409,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
+@@ -4360,6 +4411,15 @@ int TileEngine::calculateLineTile(Position origin, Position target, std::vector<
  VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool storeTrajectory, std::vector<Position> *trajectory, BattleUnit *excludeUnit, BattleUnit *excludeAllBut, bool onlyVisible)
  {
  	VoxelType result;
@@ -22204,7 +22213,7 @@ index 6e6846977..089fc1c24 100644
  	bool excludeAllUnits = false;
  	if (_save->isBeforeGame())
  	{
-@@ -4379,7 +4437,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4379,7 +4439,7 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory)
  				{ // store the position of impact
@@ -22213,7 +22222,7 @@ index 6e6846977..089fc1c24 100644
  				}
  				return true;
  			}
-@@ -4393,13 +4451,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
+@@ -4393,13 +4453,16 @@ VoxelType TileEngine::calculateLineVoxel(Position origin, Position target, bool
  			{
  				if (trajectory != 0)
  				{ // store the position of impact
@@ -22231,7 +22240,7 @@ index 6e6846977..089fc1c24 100644
  	if (hit)
  	{
  		return result;
-@@ -4422,6 +4483,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
+@@ -4422,6 +4485,10 @@ int TileEngine::calculateParabolaVoxel(Position origin, Position target, bool st
  {
  	if (target == origin) return V_EMPTY;//just in case
  
@@ -22242,7 +22251,7 @@ index 6e6846977..089fc1c24 100644
  	int result = V_EMPTY;
  	Position lastPosition = origin;
  	Position nextPosition = lastPosition;
-@@ -4526,7 +4591,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
+@@ -4526,7 +4593,7 @@ bool TileEngine::isVoxelVisible(Position voxel)
   * @param excludeAllBut If set, the only unit to be considered for ray hits.
   * @return The objectnumber(0-3) or unit(4) or out of map (5) or -1 (hit nothing).
   */
@@ -22251,7 +22260,7 @@ index 6e6846977..089fc1c24 100644
  {
  	if (voxel.x < 0 || voxel.y < 0 || voxel.z < 0) //preliminary out of map
  	{
-@@ -4552,8 +4617,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4552,8 +4619,20 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		_cacheTileBelow = tileBelow;
   	}
  
@@ -22272,7 +22281,7 @@ index 6e6846977..089fc1c24 100644
  		return V_EMPTY;
  	}
  
-@@ -4584,12 +4661,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
+@@ -4584,12 +4663,21 @@ VoxelType TileEngine::voxelCheck(Position voxel, BattleUnit *excludeUnit, bool e
  		}
  	}
  
@@ -22294,7 +22303,7 @@ index 6e6846977..089fc1c24 100644
  			Position tilepos;
  			Position unitpos = unit->getPosition();
  			int terrainHeight = 0;
-@@ -5383,7 +5469,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
+@@ -5383,7 +5471,13 @@ bool TileEngine::validMeleeRange(Position pos, int direction, BattleUnit *attack
  						Position originVoxel = Position(origin->getPosition().toVoxel())
  							+ Position(8,8,attacker->getHeight() + attacker->getFloatHeight() - 4 -origin->getTerrainLevel() + meleeOriginVoxelVerticalOffset);
  						Position targetVoxel;
@@ -22309,7 +22318,7 @@ index 6e6846977..089fc1c24 100644
  						{
  							if (dest)
  							{
-@@ -5705,11 +5797,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
+@@ -5705,11 +5799,21 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
  	{
  		trajectory.clear();
  		test = calculateParabolaVoxel(originVoxel, targetVoxel, true, &trajectory, action.actor, curvature, Position(0,0,0));
@@ -22332,7 +22341,7 @@ index 6e6846977..089fc1c24 100644
  		{
  			if (voxelType)
  			{
-@@ -5867,6 +5969,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5867,6 +5971,8 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  					originVoxel.z--;
  				}
  				originVoxel.z -= 4;
@@ -22341,7 +22350,7 @@ index 6e6846977..089fc1c24 100644
  			}
  		}
  		int direction = getDirectionTo(origin, action.target);
-@@ -5891,6 +5995,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
+@@ -5891,6 +5997,15 @@ Position TileEngine::getOriginVoxel(BattleAction &action, Tile *tile)
  			originVoxel.y += ((2 * dirYshift[direction] + dirYshift[(direction + 1) % 8]) * action.actor->getArmor()->getSize() + 1) / 3;
  			break;
  		};
@@ -23433,7 +23442,7 @@ index 480f22791..33fb51351 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index a08796ced..191684408 100644
+index a08796ced..d217f35b0 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -118,6 +118,7 @@ OPT int oxceCrashedOrLanded;
@@ -23450,7 +23459,7 @@ index a08796ced..191684408 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration, fpsLiquidScreens;
++OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration, fpsLiquidScreens, fpsObliterationClassic;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -24522,10 +24531,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..2fcb1c72d
+index 000000000..38672f1bf
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2296 @@
+@@ -0,0 +1,2357 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25101,6 +25110,61 @@ index 000000000..2fcb1c72d
 +	return false;
 +}
 +
++}
++
++/**
++ * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
++ * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
++ * IgnoreOverKill: false`)? The original games' own damage types all ignore it. (Not every item: one that hurts no one
++ * keeps a damage type nobody set, which ignores nothing.) Found once a mod.
++ * @param mod The game's rules.
++ * @return True if some item has overkill.
++ */
++static bool modHasOverkill(const Mod *mod)
++{
++	static const Mod *known = nullptr;
++	static bool has = false;
++	if (mod == known) return has;
++	known = mod;
++	has = false;
++	for (const std::string &name : mod->getItemsList())
++	{
++		const RuleItem *item = mod->getItem(name);
++		if (!item) continue;
++		const BattleType battle = item->getBattleType();
++		const bool hurts = battle == BT_FIREARM || battle == BT_AMMO || battle == BT_GRENADE || battle == BT_PROXIMITYGRENADE || battle == BT_MELEE;
++		const RuleDamageType *damage = item->getDamageType(), *melee = item->getMeleeType();
++		if ((hurts && item->getPower() > 0 && damage && !damage->IgnoreOverKill) || (item->getMeleePower() > 0 && melee && !melee->IgnoreOverKill))
++		{
++			Log(LOG_VERBOSE) << "OpenXcom3D: \"Obliteration in UFO and TFTD\" stays out: " << name << " has overkill of its own (the loaded mods set it)";
++			has = true;
++			break;
++		}
++	}
++	return has;
++}
++
++/**
++ * Setting "Obliteration in UFO and TFTD": the damage type a hit goes by (see TileEngine::hitUnit). With the setting on,
++ * where no loaded mod gives any weapon overkill of its own (the original games, and mods that leave it as they have it),
++ * an explosion's, a laser's and plasma's damage types (TFTD's Gauss is the laser's, Sonic the plasma's) don't ignore
++ * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
++ * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
++ * a stun): a unit they take below minus its armour's overkill share of its health (OXCE's 0.5 for every armour of the
++ * original games) dies leaving no corpse, as the map burns it, and with "Obliteration" bursts in 3D.
++ * @param mod The game's rules.
++ * @param type The hit's damage type.
++ * @param scratch Room for an altered copy.
++ * @return The type to go by: the hit's own, or the copy with overkill.
++ */
++const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
++{
++	if (!Options::fpsObliterationClassic || !type || !mod || !type->IgnoreOverKill) return type;
++	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
++	if (modHasOverkill(mod)) return type;
++	scratch = *type;
++	scratch.IgnoreOverKill = false;
++	return &scratch;
 +}
 +
 +/**
@@ -25943,6 +26007,12 @@ index 000000000..2fcb1c72d
 +	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
 +	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
++	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
++	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
++	// obliteration for og games also"): a unit they take past minus half its health leaves no corpse (and with
++	// "Obliteration" bursts in 3D). Only where no loaded mod gives any weapon overkill of its own. Off by default: it
++	// changes the games' rules (corpses lost). See overkillDamageType.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliterationClassic", &fpsObliterationClassic, false, "STR_FPS_OBLITERATION_CLASSIC", category));
 +	// Screen shake (a player, GitHub issue #67): off, nothing shakes the view (explosions, hits,
 +	// falls, landings, panic, one's own shots).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsScreenShake", &fpsScreenShake, true, "STR_FPS_SCREEN_SHAKE", category));
@@ -26824,10 +26894,10 @@ index 000000000..2fcb1c72d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..f4b17c4d8
+index 000000000..822cb4d9f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,563 @@
+@@ -0,0 +1,567 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27231,6 +27301,9 @@ index 000000000..f4b17c4d8
 +/// Setting "Obliteration": a blast destroyed an item lying on the floor (TileEngine::explode, before it is removed; `center`
 +/// where it went off, voxels): a body (a corpse) bursts in 3D as a unit beyond its overkill does, away from the blast.
 +void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
++/// Setting "Obliteration in UFO and TFTD": the damage type a hit goes by, an original game's explosion, laser or plasma
++/// with overkill (scratch holds the copy). See FirstPersonApi.cpp.
++const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch);
 +/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 +void noteHealthDamage(int health);
 +int lastHealthDamage();
@@ -27335,6 +27408,7 @@ index 000000000..f4b17c4d8
 +inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
 +inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, const RuleDamageType *) { }
 +inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
++inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageType *type, RuleDamageType &) { return type; }
 +inline void noteHealthDamage(int) { }
 +inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
@@ -107023,7 +107097,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..5fa9c6e72
+index 000000000..7fba42c19
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1357 @@
@@ -107403,7 +107477,7 @@ index 000000000..5fa9c6e72
 +			"fpsFalling", "fpsSafeLanding", "fpsFallDamage", "fpsRightClickDoors" } },
 +		{ "STR_FPS_SECTION_COMBAT", { "fpsFaithfulTargeting", "fpsRecoil", "fpsAkimbo", "fpsAkimboVolley", "fpsLeanShots", "fpsThrowing", "fpsLean", "fpsMeleeTerrain",
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
-+			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst" } },
++			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsObliterationClassic" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
 +			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsObliteration", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },

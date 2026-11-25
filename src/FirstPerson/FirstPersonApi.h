@@ -401,6 +401,9 @@ void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &
 /// Setting "Obliteration": a blast destroyed an item lying on the floor (TileEngine::explode, before it is removed; `center`
 /// where it went off, voxels): a body (a corpse) bursts in 3D as a unit beyond its overkill does, away from the blast.
 void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
+/// Setting "Obliteration in UFO and TFTD": the damage type a hit goes by, an original game's explosion, laser or plasma
+/// with overkill (scratch holds the copy). See FirstPersonApi.cpp.
+const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch);
 /// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 void noteHealthDamage(int health);
 int lastHealthDamage();
@@ -505,6 +508,7 @@ inline void unitStruck(BattlescapeState *, const BattleUnit *, int, int) { }
 inline void unitDamaged(BattlescapeState *, const BattleUnit *, int, int, int, int, int) { }
 inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, const RuleDamageType *) { }
 inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
+inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageType *type, RuleDamageType &) { return type; }
 inline void noteHealthDamage(int) { }
 inline int lastHealthDamage() { return 0; }
 inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
