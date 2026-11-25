@@ -155,6 +155,15 @@ bool FirstPersonMode::stepAllowed(BattleUnit *unit, int stepX, int stepY)
 				|| (belowDestination && !belowDestination->hasNoFloor(_save) && belowDestination->getTerrainLevel() <= -12);
 		}
 
+		// Falling, a step off a ledge never lands inside something: on a unit the game knows of
+		// where the fall ends (its own walk never ends there) or in a solid block (GitHub issue
+		// #266: a raider stepped into a hole over the rock under XPiratez's sewers, fell into the
+		// rock onto a gnome stuck there and knocked it out). Not even after the warning below.
+		if (allowed && Options::fpsFalling && !(canFly(unit) && flightOn(unit)) && landingInside(unit, start + Position(stepX, stepY, 0)))
+		{
+			allowed = false;
+		}
+
 		// Falling, a step off a ledge (into a tile with no floor, not the top of stairs or a ramp
 		// going down, and not flying) must land somewhere safe (setting "Check the landing", a
 		// player's report: X-Com Files' blood moat soft-locked a soldier), or the player must have
@@ -300,6 +309,48 @@ bool FirstPersonMode::landingSafe(BattleUnit *unit, const Position &ahead) const
 		}
 	}
 	return false;
+}
+
+/**
+ * Would a step off a ledge land the soldier inside something (GitHub issue #266)? The soldier falls straight down from
+ * the tile ahead to the first with a floor (the game's own fall, see landingSafe): there a unit the game counts as in
+ * the way of a walk (as Pathfinding::isBlocked has it: one they see, or of their own side), or an object that is a solid
+ * block (a big wall "block": rock, a crate filling its tile). The game's walk order never ends in either
+ * (Pathfinding::calculate); a fall into one stuck the faller in the block, or landed on the unit and knocked it out.
+ * @param unit The soldier.
+ * @param ahead The tile the step goes into, on the soldier's level.
+ * @return True if the fall would end inside something.
+ */
+bool FirstPersonMode::landingInside(BattleUnit *unit, const Position &ahead) const
+{
+	const Tile *aheadTile = _save->getTile(ahead);
+	if (!aheadTile || !aheadTile->hasNoFloor(_save))
+	{
+		return false; // (not a ledge)
+	}
+	Position landing = ahead;
+	while (landing.z > 0)
+	{
+		const Tile *tile = _save->getTile(landing);
+		if (tile && !tile->hasNoFloor(_save))
+		{
+			break;
+		}
+		--landing.z;
+	}
+	const Tile *landingTile = _save->getTile(landing);
+	if (!landingTile || landing.z == ahead.z)
+	{
+		return false;
+	}
+	// (a unit: as Pathfinding::isBlocked has it for the player's units, one they see or one of their own side)
+	const BattleUnit *there = landingTile->getUnit();
+	if (there && there != unit && (there->getVisible() || there->getFaction() == unit->getFaction()))
+	{
+		return true;
+	}
+	const MapData *object = landingTile->getMapData(O_OBJECT);
+	return object && object->getBigWall() == Pathfinding::BLOCK;
 }
 
 /**

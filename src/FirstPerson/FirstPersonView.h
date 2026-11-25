@@ -1069,6 +1069,8 @@ private:
 	void findWallPaints();
 	/// Setting "Wall paint": the colour a wall's face the iso art never shows takes from the side it faces (0: its own).
 	Uint8 wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const;
+	/// A floor's side at the tile's edge under a wall standing on that edge: the wall's colour there (0: no wall).
+	Uint8 floorSideUnderWall(const Hit &hit, bool fromLow, bool nextFrame) const;
 	/// The colour of whatever is solid at a world voxel this frame (0 if nothing), of any tile part or only one.
 	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1, bool noWaysThrough = false) const;
 	/// For a craft's west or north side: the colour of the side across from it.

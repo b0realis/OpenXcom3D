@@ -96,6 +96,11 @@ thread_local bool SlantOnly = false; // (a big walker: read along the slant from
 thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
 thread_local bool EarsApart = false; // (a long body the unit table names "ears: apart": see profile)
 thread_local bool Feminine = false; // (a person the unit table names "figure: feminine": see standardBody)
+/// The cells of a tail swept off to a side (see sweptTail) in the body being made. They are the legs' while the body is
+/// made (the tail rests on the ground with them: joined to them, not taken for the trunk's foot, left where it is by a
+/// body sat low, see sitLow), and the body's own once it is made, so it doesn't swing with either leg as the unit walks
+/// (see makeModel, before makeWalk). Empty for any other body.
+thread_local std::vector<Uint8> SweptTailCells;
 /// With "ears: apart", how many rows over the front drawing's top a side drawing's ear may reach (see profile).
 const int EarsReach = 4;
 
@@ -251,6 +256,9 @@ const int AnimalFaceDepth = 2 * VOXELSCALE;
 /// A tail drawn with the legs (see limb) is this far across to either side of the body's middle: a pixel and a half
 /// of the sprite in all.
 const float TailHalf = 0.75f * VOXELSCALE / PixelsAcross;
+/// A tail swept off to a side (see sweptTail) is at most this far across to either side of its middle: two pixels of
+/// the sprite (the tails drawn are three to four across).
+const float SweptTailHalf = 2.0f * VOXELSCALE / PixelsAcross;
 /// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
 /// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
 /// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
@@ -2626,8 +2634,9 @@ void headAndTorso(const PartFrames &torso, int bodyTop, std::vector<Uint8> &cell
 /// middle); a tie goes as the row above went. (Every frontal run as deep as all the side runs together made four
 /// legs of two, seen from between the directions: the owner, "check old models so they dont have 4 legs from the
 /// side", "follow the contour of sprites".)
-std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
+std::vector<Uint8> limb(const PartFrames &part, int side, int tail = 0)
 {
+	const bool tailed = tail != 0;
 	std::vector<Uint8> cells(GridCells, 0);
 	std::vector<std::pair<int, int>> pairsAbove;
 	std::vector<float> aheadAbove; // (where each frontal run's slice stood in the row above, when it was cut to depth)
@@ -2646,7 +2655,8 @@ std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
 			size_t widest = 0;
 			for (size_t run = 1; run < profile.size(); ++run)
 				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
-			for (size_t run = 0; run < profile.size(); ++run)
+			// ("tail: swept", 2: the tail is made apart, where the drawings have it across the body: see sweptTail)
+			for (size_t run = 0; run < profile.size() && tail == 1; ++run)
 			{
 				if (run == widest) continue;
 				float back, fore;
@@ -2748,6 +2758,59 @@ std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
 	}
 	return cells;
 }
+/// A tail drawn with the legs and swept off to one side as it goes down behind them (the unit table's "tail: swept",
+/// for the units it names: The X-Com Files' reptoids, TFTD's Tasoths): what the side drawings draw as the tail (in a
+/// row of either side drawing every run but the widest, the legs'; see limb), wherever across the body all eight
+/// drawings agree it is (the legs' frames' visual hull, none forgiven: with two forgiven, as a limb is cut, it was a
+/// skirt behind the legs), no wider than SweptTailHalf about its middle. Made in the
+/// body's middle as "tail: drawn" makes a tail, it went straight back where the drawings curl it to a side, and the
+/// diagonal drawings cut it to pieces; taken for a second leg, it was a leg (a player, GitHub issue #267: "tails seem
+/// to merge with leg", a Tasoth's "one weird, deformed tail leg").
+std::vector<Uint8> sweptTail(const PartFrames &part)
+{
+	std::vector<Uint8> candidates(GridCells, 0);
+	for (int row = 0; row < FrameSize; ++row)
+	{
+		for (int side : { RightSide, LeftSide })
+		{
+			const auto profile = runs(part, side, row);
+			if (profile.size() < 2) continue;
+			size_t widest = 0;
+			for (size_t run = 1; run < profile.size(); ++run)
+				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
+			for (size_t run = 0; run < profile.size(); ++run)
+			{
+				if (run == widest) continue;
+				float back, fore;
+				sideExtent(profile[run], profile[run], side, back, fore);
+				for (int up = 0; up < GridUp; ++up)
+				{
+					if (!atRow(up, row)) continue;
+					for (int along = 0; along < GridAlong; ++along)
+					{
+						if (cellAhead(along) < back || cellAhead(along) > fore) continue;
+						for (int across = 0; across < GridAcross; ++across) candidates[cellIndex(across, along, up)] = 1;
+					}
+				}
+			}
+		}
+	}
+	std::vector<Uint8> tail = carve(part, 0, candidates);
+	// (where the hull leaves it wider across than a tail is drawn, seen from a diagonal, a sheet: only the cells within
+	// SweptTailHalf of its middle across, at each height and depth)
+	for (int along = 0; along < GridAlong; ++along)
+		for (int up = 0; up < GridUp; ++up)
+		{
+			float sum = 0.0f;
+			int count = 0;
+			for (int across = 0; across < GridAcross; ++across) if (tail[cellIndex(across, along, up)]) { sum += cellRight(across); ++count; }
+			if (!count) continue;
+			const float middle = sum / count;
+			for (int across = 0; across < GridAcross; ++across) if (std::abs(cellRight(across) - middle) > SweptTailHalf) tail[cellIndex(across, along, up)] = 0;
+		}
+	return tail;
+}
+
 
 /// Where a body with a big head on a narrow torso has its chin's end (the row its body starts: two below the
 /// shoulders, where the arms' frames begin), or -1 for a body without (a soldier's head on its neck, a Muton's).
@@ -5669,6 +5732,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	RoundTrunk = (routine.traits & 1) != 0;
 	EarsApart = (routine.traits & 131072) != 0;
 	Feminine = (routine.traits & 1048576) != 0;
+	SweptTailCells.clear();
 	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 	// and profile.)
 	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
@@ -5985,7 +6049,9 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	{
 		if (!parts[p].any || tank) continue;
 		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
-		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, PartCodes[p] == VoxelUnitModel::Legs && (routine.traits & 4));
+		// (a tail drawn with the legs, by the unit table: "tail: drawn" in the body's middle, "tail: swept" apart, see sweptTail)
+		const int tail = PartCodes[p] != VoxelUnitModel::Legs ? 0 : (routine.traits & 2097152) ? 2 : (routine.traits & 4) ? 1 : 0;
+		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, tail);
 		// (cut by the front and back drawings alone: see Cardinals)
 		// (A limb drawn as a part of its own is still cut by all eight of its drawings, two of them forgiven: an arm
 		// laid across the chest on a weapon is a bar slanting through the body, and its front and side drawings alone
@@ -6020,6 +6086,14 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			return nearest <= PosedShoulder + (PosedHand - PosedShoulder) * where;
 		};
 		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i] && (!posed || byBones(i))) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
+		// (a swept tail is the legs' while the body is made, resting on the ground with them: joined to them, left where it
+		// is by a body sat low; the body's once it is made, see SweptTailCells)
+		if (tail == 2)
+		{
+			const std::vector<Uint8> swept = sweptTail(parts[p]);
+			SweptTailCells.assign(GridCells, 0);
+			for (int i = 0; i < GridCells; ++i) if (swept[i] && !owner[i]) { owner[i] = VoxelUnitModel::Legs; SweptTailCells[i] = 1; }
+		}
 		// (arms outside the body, see above: the bones lie over the body where they touch it)
 		if ((routine.arms & 1) && skeleton && (PartCodes[p] == VoxelUnitModel::LeftArm || PartCodes[p] == VoxelUnitModel::RightArm))
 			for (int i = 0; i < GridCells; ++i) if (skeletons[p][i] && owner[i] == VoxelUnitModel::Torso) owner[i] = PartCodes[p];
@@ -6805,6 +6879,15 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	makeHits(*model, owner, solidOnTop);
 	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
+	// (a swept tail, the legs' while it was made, is the body's: it doesn't swing with either leg, see SweptTailCells)
+	for (size_t k = 0; (int)SweptTailCells.size() == GridCells && k < model->part.size(); ++k)
+	{
+		if (model->part[k] != VoxelUnitModel::Legs) continue;
+		const int across = (int)std::floor((model->right[k] - AcrossFrom) / Cell), along = (int)std::floor((model->ahead[k] - AlongFrom) / Cell),
+			up = (int)std::floor((model->up[k] - UpFrom) / Cell);
+		if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && SweptTailCells[cellIndex(across, along, up)])
+			model->part[k] = VoxelUnitModel::Torso;
+	}
 	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 	// (a small turret's wreck is its own block too, as a big turret's: its corpse's picture laid flat on the floor as a
 	// body's is was "a big metal smear", the same issue)

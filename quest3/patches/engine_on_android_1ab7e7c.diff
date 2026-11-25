@@ -1664,10 +1664,10 @@ index 000000000..53000574c
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..74e5b75d3
+index 000000000..e8ae2afad
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,635 @@
+@@ -0,0 +1,645 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1962,7 +1962,10 @@ index 000000000..74e5b75d3
 +  #           no pair of legs, and it has no ears standing apart: a big round head), or drawn (as ever: as broad as
 +  #           its frontal drawings)
 +  #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
-+  #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
++  #           the body's middle, not a second leg), swept (the same, but a tail that goes down behind the legs off to
++  #           one side: the tail is what the side drawings draw behind the legs, wherever across the body all eight
++  #           drawings agree it is, a thin bar; it is the body's, not a leg's, and doesn't swing as the unit walks), or
++  #           none (as ever: every stretch of the legs' frames is a leg's)
 +  #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
 +  #           artist had room, and the eight drawings together leave none of them: the body is made from the thick
 +  #           part of its drawings, and the legs are made anew, as far out, as high at the knee and as thick as the
@@ -2048,6 +2051,13 @@ index 000000000..74e5b75d3
 +    # XPiratez's cat girls (sheets XNEKO_n): their tails are drawn in their legs' frames
 +    - names: [XNEKO]
 +      tail: drawn
++    # The X-Com Files' reptoids (the Agent and the Engineer, the Croc Cadet, the Commando, the Shadow, the Drake: the
++    # Leader and the Commander) and the Tasoths (TFTD's, The X-Com Files', XPiratez's): their tails are drawn in their
++    # legs' frames, down behind them and off to one side, and the side drawing's tail was taken for a leg: "tails seem
++    # to merge with leg", a Tasoth's "one weird, deformed tail leg" (a player, GitHub issue #267). Not the Pharaoh nor the
++    # reptoid VIP's disguise (no tail drawn)
++    - names: [REPTOID.PCK, CROC.PCK, REPTOID_COMMANDO.PCK, REPTOID_SHADOW.PCK, REPTOID_DRAKE.PCK, TASOTH.PCK, TASOTHS.PCK, DEEP_8.PCK]
++      tail: swept
 +    # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
 +    # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
 +    - names: [BAT, SHADOWBAT]
@@ -24860,10 +24870,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..590268614
+index 000000000..c219815f7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2380 @@
+@@ -0,0 +1,2412 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -24939,6 +24949,9 @@ index 000000000..590268614
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
 +#include "../Savegame/SavedGame.h"
++#include "../Savegame/Tile.h"
++#include "../Mod/MapData.h"
++#include "../Battlescape/Pathfinding.h"
 +#include "../Engine/Language.h"
 +
 +namespace OpenXcom
@@ -25490,6 +25503,35 @@ index 000000000..590268614
 +float overKillShare(float armorShare)
 +{
 +	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
++}
++
++/**
++ * Is the tile below a hole the top of solid ground (Tile::hasNoFloor)? The game counts a tile whose floor is gone as
++ * having one only where the tile below is raised to its top (terrain level -24); a solid block that fills its tile
++ * (a big wall "block", solid in every layer of its shape, that no one walks into) but is drawn with terrain level 0 didn't count,
++ * so a unit whose floor melted over the rock under XPiratez's sewers fell into the rock, stuck there for good, and one
++ * that came after it fell in on top and knocked it out (GitHub issue #266). Such a block's top is ground now: the hole
++ * is walked over at the block's top, as the map draws it. Only with OpenXcom3D's mod on.
++ * @param mod The game's rules.
++ * @param below The tile under the hole.
++ * @return True if its object is solid ground to stand on.
++ */
++bool solidGroundBelow(const Mod *mod, const Tile *below)
++{
++	if (!mod || !below || !mod->getFirstPerson().isEnabled())
++	{
++		return false;
++	}
++	const MapData *object = below->getMapData(O_OBJECT);
++	if (!object || object->getBigWall() != Pathfinding::BLOCK || object->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST)
++	{
++		return false;
++	}
++	for (int layer = 0; layer < 12; ++layer)
++	{
++		if (object->getLoftID(layer) == 0) return false; // (solid from its foot to its top: every layer of its shape)
++	}
++	return true;
 +}
 +
 +/**
@@ -27246,10 +27288,10 @@ index 000000000..590268614
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..1863ee05d
+index 000000000..5630d5113
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,571 @@
+@@ -0,0 +1,575 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27659,6 +27701,9 @@ index 000000000..1863ee05d
 +/// Setting "Obliteration in UFO and TFTD": the share of its full health a unit's health must go below for it to leave no
 +/// corpse (BattleUnit::getOverKillDamage): the setting's own where it holds, else the armour's.
 +float overKillShare(float armorShare);
++/// A tile whose floor is gone stands on the tile below's object when that is a solid block filled to its top (Tile::hasNoFloor;
++/// GitHub issue #266: units fell into the rock under a sewer's melted floor). See FirstPersonApi.cpp.
++bool solidGroundBelow(const Mod *mod, const Tile *below);
 +/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 +void noteHealthDamage(int health);
 +int lastHealthDamage();
@@ -27765,6 +27810,7 @@ index 000000000..1863ee05d
 +inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
 +inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageType *type, RuleDamageType &) { return type; }
 +inline float overKillShare(float armorShare) { return armorShare; }
++inline bool solidGroundBelow(const Mod *, const Tile *) { return false; }
 +inline void noteHealthDamage(int) { }
 +inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
@@ -33857,10 +33903,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..1f347c5e2
+index 000000000..917f24c0a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3437 @@
+@@ -0,0 +1,3498 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -35314,6 +35360,57 @@ index 000000000..1f347c5e2
 +	return 0u;
 +}
 +
++/**
++ * A floor's side at the tile's edge where a wall stands on that edge: the wall's colour at its lowest row there (the map
++ * draws the wall down to the floor and never the floor's edge; GitHub issue #264). See FirstPersonView::floorSideUnderWall.
++ */
++uint floorSideUnderWall(Hit hit, int hitTile, bool fromLow, bool nextFrame)
++{
++	if (hit.part != 0 || hit.ghost || hit.axis < 0 || hit.axis > 1 || hit.voxel[hit.axis] != (fromLow ? 0 : 15))
++	{
++		return 0u;
++	}
++	int axis = hit.axis;
++	int wallTile = hitTile;
++	if (!fromLow)
++	{
++		int tileX = hitTile % uSize.x, tileY = (hitTile / uSize.x) % uSize.y;
++		if (axis == 0 ? tileX + 1 >= uSize.x : tileY + 1 >= uSize.y) return 0u;
++		wallTile = hitTile + (axis == 0 ? 1 : uSize.x);
++	}
++	uvec4 wallTileInfo = texelFetch(uTiles, wallTile * 4);
++	uint wallParts[4] = uint[4](wallTileInfo.x & 0xFFFFu, wallTileInfo.x >> 16, wallTileInfo.y & 0xFFFFu, wallTileInfo.y >> 16);
++	int wallPart = axis == 0 ? 1 : 2;
++	uint wall = wallParts[wallPart];
++	if (wall == 0u)
++	{
++		return 0u;
++	}
++	int along = hit.voxel[1 - axis];
++	for (int z = 0; z < 24; ++z)
++	{
++		uint own = texelFetch(uModelSides, int(wall) * 1024 + (axis == 0 ? 256 : 640) + z * 16 + along).r;
++		if (own == 0u) continue;
++		if (!fromLow) return own;
++		Hit asWall = hit;
++		asWall.part = wallPart;
++		asWall.voxel.z = z;
++		for (int across = 0; across < 16; ++across)
++		{
++			if (modelColor(wall, axis == 0 ? ivec3(across, along, z) : ivec3(along, across, z)) != 0u)
++			{
++				asWall.voxel[axis] = across;
++				break;
++			}
++		}
++		uint shown = mirroredColor(asWall, wallTile, axis, false, nextFrame);
++		if (shown == 0u) shown = own;
++		uint painted = wallPaintColor(asWall, wallTile, wallParts, shown);
++		return painted != 0u ? painted : shown;
++	}
++	return 0u;
++}
++
 +// A plate's underside colour (shadeHit's undersideColor): its ceiling colour or its plan's, and under rock, dark art its plan's pattern.
 +uint undersideColor(uint plate, ivec3 voxel, bool undersideUnderRock, inout int rockCeilingMiddle)
 +{
@@ -35567,6 +35664,16 @@ index 000000000..1f347c5e2
 +#ifdef RELIEF
 +			reliefFrom = 3;
 +#endif
++		}
++		// A floor's side under a wall on the tile's edge: the wall's colour, as the map draws the wall down to the floor.
++		if (hit.part == 0 && hit.axis >= 0 && hit.axis < 2)
++		{
++			uint wallColor = floorSideUnderWall(hit, hitTile, rayDirection[hit.axis] > 0.0, showNextFrame);
++			if (wallColor != 0u)
++			{
++				shownColor = wallColor;
++				sidePicture = false;
++			}
 +		}
 +		if (shownColor != 0u && !ownColorAllRound) baseColor = shownColor;
 +		// Setting "Smooth light", the full-colour picture: an animated part's two frames are mixed smoothly there, where
@@ -42639,10 +42746,10 @@ index 000000000..4c4ff8151
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..25bb21dfb
+index 000000000..6077cfc0c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1656 @@
+@@ -0,0 +1,1658 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43592,6 +43699,8 @@ index 000000000..25bb21dfb
 +	bool hurtThisBattle(const BattleUnit *unit) const;
 +	/// Is the landing of a step off a ledge safe: ground to walk on, with a step leading out?
 +	bool landingSafe(BattleUnit *unit, const Position &ahead) const;
++	/// Would a step off a ledge land inside something: a unit the game knows of, or a solid block (GitHub issue #266)?
++	bool landingInside(BattleUnit *unit, const Position &ahead) const;
 +	/// A push into a step off a ledge refused for an unsafe landing: the warning, or (pushed again) the go-ahead.
 +	void pushedIntoUnsafeLanding(int direction, bool deliberate);
 +	/// The akimbo key: full or realistic akimbo off, or the same one back on.
@@ -49362,10 +49471,10 @@ index 000000000..2a310f775
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeMovement.cpp b/src/FirstPerson/FirstPersonModeMovement.cpp
 new file mode 100644
-index 000000000..b3417f43e
+index 000000000..a6112a26c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeMovement.cpp
-@@ -0,0 +1,2807 @@
+@@ -0,0 +1,2858 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -49523,6 +49632,15 @@ index 000000000..b3417f43e
 +				|| (belowDestination && !belowDestination->hasNoFloor(_save) && belowDestination->getTerrainLevel() <= -12);
 +		}
 +
++		// Falling, a step off a ledge never lands inside something: on a unit the game knows of
++		// where the fall ends (its own walk never ends there) or in a solid block (GitHub issue
++		// #266: a raider stepped into a hole over the rock under XPiratez's sewers, fell into the
++		// rock onto a gnome stuck there and knocked it out). Not even after the warning below.
++		if (allowed && Options::fpsFalling && !(canFly(unit) && flightOn(unit)) && landingInside(unit, start + Position(stepX, stepY, 0)))
++		{
++			allowed = false;
++		}
++
 +		// Falling, a step off a ledge (into a tile with no floor, not the top of stairs or a ramp
 +		// going down, and not flying) must land somewhere safe (setting "Check the landing", a
 +		// player's report: X-Com Files' blood moat soft-locked a soldier), or the player must have
@@ -49668,6 +49786,48 @@ index 000000000..b3417f43e
 +		}
 +	}
 +	return false;
++}
++
++/**
++ * Would a step off a ledge land the soldier inside something (GitHub issue #266)? The soldier falls straight down from
++ * the tile ahead to the first with a floor (the game's own fall, see landingSafe): there a unit the game counts as in
++ * the way of a walk (as Pathfinding::isBlocked has it: one they see, or of their own side), or an object that is a solid
++ * block (a big wall "block": rock, a crate filling its tile). The game's walk order never ends in either
++ * (Pathfinding::calculate); a fall into one stuck the faller in the block, or landed on the unit and knocked it out.
++ * @param unit The soldier.
++ * @param ahead The tile the step goes into, on the soldier's level.
++ * @return True if the fall would end inside something.
++ */
++bool FirstPersonMode::landingInside(BattleUnit *unit, const Position &ahead) const
++{
++	const Tile *aheadTile = _save->getTile(ahead);
++	if (!aheadTile || !aheadTile->hasNoFloor(_save))
++	{
++		return false; // (not a ledge)
++	}
++	Position landing = ahead;
++	while (landing.z > 0)
++	{
++		const Tile *tile = _save->getTile(landing);
++		if (tile && !tile->hasNoFloor(_save))
++		{
++			break;
++		}
++		--landing.z;
++	}
++	const Tile *landingTile = _save->getTile(landing);
++	if (!landingTile || landing.z == ahead.z)
++	{
++		return false;
++	}
++	// (a unit: as Pathfinding::isBlocked has it for the player's units, one they see or one of their own side)
++	const BattleUnit *there = landingTile->getUnit();
++	if (there && there != unit && (there->getVisible() || there->getFaction() == unit->getFaction()))
++	{
++		return true;
++	}
++	const MapData *object = landingTile->getMapData(O_OBJECT);
++	return object && object->getBigWall() == Pathfinding::BLOCK;
 +}
 +
 +/**
@@ -66903,10 +67063,10 @@ index 000000000..cae24a92e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..12be20a9b
+index 000000000..39fb29cb2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1967 @@
+@@ -0,0 +1,1969 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -67978,6 +68138,8 @@ index 000000000..12be20a9b
 +	void findWallPaints();
 +	/// Setting "Wall paint": the colour a wall's face the iso art never shows takes from the side it faces (0: its own).
 +	Uint8 wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const;
++	/// A floor's side at the tile's edge under a wall standing on that edge: the wall's colour there (0: no wall).
++	Uint8 floorSideUnderWall(const Hit &hit, bool fromLow, bool nextFrame) const;
 +	/// The colour of whatever is solid at a world voxel this frame (0 if nothing), of any tile part or only one.
 +	Uint8 voxelColorAt(int worldX, int worldY, int worldZ, bool nextFrame = false, int onlyPart = -1, bool noWaysThrough = false) const;
 +	/// For a craft's west or north side: the colour of the side across from it.
@@ -72746,10 +72908,10 @@ index 000000000..d3a0b7e60
 +}
 diff --git a/src/FirstPerson/FirstPersonViewRayCasting.cpp b/src/FirstPerson/FirstPersonViewRayCasting.cpp
 new file mode 100644
-index 000000000..34cfd628f
+index 000000000..63668a95b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewRayCasting.cpp
-@@ -0,0 +1,2043 @@
+@@ -0,0 +1,2048 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -73780,6 +73942,11 @@ index 000000000..34cfd628f
 +			// A south or east face on a craft's hidden west or north skin (where the hull steps
 +			// in or out): the art sees it through the hull, so it too takes the mirrored side.
 +			shownColor = mirroredColor(hit, 1 - hit.axis, true, showNextFrame);
++		}
++		// A floor's side under a wall on the tile's edge: the wall's colour, as the map draws the wall down to the floor.
++		if (hit.part == O_FLOOR && hit.axis >= 0 && hit.axis < 2)
++		{
++			if (const Uint8 wallColor = floorSideUnderWall(hit, rayDirection[hit.axis] > 0.0f, showNextFrame)) shownColor = wallColor;
 +		}
 +		if (shownColor && !ownColorAllRound) baseColor = shownColor;
 +		// The sea's top: waves (see waterColor), as on the sea beyond the map's edge. Its side
@@ -85265,10 +85432,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..bb78a8440
+index 000000000..f3e9a626e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,6323 @@
+@@ -0,0 +1,6384 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -88144,6 +88311,67 @@ index 000000000..bb78a8440
 +	{
 +		const int along = column + offset;
 +		if (along >= 0 && along < Position::TileXY && row[along]) return row[along];
++	}
++	return 0;
++}
++
++/**
++ * A floor's side at the tile's edge where a wall stands on that edge (an upper storey's floor seen from outside, under
++ * the outer wall's foot: a player, GitHub issue #264, "Siding on some faces uses some of the interior floor texture"):
++ * the map draws the wall down to the floor there and never the floor's edge, so the side takes the wall's colour at its
++ * lowest row: on the side the art shows, the wall's own; on the side it never shows, as the wall's own face there is
++ * coloured (a craft's mirrored side, else its row seen from the other side, then "Wall paint"). The wall is the tile's
++ * own west or north wall for a side looking west or north, the next tile's for one looking east or south.
++ * @param hit What the ray hit (a floor's side).
++ * @param fromLow True if the ray goes east or south (the side looks west or north).
++ * @param nextFrame Whether the next frame of an animated part is shown.
++ * @return The colour, or 0 when no wall stands there (the floor's own).
++ */
++Uint8 FirstPersonView::floorSideUnderWall(const Hit &hit, bool fromLow, bool nextFrame) const
++{
++	if (hit.part != O_FLOOR || hit.ghost || hit.axis < 0 || hit.axis > 1 || hit.voxel[hit.axis] != (fromLow ? 0 : Position::TileXY - 1))
++	{
++		return 0;
++	}
++	const int axis = hit.axis;
++	int wallTile = hit.tile;
++	if (!fromLow)
++	{
++		const Position where = _save->getTileCoords(hit.tile);
++		if (axis == 0 ? where.x + 1 >= _save->getMapSizeX() : where.y + 1 >= _save->getMapSizeY()) return 0;
++		wallTile = hit.tile + (axis == 0 ? 1 : _save->getMapSizeX());
++	}
++	const int wallPart = axis == 0 ? O_WESTWALL : O_NORTHWALL;
++	const TileView &wallView = _tileViews[wallTile];
++	const VoxelModel *wall = wallView.part[wallPart];
++	if (!wall)
++	{
++		return 0;
++	}
++	const int along = hit.voxel[1 - axis];
++	for (int z = 0; z < Position::TileZ; ++z)
++	{
++		const Uint8 own = axis == 0 ? wall->east[z][along] : wall->south[z][along];
++		if (!own) continue;
++		if (!fromLow) return own;
++		// (the wall's back at that point: its first voxel from the west or the north, as a ray from there meets it)
++		Hit asWall = hit;
++		asWall.part = wallPart;
++		asWall.tile = wallTile;
++		asWall.voxel[2] = (Uint8)z;
++		for (int across = 0; across < Position::TileXY; ++across)
++		{
++			const Uint8 solid = axis == 0 ? wall->color[z][along][across] : wall->color[z][across][along];
++			if (solid)
++			{
++				asWall.voxel[axis] = (Uint8)across;
++				break;
++			}
++		}
++		Uint8 shown = mirroredColor(asWall, axis, false, nextFrame);
++		if (!shown) shown = own;
++		const Uint8 painted = wallPaintColor(asWall, wallView, shown);
++		return painted ? painted : shown;
 +	}
 +	return 0;
 +}
@@ -93523,10 +93751,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..07b480b68
+index 000000000..37f7ec185
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6897 @@
+@@ -0,0 +1,6980 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -93625,6 +93853,11 @@ index 000000000..07b480b68
 +thread_local bool RoundTrunk = false; // (a long body the unit table names "trunk: round": see profile)
 +thread_local bool EarsApart = false; // (a long body the unit table names "ears: apart": see profile)
 +thread_local bool Feminine = false; // (a person the unit table names "figure: feminine": see standardBody)
++/// The cells of a tail swept off to a side (see sweptTail) in the body being made. They are the legs' while the body is
++/// made (the tail rests on the ground with them: joined to them, not taken for the trunk's foot, left where it is by a
++/// body sat low, see sitLow), and the body's own once it is made, so it doesn't swing with either leg as the unit walks
++/// (see makeModel, before makeWalk). Empty for any other body.
++thread_local std::vector<Uint8> SweptTailCells;
 +/// With "ears: apart", how many rows over the front drawing's top a side drawing's ear may reach (see profile).
 +const int EarsReach = 4;
 +
@@ -93780,6 +94013,9 @@ index 000000000..07b480b68
 +/// A tail drawn with the legs (see limb) is this far across to either side of the body's middle: a pixel and a half
 +/// of the sprite in all.
 +const float TailHalf = 0.75f * VOXELSCALE / PixelsAcross;
++/// A tail swept off to a side (see sweptTail) is at most this far across to either side of its middle: two pixels of
++/// the sprite (the tails drawn are three to four across).
++const float SweptTailHalf = 2.0f * VOXELSCALE / PixelsAcross;
 +/// A limb's shape is carved by its drawings' outlines grown by so many pixels (see carve): a limb a pixel or two thin
 +/// (a skeleton's shin, a spider's leg) is drawn a pixel here or there from frame to frame, and cut by the outlines as
 +/// drawn it was cut away: the body ended in stumps above the floor (GitHub issue #211 again). Half a sprite's pixel:
@@ -96155,8 +96391,9 @@ index 000000000..07b480b68
 +/// middle); a tie goes as the row above went. (Every frontal run as deep as all the side runs together made four
 +/// legs of two, seen from between the directions: the owner, "check old models so they dont have 4 legs from the
 +/// side", "follow the contour of sprites".)
-+std::vector<Uint8> limb(const PartFrames &part, int side, bool tailed = false)
++std::vector<Uint8> limb(const PartFrames &part, int side, int tail = 0)
 +{
++	const bool tailed = tail != 0;
 +	std::vector<Uint8> cells(GridCells, 0);
 +	std::vector<std::pair<int, int>> pairsAbove;
 +	std::vector<float> aheadAbove; // (where each frontal run's slice stood in the row above, when it was cut to depth)
@@ -96175,7 +96412,8 @@ index 000000000..07b480b68
 +			size_t widest = 0;
 +			for (size_t run = 1; run < profile.size(); ++run)
 +				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
-+			for (size_t run = 0; run < profile.size(); ++run)
++			// ("tail: swept", 2: the tail is made apart, where the drawings have it across the body: see sweptTail)
++			for (size_t run = 0; run < profile.size() && tail == 1; ++run)
 +			{
 +				if (run == widest) continue;
 +				float back, fore;
@@ -96277,6 +96515,59 @@ index 000000000..07b480b68
 +	}
 +	return cells;
 +}
++/// A tail drawn with the legs and swept off to one side as it goes down behind them (the unit table's "tail: swept",
++/// for the units it names: The X-Com Files' reptoids, TFTD's Tasoths): what the side drawings draw as the tail (in a
++/// row of either side drawing every run but the widest, the legs'; see limb), wherever across the body all eight
++/// drawings agree it is (the legs' frames' visual hull, none forgiven: with two forgiven, as a limb is cut, it was a
++/// skirt behind the legs), no wider than SweptTailHalf about its middle. Made in the
++/// body's middle as "tail: drawn" makes a tail, it went straight back where the drawings curl it to a side, and the
++/// diagonal drawings cut it to pieces; taken for a second leg, it was a leg (a player, GitHub issue #267: "tails seem
++/// to merge with leg", a Tasoth's "one weird, deformed tail leg").
++std::vector<Uint8> sweptTail(const PartFrames &part)
++{
++	std::vector<Uint8> candidates(GridCells, 0);
++	for (int row = 0; row < FrameSize; ++row)
++	{
++		for (int side : { RightSide, LeftSide })
++		{
++			const auto profile = runs(part, side, row);
++			if (profile.size() < 2) continue;
++			size_t widest = 0;
++			for (size_t run = 1; run < profile.size(); ++run)
++				if (profile[run].second - profile[run].first > profile[widest].second - profile[widest].first) widest = run;
++			for (size_t run = 0; run < profile.size(); ++run)
++			{
++				if (run == widest) continue;
++				float back, fore;
++				sideExtent(profile[run], profile[run], side, back, fore);
++				for (int up = 0; up < GridUp; ++up)
++				{
++					if (!atRow(up, row)) continue;
++					for (int along = 0; along < GridAlong; ++along)
++					{
++						if (cellAhead(along) < back || cellAhead(along) > fore) continue;
++						for (int across = 0; across < GridAcross; ++across) candidates[cellIndex(across, along, up)] = 1;
++					}
++				}
++			}
++		}
++	}
++	std::vector<Uint8> tail = carve(part, 0, candidates);
++	// (where the hull leaves it wider across than a tail is drawn, seen from a diagonal, a sheet: only the cells within
++	// SweptTailHalf of its middle across, at each height and depth)
++	for (int along = 0; along < GridAlong; ++along)
++		for (int up = 0; up < GridUp; ++up)
++		{
++			float sum = 0.0f;
++			int count = 0;
++			for (int across = 0; across < GridAcross; ++across) if (tail[cellIndex(across, along, up)]) { sum += cellRight(across); ++count; }
++			if (!count) continue;
++			const float middle = sum / count;
++			for (int across = 0; across < GridAcross; ++across) if (std::abs(cellRight(across) - middle) > SweptTailHalf) tail[cellIndex(across, along, up)] = 0;
++		}
++	return tail;
++}
++
 +
 +/// Where a body with a big head on a narrow torso has its chin's end (the row its body starts: two below the
 +/// shoulders, where the arms' frames begin), or -1 for a body without (a soldier's head on its neck, a Muton's).
@@ -99198,6 +99489,7 @@ index 000000000..07b480b68
 +	RoundTrunk = (routine.traits & 1) != 0;
 +	EarsApart = (routine.traits & 131072) != 0;
 +	Feminine = (routine.traits & 1048576) != 0;
++	SweptTailCells.clear();
 +	// (A long body on four legs, a dog or a cat, named so by the mod's rules: made from its side drawings, see longBody
 +	// and profile.)
 +	// (a long body: a beast the mod's rules name; and any thin thing drawn longer than wide, a snake: see profile)
@@ -99514,7 +99806,9 @@ index 000000000..07b480b68
 +	{
 +		if (!parts[p].any || tank) continue;
 +		// the left arm is nearest the camera in direction 5, the right arm and the legs in 1; an arm's skeleton joins it
-+		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, PartCodes[p] == VoxelUnitModel::Legs && (routine.traits & 4));
++		// (a tail drawn with the legs, by the unit table: "tail: drawn" in the body's middle, "tail: swept" apart, see sweptTail)
++		const int tail = PartCodes[p] != VoxelUnitModel::Legs ? 0 : (routine.traits & 2097152) ? 2 : (routine.traits & 4) ? 1 : 0;
++		std::vector<Uint8> shape = limb(parts[p], PartCodes[p] == VoxelUnitModel::LeftArm ? LeftSide : RightSide, tail);
 +		// (cut by the front and back drawings alone: see Cardinals)
 +		// (A limb drawn as a part of its own is still cut by all eight of its drawings, two of them forgiven: an arm
 +		// laid across the chest on a weapon is a bar slanting through the body, and its front and side drawings alone
@@ -99549,6 +99843,14 @@ index 000000000..07b480b68
 +			return nearest <= PosedShoulder + (PosedHand - PosedShoulder) * where;
 +		};
 +		for (int i = 0; i < GridCells; ++i) if (((shape[i] && hull[i] && (!posed || byBones(i))) || (skeleton && skeletons[p][i])) && !owner[i]) owner[i] = PartCodes[p];
++		// (a swept tail is the legs' while the body is made, resting on the ground with them: joined to them, left where it
++		// is by a body sat low; the body's once it is made, see SweptTailCells)
++		if (tail == 2)
++		{
++			const std::vector<Uint8> swept = sweptTail(parts[p]);
++			SweptTailCells.assign(GridCells, 0);
++			for (int i = 0; i < GridCells; ++i) if (swept[i] && !owner[i]) { owner[i] = VoxelUnitModel::Legs; SweptTailCells[i] = 1; }
++		}
 +		// (arms outside the body, see above: the bones lie over the body where they touch it)
 +		if ((routine.arms & 1) && skeleton && (PartCodes[p] == VoxelUnitModel::LeftArm || PartCodes[p] == VoxelUnitModel::RightArm))
 +			for (int i = 0; i < GridCells; ++i) if (skeletons[p][i] && owner[i] == VoxelUnitModel::Torso) owner[i] = PartCodes[p];
@@ -100334,6 +100636,15 @@ index 000000000..07b480b68
 +	makeHits(*model, owner, solidOnTop);
 +	const bool rightHolds = placed[0] || (placed[1] && items[1].twoHanded && !places[1].upright);
 +	const bool leftHolds = placed[1] || (placed[0] && items[0].twoHanded && !places[0].upright);
++	// (a swept tail, the legs' while it was made, is the body's: it doesn't swing with either leg, see SweptTailCells)
++	for (size_t k = 0; (int)SweptTailCells.size() == GridCells && k < model->part.size(); ++k)
++	{
++		if (model->part[k] != VoxelUnitModel::Legs) continue;
++		const int across = (int)std::floor((model->right[k] - AcrossFrom) / Cell), along = (int)std::floor((model->ahead[k] - AlongFrom) / Cell),
++			up = (int)std::floor((model->up[k] - UpFrom) / Cell);
++		if (across >= 0 && along >= 0 && up >= 0 && across < GridAcross && along < GridAlong && up < GridUp && SweptTailCells[cellIndex(across, along, up)])
++			model->part[k] = VoxelUnitModel::Torso;
++	}
 +	makeWalk(*model, routine, leftHolds, rightHolds, walks, beast);
 +	// (a small turret's wreck is its own block too, as a big turret's: its corpse's picture laid flat on the floor as a
 +	// body's is was "a big metal smear", the same issue)
@@ -101254,10 +101565,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..d7dd4a4fb
+index 000000000..aac589f00
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1446 @@
+@@ -0,0 +1,1454 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -102072,6 +102383,12 @@ index 000000000..d7dd4a4fb
 +		const Uint8 figure[2] = { 'f', 1 };
 +		hashBytes(hash, figure, 2);
 +	}
++	// (a tail swept off to a side, by the unit table: only said of a unit hashed in, as above)
++	if (look.tail == 2)
++	{
++		const Uint8 swept[2] = { 'T', 2 };
++		hashBytes(hash, swept, 2);
++	}
 +	// (beating, by the unit table: only said of a unit hashed in, as above)
 +	if (look.animated == 2)
 +	{
@@ -102175,6 +102492,8 @@ index 000000000..d7dd4a4fb
 +		if (look.boxTank == 1 && routine->big) job->traits |= 524288;
 +		// (a feminine figure, by the unit table: see standardBody in FirstPersonVoxelBodies.cpp)
 +		if (look.feminine == 1) job->traits |= 1048576;
++		// (a tail swept off to a side, by the unit table: see sweptTail in FirstPersonVoxelBodies.cpp)
++		if (look.tail == 2) job->traits |= 2097152;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -110348,7 +110667,7 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..308914ab3
+index 000000000..485853320
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
 @@ -0,0 +1,653 @@
@@ -110482,7 +110801,7 @@ index 000000000..308914ab3
 +		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 +		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 +		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
-+		int tail = -1; // (its legs' frames draw a tail too: 1; every run of theirs is a leg's, as ever: 0)
++		int tail = -1; // (its legs' frames draw a tail too: 1, in the body's middle; 2, swept off to a side as its drawings have it; every run of theirs is a leg's, as ever: 0)
 +		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 +		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 +		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
@@ -110795,7 +111114,7 @@ index 000000000..308914ab3
 +				}
 +				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 +				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
-+				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
++				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : tail == "swept" ? 2 : 0;
 +				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
 +				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
 +				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;
@@ -111653,6 +111972,27 @@ index 6c121c7b9..be4276167 100644
  
  	/// Sets the global shade.
  	void setGlobalShade(int shade);
+diff --git a/src/Savegame/Tile.cpp b/src/Savegame/Tile.cpp
+index af18529f2..d9c771089 100644
+--- a/src/Savegame/Tile.cpp
++++ b/src/Savegame/Tile.cpp
+@@ -32,6 +32,7 @@
+ #include "../Battlescape/BattlescapeGame.h"
+ #include "../fmath.h"
+ #include "SavedBattleGame.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ 
+ namespace OpenXcom
+ {
+@@ -323,7 +324,7 @@ bool Tile::hasNoFloor(const SavedBattleGame *savedBattleGame) const
+ 		if (_pos.z > 0 && savedBattleGame)
+ 		{
+ 			const Tile* tileBelow = savedBattleGame->getBelowTile(this);
+-			if (tileBelow != 0 && tileBelow->getTerrainLevel() == -24)
++			if (tileBelow != 0 && (tileBelow->getTerrainLevel() == -24 || FirstPerson::solidGroundBelow(savedBattleGame->getMod(), tileBelow))) // (OpenXcom3D: GitHub issue #266)
+ 				return false;
+ 		}
+ 	}
 diff --git a/src/main.cpp b/src/main.cpp
 index 4fd8a1d41..c18caafda 100644
 --- a/src/main.cpp

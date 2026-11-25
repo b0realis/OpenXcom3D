@@ -1029,6 +1029,11 @@ Uint8 FirstPersonView::shadeHit(Hit &hit, const float rayOrigin[3], const float 
 			// in or out): the art sees it through the hull, so it too takes the mirrored side.
 			shownColor = mirroredColor(hit, 1 - hit.axis, true, showNextFrame);
 		}
+		// A floor's side under a wall on the tile's edge: the wall's colour, as the map draws the wall down to the floor.
+		if (hit.part == O_FLOOR && hit.axis >= 0 && hit.axis < 2)
+		{
+			if (const Uint8 wallColor = floorSideUnderWall(hit, rayDirection[hit.axis] > 0.0f, showNextFrame)) shownColor = wallColor;
+		}
 		if (shownColor && !ownColorAllRound) baseColor = shownColor;
 		// The sea's top: waves (see waterColor), as on the sea beyond the map's edge. Its side
 		// (where the tile beside it has no floor) its deep colour: the art's own is the black

@@ -1451,6 +1451,57 @@ uint wallPaintColor(Hit hit, int hitTile, uint parts[4], uint ownColor)
 	return 0u;
 }
 
+/**
+ * A floor's side at the tile's edge where a wall stands on that edge: the wall's colour at its lowest row there (the map
+ * draws the wall down to the floor and never the floor's edge; GitHub issue #264). See FirstPersonView::floorSideUnderWall.
+ */
+uint floorSideUnderWall(Hit hit, int hitTile, bool fromLow, bool nextFrame)
+{
+	if (hit.part != 0 || hit.ghost || hit.axis < 0 || hit.axis > 1 || hit.voxel[hit.axis] != (fromLow ? 0 : 15))
+	{
+		return 0u;
+	}
+	int axis = hit.axis;
+	int wallTile = hitTile;
+	if (!fromLow)
+	{
+		int tileX = hitTile % uSize.x, tileY = (hitTile / uSize.x) % uSize.y;
+		if (axis == 0 ? tileX + 1 >= uSize.x : tileY + 1 >= uSize.y) return 0u;
+		wallTile = hitTile + (axis == 0 ? 1 : uSize.x);
+	}
+	uvec4 wallTileInfo = texelFetch(uTiles, wallTile * 4);
+	uint wallParts[4] = uint[4](wallTileInfo.x & 0xFFFFu, wallTileInfo.x >> 16, wallTileInfo.y & 0xFFFFu, wallTileInfo.y >> 16);
+	int wallPart = axis == 0 ? 1 : 2;
+	uint wall = wallParts[wallPart];
+	if (wall == 0u)
+	{
+		return 0u;
+	}
+	int along = hit.voxel[1 - axis];
+	for (int z = 0; z < 24; ++z)
+	{
+		uint own = texelFetch(uModelSides, int(wall) * 1024 + (axis == 0 ? 256 : 640) + z * 16 + along).r;
+		if (own == 0u) continue;
+		if (!fromLow) return own;
+		Hit asWall = hit;
+		asWall.part = wallPart;
+		asWall.voxel.z = z;
+		for (int across = 0; across < 16; ++across)
+		{
+			if (modelColor(wall, axis == 0 ? ivec3(across, along, z) : ivec3(along, across, z)) != 0u)
+			{
+				asWall.voxel[axis] = across;
+				break;
+			}
+		}
+		uint shown = mirroredColor(asWall, wallTile, axis, false, nextFrame);
+		if (shown == 0u) shown = own;
+		uint painted = wallPaintColor(asWall, wallTile, wallParts, shown);
+		return painted != 0u ? painted : shown;
+	}
+	return 0u;
+}
+
 // A plate's underside colour (shadeHit's undersideColor): its ceiling colour or its plan's, and under rock, dark art its plan's pattern.
 uint undersideColor(uint plate, ivec3 voxel, bool undersideUnderRock, inout int rockCeilingMiddle)
 {
@@ -1704,6 +1755,16 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #ifdef RELIEF
 			reliefFrom = 3;
 #endif
+		}
+		// A floor's side under a wall on the tile's edge: the wall's colour, as the map draws the wall down to the floor.
+		if (hit.part == 0 && hit.axis >= 0 && hit.axis < 2)
+		{
+			uint wallColor = floorSideUnderWall(hit, hitTile, rayDirection[hit.axis] > 0.0, showNextFrame);
+			if (wallColor != 0u)
+			{
+				shownColor = wallColor;
+				sidePicture = false;
+			}
 		}
 		if (shownColor != 0u && !ownColorAllRound) baseColor = shownColor;
 		// Setting "Smooth light", the full-colour picture: an animated part's two frames are mixed smoothly there, where

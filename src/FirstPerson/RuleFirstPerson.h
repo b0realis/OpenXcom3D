@@ -128,7 +128,7 @@ public:
 		int standard = -1; // (a person: its body made the standard humanoid: 1; as its drawings alone leave it, as ever: 0)
 		int roundTrunk = -1; // (a long body's trunk as broad as it is tall: 1; as broad as its frontal drawings have it, as ever: 0)
 		int faceHead = -1; // (its head painted as a face on hair or a helmet: 1; by its front and back drawings as the rest of it, as ever: 0)
-		int tail = -1; // (its legs' frames draw a tail too: 1; every run of theirs is a leg's, as ever: 0)
+		int tail = -1; // (its legs' frames draw a tail too: 1, in the body's middle; 2, swept off to a side as its drawings have it; every run of theirs is a leg's, as ever: 0)
 		int legs = -1; // (thin legs spread round its body, made anew: how many, all told; 0 none, as ever)
 		int barrels = -1; // (a turret's or a tank's gun: how many barrels it is made with; 0 none, the turret as its drawings leave it)
 		int hullPaint = -1; // (drawn on one frame, painted as a hull is, each cube by the drawing that looks onto it most squarely: 1; by its front and back drawings, as ever: 0)
@@ -441,7 +441,7 @@ public:
 				}
 				if (entry.tryRead("trunk", trunk)) look.roundTrunk = trunk == "round" ? 1 : 0;
 				if (entry.tryRead("head", head)) look.faceHead = head == "face" ? 1 : 0;
-				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : 0;
+				if (entry.tryRead("tail", tail)) look.tail = tail == "drawn" ? 1 : tail == "swept" ? 2 : 0;
 				if (entry.tryRead("paint", paint)) look.hullPaint = paint == "hull" ? 1 : 0;
 				if (entry.tryRead("kneel", kneel)) look.kneelLow = kneel == "low" ? 1 : 0;
 				if (entry.tryRead("hover", hover)) look.sparks = hover == "sparks" ? 1 : 0;

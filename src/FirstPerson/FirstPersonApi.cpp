@@ -73,6 +73,9 @@
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/SavedGame.h"
+#include "../Savegame/Tile.h"
+#include "../Mod/MapData.h"
+#include "../Battlescape/Pathfinding.h"
 #include "../Engine/Language.h"
 
 namespace OpenXcom
@@ -624,6 +627,35 @@ static bool modHasOverkill(const Mod *mod)
 float overKillShare(float armorShare)
 {
 	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
+}
+
+/**
+ * Is the tile below a hole the top of solid ground (Tile::hasNoFloor)? The game counts a tile whose floor is gone as
+ * having one only where the tile below is raised to its top (terrain level -24); a solid block that fills its tile
+ * (a big wall "block", solid in every layer of its shape, that no one walks into) but is drawn with terrain level 0 didn't count,
+ * so a unit whose floor melted over the rock under XPiratez's sewers fell into the rock, stuck there for good, and one
+ * that came after it fell in on top and knocked it out (GitHub issue #266). Such a block's top is ground now: the hole
+ * is walked over at the block's top, as the map draws it. Only with OpenXcom3D's mod on.
+ * @param mod The game's rules.
+ * @param below The tile under the hole.
+ * @return True if its object is solid ground to stand on.
+ */
+bool solidGroundBelow(const Mod *mod, const Tile *below)
+{
+	if (!mod || !below || !mod->getFirstPerson().isEnabled())
+	{
+		return false;
+	}
+	const MapData *object = below->getMapData(O_OBJECT);
+	if (!object || object->getBigWall() != Pathfinding::BLOCK || object->getTUCost(MT_WALK) < Pathfinding::INVALID_MOVE_COST)
+	{
+		return false;
+	}
+	for (int layer = 0; layer < 12; ++layer)
+	{
+		if (object->getLoftID(layer) == 0) return false; // (solid from its foot to its top: every layer of its shape)
+	}
+	return true;
 }
 
 /**

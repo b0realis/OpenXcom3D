@@ -2877,6 +2877,67 @@ Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, 
 	return 0;
 }
 
+/**
+ * A floor's side at the tile's edge where a wall stands on that edge (an upper storey's floor seen from outside, under
+ * the outer wall's foot: a player, GitHub issue #264, "Siding on some faces uses some of the interior floor texture"):
+ * the map draws the wall down to the floor there and never the floor's edge, so the side takes the wall's colour at its
+ * lowest row: on the side the art shows, the wall's own; on the side it never shows, as the wall's own face there is
+ * coloured (a craft's mirrored side, else its row seen from the other side, then "Wall paint"). The wall is the tile's
+ * own west or north wall for a side looking west or north, the next tile's for one looking east or south.
+ * @param hit What the ray hit (a floor's side).
+ * @param fromLow True if the ray goes east or south (the side looks west or north).
+ * @param nextFrame Whether the next frame of an animated part is shown.
+ * @return The colour, or 0 when no wall stands there (the floor's own).
+ */
+Uint8 FirstPersonView::floorSideUnderWall(const Hit &hit, bool fromLow, bool nextFrame) const
+{
+	if (hit.part != O_FLOOR || hit.ghost || hit.axis < 0 || hit.axis > 1 || hit.voxel[hit.axis] != (fromLow ? 0 : Position::TileXY - 1))
+	{
+		return 0;
+	}
+	const int axis = hit.axis;
+	int wallTile = hit.tile;
+	if (!fromLow)
+	{
+		const Position where = _save->getTileCoords(hit.tile);
+		if (axis == 0 ? where.x + 1 >= _save->getMapSizeX() : where.y + 1 >= _save->getMapSizeY()) return 0;
+		wallTile = hit.tile + (axis == 0 ? 1 : _save->getMapSizeX());
+	}
+	const int wallPart = axis == 0 ? O_WESTWALL : O_NORTHWALL;
+	const TileView &wallView = _tileViews[wallTile];
+	const VoxelModel *wall = wallView.part[wallPart];
+	if (!wall)
+	{
+		return 0;
+	}
+	const int along = hit.voxel[1 - axis];
+	for (int z = 0; z < Position::TileZ; ++z)
+	{
+		const Uint8 own = axis == 0 ? wall->east[z][along] : wall->south[z][along];
+		if (!own) continue;
+		if (!fromLow) return own;
+		// (the wall's back at that point: its first voxel from the west or the north, as a ray from there meets it)
+		Hit asWall = hit;
+		asWall.part = wallPart;
+		asWall.tile = wallTile;
+		asWall.voxel[2] = (Uint8)z;
+		for (int across = 0; across < Position::TileXY; ++across)
+		{
+			const Uint8 solid = axis == 0 ? wall->color[z][along][across] : wall->color[z][across][along];
+			if (solid)
+			{
+				asWall.voxel[axis] = (Uint8)across;
+				break;
+			}
+		}
+		Uint8 shown = mirroredColor(asWall, axis, false, nextFrame);
+		if (!shown) shown = own;
+		const Uint8 painted = wallPaintColor(asWall, wallView, shown);
+		return painted ? painted : shown;
+	}
+	return 0;
+}
+
 static void turnFromArt(FirstPersonView::VoxelModel &model, const Surface *sprite, int yOffset, int from); // (below)
 
 /**

@@ -292,7 +292,10 @@ firstPerson:
   #           no pair of legs, and it has no ears standing apart: a big round head), or drawn (as ever: as broad as
   #           its frontal drawings)
   #   tail: drawn (its legs' frames draw a tail too: what the side drawing has behind the legs is the tail, behind
-  #           the body's middle, not a second leg), or none (as ever: every stretch of the legs' frames is a leg's)
+  #           the body's middle, not a second leg), swept (the same, but a tail that goes down behind the legs off to
+  #           one side: the tail is what the side drawings draw behind the legs, wherever across the body all eight
+  #           drawings agree it is, a thin bar; it is the body's, not a leg's, and doesn't swing as the unit walks), or
+  #           none (as ever: every stretch of the legs' frames is a leg's)
   #   legs: how many thin legs stand round its body, all told (8: a spider). Legs a pixel thin are drawn wherever the
   #           artist had room, and the eight drawings together leave none of them: the body is made from the thick
   #           part of its drawings, and the legs are made anew, as far out, as high at the knee and as thick as the
@@ -378,6 +381,13 @@ firstPerson:
     # XPiratez's cat girls (sheets XNEKO_n): their tails are drawn in their legs' frames
     - names: [XNEKO]
       tail: drawn
+    # The X-Com Files' reptoids (the Agent and the Engineer, the Croc Cadet, the Commando, the Shadow, the Drake: the
+    # Leader and the Commander) and the Tasoths (TFTD's, The X-Com Files', XPiratez's): their tails are drawn in their
+    # legs' frames, down behind them and off to one side, and the side drawing's tail was taken for a leg: "tails seem
+    # to merge with leg", a Tasoth's "one weird, deformed tail leg" (a player, GitHub issue #267). Not the Pharaoh nor the
+    # reptoid VIP's disguise (no tail drawn)
+    - names: [REPTOID.PCK, CROC.PCK, REPTOID_COMMANDO.PCK, REPTOID_SHADOW.PCK, REPTOID_DRAKE.PCK, TASOTH.PCK, TASOTHS.PCK, DEEP_8.PCK]
+      tail: swept
     # the bats (XPiratez's vampire bat, The X-Com Files' shadowbat: a script flaps their wings as they hover); any unit whose
     # standing sprite is animated has a body for each frame without being named (animation: none switches that off)
     - names: [BAT, SHADOWBAT]

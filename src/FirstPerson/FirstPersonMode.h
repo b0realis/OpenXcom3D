@@ -947,6 +947,8 @@ private:
 	bool hurtThisBattle(const BattleUnit *unit) const;
 	/// Is the landing of a step off a ledge safe: ground to walk on, with a step leading out?
 	bool landingSafe(BattleUnit *unit, const Position &ahead) const;
+	/// Would a step off a ledge land inside something: a unit the game knows of, or a solid block (GitHub issue #266)?
+	bool landingInside(BattleUnit *unit, const Position &ahead) const;
 	/// A push into a step off a ledge refused for an unsafe landing: the warning, or (pushed again) the go-ahead.
 	void pushedIntoUnsafeLanding(int direction, bool deliberate);
 	/// The akimbo key: full or realistic akimbo off, or the same one back on.

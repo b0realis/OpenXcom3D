@@ -812,6 +812,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		const Uint8 figure[2] = { 'f', 1 };
 		hashBytes(hash, figure, 2);
 	}
+	// (a tail swept off to a side, by the unit table: only said of a unit hashed in, as above)
+	if (look.tail == 2)
+	{
+		const Uint8 swept[2] = { 'T', 2 };
+		hashBytes(hash, swept, 2);
+	}
 	// (beating, by the unit table: only said of a unit hashed in, as above)
 	if (look.animated == 2)
 	{
@@ -915,6 +921,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.boxTank == 1 && routine->big) job->traits |= 524288;
 		// (a feminine figure, by the unit table: see standardBody in FirstPersonVoxelBodies.cpp)
 		if (look.feminine == 1) job->traits |= 1048576;
+		// (a tail swept off to a side, by the unit table: see sweptTail in FirstPersonVoxelBodies.cpp)
+		if (look.tail == 2) job->traits |= 2097152;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

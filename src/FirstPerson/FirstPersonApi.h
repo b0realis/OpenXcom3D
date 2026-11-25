@@ -407,6 +407,9 @@ const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *t
 /// Setting "Obliteration in UFO and TFTD": the share of its full health a unit's health must go below for it to leave no
 /// corpse (BattleUnit::getOverKillDamage): the setting's own where it holds, else the armour's.
 float overKillShare(float armorShare);
+/// A tile whose floor is gone stands on the tile below's object when that is a solid block filled to its top (Tile::hasNoFloor;
+/// GitHub issue #266: units fell into the rock under a sewer's melted floor). See FirstPersonApi.cpp.
+bool solidGroundBelow(const Mod *mod, const Tile *below);
 /// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 void noteHealthDamage(int health);
 int lastHealthDamage();
@@ -513,6 +516,7 @@ inline void unitObliterated(BattlescapeState *, BattleUnit *, const Position &, 
 inline void itemBlasted(BattlescapeState *, const BattleItem *, const Position &, const RuleDamageType *) { }
 inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageType *type, RuleDamageType &) { return type; }
 inline float overKillShare(float armorShare) { return armorShare; }
+inline bool solidGroundBelow(const Mod *, const Tile *) { return false; }
 inline void noteHealthDamage(int) { }
 inline int lastHealthDamage() { return 0; }
 inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
