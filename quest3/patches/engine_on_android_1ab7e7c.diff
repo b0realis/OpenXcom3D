@@ -99477,10 +99477,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..4f70dc74c
+index 000000000..26235e716
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1423 @@
+@@ -0,0 +1,1438 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -99816,6 +99816,29 @@ index 000000000..4f70dc74c
 +
 +	const Routine *routine = routineFor(unit->getArmor()->getDrawingRoutine());
 +	if (!routine) return nullptr;
++	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
++	const Unit *unitRules = unit->getUnitRules();
++	const Soldier *soldier = unit->getGeoscapeSoldier();
++	// (and by the routine the game draws it with, as the name "routine:N": the big mods have thousands of units, most of
++	// them people drawn as the games' own soldiers are, under every kind of name)
++	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
++		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string(),
++		"routine:" + std::to_string(unit->getArmor()->getDrawingRoutine()) });
++	// (A tank the unit table makes of boxes is made from its drawings as they are drawn, not in the colours a soldier's
++	// looks give its sprite: XPiratez's tank, worn by a gal, shares the colour group the game gives her hair colour with
++	// its treads' darkest shade, and its treads came out in her green; the owner: "The tank side view of tracks should
++	// not have green pixels/voxels!". The unit's own recolouring is set aside while its frames are drawn here.)
++	struct RecolourSetAside
++	{
++		std::vector<std::pair<Uint8, Uint8>> *list = nullptr, kept;
++		~RecolourSetAside() { if (list) *list = kept; }
++	} setAside;
++	if (look.boxTank == 1 && routine->big)
++	{
++		setAside.list = &const_cast<std::vector<std::pair<Uint8, Uint8>> &>(unit->getRecolor());
++		setAside.kept = *setAside.list;
++		setAside.list->clear();
++	}
 +	unitSprite.setDrawOut(unit->isOut()); // (a unit already down, see suitsDown: drawn as it stood)
 +	// Each part on a frame of its own, for each direction (the drawer turned to it), with the game's colours; the
 +	// drawer's other parts on a frame nobody looks at. A big unit's four tiles (and its turret, and what it floats on) on
@@ -100002,14 +100025,6 @@ index 000000000..4f70dc74c
 +		unitSprite.setWalkOverride(-1);
 +		walks = WalkFrames();
 +	}
-+	// What the mod's rules say of the unit by its names (the unit table: a ghost seen through, a beast on four legs).
-+	const Unit *unitRules = unit->getUnitRules();
-+	const Soldier *soldier = unit->getGeoscapeSoldier();
-+	// (and by the routine the game draws it with, as the name "routine:N": the big mods have thousands of units, most of
-+	// them people drawn as the games' own soldiers are, under every kind of name)
-+	const RuleFirstPerson::UnitLook look = save->getMod()->getFirstPerson().getUnitLook({ unit->getType(), unit->getArmor()->getType(),
-+		unit->getArmor()->getSpriteSheet(), unitRules ? unitRules->getRace() : std::string(), soldier ? soldier->getRules()->getType() : std::string(),
-+		"routine:" + std::to_string(unit->getArmor()->getDrawingRoutine()) });
 +	// A unit whose standing drawing changes shape with the battle's animation frame (the game's routine draws a frame
 +	// of it for each: the Silacoid and the Celatid pulse; or a mod's script picks its sprite by it: X-Com Files'
 +	// shadowbat flaps as it hovers) has a body for each frame, as its sprite has a drawing (the owner: "voxel models
