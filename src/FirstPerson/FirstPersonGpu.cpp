@@ -1496,7 +1496,15 @@ void FirstPersonGpu::State::encodeTiles(const Frame &frame)
 		uints[6] = (tile.discovered ? 1 : 0) | tile.smoke << 8 | (tile.burning ? 1 << 16 : 0) | (frame.roofed[index] ? 1 << 17 : 0);
 		uints[7] = index < perLevel && frame.waterAtEdge ? frame.waterAtEdge[index] : 0;
 		uints[10] = (frame.ufoOfTile ? frame.ufoOfTile[index] : 0) | (frame.ufoPhaseOfTile ? frame.ufoPhaseOfTile[index] << 8 : 0);
-		uints[11] = frame.wallPaintOf ? frame.wallPaintOf[index * 2] | (Uint32)frame.wallPaintOf[index * 2 + 1] << 16 : 0;
+		// (Each wall's paint while the wall stands as it was found, in whichever frame of its animation; not its rubble. See
+		// FirstPersonView::showsWall.)
+		Uint32 paints = 0;
+		for (int side = 0; frame.wallPaintOf && side < 2; ++side)
+		{
+			const Uint16 paint = frame.wallPaintOf[index * 2 + side];
+			if (paint && paint <= frame.wallPaintCount && FirstPersonView::showsWall(tile.part[1 + side], /* (the west wall, the north wall) */ frame.wallPaints[paint - 1].wall)) paints |= (Uint32)paint << (16 * side);
+		}
+		uints[11] = paints;
 		uints[12] = frame.mirrorOfTile ? (Uint32)(frame.mirrorOfTile[index] + 1) : 0;
 	}
 }
@@ -1707,6 +1715,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
+	Gl::Uniform1i(location("uLiquidScreens"), frame.liquidScreens ? 1 : 0);
 	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);

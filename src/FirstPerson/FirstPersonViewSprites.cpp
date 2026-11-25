@@ -69,6 +69,7 @@
 #include "../Engine/SurfaceSet.h"
 #include "../Mod/Armor.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -1536,6 +1537,76 @@ const size_t ObliterationRoomKept = 1500;
 /// not for the body (see obliterateUnit).
 const int OutlineShade = 13;
 
+/// Setting "Obliteration": a body's blood is the colour groups that are BloodGroupLeast or more of its corpse's picture and
+/// under BloodLiveMost of the living unit's, all of its sprite sheet (see bloodOf).
+const float BloodGroupLeast = 0.02f, BloodLiveMost = 0.01f;
+
+/**
+ * Setting "Obliteration": the colours a body bleeds, read off its corpse's picture as the map draws it lying in its blood
+ * (FLOOROB.PCK: a soldier's red, a Sectoid's, a Snakeman's or a Chryssalid's green; the owner: "the sectoid has green
+ * blood so the overkill should sample particles from the dead body sprite! This should work also in 3D!"), whether its
+ * body is a picture or of voxels: the corpse's pixels in the colour groups it shows and the living unit's sprite sheet
+ * hardly does (see BloodGroupLeast), its dark outline left out. X-COM's: the armoured soldiers' red, the Sectoid's, the
+ * Snakeman's and the Chryssalid's green, the Floater's purple; none on the soldier without armour (that corpse's red is
+ * on the sheet too), so the game's red. Found once for an armour and corpse, and kept for the battle.
+ * @param armor The unit's armour (its sprite sheet: the living unit), or null.
+ * @param corpses Its corpse's parts (a big unit's four).
+ * @return The blood's colours, each as often as the corpse shows it; empty for none found (the game's red, then).
+ */
+const std::vector<Uint8> &FirstPersonView::bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses)
+{
+	const auto key = std::make_pair(armor, corpses.empty() ? (const RuleItem*)nullptr : corpses.front());
+	auto found = _bloodColors.find(key);
+	if (found != _bloodColors.end())
+	{
+		return found->second;
+	}
+	std::vector<Uint8> &blood = _bloodColors[key];
+	SurfaceSet *floorSprites = _game->getMod()->getSurfaceSet("FLOOROB.PCK", false);
+	SurfaceSet *sheet = armor ? _game->getMod()->getSurfaceSet(armor->getSpriteSheet(), false) : nullptr;
+	if (!floorSprites || !sheet)
+	{
+		return blood;
+	}
+	int liveCounts[16] = {}, live = 0;
+	for (int frame = 0; frame < (int)sheet->getTotalFrames(); ++frame)
+	{
+		const Surface *picture = sheet->getFrame(frame);
+		for (int y = 0; picture && y < picture->getHeight(); ++y)
+			for (int x = 0; x < picture->getWidth(); ++x)
+			{
+				const Uint8 color = picture->getPixel(x, y);
+				if (!color) continue;
+				++liveCounts[color >> 4];
+				++live;
+			}
+	}
+	std::vector<Uint8> dead;
+	int deadCounts[16] = {};
+	for (const RuleItem *corpse : corpses)
+	{
+		const Surface *picture = corpse && corpse->getFloorSprite() >= 0 ? floorSprites->getFrame(corpse->getFloorSprite()) : nullptr;
+		for (int y = 0; picture && y < picture->getHeight(); ++y)
+			for (int x = 0; x < picture->getWidth(); ++x)
+			{
+				const Uint8 color = picture->getPixel(x, y);
+				if (!color || (color & 15) >= OutlineShade) continue;
+				dead.push_back(color);
+				++deadCounts[color >> 4];
+			}
+	}
+	if (!live || dead.empty())
+	{
+		return blood;
+	}
+	for (const Uint8 color : dead)
+	{
+		const int group = color >> 4;
+		if (deadCounts[group] >= BloodGroupLeast * dead.size() && liveCounts[group] < BloodLiveMost * live) blood.push_back(color);
+	}
+	return blood;
+}
+
 /**
  * Setting "Obliteration": whether a unit's body bleeds as it bursts, or throws sparks and smoke: flesh, unless it is a
  * vehicle (a hull: tanks, hover tanks, the Cyberdisc, TFTD's tanks, turrets; see FirstPerson::hullLayBack) or its armour
@@ -1656,7 +1727,7 @@ void FirstPersonView::obliterateUnit(BattleUnit *unit, const float away[3], int 
 		}
 	}
 	const float middle[3] = { (float)feet[0], (float)feet[1], (float)(feet[2] + 0.5 * unit->getHeight() * unitScale) };
-	burstPieces(pieces, middle, away, burn, hot, blast, bleedsWhenBurst(unit), size);
+	burstPieces(pieces, middle, away, burn, hot, blast, bleedsWhenBurst(unit), size, bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()));
 }
 
 /**
@@ -1729,7 +1800,7 @@ void FirstPersonView::obliterateBody(const BattleItem *item, const float away[3]
 		_spriteBuffer->clear();
 	}
 	const float middle[3] = { (float)ground[0], (float)ground[1], (float)ground[2] + 3.0f };
-	burstPieces(pieces, middle, away, burn, hot, blast, owner ? bleedsWhenBurst(owner) : true, 1);
+	burstPieces(pieces, middle, away, burn, hot, blast, owner ? bleedsWhenBurst(owner) : true, 1, bloodOf(owner ? owner->getArmor() : nullptr, { item->getRules() }));
 }
 
 /**
@@ -1739,8 +1810,8 @@ void FirstPersonView::obliterateBody(const BattleItem *item, const float away[3]
  * the body's colours and char as they go, as the map burns a unit beyond its overkill over its fall (each piece by any
  * part of the burn, so some stay their colour: see drawParticles), down to its colour's darkest, gone beyond 26 shades;
  * from fire, a laser or plasma one that chars that far throws off a glowing ember. A body that bleeds also sprays drops of
- * blood, which land as the pieces do, and leaves a red mist hanging; a machine throws sparks and smoke. Fewer pieces when
- * the particle system is near full (ObliterationRoomKept stay for the rest).
+ * blood in its own colours (see bloodOf), which land as the pieces do, and leaves a mist of it hanging; a machine throws
+ * sparks and smoke. Fewer pieces when the particle system is near full (ObliterationRoomKept stay for the rest).
  * @param pieces The pieces: where each is and its colour.
  * @param middle The middle of the body, in voxels.
  * @param away The way the pieces fly.
@@ -1749,8 +1820,9 @@ void FirstPersonView::obliterateBody(const BattleItem *item, const float away[3]
  * @param blast A blast's: they fly harder.
  * @param flesh A body that bleeds (else a machine's).
  * @param size The body's size in tiles across: 1, or 2 for a big unit.
+ * @param blood The blood's colours, from its corpse's picture (see bloodOf); empty: the game's red.
  */
-void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size)
+void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood)
 {
 	typedef FirstPersonParticles P;
 	const float strength = blast ? 1.3f : 1.0f;
@@ -1805,23 +1877,26 @@ void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const fl
 	const int tiles = size * size;
 	if (flesh)
 	{
-		// Drops of blood, thrown the way the pieces go and every way, landing as the pieces do; and a red mist hanging
+		// Drops of blood, thrown the way the pieces go and every way, landing as the pieces do; and a mist of it hanging
 		// where the body was, fading within a second.
-		for (int drop = 0; drop < 80 * tiles; ++drop)
+		// (the colours of its own blood, as its corpse's picture shows it, at random: see bloodOf; else the game's red)
+		int pick = 0;
+		auto bloodColor = [&]() { return blood.empty() ? _colors.blood[pick++ & 1] : blood[std::min(blood.size() - 1, (size_t)(_particles.random() * blood.size()))]; };
+		for (int spray = 0; spray < 80 * tiles; ++spray)
 		{
-			P::Particle blood;
+			P::Particle drop;
 			float way[3];
 			anyWay(way);
 			const float along = _particles.random(20.0f, 90.0f) * strength, spread = _particles.random(10.0f, 50.0f);
 			for (int axis = 0; axis < 3; ++axis)
 			{
-				blood.pos[axis] = middle[axis] + _particles.random(-3.0f, 3.0f) * size;
-				blood.vel[axis] = away[axis] * along + way[axis] * spread;
+				drop.pos[axis] = middle[axis] + _particles.random(-3.0f, 3.0f) * size;
+				drop.vel[axis] = away[axis] * along + way[axis] * spread;
 			}
-			blood.vel[2] += _particles.random(5.0f, 35.0f);
-			blood.age = 0.0f; blood.life = _particles.random(1.2f, 2.6f); blood.gravity = 200.0f; blood.drag = 0.5f;
-			blood.color = _colors.blood[drop & 1]; blood.size = (Uint8)_particles.random(3.0f, 6.99f); blood.kind = P::CHUNK; blood.group = P::EFFECT;
-			_particles.add(blood);
+			drop.vel[2] += _particles.random(5.0f, 35.0f);
+			drop.age = 0.0f; drop.life = _particles.random(1.2f, 2.6f); drop.gravity = 200.0f; drop.drag = 0.5f;
+			drop.color = bloodColor(); drop.size = (Uint8)_particles.random(3.0f, 6.99f); drop.kind = P::CHUNK; drop.group = P::EFFECT;
+			_particles.add(drop);
 		}
 		for (int puff = 0; puff < 20 * tiles; ++puff)
 		{
@@ -1832,7 +1907,7 @@ void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const fl
 				mist.vel[axis] = away[axis] * _particles.random(5.0f, 20.0f) + _particles.random(-8.0f, 8.0f);
 			}
 			mist.age = 0.0f; mist.life = _particles.random(0.5f, 1.1f); mist.gravity = -3.0f; mist.drag = 2.0f;
-			mist.color = shadeColor(_colors.blood[1], (int)_particles.random(0.0f, 3.99f)); mist.size = (Uint8)_particles.random(6.0f, 8.99f);
+			mist.color = shadeColor(blood.empty() ? _colors.blood[1] : bloodColor(), (int)_particles.random(0.0f, 3.99f)); mist.size = (Uint8)_particles.random(6.0f, 8.99f);
 			mist.kind = P::LIT; mist.group = P::EFFECT;
 			_particles.add(mist);
 		}

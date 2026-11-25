@@ -163,6 +163,27 @@ firstPerson:
     - { dataSet: MADDECOR, groups: [8, 13], records: [54, 59, 65, 67] }
     - { dataSet: XB3BITZ3, groups: [8, 13], records: [10, 11, 12, 13] }
     - { dataSet: HAVIRABASE, groups: [8, 13], records: [0, 1, 2, 3] }
+  # Liquid screens (setting "Liquid screens"): wall records whose screen, the pixels their animation changes less the
+  # colours of their still frame, is still water standing on end: it ripples and mirrors the room (with "Reflections").
+  # `{ dataSet, records: [...] }`. A list replaces the earlier one.
+  # The alien entertainment panels, yellow and blue (X-COM's alien base, and the same panels in XPiratez's and The
+  # X-Com Files' sets: a scan of every wall shaped like them whose whole screen animates).
+  liquidScreens:
+    - { dataSet: U_PODS, records: [3, 4, 7, 8] }
+    - { dataSet: U_PODS_G, records: [3, 4, 7, 8] }
+    - { dataSet: U_PODS_B, records: [3, 4, 7, 8] }
+    - { dataSet: U_PODSCHURCH, records: [3, 4, 7, 8] }
+    - { dataSet: U_PODSGOLD, records: [3, 4, 7, 8] }
+    - { dataSet: CHTONITE_PODS, records: [3, 4, 7, 8] }
+    - { dataSet: MIB_PODS, records: [3, 4, 7, 8] }
+    - { dataSet: REP_PODS, records: [3, 4, 7, 8] }
+    - { dataSet: MARSEC_PODS, records: [3, 4, 7, 8] }
+    - { dataSet: SGR_HABITATION, records: [0, 1, 3, 4] }
+    - { dataSet: SGR_INT01, records: [3, 4, 11, 12] }
+    - { dataSet: SGR_ELECTRONICS, records: [17, 18, 20, 21] }
+    - { dataSet: UFOAA_INT, records: [25, 26, 34, 35] }
+    - { dataSet: SGR_TRAIN, records: [51] }
+    - { dataSet: SGR_TRAIN2, records: [51] }
   # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
   # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
   # A list replaces the earlier one.
@@ -243,7 +264,10 @@ firstPerson:
   # (*SPIDER*); or it is a whole name, for one unit (BAN_6.PCK). Capitals or not is the same.
   #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
   #   shape: beast (a long body on four legs, made from its side drawings; only a unit drawn on one frame, one tile
-  #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
+  #          big, at least 1.2 times as long as wide), turret (one tile big and unable to move: a plain block standing
+  #          on the floor, with its gun, as the big turrets are), tank (two tiles by two, drawn on one frame: a hull box
+  #          and a turret box on its deck, their sizes the ones whose outlines best match its eight drawings, with its
+  #          gun), or upright (as ever: to take a unit out of an earlier entry)
   #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
   #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
   #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
@@ -492,6 +516,18 @@ firstPerson:
     # block standing on the floor, with its gun, as the big turrets are
     - names: [TURRET_MINIGUN.PCK]
       shape: turret
+    # XPiratez's tank (the gals' tank in its autocannon and battlecannon kit, sheet PIR_TANK, and its lascannon kit,
+    # PIR_TANK_L): hull, turret and gun drawn in one picture a side, by a walker's routine. Carved from its eight
+    # drawings and painted as the gals are (its sheet's name begins with PIR, as theirs do) it was a lumpy purple loaf,
+    # "a lot more goofy" (a player on the forum): a hull box and a turret box fitted to its drawings, with its gun (the
+    # owner: "build a good boxy tank model with boxy turret and barrel"); the gals' words taken back
+    - names: [PIR_TANK.PCK, PIR_TANK_L.PCK]
+      shape: tank
+      torsoDepth: 0
+      waist: filled
+      top: slant
+      sculpt: all
+      back: drawn
     # (and two more that cannot move and came out wrong on the general carving: The X-Com Files' Wizkid turret, a drum
     # too tall with its barrel lost, and the 40k mod's Tauros small turret, a gun carved flat as paper. The other
     # one-tile turrets of the three mods were built both ways and are better as they are)

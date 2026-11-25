@@ -69,7 +69,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 ## New in 1.12
 
 - **Further, and the unseen in mist:** *View distance* reaches 60 to 200 tiles; *Unseen terrain* draws what your squad hasn't seen as slate shapes in a mist (or 0.9's fog, or as it is); with *Fog of war in 3D* off, the default, the floor below the stairs shows as you look at it.
-- **Walls in the paint of their side:** a wall's face the map never shows takes the paint of the side it faces, a house's outside from behind (*Wall paint*).
+- **Walls in the paint of their side:** a wall's face the map never shows takes the paint of the side it faces, a house's outside from behind.
 - **Enemy markers in the buttons' colours:** red seen, green seen only by the squad, yellow hidden but in a clear line of fire.
 - **Wounded markers:** our own wounded in the map buttons' blue, those about to pass out in purple.
 - **Damage numbers:** a hit's damage rises over the unit, in 3D and on the map: health red, armour blue, stun purple, a grey 0 when the armour stopped it.

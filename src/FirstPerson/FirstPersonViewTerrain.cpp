@@ -387,6 +387,57 @@ Uint8 nearestColor(const SDL_Color *palette, const float *rgb)
 }
 
 /**
+ * The colour groups of a liquid screen (setting "Liquid screens", the mod's table `liquidScreens:`): those of the
+ * pixels of a wall's art that its animation changes, in any of its frames, less those of its still frame (a group is
+ * the frame's when DisplayFrameGroupShare of the pixels no frame changes are in it). The alien entertainment panels:
+ * the yellow show's six groups, the blue one's blues and pinks; not the grey pedestal round them.
+ * @param mapData The wall's record.
+ * @return The groups, a bit each; 0 for a wall whose art doesn't animate.
+ */
+static Uint16 screenGroups(const MapData *mapData)
+{
+	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
+	const Surface *first = art ? art->getFrame(mapData->getSprite(0)) : nullptr;
+	if (!first)
+	{
+		return 0;
+	}
+	const int width = first->getWidth(), height = first->getHeight();
+	std::vector<const Surface*> frames;
+	for (int frame = 1; frame < 8; ++frame)
+	{
+		const Surface *other = art->getFrame(mapData->getSprite(frame));
+		if (other && other != first && other->getWidth() == width && other->getHeight() == height) frames.push_back(other);
+	}
+	Uint16 movingGroups = 0;
+	int stillCounts[16] = {}, still = 0;
+	for (int y = 0; y < height; ++y)
+		for (int x = 0; x < width; ++x)
+		{
+			const Uint8 color = first->getPixel(x, y);
+			bool moving = false;
+			for (const Surface *other : frames)
+			{
+				const Uint8 otherColor = other->getPixel(x, y);
+				if (otherColor == color) continue;
+				moving = true;
+				if (otherColor) movingGroups |= (Uint16)(1 << (otherColor >> 4));
+			}
+			if (!color) continue;
+			if (moving) movingGroups |= (Uint16)(1 << (color >> 4));
+			else
+			{
+				++stillCounts[color >> 4];
+				++still;
+			}
+		}
+	Uint16 stillGroups = 0;
+	for (int group = 0; group < 16; ++group)
+		if (still && stillCounts[group] >= DisplayFrameGroupShare * still) stillGroups |= (Uint16)(1 << group);
+	return movingGroups & (Uint16)~stillGroups;
+}
+
+/**
  * Gives what stands above still water the art's colours that aren't the water's (a player, GitHub issue #261: a
  * paddy's rice, the game's own voxels, a few thin stalks, "all of its actual sprite data is green"): projected, those
  * voxels landed on the water the art draws behind its tufts and stood blue. Each voxel above the water's face (the
@@ -2337,8 +2388,9 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
 }
 
 /**
- * Setting "Wall paint" (a player, GitHub issue #111): for each wall, which side its face the
- * isometric art never shows looks onto, and which wall lends that face the paint of that side.
+ * Wall paint (a player, GitHub issue #111; a setting, with no row on the tab and always All rooms
+ * since GitHub issue #264: see WallPaintLevel): for each wall, which side its face the isometric art never shows looks onto,
+ * and which wall lends that face the paint of that side.
  *
  * The art shows a west wall from the east and a north wall from the south only, the room with its
  * roof cut away: so a building's west and north outer walls are drawn in the paint of the rooms
@@ -2366,7 +2418,11 @@ Uint8 FirstPersonView::mirroredColor(const Hit &hit, int axis, bool skinOnly, bo
  *   wall with a window, only the voxels of its own paint do: the colour group most of the nearest
  *   plain wall on the same side shows (the window's frame, its glass and curtains, painted panes
  *   keep theirs). Doors keep theirs whole, and so do fences, ghosts, the walls of crafts and UFOs
- *   (mirrored, see mirroredColor) and walls with no donor.
+ *   (mirrored, see mirroredColor) and walls with no donor;
+ * - a display (a wall whose art animates: an alien base's entertainment panels, a computer's
+ *   screen) lends none, and its back takes, whichever sides its faces look onto, the paint of the
+ *   nearest plain wall made of the display's own frame (see DisplayFrameMatch): the base's grey
+ *   wall, not the cave's rock. A paint holds in every frame of the wall's animation (see showsWall).
  * Coordinates are tiles. A wall blown away later leaves its rubble as the art has it (see
  * wallPaintColor), and the rest keep theirs: the regions stay as they were found (a saved battle
  * loaded finds them anew, from the map as it is then: a room blown open is the outdoors then).
@@ -2484,9 +2540,25 @@ void FirstPersonView::findWallPaints()
 		++buildingCount;
 	}
 
+	// A display: a wall whose art animates, some frame of it another model than its first (a door is never asked: it
+	// keeps its own). The alien bases' entertainment panels, a computer's screen. It lends none of its paint (a copy of
+	// one of its frames stood still on the walls round it), and its back takes a plain wall's (both faces had shown the
+	// show; a player, GitHub issue #264).
+	std::map<const MapData*, bool> displays;
+	auto isDisplay = [&](const MapData *data)
+	{
+		auto found = displays.find(data);
+		if (found != displays.end()) return found->second;
+		const VoxelModel *first = getModel(data, -1, false);
+		bool display = false;
+		for (int frame = 1; frame < 8 && !display; ++frame) display = getModel(data, data->getSprite(frame), false) != first;
+		displays[data] = display;
+		return display;
+	};
+
 	// What a wall part can be here: 0 kept as it is (a door, a wall one walks through, a fence, a ghost, nothing to see), 1
 	// repainted, 2 repainted and a donor (a plain wall: no glass, no holes in its art, from the
-	// floor to nearly the top, its shown face nearly whole), 3 a window (glass or holes in its
+	// floor to nearly the top, its shown face nearly whole, not a display), 3 a window (glass or holes in its
 	// art): its frame and glass keep theirs, the wall round them may take the paint.
 	std::map<const MapData*, int> wallKinds;
 	auto wallKind = [&](const MapData *data)
@@ -2510,6 +2582,7 @@ void FirstPersonView::findWallPaints()
 				for (int along = 0; along < Position::TileXY; ++along)
 					shownVoxels += (data->getObjectType() == O_WESTWALL ? model->east[z][along] : model->south[z][along]) != 0;
 			kind = seeThrough ? 3 : model->max[2] >= 20 && model->min[2] <= 2 && shownVoxels >= 16 * 20 ? 2 : 1;
+			if (kind == 2 && isDisplay(data)) kind = 1;
 		}
 		wallKinds[data] = kind;
 		return kind;
@@ -2591,14 +2664,99 @@ void FirstPersonView::findWallPaints()
 		return -1;
 	};
 
-	// Each wall whose two faces look onto different sides: its donor, and the paint of its own side.
-	int kept = 0, outerCount = 0, betweenCount = 0;
+	// The plain wall whose paint a display's back takes: one made of the display's frame (its shown face
+	// DisplayFrameMatch in the colour groups of the display's still voxels; else the closest match there is), of the
+	// same kind (west or north) first, its shown face looking onto the side the display's back faces first, then the
+	// nearest, on the same level first. -1 for none.
+	auto shownFace = [](const VoxelModel *model, const MapData *data) -> const Uint8 (*)[Position::TileXY]
+	{
+		return data->getObjectType() == O_WESTWALL ? model->east : model->south;
+	};
+	std::map<const MapData*, Uint16> frameGroupsOf; // a display's frame: its colour groups, a bit each
+	auto frameGroups = [&](const MapData *data)
+	{
+		auto found = frameGroupsOf.find(data);
+		if (found != frameGroupsOf.end()) return found->second;
+		const Uint8 (*face)[Position::TileXY] = shownFace(getModel(data, -1, false), data);
+		bool moving[Position::TileZ][Position::TileXY] = {};
+		for (int frame = 1; frame < 8; ++frame)
+		{
+			const Uint8 (*other)[Position::TileXY] = shownFace(getModel(data, data->getSprite(frame), false), data);
+			for (int z = 0; z < Position::TileZ; ++z)
+				for (int along = 0; along < Position::TileXY; ++along) moving[z][along] = moving[z][along] || other[z][along] != face[z][along];
+		}
+		int counts[16] = {}, still = 0;
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int along = 0; along < Position::TileXY; ++along)
+				if (face[z][along] && !moving[z][along])
+				{
+					++counts[face[z][along] >> 4];
+					++still;
+				}
+		Uint16 groups = 0;
+		for (int group = 0; group < 16; ++group)
+			if (still && counts[group] >= DisplayFrameGroupShare * still) groups |= (Uint16)(1 << group);
+		frameGroupsOf[data] = groups;
+		return groups;
+	};
+	std::map<std::pair<const MapData*, Uint16>, float> frameMatches; // how much of a plain wall's shown face is in a frame's groups
+	auto frameMatch = [&](const MapData *data, Uint16 groups)
+	{
+		const auto key = std::make_pair(data, groups);
+		auto found = frameMatches.find(key);
+		if (found != frameMatches.end()) return found->second;
+		const Uint8 (*face)[Position::TileXY] = shownFace(getModel(data, -1, false), data);
+		int in = 0, all = 0;
+		for (int z = 0; z < Position::TileZ; ++z)
+			for (int along = 0; along < Position::TileXY; ++along)
+				if (face[z][along])
+				{
+					++all;
+					in += (groups >> (face[z][along] >> 4)) & 1;
+				}
+		const float match = all ? (float)in / all : 0.0f;
+		frameMatches[key] = match;
+		return match;
+	};
+	auto displayDonor = [&](const WallSide &to)
+	{
+		const Uint16 groups = frameGroups(to.data);
+		const int x = to.tile % mapSizeX, y = (to.tile / mapSizeX) % mapSizeY, z = to.tile / tilesPerLevel;
+		int best = -1;
+		long long bestScore = LLONG_MAX;
+		for (int wall = 0; wall < (int)walls.size(); ++wall)
+		{
+			const WallSide &from = walls[wall];
+			if (wallKind(from.data) != 2) continue;
+			const float match = frameMatch(from.data, groups);
+			const int fromX = from.tile % mapSizeX, fromY = (from.tile / mapSizeX) % mapSizeY, fromZ = from.tile / tilesPerLevel;
+			const long long score = (match >= DisplayFrameMatch ? 0LL : 1LL + (long long)((1.0f - match) * 20.0f)) * 100000000LL
+				+ (from.part != to.part ? 10000000LL : 0LL) + (region[from.tile] != region[to.hiddenTile] ? 1000000LL : 0LL)
+				+ std::abs(fromZ - z) * 1000LL + std::abs(fromX - x) + std::abs(fromY - y);
+			if (score < bestScore)
+			{
+				bestScore = score;
+				best = wall;
+			}
+		}
+		return best;
+	};
+
+	// Each wall whose two faces look onto different sides, and each display: its donor, and the paint of its own side.
+	int kept = 0, outerCount = 0, betweenCount = 0, displayCount = 0;
 	for (const WallSide &side : walls)
 	{
 		if (!wallKind(side.data) || side.hiddenTile < 0) continue;
 		int donor = -1, reference = -1; // the wall lending its paint; a plain wall on this wall's own side, for its paint
 		Uint8 kind = 0;
-		if (side.shownIn && !side.hiddenIn)
+		if (wallKind(side.data) != 3 && isDisplay(side.data))
+		{
+			// A display's back: a plain wall's paint, whichever sides its two faces look onto (a ring of the alien base's
+			// panels has the show inside and out; see displayDonor).
+			kind = side.shownIn != side.hiddenIn ? WallPaintEachSide : WallPaintAllRooms;
+			donor = displayDonor(side);
+		}
+		else if (side.shownIn && !side.hiddenIn)
 		{
 			// A building's west or north outer wall, drawn in the room's paint: outdoors, the building's outside.
 			kind = 1;
@@ -2648,15 +2806,17 @@ void FirstPersonView::findWallPaints()
 		const Uint8 paintGroup = wallKind(side.data) != 3 ? WallPaintWhole : (Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts);
 		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind, paintGroup });
 		_wallPaintOf[side.tile * 2 + side.part - O_WESTWALL] = (Uint16)_wallPaints.size();
-		if (kind == 1) ++outerCount;
+		if (wallKind(side.data) != 3 && isDisplay(side.data)) ++displayCount;
+		else if (kind == 1) ++outerCount;
 		else ++betweenCount;
 	}
 	Log(LOG_INFO) << "OpenXcom3D: wall paint: " << buildingCount << " buildings, " << outerCount << " outer walls and " << betweenCount
-		<< " walls between rooms take the paint of the side they face (" << kept << " keep theirs), found in " << SDL_GetTicks() - startTick << " ms";
+		<< " walls between rooms take the paint of the side they face, " << displayCount << " displays' backs a plain wall's (" << kept
+		<< " keep theirs), found in " << SDL_GetTicks() - startTick << " ms";
 }
 
 /**
- * Setting "Wall paint": the colour a wall's face the isometric art never shows takes from the side
+ * Wall paint: the colour a wall's face the isometric art never shows takes from the side
  * it faces (see findWallPaints): the donor's shown face on the same row of voxels, read as one
  * standing before it sees it (its left end on the left), the nearest column of it where it has
  * nothing there. Only on the wall's back plane (its westmost or northmost voxels: the faces inside
@@ -2672,7 +2832,7 @@ void FirstPersonView::findWallPaints()
  */
 Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const
 {
-	if (Options::fpsWallPaint <= 0 || (hit.part != O_WESTWALL && hit.part != O_NORTHWALL) || hit.ghost || !ownColor
+	if (Options::fpsWallPaint <= WallPaintArt || (hit.part != O_WESTWALL && hit.part != O_NORTHWALL) || hit.ghost || !ownColor
 		|| hit.axis < 0 || hit.axis > 1 || _wallPaintOf.empty())
 	{
 		return 0;
@@ -2695,7 +2855,7 @@ Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, 
 		return 0;
 	}
 	const WallPaint &paint = _wallPaints[paintIndex - 1];
-	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
+	if (paint.kind > Options::fpsWallPaint || !showsWall(tileView.part[hit.part], paint.wall) || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
 	{
 		return 0;
 	}
@@ -2785,21 +2945,25 @@ static bool pulsingFrames(const MapData *mapData)
  * @param spriteIndex The frame of the record's surface set; -1 for its first animation frame.
  * @param cutout Leave out the voxels whose sprite pixel is transparent: used for the frames of
  *        a UFO door sliding open, where the door has gone.
+ * @param loneLift The record is a grav lift's floor, here on a tile with no other over or under it
+ *        (see liftAt): it is a floor like any other here, even where it is a lift elsewhere on the map.
  * @return The model; it stays valid until the battle changes (setSavedBattleGame).
  */
-const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapData, int spriteIndex, bool cutout)
+const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapData, int spriteIndex, bool cutout, bool loneLift)
 {
 	if (_sharedModelsOwner)
 	{
-		return _sharedModelsOwner->getModel(mapData, spriteIndex, cutout);
+		return _sharedModelsOwner->getModel(mapData, spriteIndex, cutout, loneLift);
 	}
 	if (spriteIndex < 0)
 	{
 		spriteIndex = mapData->getSprite(0);
 	}
-	// One key for record, frame and cut-out: the record's address in the high bits, the frame
-	// (15 bits) and the cut-out flag (the lowest bit) below it.
-	const Uint64 key = ((Uint64)(uintptr_t)mapData << 16) | ((Uint64)(spriteIndex & 0x7FFF) << 1) | (cutout ? 1 : 0);
+	// (A lone lift's floor differs from the record's model only where the record is a lift somewhere else on the map.)
+	loneLift = loneLift && mapData->isGravLift() && mapData->getObjectType() == O_FLOOR && liftInUse(mapData);
+	// One key for record, frame, lone lift and cut-out: the record's address in the high bits, the frame (14 bits), the
+	// lone lift flag and the cut-out flag (the lowest bit) below it.
+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 16) | ((Uint64)(spriteIndex & 0x3FFF) << 2) | (loneLift ? 2 : 0) | (cutout ? 1 : 0);
 	auto found = _models.find(key);
 	if (found == _models.end())
 	{
@@ -2825,7 +2989,7 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 			}
 			if (same)
 			{
-				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout);
+				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout, loneLift);
 				_sameArtModels.emplace(key, firstModel);
 				return firstModel;
 			}
@@ -2833,11 +2997,14 @@ const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapD
 		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 		// part that animates is built as the kind of part its first frame is (see buildModel).
 		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
-		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
-		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
+		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout, loneLift) : nullptr;
+		if (const VoxelModel *kind = partKind(mapData, cutout, loneLift)) firstFrame = kind;
 		found = _models.emplace(key, VoxelModel()).first;
-		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
+		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame, loneLift);
 		found->second.pulse = pulsingFrames(mapData);
+		// (A later frame knows its record's first frame: a wall's paint goes by the wall, whichever frame it shows. Held by
+		// the first frame's model alone, an animated wall's back took the paint one tick in four: a player, GitHub issue #264.)
+		found->second.frameOf = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout, loneLift) : nullptr;
 		// (A thing in motion round its own upright axis, named in the mod's table: this frame's shape turned from this frame's art. See turnedFrom.)
 		const int turned = cutout || found->second.empty || found->second.ghostly ? -1 : turnedFrom(mapData);
 		if (turned >= 0)
@@ -2901,6 +3068,29 @@ bool FirstPersonView::liftInUse(const MapData *floor) const
 }
 
 /**
+ * Is a tile's floor a lift: a grav lift's, with another grav lift's floor directly over or under it? The game floats
+ * a unit up or down only from one such floor to the next (Pathfinding), so one on its own is no lift, whatever its
+ * record is elsewhere: a floor like any other, with no beam and no see-through pad (a player, GitHub issue #265: "is
+ * there a navigable path directly up? ... directly down? If not, don't apply"; the X-Com Files' maps lay single ones).
+ * @param tileIndex The tile.
+ * @return True if it is a lift.
+ */
+bool FirstPersonView::liftAt(int tileIndex) const
+{
+	const Tile *tile = _save->getTile(tileIndex);
+	const MapData *floor = tile ? tile->getMapData(O_FLOOR) : nullptr;
+	if (!floor || !floor->isGravLift()) return false;
+	const int level = _save->getMapSizeX() * _save->getMapSizeY(), tiles = _save->getMapSizeXYZ();
+	for (int other : { tileIndex - level, tileIndex + level })
+	{
+		if (other < 0 || other >= tiles) continue;
+		const MapData *beside = _save->getTile(other)->getMapData(O_FLOOR);
+		if (beside && beside->isGravLift()) return true;
+	}
+	return false;
+}
+
+/**
  * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
  * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
  * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
@@ -2910,7 +3100,7 @@ bool FirstPersonView::liftInUse(const MapData *floor) const
  * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
  *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
  */
-const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
+const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout, bool loneLift)
 {
 	bool animates = false;
 	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
@@ -2918,7 +3108,7 @@ const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapD
 	{
 		return nullptr;
 	}
-	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 2) | (loneLift ? 2 : 0) | (cutout ? 1 : 0);
 	auto found = _partKinds.find(key);
 	if (found == _partKinds.end())
 	{
@@ -2926,7 +3116,7 @@ const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapD
 		VoxelModel &kind = found->second;
 		for (int frame = 0; frame < 8; ++frame)
 		{
-			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
+			buildModel(mapData, mapData->getSprite(frame), cutout, kind, nullptr, loneLift);
 			if (kind.ghostKind != 0 || !kind.empty)
 			{
 				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
@@ -3044,8 +3234,10 @@ const FirstPersonView::Frames &FirstPersonView::getFrames(const MapData *mapData
  * @param spriteIndex The frame of the record's surface set to colour it from.
  * @param cutout Leave out the voxels whose pixel is transparent (a sliding UFO door's frames).
  * @param model Where to build it.
+ * @param firstFrame A later frame's: what its first frame was built as (see getModel), or null.
+ * @param loneLift A grav lift's floor on a tile with no other over or under it: a floor like any other (see getModel).
  */
-void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
+void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame, bool loneLift) const
 {
 	clearModel(model);
 	model.wayThrough = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
@@ -3415,8 +3607,10 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 		// who is above or below it is a threat to watch.
 		// (A lift's pad: a floor the game calls a grav lift that has one over or under it somewhere on this map, see
 		// liftInUse. One that never has is a floor like any other: XPiratez lays whole rooms with such a record, a
-		// house's upper storey, and seen through as a pad it was a glass floor: a player, GitHub issue #216.)
-		const bool lift = mapData->isGravLift() && (mapData->getObjectType() != O_FLOOR || liftInUse(mapData));
+		// house's upper storey, and seen through as a pad it was a glass floor: a player, GitHub issue #216. And so is
+		// one on a tile of its own, with no other over or under it, where the record is a lift elsewhere: the game
+		// floats no one from it, a player, GitHub issue #265, "nukes all instances of this bug". See liftAt.)
+		const bool lift = mapData->isGravLift() && (mapData->getObjectType() != O_FLOOR || (liftInUse(mapData) && !loneLift));
 		bool flatFloor = mapData->getObjectType() == O_FLOOR && !lift && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
 		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
 		// lamp without shape. A flame among them isn't built here: see partKind.)
@@ -3625,6 +3819,16 @@ void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool c
 			model.artFill = false;
 			dryAboveWater(model, sprite, groups, yOffset); // (a paddy's rice the art's green, not the water's blue)
 		}
+	}
+	// Liquid screens (the mod's table `liquidScreens:`, the alien entertainment panels; a player, GitHub issue #261:
+	// "could this trippy water effect apply to [them]?"): a wall whose screen is still water standing on end. The
+	// voxels of its shown face in the screen's colour groups (see screenGroups) ripple and mirror the room (setting
+	// "Liquid screens", with "Reflections": see the shaders' onScreen); kept as a floor's still water is.
+	if (!model.empty && !cutout && (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
+		&& firstPerson.isLiquidScreen(dataSet->getName(), record))
+	{
+		model.stillWater = firstFrame ? firstFrame->stillWater : screenGroups(mapData);
+		if (model.stillWater) _anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
 	}
 	// An object the art draws as a block of crops though the game gives it only a few voxels
 	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
@@ -4693,7 +4897,9 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			memo.frame = frame;
 			memo.cutout = cutout;
 			memo.steady = steady;
-			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout);
+			// (A grav lift's floor with no other over or under it is a floor like any other: see liftAt.)
+			const bool loneLift = part == O_FLOOR && mapData->isGravLift() && !liftAt(index);
+			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout, loneLift);
 			// A tree's crown (foliage on a tile with no floor under it: a big tree's upper levels):
 			// leafy (see leafyModel), also where a mod counts its forest among a UFO's tile sets
 			// (X-Com Files: a crown has no lights for a steady model to show).
@@ -4704,7 +4910,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 			memo.next = nullptr;
 			if (frames.animated && !mapData->isUFODoor() && memo.model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
 			{
-				const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false);
+				const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false, loneLift);
 				if (!nextModel->empty) memo.next = nextModel;
 			}
 		}

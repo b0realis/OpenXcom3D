@@ -530,6 +530,7 @@ const struct { const char *id; HiddenAs as; } HiddenSettings[] = {
 	{ "fpsHitFlash", HIDDEN_FIXED },            // a unit hit flashes, with "Muzzle flashes" (which says so: flashes from gunfire, hits and blasts)
 	{ "fpsForceArcing", HIDDEN_FIXED },         // an arcing shot the game would refuse fires anyway (the owner's call)
 	{ "fpsRightClickDoors", HIDDEN_FIXED },     // a right click on a door opens it, as on the map (the owner's call)
+	{ "fpsWallPaint", HIDDEN_FIXED },           // All rooms: every wall's face the map never shows in the paint of the side it faces (GitHub issue #264: "lets have All rooms always")
 	{ "fpsTacticalMapIso", HIDDEN_FOLDED },     // into "Tactical map": Off, In 3D, Both views
 	{ "fpsCrosshairCosts", HIDDEN_FOLDED },     // into "Shot info": Off, Basic, Costs, Damage, Full
 	{ "fpsCrosshairDamage", HIDDEN_FOLDED },    // the same
@@ -1361,7 +1362,8 @@ void createOptions(std::vector<OptionInfo> &options)
 	// the face it shows, as before. Each side (1): a building's outer walls in the paint of the side
 	// they face, its outside or the room inside. All rooms (2): the walls between its rooms too, each
 	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
-	// glass, keep theirs.
+	// glass, keep theirs. Since GitHub issue #264 no row on the tab and always All rooms (the owner: "lets have All rooms
+	// always and thats it"; HiddenSettings, see WallPaintLevel in FirstPersonViewShared.h).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 2, "STR_FPS_WALL_PAINT", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
@@ -1460,6 +1462,10 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsColoredLights", &fpsColoredLights, false, "STR_FPS_COLORED_LIGHTS", category));
 	// In full colour: the sea mirrors the sky and what stands in it.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
+	// With "Reflections": the alien entertainment panels' screens are still water standing on end, rippling and mirroring
+	// the room (a player, GitHub issue #261: "trippy"; the owner: "Build it"). The mod's table names the panels
+	// (`liquidScreens:`). On by default.
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiquidScreens", &fpsLiquidScreens, true, "STR_FPS_LIQUID_SCREENS", category));
 	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
 	// On the graphics card: walls, floors and hulls show a little relief read from their own drawings (0 off, 1 subtle, 2 strong). Off by default.

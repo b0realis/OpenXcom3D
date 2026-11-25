@@ -408,9 +408,30 @@ const int CropBlockMinHeight = 4, CropBlockMaxHeight = 16;
 /// An object's upright ghost on the tile's west or north edge stands this many voxels into the tile, clear of the
 /// wall there (a wall is two voxels thick; see buildGhost).
 const int GhostWallClearance = 2;
-/// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
-/// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
+/// Setting "Wall paint": the faces of walls the isometric art never shows (a west wall's west face, a north wall's
+/// north face) take the paint of the side they face, from a wall whose face the art does show (see
+/// FirstPersonView::findWallPaints). A choice of three on the tab (a player, GitHub issue #111); since GitHub issue
+/// #264 it has no row there and is always All rooms (the owner: "lets have All rooms always and thats it. ... leave
+/// options in code and comment what every setting means!": FirstPerson's HiddenSettings, which gives a profile with
+/// another value All rooms; OPENXCOM3D_ALL_SETTINGS=1 lists its row again). Each choice is a level of
+/// FirstPersonView::WallPaint's kind, a paint showing where its kind is at most the setting:
+/// - WallPaintArt (0, "As the art"): no paint at all: both faces of every wall show the art of the face the map shows,
+///   as the 3D view did before #111 (from behind a house its rooms' beige, inside a room the brick of its front);
+/// - WallPaintEachSide (1, "Each side"): a building's outer walls take the paint of the side they face, its outside or
+///   the room inside; the walls between its rooms keep the art on both faces;
+/// - WallPaintAllRooms (2, "All rooms", the one played): the walls between rooms too, each face in the paint of the
+///   room it faces; and the back of a display (a wall whose art animates: an alien base's entertainment panels) a
+///   plain wall's (GitHub issue #264).
+enum WallPaintLevel { WallPaintArt = 0, WallPaintEachSide = 1, WallPaintAllRooms = 2 };
+/// Wall paint: in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with nothing to
+/// see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
 const int WallPaintWhole = 255;
+/// Wall paint: the back of a display takes the paint of the nearest plain wall made of the display's own frame (see
+/// FirstPersonView::findWallPaints): a colour group is the frame's when DisplayFrameGroupShare of the display's still
+/// voxels on its shown face (those no frame of its animation changes) are in it, and a plain wall is made of it when
+/// DisplayFrameMatch of its shown face is in the frame's groups (the alien base's grey wall on a pedestal, not the
+/// cave's rock beside it, whose brown veins the panels' frames lack). None that close: the closest there is.
+const float DisplayFrameGroupShare = 0.05f, DisplayFrameMatch = 0.9f;
 // Setting "Reflections": the units a mirror shows (window glass, still water, a UFO's metal): the nearest MirrorUnitsMost
 // within MirrorUnitReach voxels of the eye across the map, each MirrorUnitNumbers numbers and its eight pictures
 // (see FirstPersonView::mirrorUnits, and mirrorUnit in the shader).

@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..3bd26d8cd
+index 000000000..94d7df28b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,732 @@
+@@ -0,0 +1,734 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -384,6 +384,8 @@ index 000000000..3bd26d8cd
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
 +  STR_FPS_REFLECTIONS_DESC: "With True colour. Water mirrors the sky and what stands by it, glass what is before it, UFO metal its surroundings. Units too."
++  STR_FPS_LIQUID_SCREENS: "Liquid screens"
++  STR_FPS_LIQUID_SCREENS_DESC: "With Reflections. The alien entertainment panels' screens ripple like water standing on end and mirror the room."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -900,10 +902,10 @@ index 000000000..3bd26d8cd
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..77cc8bb54
+index 000000000..5298897a5
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,732 @@
+@@ -0,0 +1,734 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1122,6 +1124,8 @@ index 000000000..77cc8bb54
 +  STR_FPS_COLORED_LIGHTS_DESC: "With True colour. Shots in flight, explosions, fires and muzzle flashes light the walls and ground round them in their own colour."
 +  STR_FPS_REFLECTIONS: "Reflections"
 +  STR_FPS_REFLECTIONS_DESC: "With True colour. Water mirrors the sky and what stands by it, glass what is before it, UFO metal its surroundings. Units too."
++  STR_FPS_LIQUID_SCREENS: "Liquid screens"
++  STR_FPS_LIQUID_SCREENS_DESC: "With Reflections. The alien entertainment panels' screens ripple like water standing on end and mirror the room."
 +  STR_FPS_LIGHT_SHAFTS: "Light shafts"
 +  STR_FPS_LIGHT_SHAFTS_DESC: "With True colour. The flashlight, flares, lamps and coloured lights show as beams and glows in smoke, and everywhere under the sea."
 +  STR_FPS_SURFACE_RELIEF: "Surface relief"
@@ -1638,10 +1642,10 @@ index 000000000..77cc8bb54
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/OpenXcom3D.rul b/mod/OpenXcom3D/OpenXcom3D.rul
 new file mode 100644
-index 000000000..3213094d6
+index 000000000..f7afb2b1f
 --- /dev/null
 +++ b/mod/OpenXcom3D/OpenXcom3D.rul
-@@ -0,0 +1,557 @@
+@@ -0,0 +1,593 @@
 +# Switches on the engine's first-person mode (src/FirstPerson) and styles its interface.
 +firstPerson:
 +  enabled: true
@@ -1807,6 +1811,27 @@ index 000000000..3213094d6
 +    - { dataSet: MADDECOR, groups: [8, 13], records: [54, 59, 65, 67] }
 +    - { dataSet: XB3BITZ3, groups: [8, 13], records: [10, 11, 12, 13] }
 +    - { dataSet: HAVIRABASE, groups: [8, 13], records: [0, 1, 2, 3] }
++  # Liquid screens (setting "Liquid screens"): wall records whose screen, the pixels their animation changes less the
++  # colours of their still frame, is still water standing on end: it ripples and mirrors the room (with "Reflections").
++  # `{ dataSet, records: [...] }`. A list replaces the earlier one.
++  # The alien entertainment panels, yellow and blue (X-COM's alien base, and the same panels in XPiratez's and The
++  # X-Com Files' sets: a scan of every wall shaped like them whose whole screen animates).
++  liquidScreens:
++    - { dataSet: U_PODS, records: [3, 4, 7, 8] }
++    - { dataSet: U_PODS_G, records: [3, 4, 7, 8] }
++    - { dataSet: U_PODS_B, records: [3, 4, 7, 8] }
++    - { dataSet: U_PODSCHURCH, records: [3, 4, 7, 8] }
++    - { dataSet: U_PODSGOLD, records: [3, 4, 7, 8] }
++    - { dataSet: CHTONITE_PODS, records: [3, 4, 7, 8] }
++    - { dataSet: MIB_PODS, records: [3, 4, 7, 8] }
++    - { dataSet: REP_PODS, records: [3, 4, 7, 8] }
++    - { dataSet: MARSEC_PODS, records: [3, 4, 7, 8] }
++    - { dataSet: SGR_HABITATION, records: [0, 1, 3, 4] }
++    - { dataSet: SGR_INT01, records: [3, 4, 11, 12] }
++    - { dataSet: SGR_ELECTRONICS, records: [17, 18, 20, 21] }
++    - { dataSet: UFOAA_INT, records: [25, 26, 34, 35] }
++    - { dataSet: SGR_TRAIN, records: [51] }
++    - { dataSet: SGR_TRAIN2, records: [51] }
 +  # Tile parts that are a thing in motion round its own upright axis: from the height `from` (voxels) up, each
 +  # frame's shape is turned from that frame's art, as on a lathe, where the game has one shape for all the frames.
 +  # A list replaces the earlier one.
@@ -1887,7 +1912,10 @@ index 000000000..3213094d6
 +  # (*SPIDER*); or it is a whole name, for one unit (BAN_6.PCK). Capitals or not is the same.
 +  #   seeThrough: how much of the body is left out, in hundredths (50: every other cube, a ghost)
 +  #   shape: beast (a long body on four legs, made from its side drawings; only a unit drawn on one frame, one tile
-+  #          big, at least 1.2 times as long as wide), or upright (as ever: to take a unit out of an earlier entry)
++  #          big, at least 1.2 times as long as wide), turret (one tile big and unable to move: a plain block standing
++  #          on the floor, with its gun, as the big turrets are), tank (two tiles by two, drawn on one frame: a hull box
++  #          and a turret box on its deck, their sizes the ones whose outlines best match its eight drawings, with its
++  #          gun), or upright (as ever: to take a unit out of an earlier entry)
 +  #   torsoDepth: the most a torso is deep below the shoulders, in hundredths of its width (80), cut at the front; 0: no limit
 +  #   top: back (what faces up is painted by the back drawing: the top of a head is hair), or slant (as ever)
 +  #   sculpt: frontal (nothing of the body stands outside what its front and back drawings show: the gap between an arm
@@ -2136,6 +2164,18 @@ index 000000000..3213094d6
 +    # block standing on the floor, with its gun, as the big turrets are
 +    - names: [TURRET_MINIGUN.PCK]
 +      shape: turret
++    # XPiratez's tank (the gals' tank in its autocannon and battlecannon kit, sheet PIR_TANK, and its lascannon kit,
++    # PIR_TANK_L): hull, turret and gun drawn in one picture a side, by a walker's routine. Carved from its eight
++    # drawings and painted as the gals are (its sheet's name begins with PIR, as theirs do) it was a lumpy purple loaf,
++    # "a lot more goofy" (a player on the forum): a hull box and a turret box fitted to its drawings, with its gun (the
++    # owner: "build a good boxy tank model with boxy turret and barrel"); the gals' words taken back
++    - names: [PIR_TANK.PCK, PIR_TANK_L.PCK]
++      shape: tank
++      torsoDepth: 0
++      waist: filled
++      top: slant
++      sculpt: all
++      back: drawn
 +    # (and two more that cannot move and came out wrong on the general carving: The X-Com Files' Wizkid turret, a drum
 +    # too tall with its barrel lost, and the 40k mod's Tauros small turret, a gun carved flat as paper. The other
 +    # one-tile turrets of the three mods were built both ways and are better as they are)
@@ -23491,7 +23531,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..88a1d0b23 100644
+index 0467dd243..b3395c429 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -23508,7 +23548,7 @@ index 0467dd243..88a1d0b23 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration;
++OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration, fpsLiquidScreens;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -24538,10 +24578,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..8f139d1c0
+index 000000000..2fcb1c72d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2290 @@
+@@ -0,0 +1,2296 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25074,6 +25114,7 @@ index 000000000..8f139d1c0
 +	{ "fpsHitFlash", HIDDEN_FIXED },            // a unit hit flashes, with "Muzzle flashes" (which says so: flashes from gunfire, hits and blasts)
 +	{ "fpsForceArcing", HIDDEN_FIXED },         // an arcing shot the game would refuse fires anyway (the owner's call)
 +	{ "fpsRightClickDoors", HIDDEN_FIXED },     // a right click on a door opens it, as on the map (the owner's call)
++	{ "fpsWallPaint", HIDDEN_FIXED },           // All rooms: every wall's face the map never shows in the paint of the side it faces (GitHub issue #264: "lets have All rooms always")
 +	{ "fpsTacticalMapIso", HIDDEN_FOLDED },     // into "Tactical map": Off, In 3D, Both views
 +	{ "fpsCrosshairCosts", HIDDEN_FOLDED },     // into "Shot info": Off, Basic, Costs, Damage, Full
 +	{ "fpsCrosshairDamage", HIDDEN_FOLDED },    // the same
@@ -25905,7 +25946,8 @@ index 000000000..8f139d1c0
 +	// the face it shows, as before. Each side (1): a building's outer walls in the paint of the side
 +	// they face, its outside or the room inside. All rooms (2): the walls between its rooms too, each
 +	// face in its room's. The faces the map shows stay as it draws them; doors, and windows' frames and
-+	// glass, keep theirs.
++	// glass, keep theirs. Since GitHub issue #264 no row on the tab and always All rooms (the owner: "lets have All rooms
++	// always and thats it"; HiddenSettings, see WallPaintLevel in FirstPersonViewShared.h).
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsWallPaint", &fpsWallPaint, 2, "STR_FPS_WALL_PAINT", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsCombatMusic", &fpsCombatMusic, false, "STR_FPS_COMBAT_MUSIC", category));
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsHitSounds", &fpsHitSounds, false, "STR_FPS_HIT_SOUNDS", category));
@@ -26004,6 +26046,10 @@ index 000000000..8f139d1c0
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsColoredLights", &fpsColoredLights, false, "STR_FPS_COLORED_LIGHTS", category));
 +	// In full colour: the sea mirrors the sky and what stands in it.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsReflections", &fpsReflections, false, "STR_FPS_REFLECTIONS", category));
++	// With "Reflections": the alien entertainment panels' screens are still water standing on end, rippling and mirroring
++	// the room (a player, GitHub issue #261: "trippy"; the owner: "Build it"). The mod's table names the panels
++	// (`liquidScreens:`). On by default.
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsLiquidScreens", &fpsLiquidScreens, true, "STR_FPS_LIQUID_SCREENS", category));
 +	// In full colour: the flashlight, flares, lamps and coloured lights show as beams and glows in smoke and under the sea.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsLightShafts", &fpsLightShafts, false, "STR_FPS_LIGHT_SHAFTS", category));
 +	// On the graphics card: walls, floors and hulls show a little relief read from their own drawings (0 off, 1 subtle, 2 strong). Off by default.
@@ -28975,10 +29021,10 @@ index 000000000..59002ea0a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..f99e6bc6b
+index 000000000..096fd6b8d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,3895 @@
+@@ -0,0 +1,3904 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -30477,7 +30523,15 @@ index 000000000..f99e6bc6b
 +		uints[6] = (tile.discovered ? 1 : 0) | tile.smoke << 8 | (tile.burning ? 1 << 16 : 0) | (frame.roofed[index] ? 1 << 17 : 0);
 +		uints[7] = index < perLevel && frame.waterAtEdge ? frame.waterAtEdge[index] : 0;
 +		uints[10] = (frame.ufoOfTile ? frame.ufoOfTile[index] : 0) | (frame.ufoPhaseOfTile ? frame.ufoPhaseOfTile[index] << 8 : 0);
-+		uints[11] = frame.wallPaintOf ? frame.wallPaintOf[index * 2] | (Uint32)frame.wallPaintOf[index * 2 + 1] << 16 : 0;
++		// (Each wall's paint while the wall stands as it was found, in whichever frame of its animation; not its rubble. See
++		// FirstPersonView::showsWall.)
++		Uint32 paints = 0;
++		for (int side = 0; frame.wallPaintOf && side < 2; ++side)
++		{
++			const Uint16 paint = frame.wallPaintOf[index * 2 + side];
++			if (paint && paint <= frame.wallPaintCount && FirstPersonView::showsWall(tile.part[1 + side], /* (the west wall, the north wall) */ frame.wallPaints[paint - 1].wall)) paints |= (Uint32)paint << (16 * side);
++		}
++		uints[11] = paints;
 +		uints[12] = frame.mirrorOfTile ? (Uint32)(frame.mirrorOfTile[index] + 1) : 0;
 +	}
 +}
@@ -30688,6 +30742,7 @@ index 000000000..f99e6bc6b
 +	Gl::Uniform1i(location("uAmbientOcclusion"), frame.ambientOcclusion ? 1 : 0);
 +	Gl::Uniform1i(location("uSmoothLight"), frame.smoothLight && frame.palette ? 1 : 0);
 +	Gl::Uniform1i(location("uReflections"), frame.reflections && frame.palette ? 1 : 0);
++	Gl::Uniform1i(location("uLiquidScreens"), frame.liquidScreens ? 1 : 0);
 +	Gl::Uniform1i(location("uMirrorUnits"), mirrorUnitsAt);
 +	Gl::Uniform1i(location("uShaftSmoke"), frame.shaftSmoke ? 1 : 0);
 +	Gl::Uniform1f(location("uShaftAir"), frame.shaftAir);
@@ -32876,10 +32931,10 @@ index 000000000..f99e6bc6b
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.h b/src/FirstPerson/FirstPersonGpu.h
 new file mode 100644
-index 000000000..a37624fe3
+index 000000000..d35a80184
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.h
-@@ -0,0 +1,333 @@
+@@ -0,0 +1,334 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -32986,6 +33041,7 @@ index 000000000..a37624fe3
 +		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 +		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
 +		bool reflections;                         // setting "Reflections" (in full colour): the sea and still water mirror the sky and what stands by them, window glass what is in front of it, a UFO's metal (setting "Metallic surfaces") its surroundings
++		bool liquidScreens;                       // setting "Liquid screens" (with Reflections): the alien entertainment panels' screens mirror as still water standing on end
 +		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 +		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 +		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers
@@ -33427,10 +33483,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..aa155c59a
+index 000000000..1f347c5e2
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3403 @@
+@@ -0,0 +1,3437 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -33885,6 +33941,7 @@ index 000000000..aa155c59a
 +uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 +#endif
 +uniform int uReflections;       // setting "Reflections" (in full colour): the sea, still water and window glass mirror what stands by them, and a UFO's metal its surroundings
++uniform int uLiquidScreens;     // setting "Liquid screens" (with "Reflections"): the alien entertainment panels' screens are still water standing on end
 +uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 +uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 +// (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
@@ -34505,6 +34562,7 @@ index 000000000..aa155c59a
 +}
 +
 +const float PondSwell = 0.35; // still water's ripples, of the sea's waves (see seaMirror)
++const float ScreenSwell = 1.0, ScreenMirrorLeast = 0.35, ScreenMirrorMost = 0.75; // a liquid screen's ripples, and how much of it is the mirrored picture, seen straight on and looked along (see screenMirror)
 +const float GlassMirror = 0.2, GlassMirrorMost = 0.85; // window glass: how much of it is the mirrored picture, seen straight on and at the most
 +
 +/**
@@ -34520,6 +34578,27 @@ index 000000000..aa155c59a
 +	mirrored.z = max(mirrored.z, 0.03);
 +	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
 +	share = 0.1 + 0.65 * glancing * glancing * glancing;
++	return normalize(mirrored);
++}
++
++/**
++ * The way a liquid screen mirrors a ray at a point (setting "Liquid screens", with "Reflections"; a player, GitHub issue
++ * #261: "this trippy water effect" on the alien entertainment panels, "supposed to make you feel weird looking at"): as
++ * still water standing on end, off the screen's face tilted by the waves running over it, along the wall and up; more
++ * of the mirrored picture the more the face is looked along, and a good deal of it straight on, so the show swims.
++ */
++vec3 screenMirror(vec3 rayDirection, vec3 faceNormal, vec3 point, float span, out float share)
++{
++	vec3 ray = normalize(rayDirection);
++	vec3 alongAxis = faceNormal.x != 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
++	float along = dot(point, alongAxis), up = point.z;
++	float slopeAlong = waveHeight(along + 1.0, up, span) - waveHeight(along - 1.0, up, span), slopeUp = waveHeight(along, up + 1.0, span) - waveHeight(along, up - 1.0, span);
++	vec3 screenNormal = normalize(faceNormal - (alongAxis * slopeAlong + vec3(0.0, 0.0, slopeUp)) * 0.5 * ScreenSwell);
++	vec3 mirrored = reflect(ray, screenNormal);
++	float outward = dot(mirrored, faceNormal);
++	if (outward < 0.03) mirrored += faceNormal * (0.03 - outward); // (never into the wall)
++	float glancing = 1.0 - clamp(-dot(ray, screenNormal), 0.0, 1.0);
++	share = ScreenMirrorLeast + (ScreenMirrorMost - ScreenMirrorLeast) * glancing * glancing;
 +	return normalize(mirrored);
 +}
 +
@@ -34825,7 +34904,9 @@ index 000000000..aa155c59a
 +	// The paint: the wall's model, the donor's, donorWest | openEnd << 1 | kind << 8 | paintGroup << 16, the wall's min x | min y << 8.
 +	uvec4 paint = texelFetch(uWallPaints, int(paintIndex) - 1);
 +	bool donorWest = (paint.z & 1u) != 0u, openEnd = (paint.z & 2u) != 0u;
-+	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x
++	// (Whether the wall still stands as it was found, in any frame of its animation, the tiles' paint numbers say: a
++	// wall's rubble has none. See encodeTiles.)
++	if (int((paint.z >> 8) & 0xFFu) > uWallPaint
 +		|| (((paint.z >> 16) & 0xFFu) != uint(WallPaintWhole) && (ownColor >> 4) != ((paint.z >> 16) & 0xFFu)))
 +	{
 +		return 0u;
@@ -35053,6 +35134,7 @@ index 000000000..aa155c59a
 +	float waveShade = 0.0;
 +	bool onSea = false;
 +	bool onPond = false; // (on still water: a pixel of a pond's, a swamp's or a paddy's face, see VoxelModel::stillWater)
++	bool onScreen = false; // (... and of a liquid screen's, still water standing on end: see screenMirror)
 +	float hitHeight = rayOrigin.z + rayDirection.z * hit.t;
 +	if (hit.part >= 0 && parts[hit.part] != 0u)
 +	{
@@ -35140,10 +35222,17 @@ index 000000000..aa155c59a
 +			reliefFrom = -1;
 +#endif
 +		}
-+		else if ((info.x >> 16) != 0u && faceIndex == 4 && !hit.ghost)
++		else if ((info.x >> 16) != 0u && faceIndex == 4 && hit.part == 0 && !hit.ghost)
 +		{
 +			// (still water: the floor's top where its own colour is one of the water's groups)
 +			onPond = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
++		}
++		else if ((info.x >> 16) != 0u && uLiquidScreens != 0 && ((hit.part == 1 && faceIndex == 0) || (hit.part == 2 && faceIndex == 2)) && !hit.ghost)
++		{
++			// (a liquid screen: a wall's shown face, the east of a west wall's, the south of a north wall's, where its own
++			// colour is one of the screen's groups; its back, in a plain wall's paint, never is)
++			onScreen = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
++			onPond = onScreen;
 +		}
 +#ifdef RELIEF
 +		// The face's tilt: the slope of its drawing's brightness there, from the voxel's four neighbours along the face.
@@ -35455,7 +35544,8 @@ index 000000000..aa155c59a
 +			}
 +			else
 +#endif
-+			mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
++			if (onScreen) mirrored = screenMirror(rayDirection, normal, surfacePoint, hit.t, share);
++			else mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 +			Hit met;
 +			int metTile, metAxis;
 +			float metDistance;
@@ -64153,10 +64243,10 @@ index 000000000..d43f8ffe8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..0608fdf1d
+index 000000000..cae24a92e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,934 @@
+@@ -0,0 +1,935 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -64353,6 +64443,7 @@ index 000000000..0608fdf1d
 +	_flares.clear();
 +	_watchedUnits.clear();
 +	_obliterated.clear();
++	_bloodColors.clear();
 +	_decals.clear();
 +	_scorches.clear();
 +	_burningLastFrame.clear();
@@ -65093,10 +65184,10 @@ index 000000000..0608fdf1d
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..ace7f5a17
+index 000000000..12be20a9b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1959 @@
+@@ -0,0 +1,1967 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -65182,6 +65273,7 @@ index 000000000..ace7f5a17
 +class Explosion;
 +class Projectile;
 +class RuleItem;
++class Armor;
 +class BattleItem;
 +namespace FirstPerson { class DamageNumbers; }
 +struct AmbientScene;
@@ -65295,7 +65387,7 @@ index 000000000..ace7f5a17
 +		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 +		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 +		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
-+		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; 0 for none
++		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; on a wall, a liquid screen's on its shown face (RuleFirstPerson::isLiquidScreen); 0 for none
 +		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 +		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
 +		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
@@ -65303,6 +65395,7 @@ index 000000000..ace7f5a17
 +		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
 +		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 6 a floor lying flat drawn solid (a pool's water), 7 a body made from the art (a console no one walks through), 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 +		bool reliefRises;         // ... low art that rises (see lowArt)
++		const VoxelModel *frameOf = nullptr; // a later animation frame's model: its record's first frame's, which a wall's paint goes by (see findWallPaints); null on a first frame
 +		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 +		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 +		int glowCount;
@@ -65317,6 +65410,9 @@ index 000000000..ace7f5a17
 +		const Uint8 (*exposed)[16][16]; // [z][y][x]: the voxel's open faces (bit per face: +x -x +y -y +z -z), for smooth hull shading
 +		Uint8 pulseKind;                // how its lights pulse: 1 small lights, 2 a big lit panel (a lift pad), 0 none
 +	};
++	/// Wall paint: does a tile's wall part, the model it shows this frame, still stand as the wall a paint was found
++	/// for (that wall's first frame's model), in any frame of its animation? Its rubble doesn't (see findWallPaints).
++	static bool showsWall(const VoxelModel *shown, const VoxelModel *wall) { return shown && (shown->frameOf ? shown->frameOf : shown) == wall; }
 +	/// A tile's solid mask: for each row of voxels, [z][y], a bit for each x where any of the
 +	/// tile's parts has a voxel (window glass included). See TileView::solid.
 +	typedef const Uint16 (*SolidRows)[16];
@@ -66076,7 +66172,7 @@ index 000000000..ace7f5a17
 +	std::vector<Uint16> _wallPaintOf;   // per tile, two (its west wall, its north wall): 1 + the wall's index in _wallPaints, 0 none
 +
 +	/// Gets (building on first use) the voxel model of a MapData record shown with a sprite.
-+	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
++	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false, bool loneLift = false);
 +	/// Gets the leafy model of a mass of foliage hanging with no floor under it (a tree's crown).
 +	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 +	/// Gets (building on first use) a model with the glass filled into its openings broken out.
@@ -66086,11 +66182,12 @@ index 000000000..ace7f5a17
 +	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 +	bool glassBroken(int tileIndex, int part) const;
 +	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
-+	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
++	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr, bool loneLift = false) const;
 +	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
-+	const VoxelModel *partKind(const MapData *mapData, bool cutout);
++	const VoxelModel *partKind(const MapData *mapData, bool cutout, bool loneLift = false);
 +	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
 +	bool liftInUse(const MapData *floor) const;         // is a grav lift's floor a lift somewhere on this map (another over or under it)?
++	bool liftAt(int tileIndex) const;                  // is a tile's floor a lift: a grav lift's, with another over or under it (GitHub issue #265)?
 +	mutable std::map<const MapData*, bool> _liftRecords; // ... found once a record, for the battle
 +	/// The art of an animated part that its model has no voxels for, drawn as a sprite standing in its tile (see
 +	/// artOverlay): a torch's flame above its holder, a hologram over its base, bubbles the game gives no shape.
@@ -66307,8 +66404,10 @@ index 000000000..ace7f5a17
 +	bool isObliterated(const BattleUnit *unit) const { return !_obliterated.empty() && _obliterated.count(unit) != 0; }
 +	/// A piece of a body blown apart: where it is (voxels) and its colour.
 +	struct BodyPiece { float pos[3]; Uint8 color; };
++	std::map<std::pair<const Armor*, const RuleItem*>, std::vector<Uint8>> _bloodColors; // a body's blood, by its armour and its corpse (see bloodOf)
++	const std::vector<Uint8> &bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses);
 +	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
-+	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size);
++	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood);
 +	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 +	bool _hitMarkKill = false;                          // and whether that hit killed it
 +	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm
@@ -68983,10 +69082,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..6963b3490
+index 000000000..32cd9b73f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,866 @@
+@@ -0,0 +1,867 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -69235,6 +69334,7 @@ index 000000000..6963b3490
 +	frame.palette = view.getPalette();
 +	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
 +	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror: "Reflections" is every mirror's switch)
++	frame.liquidScreens = Options::fpsLiquidScreens;
 +	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 +	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 +	frame.colorLightCount = 0;
@@ -74292,10 +74392,10 @@ index 000000000..5ee90296f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShared.h b/src/FirstPerson/FirstPersonViewShared.h
 new file mode 100644
-index 000000000..0d0adade4
+index 000000000..2c4a40641
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShared.h
-@@ -0,0 +1,778 @@
+@@ -0,0 +1,799 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -74706,9 +74806,30 @@ index 000000000..0d0adade4
 +/// An object's upright ghost on the tile's west or north edge stands this many voxels into the tile, clear of the
 +/// wall there (a wall is two voxels thick; see buildGhost).
 +const int GhostWallClearance = 2;
-+/// Setting "Wall paint": in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with
-+/// nothing to see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
++/// Setting "Wall paint": the faces of walls the isometric art never shows (a west wall's west face, a north wall's
++/// north face) take the paint of the side they face, from a wall whose face the art does show (see
++/// FirstPersonView::findWallPaints). A choice of three on the tab (a player, GitHub issue #111); since GitHub issue
++/// #264 it has no row there and is always All rooms (the owner: "lets have All rooms always and thats it. ... leave
++/// options in code and comment what every setting means!": FirstPerson's HiddenSettings, which gives a profile with
++/// another value All rooms; OPENXCOM3D_ALL_SETTINGS=1 lists its row again). Each choice is a level of
++/// FirstPersonView::WallPaint's kind, a paint showing where its kind is at most the setting:
++/// - WallPaintArt (0, "As the art"): no paint at all: both faces of every wall show the art of the face the map shows,
++///   as the 3D view did before #111 (from behind a house its rooms' beige, inside a room the brick of its front);
++/// - WallPaintEachSide (1, "Each side"): a building's outer walls take the paint of the side they face, its outside or
++///   the room inside; the walls between its rooms keep the art on both faces;
++/// - WallPaintAllRooms (2, "All rooms", the one played): the walls between rooms too, each face in the paint of the
++///   room it faces; and the back of a display (a wall whose art animates: an alien base's entertainment panels) a
++///   plain wall's (GitHub issue #264).
++enum WallPaintLevel { WallPaintArt = 0, WallPaintEachSide = 1, WallPaintAllRooms = 2 };
++/// Wall paint: in place of a colour group, every voxel of a wall's hidden face takes the paint (a wall with nothing to
++/// see through; see FirstPersonView::findWallPaints). The card's shader has the number too (wallPaintColor).
 +const int WallPaintWhole = 255;
++/// Wall paint: the back of a display takes the paint of the nearest plain wall made of the display's own frame (see
++/// FirstPersonView::findWallPaints): a colour group is the frame's when DisplayFrameGroupShare of the display's still
++/// voxels on its shown face (those no frame of its animation changes) are in it, and a plain wall is made of it when
++/// DisplayFrameMatch of its shown face is in the frame's groups (the alien base's grey wall on a pedestal, not the
++/// cave's rock beside it, whose brown veins the panels' frames lack). None that close: the closest there is.
++const float DisplayFrameGroupShare = 0.05f, DisplayFrameMatch = 0.9f;
 +// Setting "Reflections": the units a mirror shows (window glass, still water, a UFO's metal): the nearest MirrorUnitsMost
 +// within MirrorUnitReach voxels of the eye across the map, each MirrorUnitNumbers numbers and its eight pictures
 +// (see FirstPersonView::mirrorUnits, and mirrorUnit in the shader).
@@ -77416,10 +77537,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..afdc00847
+index 000000000..daa567832
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,4937 @@
+@@ -0,0 +1,5012 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -77491,6 +77612,7 @@ index 000000000..afdc00847
 +#include "../Engine/SurfaceSet.h"
 +#include "../Mod/Armor.h"
 +#include "../Mod/Mod.h"
++#include "../Mod/RuleItem.h"
 +#include "../Savegame/BattleItem.h"
 +#include "../Savegame/BattleUnit.h"
 +#include "../Savegame/SavedBattleGame.h"
@@ -78958,6 +79080,76 @@ index 000000000..afdc00847
 +/// not for the body (see obliterateUnit).
 +const int OutlineShade = 13;
 +
++/// Setting "Obliteration": a body's blood is the colour groups that are BloodGroupLeast or more of its corpse's picture and
++/// under BloodLiveMost of the living unit's, all of its sprite sheet (see bloodOf).
++const float BloodGroupLeast = 0.02f, BloodLiveMost = 0.01f;
++
++/**
++ * Setting "Obliteration": the colours a body bleeds, read off its corpse's picture as the map draws it lying in its blood
++ * (FLOOROB.PCK: a soldier's red, a Sectoid's, a Snakeman's or a Chryssalid's green; the owner: "the sectoid has green
++ * blood so the overkill should sample particles from the dead body sprite! This should work also in 3D!"), whether its
++ * body is a picture or of voxels: the corpse's pixels in the colour groups it shows and the living unit's sprite sheet
++ * hardly does (see BloodGroupLeast), its dark outline left out. X-COM's: the armoured soldiers' red, the Sectoid's, the
++ * Snakeman's and the Chryssalid's green, the Floater's purple; none on the soldier without armour (that corpse's red is
++ * on the sheet too), so the game's red. Found once for an armour and corpse, and kept for the battle.
++ * @param armor The unit's armour (its sprite sheet: the living unit), or null.
++ * @param corpses Its corpse's parts (a big unit's four).
++ * @return The blood's colours, each as often as the corpse shows it; empty for none found (the game's red, then).
++ */
++const std::vector<Uint8> &FirstPersonView::bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses)
++{
++	const auto key = std::make_pair(armor, corpses.empty() ? (const RuleItem*)nullptr : corpses.front());
++	auto found = _bloodColors.find(key);
++	if (found != _bloodColors.end())
++	{
++		return found->second;
++	}
++	std::vector<Uint8> &blood = _bloodColors[key];
++	SurfaceSet *floorSprites = _game->getMod()->getSurfaceSet("FLOOROB.PCK", false);
++	SurfaceSet *sheet = armor ? _game->getMod()->getSurfaceSet(armor->getSpriteSheet(), false) : nullptr;
++	if (!floorSprites || !sheet)
++	{
++		return blood;
++	}
++	int liveCounts[16] = {}, live = 0;
++	for (int frame = 0; frame < (int)sheet->getTotalFrames(); ++frame)
++	{
++		const Surface *picture = sheet->getFrame(frame);
++		for (int y = 0; picture && y < picture->getHeight(); ++y)
++			for (int x = 0; x < picture->getWidth(); ++x)
++			{
++				const Uint8 color = picture->getPixel(x, y);
++				if (!color) continue;
++				++liveCounts[color >> 4];
++				++live;
++			}
++	}
++	std::vector<Uint8> dead;
++	int deadCounts[16] = {};
++	for (const RuleItem *corpse : corpses)
++	{
++		const Surface *picture = corpse && corpse->getFloorSprite() >= 0 ? floorSprites->getFrame(corpse->getFloorSprite()) : nullptr;
++		for (int y = 0; picture && y < picture->getHeight(); ++y)
++			for (int x = 0; x < picture->getWidth(); ++x)
++			{
++				const Uint8 color = picture->getPixel(x, y);
++				if (!color || (color & 15) >= OutlineShade) continue;
++				dead.push_back(color);
++				++deadCounts[color >> 4];
++			}
++	}
++	if (!live || dead.empty())
++	{
++		return blood;
++	}
++	for (const Uint8 color : dead)
++	{
++		const int group = color >> 4;
++		if (deadCounts[group] >= BloodGroupLeast * dead.size() && liveCounts[group] < BloodLiveMost * live) blood.push_back(color);
++	}
++	return blood;
++}
++
 +/**
 + * Setting "Obliteration": whether a unit's body bleeds as it bursts, or throws sparks and smoke: flesh, unless it is a
 + * vehicle (a hull: tanks, hover tanks, the Cyberdisc, TFTD's tanks, turrets; see FirstPerson::hullLayBack) or its armour
@@ -79078,7 +79270,7 @@ index 000000000..afdc00847
 +		}
 +	}
 +	const float middle[3] = { (float)feet[0], (float)feet[1], (float)(feet[2] + 0.5 * unit->getHeight() * unitScale) };
-+	burstPieces(pieces, middle, away, burn, hot, blast, bleedsWhenBurst(unit), size);
++	burstPieces(pieces, middle, away, burn, hot, blast, bleedsWhenBurst(unit), size, bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()));
 +}
 +
 +/**
@@ -79151,7 +79343,7 @@ index 000000000..afdc00847
 +		_spriteBuffer->clear();
 +	}
 +	const float middle[3] = { (float)ground[0], (float)ground[1], (float)ground[2] + 3.0f };
-+	burstPieces(pieces, middle, away, burn, hot, blast, owner ? bleedsWhenBurst(owner) : true, 1);
++	burstPieces(pieces, middle, away, burn, hot, blast, owner ? bleedsWhenBurst(owner) : true, 1, bloodOf(owner ? owner->getArmor() : nullptr, { item->getRules() }));
 +}
 +
 +/**
@@ -79161,8 +79353,8 @@ index 000000000..afdc00847
 + * the body's colours and char as they go, as the map burns a unit beyond its overkill over its fall (each piece by any
 + * part of the burn, so some stay their colour: see drawParticles), down to its colour's darkest, gone beyond 26 shades;
 + * from fire, a laser or plasma one that chars that far throws off a glowing ember. A body that bleeds also sprays drops of
-+ * blood, which land as the pieces do, and leaves a red mist hanging; a machine throws sparks and smoke. Fewer pieces when
-+ * the particle system is near full (ObliterationRoomKept stay for the rest).
++ * blood in its own colours (see bloodOf), which land as the pieces do, and leaves a mist of it hanging; a machine throws
++ * sparks and smoke. Fewer pieces when the particle system is near full (ObliterationRoomKept stay for the rest).
 + * @param pieces The pieces: where each is and its colour.
 + * @param middle The middle of the body, in voxels.
 + * @param away The way the pieces fly.
@@ -79171,8 +79363,9 @@ index 000000000..afdc00847
 + * @param blast A blast's: they fly harder.
 + * @param flesh A body that bleeds (else a machine's).
 + * @param size The body's size in tiles across: 1, or 2 for a big unit.
++ * @param blood The blood's colours, from its corpse's picture (see bloodOf); empty: the game's red.
 + */
-+void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size)
++void FirstPersonView::burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood)
 +{
 +	typedef FirstPersonParticles P;
 +	const float strength = blast ? 1.3f : 1.0f;
@@ -79227,23 +79420,26 @@ index 000000000..afdc00847
 +	const int tiles = size * size;
 +	if (flesh)
 +	{
-+		// Drops of blood, thrown the way the pieces go and every way, landing as the pieces do; and a red mist hanging
++		// Drops of blood, thrown the way the pieces go and every way, landing as the pieces do; and a mist of it hanging
 +		// where the body was, fading within a second.
-+		for (int drop = 0; drop < 80 * tiles; ++drop)
++		// (the colours of its own blood, as its corpse's picture shows it, at random: see bloodOf; else the game's red)
++		int pick = 0;
++		auto bloodColor = [&]() { return blood.empty() ? _colors.blood[pick++ & 1] : blood[std::min(blood.size() - 1, (size_t)(_particles.random() * blood.size()))]; };
++		for (int spray = 0; spray < 80 * tiles; ++spray)
 +		{
-+			P::Particle blood;
++			P::Particle drop;
 +			float way[3];
 +			anyWay(way);
 +			const float along = _particles.random(20.0f, 90.0f) * strength, spread = _particles.random(10.0f, 50.0f);
 +			for (int axis = 0; axis < 3; ++axis)
 +			{
-+				blood.pos[axis] = middle[axis] + _particles.random(-3.0f, 3.0f) * size;
-+				blood.vel[axis] = away[axis] * along + way[axis] * spread;
++				drop.pos[axis] = middle[axis] + _particles.random(-3.0f, 3.0f) * size;
++				drop.vel[axis] = away[axis] * along + way[axis] * spread;
 +			}
-+			blood.vel[2] += _particles.random(5.0f, 35.0f);
-+			blood.age = 0.0f; blood.life = _particles.random(1.2f, 2.6f); blood.gravity = 200.0f; blood.drag = 0.5f;
-+			blood.color = _colors.blood[drop & 1]; blood.size = (Uint8)_particles.random(3.0f, 6.99f); blood.kind = P::CHUNK; blood.group = P::EFFECT;
-+			_particles.add(blood);
++			drop.vel[2] += _particles.random(5.0f, 35.0f);
++			drop.age = 0.0f; drop.life = _particles.random(1.2f, 2.6f); drop.gravity = 200.0f; drop.drag = 0.5f;
++			drop.color = bloodColor(); drop.size = (Uint8)_particles.random(3.0f, 6.99f); drop.kind = P::CHUNK; drop.group = P::EFFECT;
++			_particles.add(drop);
 +		}
 +		for (int puff = 0; puff < 20 * tiles; ++puff)
 +		{
@@ -79254,7 +79450,7 @@ index 000000000..afdc00847
 +				mist.vel[axis] = away[axis] * _particles.random(5.0f, 20.0f) + _particles.random(-8.0f, 8.0f);
 +			}
 +			mist.age = 0.0f; mist.life = _particles.random(0.5f, 1.1f); mist.gravity = -3.0f; mist.drag = 2.0f;
-+			mist.color = shadeColor(_colors.blood[1], (int)_particles.random(0.0f, 3.99f)); mist.size = (Uint8)_particles.random(6.0f, 8.99f);
++			mist.color = shadeColor(blood.empty() ? _colors.blood[1] : bloodColor(), (int)_particles.random(0.0f, 3.99f)); mist.size = (Uint8)_particles.random(6.0f, 8.99f);
 +			mist.kind = P::LIT; mist.group = P::EFFECT;
 +			_particles.add(mist);
 +		}
@@ -83350,10 +83546,10 @@ index 000000000..c98895a8a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewTerrain.cpp b/src/FirstPerson/FirstPersonViewTerrain.cpp
 new file mode 100644
-index 000000000..04040f6f5
+index 000000000..bb78a8440
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewTerrain.cpp
-@@ -0,0 +1,6117 @@
+@@ -0,0 +1,6323 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83740,6 +83936,57 @@ index 000000000..04040f6f5
 +		}
 +	}
 +	return (Uint8)best;
++}
++
++/**
++ * The colour groups of a liquid screen (setting "Liquid screens", the mod's table `liquidScreens:`): those of the
++ * pixels of a wall's art that its animation changes, in any of its frames, less those of its still frame (a group is
++ * the frame's when DisplayFrameGroupShare of the pixels no frame changes are in it). The alien entertainment panels:
++ * the yellow show's six groups, the blue one's blues and pinks; not the grey pedestal round them.
++ * @param mapData The wall's record.
++ * @return The groups, a bit each; 0 for a wall whose art doesn't animate.
++ */
++static Uint16 screenGroups(const MapData *mapData)
++{
++	SurfaceSet *art = mapData->getDataset() ? mapData->getDataset()->getSurfaceset() : nullptr;
++	const Surface *first = art ? art->getFrame(mapData->getSprite(0)) : nullptr;
++	if (!first)
++	{
++		return 0;
++	}
++	const int width = first->getWidth(), height = first->getHeight();
++	std::vector<const Surface*> frames;
++	for (int frame = 1; frame < 8; ++frame)
++	{
++		const Surface *other = art->getFrame(mapData->getSprite(frame));
++		if (other && other != first && other->getWidth() == width && other->getHeight() == height) frames.push_back(other);
++	}
++	Uint16 movingGroups = 0;
++	int stillCounts[16] = {}, still = 0;
++	for (int y = 0; y < height; ++y)
++		for (int x = 0; x < width; ++x)
++		{
++			const Uint8 color = first->getPixel(x, y);
++			bool moving = false;
++			for (const Surface *other : frames)
++			{
++				const Uint8 otherColor = other->getPixel(x, y);
++				if (otherColor == color) continue;
++				moving = true;
++				if (otherColor) movingGroups |= (Uint16)(1 << (otherColor >> 4));
++			}
++			if (!color) continue;
++			if (moving) movingGroups |= (Uint16)(1 << (color >> 4));
++			else
++			{
++				++stillCounts[color >> 4];
++				++still;
++			}
++		}
++	Uint16 stillGroups = 0;
++	for (int group = 0; group < 16; ++group)
++		if (still && stillCounts[group] >= DisplayFrameGroupShare * still) stillGroups |= (Uint16)(1 << group);
++	return movingGroups & (Uint16)~stillGroups;
 +}
 +
 +/**
@@ -85693,8 +85940,9 @@ index 000000000..04040f6f5
 +}
 +
 +/**
-+ * Setting "Wall paint" (a player, GitHub issue #111): for each wall, which side its face the
-+ * isometric art never shows looks onto, and which wall lends that face the paint of that side.
++ * Wall paint (a player, GitHub issue #111; a setting, with no row on the tab and always All rooms
++ * since GitHub issue #264: see WallPaintLevel): for each wall, which side its face the isometric art never shows looks onto,
++ * and which wall lends that face the paint of that side.
 + *
 + * The art shows a west wall from the east and a north wall from the south only, the room with its
 + * roof cut away: so a building's west and north outer walls are drawn in the paint of the rooms
@@ -85722,7 +85970,11 @@ index 000000000..04040f6f5
 + *   wall with a window, only the voxels of its own paint do: the colour group most of the nearest
 + *   plain wall on the same side shows (the window's frame, its glass and curtains, painted panes
 + *   keep theirs). Doors keep theirs whole, and so do fences, ghosts, the walls of crafts and UFOs
-+ *   (mirrored, see mirroredColor) and walls with no donor.
++ *   (mirrored, see mirroredColor) and walls with no donor;
++ * - a display (a wall whose art animates: an alien base's entertainment panels, a computer's
++ *   screen) lends none, and its back takes, whichever sides its faces look onto, the paint of the
++ *   nearest plain wall made of the display's own frame (see DisplayFrameMatch): the base's grey
++ *   wall, not the cave's rock. A paint holds in every frame of the wall's animation (see showsWall).
 + * Coordinates are tiles. A wall blown away later leaves its rubble as the art has it (see
 + * wallPaintColor), and the rest keep theirs: the regions stay as they were found (a saved battle
 + * loaded finds them anew, from the map as it is then: a room blown open is the outdoors then).
@@ -85840,9 +86092,25 @@ index 000000000..04040f6f5
 +		++buildingCount;
 +	}
 +
++	// A display: a wall whose art animates, some frame of it another model than its first (a door is never asked: it
++	// keeps its own). The alien bases' entertainment panels, a computer's screen. It lends none of its paint (a copy of
++	// one of its frames stood still on the walls round it), and its back takes a plain wall's (both faces had shown the
++	// show; a player, GitHub issue #264).
++	std::map<const MapData*, bool> displays;
++	auto isDisplay = [&](const MapData *data)
++	{
++		auto found = displays.find(data);
++		if (found != displays.end()) return found->second;
++		const VoxelModel *first = getModel(data, -1, false);
++		bool display = false;
++		for (int frame = 1; frame < 8 && !display; ++frame) display = getModel(data, data->getSprite(frame), false) != first;
++		displays[data] = display;
++		return display;
++	};
++
 +	// What a wall part can be here: 0 kept as it is (a door, a wall one walks through, a fence, a ghost, nothing to see), 1
 +	// repainted, 2 repainted and a donor (a plain wall: no glass, no holes in its art, from the
-+	// floor to nearly the top, its shown face nearly whole), 3 a window (glass or holes in its
++	// floor to nearly the top, its shown face nearly whole, not a display), 3 a window (glass or holes in its
 +	// art): its frame and glass keep theirs, the wall round them may take the paint.
 +	std::map<const MapData*, int> wallKinds;
 +	auto wallKind = [&](const MapData *data)
@@ -85866,6 +86134,7 @@ index 000000000..04040f6f5
 +				for (int along = 0; along < Position::TileXY; ++along)
 +					shownVoxels += (data->getObjectType() == O_WESTWALL ? model->east[z][along] : model->south[z][along]) != 0;
 +			kind = seeThrough ? 3 : model->max[2] >= 20 && model->min[2] <= 2 && shownVoxels >= 16 * 20 ? 2 : 1;
++			if (kind == 2 && isDisplay(data)) kind = 1;
 +		}
 +		wallKinds[data] = kind;
 +		return kind;
@@ -85947,14 +86216,99 @@ index 000000000..04040f6f5
 +		return -1;
 +	};
 +
-+	// Each wall whose two faces look onto different sides: its donor, and the paint of its own side.
-+	int kept = 0, outerCount = 0, betweenCount = 0;
++	// The plain wall whose paint a display's back takes: one made of the display's frame (its shown face
++	// DisplayFrameMatch in the colour groups of the display's still voxels; else the closest match there is), of the
++	// same kind (west or north) first, its shown face looking onto the side the display's back faces first, then the
++	// nearest, on the same level first. -1 for none.
++	auto shownFace = [](const VoxelModel *model, const MapData *data) -> const Uint8 (*)[Position::TileXY]
++	{
++		return data->getObjectType() == O_WESTWALL ? model->east : model->south;
++	};
++	std::map<const MapData*, Uint16> frameGroupsOf; // a display's frame: its colour groups, a bit each
++	auto frameGroups = [&](const MapData *data)
++	{
++		auto found = frameGroupsOf.find(data);
++		if (found != frameGroupsOf.end()) return found->second;
++		const Uint8 (*face)[Position::TileXY] = shownFace(getModel(data, -1, false), data);
++		bool moving[Position::TileZ][Position::TileXY] = {};
++		for (int frame = 1; frame < 8; ++frame)
++		{
++			const Uint8 (*other)[Position::TileXY] = shownFace(getModel(data, data->getSprite(frame), false), data);
++			for (int z = 0; z < Position::TileZ; ++z)
++				for (int along = 0; along < Position::TileXY; ++along) moving[z][along] = moving[z][along] || other[z][along] != face[z][along];
++		}
++		int counts[16] = {}, still = 0;
++		for (int z = 0; z < Position::TileZ; ++z)
++			for (int along = 0; along < Position::TileXY; ++along)
++				if (face[z][along] && !moving[z][along])
++				{
++					++counts[face[z][along] >> 4];
++					++still;
++				}
++		Uint16 groups = 0;
++		for (int group = 0; group < 16; ++group)
++			if (still && counts[group] >= DisplayFrameGroupShare * still) groups |= (Uint16)(1 << group);
++		frameGroupsOf[data] = groups;
++		return groups;
++	};
++	std::map<std::pair<const MapData*, Uint16>, float> frameMatches; // how much of a plain wall's shown face is in a frame's groups
++	auto frameMatch = [&](const MapData *data, Uint16 groups)
++	{
++		const auto key = std::make_pair(data, groups);
++		auto found = frameMatches.find(key);
++		if (found != frameMatches.end()) return found->second;
++		const Uint8 (*face)[Position::TileXY] = shownFace(getModel(data, -1, false), data);
++		int in = 0, all = 0;
++		for (int z = 0; z < Position::TileZ; ++z)
++			for (int along = 0; along < Position::TileXY; ++along)
++				if (face[z][along])
++				{
++					++all;
++					in += (groups >> (face[z][along] >> 4)) & 1;
++				}
++		const float match = all ? (float)in / all : 0.0f;
++		frameMatches[key] = match;
++		return match;
++	};
++	auto displayDonor = [&](const WallSide &to)
++	{
++		const Uint16 groups = frameGroups(to.data);
++		const int x = to.tile % mapSizeX, y = (to.tile / mapSizeX) % mapSizeY, z = to.tile / tilesPerLevel;
++		int best = -1;
++		long long bestScore = LLONG_MAX;
++		for (int wall = 0; wall < (int)walls.size(); ++wall)
++		{
++			const WallSide &from = walls[wall];
++			if (wallKind(from.data) != 2) continue;
++			const float match = frameMatch(from.data, groups);
++			const int fromX = from.tile % mapSizeX, fromY = (from.tile / mapSizeX) % mapSizeY, fromZ = from.tile / tilesPerLevel;
++			const long long score = (match >= DisplayFrameMatch ? 0LL : 1LL + (long long)((1.0f - match) * 20.0f)) * 100000000LL
++				+ (from.part != to.part ? 10000000LL : 0LL) + (region[from.tile] != region[to.hiddenTile] ? 1000000LL : 0LL)
++				+ std::abs(fromZ - z) * 1000LL + std::abs(fromX - x) + std::abs(fromY - y);
++			if (score < bestScore)
++			{
++				bestScore = score;
++				best = wall;
++			}
++		}
++		return best;
++	};
++
++	// Each wall whose two faces look onto different sides, and each display: its donor, and the paint of its own side.
++	int kept = 0, outerCount = 0, betweenCount = 0, displayCount = 0;
 +	for (const WallSide &side : walls)
 +	{
 +		if (!wallKind(side.data) || side.hiddenTile < 0) continue;
 +		int donor = -1, reference = -1; // the wall lending its paint; a plain wall on this wall's own side, for its paint
 +		Uint8 kind = 0;
-+		if (side.shownIn && !side.hiddenIn)
++		if (wallKind(side.data) != 3 && isDisplay(side.data))
++		{
++			// A display's back: a plain wall's paint, whichever sides its two faces look onto (a ring of the alien base's
++			// panels has the show inside and out; see displayDonor).
++			kind = side.shownIn != side.hiddenIn ? WallPaintEachSide : WallPaintAllRooms;
++			donor = displayDonor(side);
++		}
++		else if (side.shownIn && !side.hiddenIn)
 +		{
 +			// A building's west or north outer wall, drawn in the room's paint: outdoors, the building's outside.
 +			kind = 1;
@@ -86004,15 +86358,17 @@ index 000000000..04040f6f5
 +		const Uint8 paintGroup = wallKind(side.data) != 3 ? WallPaintWhole : (Uint8)(std::max_element(groupCounts, groupCounts + 16) - groupCounts);
 +		_wallPaints.push_back({ getModel(side.data, -1, false), getModel(walls[donor].data, -1, false), walls[donor].part == O_WESTWALL, openEnd, kind, paintGroup });
 +		_wallPaintOf[side.tile * 2 + side.part - O_WESTWALL] = (Uint16)_wallPaints.size();
-+		if (kind == 1) ++outerCount;
++		if (wallKind(side.data) != 3 && isDisplay(side.data)) ++displayCount;
++		else if (kind == 1) ++outerCount;
 +		else ++betweenCount;
 +	}
 +	Log(LOG_INFO) << "OpenXcom3D: wall paint: " << buildingCount << " buildings, " << outerCount << " outer walls and " << betweenCount
-+		<< " walls between rooms take the paint of the side they face (" << kept << " keep theirs), found in " << SDL_GetTicks() - startTick << " ms";
++		<< " walls between rooms take the paint of the side they face, " << displayCount << " displays' backs a plain wall's (" << kept
++		<< " keep theirs), found in " << SDL_GetTicks() - startTick << " ms";
 +}
 +
 +/**
-+ * Setting "Wall paint": the colour a wall's face the isometric art never shows takes from the side
++ * Wall paint: the colour a wall's face the isometric art never shows takes from the side
 + * it faces (see findWallPaints): the donor's shown face on the same row of voxels, read as one
 + * standing before it sees it (its left end on the left), the nearest column of it where it has
 + * nothing there. Only on the wall's back plane (its westmost or northmost voxels: the faces inside
@@ -86028,7 +86384,7 @@ index 000000000..04040f6f5
 + */
 +Uint8 FirstPersonView::wallPaintColor(const Hit &hit, const TileView &tileView, Uint8 ownColor) const
 +{
-+	if (Options::fpsWallPaint <= 0 || (hit.part != O_WESTWALL && hit.part != O_NORTHWALL) || hit.ghost || !ownColor
++	if (Options::fpsWallPaint <= WallPaintArt || (hit.part != O_WESTWALL && hit.part != O_NORTHWALL) || hit.ghost || !ownColor
 +		|| hit.axis < 0 || hit.axis > 1 || _wallPaintOf.empty())
 +	{
 +		return 0;
@@ -86051,7 +86407,7 @@ index 000000000..04040f6f5
 +		return 0;
 +	}
 +	const WallPaint &paint = _wallPaints[paintIndex - 1];
-+	if (paint.kind > Options::fpsWallPaint || tileView.part[hit.part] != paint.wall || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
++	if (paint.kind > Options::fpsWallPaint || !showsWall(tileView.part[hit.part], paint.wall) || (paint.paintGroup != WallPaintWhole && (ownColor >> 4) != paint.paintGroup))
 +	{
 +		return 0;
 +	}
@@ -86141,21 +86497,25 @@ index 000000000..04040f6f5
 + * @param spriteIndex The frame of the record's surface set; -1 for its first animation frame.
 + * @param cutout Leave out the voxels whose sprite pixel is transparent: used for the frames of
 + *        a UFO door sliding open, where the door has gone.
++ * @param loneLift The record is a grav lift's floor, here on a tile with no other over or under it
++ *        (see liftAt): it is a floor like any other here, even where it is a lift elsewhere on the map.
 + * @return The model; it stays valid until the battle changes (setSavedBattleGame).
 + */
-+const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapData, int spriteIndex, bool cutout)
++const FirstPersonView::VoxelModel *FirstPersonView::getModel(const MapData *mapData, int spriteIndex, bool cutout, bool loneLift)
 +{
 +	if (_sharedModelsOwner)
 +	{
-+		return _sharedModelsOwner->getModel(mapData, spriteIndex, cutout);
++		return _sharedModelsOwner->getModel(mapData, spriteIndex, cutout, loneLift);
 +	}
 +	if (spriteIndex < 0)
 +	{
 +		spriteIndex = mapData->getSprite(0);
 +	}
-+	// One key for record, frame and cut-out: the record's address in the high bits, the frame
-+	// (15 bits) and the cut-out flag (the lowest bit) below it.
-+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 16) | ((Uint64)(spriteIndex & 0x7FFF) << 1) | (cutout ? 1 : 0);
++	// (A lone lift's floor differs from the record's model only where the record is a lift somewhere else on the map.)
++	loneLift = loneLift && mapData->isGravLift() && mapData->getObjectType() == O_FLOOR && liftInUse(mapData);
++	// One key for record, frame, lone lift and cut-out: the record's address in the high bits, the frame (14 bits), the
++	// lone lift flag and the cut-out flag (the lowest bit) below it.
++	const Uint64 key = ((Uint64)(uintptr_t)mapData << 16) | ((Uint64)(spriteIndex & 0x3FFF) << 2) | (loneLift ? 2 : 0) | (cutout ? 1 : 0);
 +	auto found = _models.find(key);
 +	if (found == _models.end())
 +	{
@@ -86181,7 +86541,7 @@ index 000000000..04040f6f5
 +			}
 +			if (same)
 +			{
-+				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout);
++				const VoxelModel *firstModel = getModel(mapData, firstSprite, cutout, loneLift);
 +				_sameArtModels.emplace(key, firstModel);
 +				return firstModel;
 +			}
@@ -86189,11 +86549,14 @@ index 000000000..04040f6f5
 +		// Not built yet: build it in place (the map keeps it at the same address from then on). A later frame of a
 +		// part that animates is built as the kind of part its first frame is (see buildModel).
 +		// And a part without voxels is, in every frame, the kind of ghost any one of its frames makes it (see partKind).
-+		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout) : nullptr;
-+		if (const VoxelModel *kind = partKind(mapData, cutout)) firstFrame = kind;
++		const VoxelModel *firstFrame = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout, loneLift) : nullptr;
++		if (const VoxelModel *kind = partKind(mapData, cutout, loneLift)) firstFrame = kind;
 +		found = _models.emplace(key, VoxelModel()).first;
-+		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame);
++		buildModel(mapData, spriteIndex, cutout, found->second, firstFrame, loneLift);
 +		found->second.pulse = pulsingFrames(mapData);
++		// (A later frame knows its record's first frame: a wall's paint goes by the wall, whichever frame it shows. Held by
++		// the first frame's model alone, an animated wall's back took the paint one tick in four: a player, GitHub issue #264.)
++		found->second.frameOf = spriteIndex != firstSprite ? getModel(mapData, firstSprite, cutout, loneLift) : nullptr;
 +		// (A thing in motion round its own upright axis, named in the mod's table: this frame's shape turned from this frame's art. See turnedFrom.)
 +		const int turned = cutout || found->second.empty || found->second.ghostly ? -1 : turnedFrom(mapData);
 +		if (turned >= 0)
@@ -86257,6 +86620,29 @@ index 000000000..04040f6f5
 +}
 +
 +/**
++ * Is a tile's floor a lift: a grav lift's, with another grav lift's floor directly over or under it? The game floats
++ * a unit up or down only from one such floor to the next (Pathfinding), so one on its own is no lift, whatever its
++ * record is elsewhere: a floor like any other, with no beam and no see-through pad (a player, GitHub issue #265: "is
++ * there a navigable path directly up? ... directly down? If not, don't apply"; the X-Com Files' maps lay single ones).
++ * @param tileIndex The tile.
++ * @return True if it is a lift.
++ */
++bool FirstPersonView::liftAt(int tileIndex) const
++{
++	const Tile *tile = _save->getTile(tileIndex);
++	const MapData *floor = tile ? tile->getMapData(O_FLOOR) : nullptr;
++	if (!floor || !floor->isGravLift()) return false;
++	const int level = _save->getMapSizeX() * _save->getMapSizeY(), tiles = _save->getMapSizeXYZ();
++	for (int other : { tileIndex - level, tileIndex + level })
++	{
++		if (other < 0 || other >= tiles) continue;
++		const MapData *beside = _save->getTile(other)->getMapData(O_FLOOR);
++		if (beside && beside->isGravLift()) return true;
++	}
++	return false;
++}
++
++/**
 + * The kind of ghost a part that animates and has no voxels is drawn as, in all its frames: what
 + * the first of its frames that gets a ghost at all is made (low art standing up, a block, a plain
 + * ghost: see buildModel), read off that frame's art. A flame's frames differ enough that some
@@ -86266,7 +86652,7 @@ index 000000000..04040f6f5
 + * @return A model holding the kind (its ghostKind, reliefRises and cropBlock; nothing else of it
 + *         is meant to be drawn), or null for a part that doesn't animate or has voxels of its own.
 + */
-+const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout)
++const FirstPersonView::VoxelModel *FirstPersonView::partKind(const MapData *mapData, bool cutout, bool loneLift)
 +{
 +	bool animates = false;
 +	for (int frame = 1; frame < 8 && !animates; ++frame) animates = mapData->getSprite(frame) != mapData->getSprite(0);
@@ -86274,7 +86660,7 @@ index 000000000..04040f6f5
 +	{
 +		return nullptr;
 +	}
-+	const Uint64 key = ((Uint64)(uintptr_t)mapData << 1) | (cutout ? 1 : 0);
++	const Uint64 key = ((Uint64)(uintptr_t)mapData << 2) | (loneLift ? 2 : 0) | (cutout ? 1 : 0);
 +	auto found = _partKinds.find(key);
 +	if (found == _partKinds.end())
 +	{
@@ -86282,7 +86668,7 @@ index 000000000..04040f6f5
 +		VoxelModel &kind = found->second;
 +		for (int frame = 0; frame < 8; ++frame)
 +		{
-+			buildModel(mapData, mapData->getSprite(frame), cutout, kind);
++			buildModel(mapData, mapData->getSprite(frame), cutout, kind, nullptr, loneLift);
 +			if (kind.ghostKind != 0 || !kind.empty)
 +			{
 +				break; // (a ghost: that kind; or voxels of its own: it follows its first frame instead, see getModel)
@@ -86400,8 +86786,10 @@ index 000000000..04040f6f5
 + * @param spriteIndex The frame of the record's surface set to colour it from.
 + * @param cutout Leave out the voxels whose pixel is transparent (a sliding UFO door's frames).
 + * @param model Where to build it.
++ * @param firstFrame A later frame's: what its first frame was built as (see getModel), or null.
++ * @param loneLift A grav lift's floor on a tile with no other over or under it: a floor like any other (see getModel).
 + */
-+void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame) const
++void FirstPersonView::buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame, bool loneLift) const
 +{
 +	clearModel(model);
 +	model.wayThrough = (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
@@ -86771,8 +87159,10 @@ index 000000000..04040f6f5
 +		// who is above or below it is a threat to watch.
 +		// (A lift's pad: a floor the game calls a grav lift that has one over or under it somewhere on this map, see
 +		// liftInUse. One that never has is a floor like any other: XPiratez lays whole rooms with such a record, a
-+		// house's upper storey, and seen through as a pad it was a glass floor: a player, GitHub issue #216.)
-+		const bool lift = mapData->isGravLift() && (mapData->getObjectType() != O_FLOOR || liftInUse(mapData));
++		// house's upper storey, and seen through as a pad it was a glass floor: a player, GitHub issue #216. And so is
++		// one on a tile of its own, with no other over or under it, where the record is a lift elsewhere: the game
++		// floats no one from it, a player, GitHub issue #265, "nukes all instances of this bug". See liftAt.)
++		const bool lift = mapData->isGravLift() && (mapData->getObjectType() != O_FLOOR || (liftInUse(mapData) && !loneLift));
 +		bool flatFloor = mapData->getObjectType() == O_FLOOR && !lift && !ghostShape && !cageArt(sprite, O_FLOOR, yOffset) && artLiesFlat(sprite, yOffset);
 +		// (An object that lights its surroundings shows with Lifts too, as its light does: a console, a
 +		// lamp without shape. A flame among them isn't built here: see partKind.)
@@ -86981,6 +87371,16 @@ index 000000000..04040f6f5
 +			model.artFill = false;
 +			dryAboveWater(model, sprite, groups, yOffset); // (a paddy's rice the art's green, not the water's blue)
 +		}
++	}
++	// Liquid screens (the mod's table `liquidScreens:`, the alien entertainment panels; a player, GitHub issue #261:
++	// "could this trippy water effect apply to [them]?"): a wall whose screen is still water standing on end. The
++	// voxels of its shown face in the screen's colour groups (see screenGroups) ripple and mirror the room (setting
++	// "Liquid screens", with "Reflections": see the shaders' onScreen); kept as a floor's still water is.
++	if (!model.empty && !cutout && (mapData->getObjectType() == O_WESTWALL || mapData->getObjectType() == O_NORTHWALL)
++		&& firstPerson.isLiquidScreen(dataSet->getName(), record))
++	{
++		model.stillWater = firstFrame ? firstFrame->stillWater : screenGroups(mapData);
++		if (model.stillWater) _anyGlass = true; // (a model that mirrors: the card's program with the reflections is wanted)
 +	}
 +	// An object the art draws as a block of crops though the game gives it only a few voxels
 +	// (X-Com Files' wheat: see cropBlockOf): the block is a ghost model of its own (see getModel).
@@ -88049,7 +88449,9 @@ index 000000000..04040f6f5
 +			memo.frame = frame;
 +			memo.cutout = cutout;
 +			memo.steady = steady;
-+			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout);
++			// (A grav lift's floor with no other over or under it is a floor like any other: see liftAt.)
++			const bool loneLift = part == O_FLOOR && mapData->isGravLift() && !liftAt(index);
++			memo.model = steady ? steady : getModel(mapData, frames.sprite[frame], cutout, loneLift);
 +			// A tree's crown (foliage on a tile with no floor under it: a big tree's upper levels):
 +			// leafy (see leafyModel), also where a mod counts its forest among a UFO's tile sets
 +			// (X-Com Files: a crown has no lights for a steady model to show).
@@ -88060,7 +88462,7 @@ index 000000000..04040f6f5
 +			memo.next = nullptr;
 +			if (frames.animated && !mapData->isUFODoor() && memo.model != frames.steady && frames.sprite[(frame + 1) % 8] != frames.sprite[frame])
 +			{
-+				const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false);
++				const VoxelModel *nextModel = getModel(mapData, frames.sprite[(frame + 1) % 8], false, loneLift);
 +				if (!nextModel->empty) memo.next = nextModel;
 +			}
 +		}
@@ -89473,10 +89875,10 @@ index 000000000..04040f6f5
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewUfo.cpp b/src/FirstPerson/FirstPersonViewUfo.cpp
 new file mode 100644
-index 000000000..773f6e0f4
+index 000000000..d5e379d9e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewUfo.cpp
-@@ -0,0 +1,1198 @@
+@@ -0,0 +1,1209 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -89541,6 +89943,7 @@ index 000000000..773f6e0f4
 + * pixel to know whether a UFO's light reaches it.
 + */
 +#include "FirstPersonView.h"
++#include "../Engine/Logger.h"
 +#include <algorithm>
 +#include <array>
 +#include <cmath>
@@ -89842,8 +90245,7 @@ index 000000000..773f6e0f4
 +		// each beam starts on the first floor below the lift (the ground under a landed UFO).
 +		for (const int tileIndex : ufo.tiles)
 +		{
-+			const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
-+			if (!floor || !floor->isGravLift()) continue;
++			if (!liftAt(tileIndex)) continue; // (a grav lift's floor with another over or under it: GitHub issue #265)
 +			const int liftLevel = tileIndex / (mapSizeX * mapSizeY), column = tileIndex % (mapSizeX * mapSizeY);
 +			int bottomLevel = liftLevel;
 +			for (int level = liftLevel - 1; level >= 0; --level)
@@ -90575,7 +90977,8 @@ index 000000000..773f6e0f4
 + * Finds the lifts on the map, once per battle: every floor the game lets units float up through
 + * (a UFO's grav lift, an alien base's, a building's elevator: XPiratez's mansion has blue pads
 + * with yellow lines striking up), each with the height its beam starts at, the first floor below
-+ * it, and where it ends, the level above it. Their colours are picked when first needed.
++ * it, and where it ends, the level above it. Their colours are picked when first needed. A grav
++ * lift's floor with no other over or under it is no lift (see liftAt): no beam.
 + */
 +void FirstPersonView::findLifts()
 +{
@@ -90585,10 +90988,16 @@ index 000000000..773f6e0f4
 +		return;
 +	}
 +	const int perLevel = _save->getMapSizeX() * _save->getMapSizeY(), tileCount = perLevel * _save->getMapSizeZ();
++	int lone = 0;
 +	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 +	{
 +		const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
 +		if (!floor || !floor->isGravLift()) continue;
++		if (!liftAt(tileIndex))
++		{
++			++lone;
++			continue;
++		}
 +		const int liftLevel = tileIndex / perLevel, column = tileIndex % perLevel;
 +		int bottomLevel = liftLevel;
 +		for (int level = liftLevel - 1; level >= 0; --level)
@@ -90599,6 +91008,10 @@ index 000000000..773f6e0f4
 +		}
 +		LiftSpot lift = { tileIndex, bottomLevel * 24.0f + GroundTop, (liftLevel + 1) * 24.0f + 8.0f, { 0, 0 }, false };
 +		_lifts.push_back(lift);
++	}
++	if (!_lifts.empty() || lone)
++	{
++		Log(LOG_VERBOSE) << "OpenXcom3D: " << _lifts.size() << " lift floors, " << lone << " grav lift floors with none over or under them (floors like any other)";
 +	}
 +}
 +
@@ -91391,10 +91804,10 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..42d9277d9
+index 000000000..5fd414805
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
-@@ -0,0 +1,6556 @@
+@@ -0,0 +1,6839 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -96697,6 +97110,279 @@ index 000000000..42d9277d9
 +	}
 +}
 +
++/// A tank the unit table names "shape: tank" (see boxTank): the boxes' fit is a cell's step at a time, at most
++/// BoxTankSteps of them from each of three turrets to start from (BoxTurretStarts of the hull's width), and
++/// BoxTankFineSteps to finish, each box at least BoxTankLeast cells through; its gun starts BoxBarrelHalf thick each way,
++/// at most BoxBarrelHalfMost (thicker, it stood in for the turret's dome), and half way from the turret's front to the
++/// hull's. An outline's pixel the drawing hasn't costs BoxExtraCost of one the drawing has and the outlines miss.
++constexpr int BoxTankSteps = 2500, BoxTankFineSteps = 400, BoxTankLeast = 2;
++constexpr float BoxBarrelHalf = 1.0f * VOXELSCALE, BoxBarrelHalfMost = 1.5f * VOXELSCALE, BoxExtraCost = 0.6f, BoxTurretStarts[3] = { 0.3f, 0.5f, 0.7f };
++/// ... its belly hollow where its front and back drawings' lowest rows between the tracks are BellyLeast rows or more
++/// above the tracks' (see boxTank).
++constexpr int BellyLeast = 2 * VOXELSCALE;
++/**
++ * A tank the unit table names "shape: tank", by name (XPiratez's: hull, turret and gun drawn in one picture a side, by a
++ * walker's routine; carved from its eight drawings and painted as the gals are it was a lumpy purple loaf, "a lot more
++ * goofy", a player on the forum; the owner: "specifically for that tank try to build a good boxy tank model with boxy
++ * turret and barrel - lets optimise this"). Two boxes square to the tank's own axes on its middle line, the hull on the
++ * ground and the turret standing on its deck, and its gun, a bar from the turret's face ahead. Their sizes are found by
++ * optimising how well their outlines, seen along the slant as the eight drawings see the tank (see project; a box's
++ * outline is the hull of its eight corners'), match the drawings: over the eight, the pixels both have against those
++ * plus what the outlines add (BoxExtraCost each) and what they miss. (The plain overlap, extra and missed pixels alike,
++ * made the turret a tall narrow cube: drawn along the slant, a low wide turret's flanks lie inside the hull's outline,
++ * and only what of its dome rises over it counts; a tank's boxes should rather cover what is drawn.) From the box round
++ * what the drawings leave (see carve), its lower half the hull's and the middle of its top the turret's, each size
++ * steps a cell either way while that matches better; the hull and turret first, then the gun with them (a short gun
++ * lies over the hull's deck in the side drawings, where no thin end shows it, see findGun: the drawings from behind and
++ * the quarters, where it stands out past the turret, tell its length and height). Done from three turret widths to
++ * start from, the best kept. Then each box is cut by what the drawings leave of the tank (see carve): its flat faces
++ * stay, and what the drawings show sloped slopes (the owner, of the first, plain boxes: "too boxy! Now try to match
++ * the sprites and adapt the boxes a bit", "Turret is too high! It should roughly have the rhombus shape"); the belly
++ * between its tracks is hollow as its front and back drawings show it ("bottom should not be filled with voxels as it
++ * is empty space"); and it stands as high as the game's tanks (see standTank: its deck at a kneeling soldier's height,
++ * its turret's top at 20 voxels). About a second of the body builder's thread, once a battle. The gun is made a hollow
++ * barrel as a turret's (see mountBarrels), and the tank is painted from the eight drawings as any hull is.
++ * @param solid The tank's drawings, their thin detail left out (see keepSolid).
++ * @param wanted How many barrels it has by the unit table (0: none; else one).
++ * @param owner Set: the hull's cells to the body's code, the turret's to the second part's (see PartCodes).
++ * @param gun Set to its gun.
++ * @return True if it has a gun.
++ */
++static bool boxTank(const PartFrames &solid, int wanted, std::vector<Uint8> &owner, Gun &gun)
++{
++	gun = Gun();
++	// What the drawings leave: where to start from.
++	const std::vector<Uint8> carved = carve(solid, 0, std::vector<Uint8>(GridCells, 1));
++	int low[3] = { GridAcross, GridAlong, GridUp }, high[3] = { -1, -1, -1 };
++	for (int cell = 0; cell < GridCells; ++cell)
++	{
++		if (!carved[cell]) continue;
++		const int at[3] = { cell / (GridUp * GridAlong), (cell / GridUp) % GridAlong, cell % GridUp };
++		for (int axis = 0; axis < 3; ++axis) { low[axis] = std::min(low[axis], at[axis]); high[axis] = std::max(high[axis], at[axis]); }
++	}
++	if (high[0] < 0) return false;
++	// The sizes, in cells: the hull's half width (from the middle line), back and front (along the grid, the front
++	// past its last cell), bottom and deck (up the grid); the turret's half width, back, front and top; the gun's half
++	// thickness, its underside (up the grid) and its muzzle (along it: it starts at the turret's front).
++	enum { HullHalf, HullBack, HullFront, HullBottom, Deck, TurretHalf, TurretBack, TurretFront, TurretTop, GunHalf, GunLow, Muzzle, Sizes };
++	const int middleAcross = GridAcross / 2;
++	int first[Sizes];
++	first[HullHalf] = std::max(BoxTankLeast, std::max(middleAcross - low[0], high[0] + 1 - middleAcross));
++	first[HullBack] = low[1];
++	first[HullFront] = high[1] + 1;
++	first[HullBottom] = low[2];
++	first[Deck] = low[2] + (high[2] + 1 - low[2]) / 2;
++	first[TurretHalf] = first[HullHalf] / 2;
++	first[TurretBack] = low[1] + (high[1] + 1 - low[1]) / 4;
++	first[TurretFront] = high[1] + 1 - (high[1] + 1 - low[1]) / 4;
++	first[TurretTop] = high[2] + 1;
++	first[GunHalf] = std::max(1, (int)std::lround(BoxBarrelHalf / Cell));
++	first[GunLow] = (first[Deck] + first[TurretTop]) / 2 - first[GunHalf];
++	first[Muzzle] = (first[TurretFront] + first[HullFront]) / 2 + 1;
++	const bool armed = wanted != 0;
++	// A box's outline in a drawing: its corners seen along the slant, the hull round them, every pixel whose middle is in
++	// it; and the rectangle round all the outlines drawn so far.
++	auto outline = [](const float from[3], const float to[3], int d, int stride, std::vector<Uint8> &mask, int bounds[4]) {
++		std::pair<float, float> corners[8], round[16];
++		for (int corner = 0; corner < 8; ++corner)
++		{
++			float nearness;
++			project(corner & 1 ? to[0] : from[0], corner & 2 ? to[1] : from[1], corner & 4 ? to[2] : from[2], d, false, corners[corner].first, corners[corner].second, nearness);
++		}
++		std::sort(corners, corners + 8);
++		int count = 0;
++		auto turnsLeft = [](const std::pair<float, float> &a, const std::pair<float, float> &b, const std::pair<float, float> &c) {
++			return (b.first - a.first) * (c.second - a.second) - (b.second - a.second) * (c.first - a.first) > 0.0f;
++		};
++		for (int pass = 0; pass < 2; ++pass) // (the hull's lower side, then its upper: each ends where the other begins)
++		{
++			const int start = count;
++			for (int n = 0; n < 8; ++n)
++			{
++				const std::pair<float, float> &next = corners[pass == 0 ? n : 7 - n];
++				while (count >= start + 2 && !turnsLeft(round[count - 2], round[count - 1], next)) --count;
++				round[count++] = next;
++			}
++			--count;
++		}
++		float left = FrameSize, right = 0.0f, top = FrameSize, bottom = 0.0f;
++		for (int n = 0; n < count; ++n)
++		{
++			left = std::min(left, round[n].first); right = std::max(right, round[n].first);
++			top = std::min(top, round[n].second); bottom = std::max(bottom, round[n].second);
++		}
++		// (every stride'th pixel each way: see match)
++		const int rows[2] = { (std::max(0, (int)std::floor(top)) + stride - 1) / stride * stride, std::min(FrameSize, (int)std::ceil(bottom) + 1) };
++		const int columns[2] = { (std::max(0, (int)std::floor(left)) + stride - 1) / stride * stride, std::min(FrameSize, (int)std::ceil(right) + 1) };
++		for (int row = rows[0]; row < rows[1]; row += stride)
++			for (int column = columns[0]; column < columns[1]; column += stride)
++			{
++				const std::pair<float, float> middle(column + 0.5f, row + 0.5f);
++				bool inside = count >= 3;
++				for (int n = 0; n < count && inside; ++n) inside = turnsLeft(round[n], round[(n + 1) % count], middle);
++				if (inside) mask[row * FrameSize + column] = 1;
++			}
++		bounds[0] = std::min(bounds[0], columns[0]); bounds[1] = std::max(bounds[1], columns[1]);
++		bounds[2] = std::min(bounds[2], rows[0]); bounds[3] = std::max(bounds[3], rows[1]);
++	};
++	// A box's corners in the body's measure, from its sizes: across from the middle line, along and up the grid.
++	auto box = [](int half, int back, int front, int bottom, int top, float corners[2][3]) {
++		corners[0][0] = -half * Cell; corners[1][0] = half * Cell;
++		corners[0][1] = AlongFrom + back * Cell; corners[1][1] = AlongFrom + front * Cell;
++		corners[0][2] = UpFrom + bottom * Cell; corners[1][2] = UpFrom + top * Cell;
++	};
++	// How well the boxes match the drawings (see above), added up over the eight; read on every pixel (stride 1), or on
++	// every other one each way (2: a quarter of the work, for the first rough steps).
++	int drawn[8][2] = {};
++	for (int d = 0; d < 8; ++d)
++		for (int pixel = 0; pixel < FrameSize * FrameSize; ++pixel)
++		{
++			if (!solid.frame[d][pixel]) continue;
++			++drawn[d][0];
++			if ((pixel / FrameSize) % 2 == 0 && (pixel % FrameSize) % 2 == 0) ++drawn[d][1];
++		}
++	std::vector<Uint8> mask(FrameSize * FrameSize, 0);
++	auto match = [&](const int sizes[Sizes], bool withGun, int stride) {
++		float hull[2][3], turret[2][3], barrel[2][3];
++		box(sizes[HullHalf], sizes[HullBack], sizes[HullFront], sizes[HullBottom], sizes[Deck], hull);
++		box(sizes[TurretHalf], sizes[TurretBack], sizes[TurretFront], sizes[Deck], sizes[TurretTop], turret);
++		box(sizes[GunHalf], sizes[TurretFront], sizes[Muzzle], sizes[GunLow], sizes[GunLow] + 2 * sizes[GunHalf], barrel);
++		double sum = 0.0;
++		for (int d = 0; d < 8; ++d)
++		{
++			int bounds[4] = { FrameSize, 0, FrameSize, 0 };
++			outline(hull[0], hull[1], d, stride, mask, bounds);
++			outline(turret[0], turret[1], d, stride, mask, bounds);
++			if (withGun) outline(barrel[0], barrel[1], d, stride, mask, bounds);
++			int both = 0, outlined = 0;
++			for (int row = bounds[2]; row < bounds[3]; row += stride)
++				for (int column = bounds[0]; column < bounds[1]; column += stride)
++				{
++					Uint8 &in = mask[row * FrameSize + column];
++					if (!in) continue;
++					in = 0; // (cleared again for the next view)
++					++outlined;
++					both += solid.frame[d][row * FrameSize + column] != 0;
++				}
++			const double cost = both + BoxExtraCost * (outlined - both) + (drawn[d][stride - 1] - both);
++			sum += cost > 0.0 ? both / cost : 0.0;
++		}
++		return sum;
++	};
++	auto fits = [&](const int sizes[Sizes]) {
++		return sizes[HullHalf] >= BoxTankLeast && sizes[HullHalf] <= middleAcross && sizes[TurretHalf] >= BoxTankLeast && sizes[TurretHalf] <= middleAcross
++			&& sizes[HullBack] >= 0 && sizes[HullFront] - sizes[HullBack] >= BoxTankLeast && sizes[HullFront] <= GridAlong
++			&& sizes[TurretBack] >= 0 && sizes[TurretFront] - sizes[TurretBack] >= BoxTankLeast && sizes[TurretFront] <= GridAlong
++			&& sizes[HullBottom] >= 0 && sizes[Deck] - sizes[HullBottom] >= BoxTankLeast && sizes[TurretTop] - sizes[Deck] >= BoxTankLeast && sizes[TurretTop] <= GridUp
++			&& sizes[GunHalf] >= 1 && sizes[GunHalf] * Cell <= BoxBarrelHalfMost && sizes[GunHalf] < sizes[TurretHalf] && sizes[GunLow] >= sizes[Deck] && sizes[GunLow] + 2 * sizes[GunHalf] <= sizes[TurretTop]
++			&& sizes[Muzzle] >= sizes[TurretFront] + BoxTankLeast && sizes[Muzzle] <= GridAlong;
++	};
++	// A search: a size at a time, by the steps given, the first step that matches better taken, until none does or the
++	// steps run out. The score where it ends.
++	int steps = 0;
++	auto search = [&](int sizes[Sizes], bool withGun, int stride, std::initializer_list<int> bys, int most) {
++		const int count = withGun ? Sizes : GunHalf;
++		double best = match(sizes, withGun, stride);
++		for (bool better = true; better && steps < most; )
++		{
++			better = false;
++			for (int which = 0; which < count && !better && steps < most; ++which)
++				for (const int by : bys)
++				{
++					int tried[Sizes];
++					std::copy(sizes, sizes + Sizes, tried);
++					tried[which] += by;
++					if (!fits(tried)) continue;
++					++steps;
++					const double score = match(tried, withGun, stride);
++					if (score > best + 1e-9)
++					{
++						best = score;
++						std::copy(tried, tried + Sizes, sizes);
++						better = true;
++						break;
++					}
++				}
++		}
++		return best;
++	};
++	// From each turret to start from: the hull and turret, then the gun with them, in steps of two cells on every other
++	// pixel (on the game's finer bodies: on the coarse ones a cell on every pixel); the best of the three then a cell at a
++	// time on every pixel.
++	int size[Sizes];
++	std::copy(first, first + Sizes, size);
++	double bestOfAll = -1.0;
++	for (const float share : BoxTurretStarts)
++	{
++		int now[Sizes];
++		std::copy(first, first + Sizes, now);
++		now[TurretHalf] = std::max(BoxTankLeast, (int)std::lround(first[HullHalf] * share));
++		steps = 0;
++		double best = search(now, false, VOXELSCALE, { VOXELSCALE, -VOXELSCALE, 2 * VOXELSCALE, -2 * VOXELSCALE }, BoxTankSteps);
++		if (armed) best = search(now, true, VOXELSCALE, { VOXELSCALE, -VOXELSCALE, 2 * VOXELSCALE, -2 * VOXELSCALE }, BoxTankSteps);
++		if (best > bestOfAll)
++		{
++			bestOfAll = best;
++			std::copy(now, now + Sizes, size);
++		}
++	}
++	steps = 0;
++	if (VOXELSCALE > 1) bestOfAll = search(size, armed, 1, { 1, -1, 2, -2 }, BoxTankFineSteps);
++	// The hollow under its belly between its tracks, as its front and back drawings show it: the columns round its middle
++	// whose lowest drawn row is BellyLeast rows or more above the tracks' lowest; as wide as they, as high as the least of
++	// them is (the drawing's rows at its front end are heights). The narrower and lower of the two drawings'.
++	float bellyHalf = 1e9f, bellyHigh = 1e9f;
++	for (const int d : { Front, (Front + 4) % 8 })
++	{
++		std::vector<int> lowest(FrameSize, -1);
++		int tracks = -1;
++		for (int column = 0; column < FrameSize; ++column)
++			for (int row = 0; row < FrameSize; ++row)
++				if (solid.frame[d][row * FrameSize + column]) { lowest[column] = row; tracks = std::max(tracks, row); }
++		int left = FloorX, right = FloorX - 1, notch = tracks;
++		while (left - 1 >= 0 && lowest[left - 1] >= 0 && lowest[left - 1] <= tracks - BellyLeast) notch = std::min(notch, tracks - lowest[--left]);
++		while (right + 1 < FrameSize && lowest[right + 1] >= 0 && lowest[right + 1] <= tracks - BellyLeast) notch = std::min(notch, tracks - lowest[++right]);
++		if (right < left || tracks < 0)
++		{
++			bellyHalf = bellyHigh = 0.0f;
++			break;
++		}
++		bellyHalf = std::min(bellyHalf, (right + 1 - left) * 0.5f / PixelsAcross);
++		bellyHigh = std::min(bellyHigh, (float)notch);
++	}
++	// The hull's and the turret's cells: each box as far as the drawings leave it (see carve: a turret's sides slope as its
++	// drawings have them, the hull's ends too), the belly hollow. (The gun is made a barrel later: see mountBarrels.)
++	const float bellyTop = UpFrom + size[HullBottom] * Cell + bellyHigh;
++	for (int across = 0; across < GridAcross; ++across)
++		for (int along = 0; along < GridAlong; ++along)
++			for (int up = 0; up < GridUp; ++up)
++			{
++				const int cell = cellIndex(across, along, up);
++				if (!carved[cell]) continue;
++				const int fromMiddle = across < middleAcross ? middleAcross - across : across + 1 - middleAcross;
++				if (fromMiddle <= size[HullHalf] && along >= size[HullBack] && along < size[HullFront] && up >= size[HullBottom] && up < size[Deck])
++				{
++					if (std::abs(cellRight(across)) < bellyHalf && cellUp(up) < bellyTop) continue;
++					owner[cell] = PartCodes[0];
++				}
++				else if (fromMiddle <= size[TurretHalf] && along >= size[TurretBack] && along < size[TurretFront] && up >= size[Deck] && up < size[TurretTop])
++					owner[cell] = PartCodes[1];
++			}
++	if (!armed) return false;
++	// The gun, one barrel on the middle line; where its side drawing has it, for its colours (see mountBarrels).
++	gun.barrels = 1;
++	gun.right[0] = 0.0f;
++	gun.radius = size[GunHalf] * Cell;
++	gun.root = AlongFrom + size[TurretFront] * Cell;
++	gun.muzzle = AlongFrom + size[Muzzle] * Cell;
++	gun.height = UpFrom + (size[GunLow] + size[GunHalf]) * Cell;
++	gun.from = std::clamp((int)std::floor(FloorX + gun.root * PixelsAcross), 0, FrameSize - 1);
++	gun.to = std::clamp((int)std::floor(FloorX + gun.muzzle * PixelsAcross) - 1, gun.from, FrameSize - 1);
++	gun.top = std::clamp((int)std::floor(FloorY - gun.height - gun.radius), 0, FrameSize - 1);
++	gun.bottom = std::clamp((int)std::floor(FloorY - gun.height + gun.radius), gun.top, FrameSize - 1);
++	return true;
++}
++
 +std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 +	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 +	const SDL_Color *palette)
@@ -96704,9 +97390,12 @@ index 000000000..42d9277d9
 +	if (!parts[0].any) return nullptr;
 +	useGrid(routine.big ? 2 : 1);
 +	if (routine.relief && routine.whole && !routine.big) return reliefModel(parts[0], deaths, corpse, lying, palette);
++	// (A tank the unit table names "shape: tank", hull, turret and gun drawn in one picture a side: two boxes fitted to
++	// its drawings, see boxTank. Drawn by a walker's routine, it walks on no legs.)
++	const bool boxed = routine.big && routine.whole && (routine.traits & 524288) != 0;
 +	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 +	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
-+	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
++	const bool bigHull = routine.big && (boxed || !(routine.legsSwing && walks.any));
 +	// (A turret: two tiles by two and unable to move, mounted on a vehicle. It alone is made a plain block and painted
 +	// from all eight drawings (see levelOff): the owner, "leave all units as before only the turrets (2x2) that cant
 +	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
@@ -96721,7 +97410,7 @@ index 000000000..42d9277d9
 +	// Each is made a plain block as a turret is, the hull's and on it the turret's with its barrel, and painted from all
 +	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
 +	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
-+	const bool tank = bigHull && !turret && parts[1].any;
++	const bool tank = bigHull && !turret && (parts[1].any || boxed);
 +	// (A big walker the unit table names "sculpt: sides", a frog: its shape is its four drawings' from front, back and
 +	// sides alone, rounded between them (see roundPlan), and each of its cubes is painted by the drawing it is turned
 +	// to, as a humanoid's. Cut by all eight with one forgiven, as big walkers are, it had no legs to tell and no gap
@@ -96771,7 +97460,14 @@ index 000000000..42d9277d9
 +	std::vector<Uint8> owner(GridCells, 0);
 +	bool leaning = false; // (a creature on one frame whose drawings are no standing body's seen along the slant: see below)
 +	float headBottom = 1e9f; // (a person's head begins here: see standardBody and the colours below)
-+	if (routine.whole)
++	if (boxed)
++	{
++		// (a tank of two boxes fitted to its drawings, its gun found in them as a turret's: see boxTank)
++		PartFrames solid = parts[0];
++		if (!OneBody) keepSolid(solid);
++		if ((gunFound = boxTank(solid, barrelsWanted, owner, mounted))) gunFrames = solid;
++	}
++	else if (routine.whole)
 +	{
 +		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own); a
 +		// big unit's fine detail (the sparks and streaks of a hover field, a pixel or two wide) left out of its solid
@@ -97854,7 +98550,7 @@ index 000000000..42d9277d9
 +			turretLevels(stoodLow, stoodHigh);
 +			if (madeHigh > madeLow && stoodHigh > stoodLow) level = stoodLow + (level - madeLow) * (float)(stoodHigh - stoodLow) / (float)(madeHigh - madeLow);
 +		}
-+		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank ? turretTurn : 0, gunFrames, palette);
++		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank && !boxed ? turretTurn : 0, gunFrames, palette);
 +	}
 +	// (a kneeling body sat low, by the unit table: see sitLow)
 +	if (routine.kneeling && (routine.traits & 128) && !routine.whole && !routine.big) sitLow(*model, owner);
@@ -98781,10 +99477,10 @@ index 000000000..2b8e58cc7
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelUnits.cpp b/src/FirstPerson/FirstPersonVoxelUnits.cpp
 new file mode 100644
-index 000000000..83183df40
+index 000000000..4f70dc74c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelUnits.cpp
-@@ -0,0 +1,1414 @@
+@@ -0,0 +1,1423 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -99536,9 +100232,10 @@ index 000000000..83183df40
 +	// A tank (a big unit with a turret of its own that moves: see makeModel) stands about as high as the game's units
 +	// do: its deck at a kneeling soldier's height, by the rules of the game's first kind of soldier (14 in the games
 +	// themselves), its turret's top at TankTop, 20 voxels (a standing soldier is 22: the owner, "make tank only 20
-+	// voxels tall"). See VoxelBodies::Routine::tankHull.
++	// voxels tall"). See VoxelBodies::Routine::tankHull. So does a tank the unit table makes of boxes, which has no turret
++	// of the game's own (XPiratez's: "Turret is too high!", the owner).
 +	float tankHull = 0.0f, tankTop = 0.0f;
-+	if (routine->big && unit->getTurretType() != -1 && unit->getArmor()->allowsMoving())
++	if (routine->big && ((unit->getTurretType() != -1 && unit->getArmor()->allowsMoving()) || look.boxTank == 1))
 +	{
 +		tankHull = 14.0f;
 +		tankTop = (float)TankTop;
@@ -99570,6 +100267,12 @@ index 000000000..83183df40
 +	{
 +		const Uint8 turret[2] = { 't', 1 };
 +		hashBytes(hash, turret, 2);
++	}
++	// (a tank of two boxes, by the unit table: only said of a unit hashed in, as above)
++	if (look.boxTank == 1 && routine->big)
++	{
++		const Uint8 boxed[2] = { 'x', 1 };
++		hashBytes(hash, boxed, 2);
 +	}
 +	// (beating, by the unit table: only said of a unit hashed in, as above)
 +	if (look.animated == 2)
@@ -99670,6 +100373,8 @@ index 000000000..83183df40
 +		if (look.earsApart == 1) job->traits |= 131072;
 +		// (no chin and neck looked for, by the unit table: see makeModel in FirstPersonVoxelBodies.cpp)
 +		if (look.neckNone == 1) job->traits |= 262144;
++		// (a tank of two boxes fitted to its drawings, by the unit table: see boxTank in FirstPersonVoxelBodies.cpp)
++		if (look.boxTank == 1 && routine->big) job->traits |= 524288;
 +		job->tankHull = tankHull;
 +		job->tankTop = tankTop;
 +		job->flatTop = flatTop / 100.0f;
@@ -106359,7 +107064,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..7443e3f44
+index 000000000..5fa9c6e72
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1357 @@
@@ -106750,7 +107455,7 @@ index 000000000..7443e3f44
 +		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 +		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
++			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLiquidScreens", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 +	};
 +	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 +	std::vector<Section> sorted;
@@ -107843,10 +108548,10 @@ index 000000000..b860f5356
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/RuleFirstPerson.h b/src/FirstPerson/RuleFirstPerson.h
 new file mode 100644
-index 000000000..d398cb461
+index 000000000..ee07bc4e7
 --- /dev/null
 +++ b/src/FirstPerson/RuleFirstPerson.h
-@@ -0,0 +1,621 @@
+@@ -0,0 +1,650 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -107986,6 +108691,7 @@ index 000000000..d398cb461
 +		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 +		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 +		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
++		int boxTank = -1; // (a tank drawn in one picture a side: a hull box and a turret box fitted to its drawings, with its gun: 1; as ever: 0)
 +		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 +		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 +		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
@@ -108033,6 +108739,7 @@ index 000000000..d398cb461
 +	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 +	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
 +	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
++	std::map<std::string, std::set<int>> _liquidScreens; // terrain data set -> its walls whose screens are still water standing on end (the alien entertainment panels)
 +	std::map<std::string, std::set<int>> _filler;   // terrain data set -> the palette colours its art fills where the map never shows it
 +	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 +	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -108138,6 +108845,24 @@ index 000000000..d398cb461
 +			}
 +		}
 +
++		// Liquid screens (setting "Liquid screens"; a player, GitHub issue #261, of the alien entertainment panels: "could
++		// this trippy water effect apply to [them]? ... the panels in lore are supposed to make you feel weird looking
++		// at"): wall records whose screen, the pixels their animation changes, is still water standing on end: it
++		// ripples and mirrors the room (setting "Reflections"). Each `{ dataSet, records: [...] }`. A list replaces the
++		// earlier one.
++		if (const auto& screens = reader["liquidScreens"])
++		{
++			_liquidScreens.clear();
++			for (const auto& entry : screens.children())
++			{
++				std::string dataSet;
++				std::vector<int> records;
++				entry.tryRead("dataSet", dataSet);
++				entry.tryRead("records", records);
++				_liquidScreens[dataSet].insert(records.begin(), records.end());
++			}
++		}
++
 +		// Filler: terrain data sets whose art paints, where the map never shows it (covered by the tiles beside it), a
 +		// colour of no meaning (XPiratez's craft noses: a pink); seen in 3D from that side, such a part showed the pink
 +		// (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft"). Each
@@ -108229,7 +108954,8 @@ index 000000000..d398cb461
 +		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 +		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
 +		// relief: its one drawing given volume, see VoxelBodies::Routine; turret: one tile big and unable to move, made a plain
-+		// block with its gun as the big turrets are; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
++		// block with its gun as the big turrets are; tank: two tiles by two, a hull box and a turret box fitted to its
++		// drawings, with its gun, see boxTank in FirstPersonVoxelBodies.cpp; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
 +		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
 +		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
 +		// we dont have unit name in table we will apply some general rules").
@@ -108247,6 +108973,7 @@ index 000000000..d398cb461
 +					look.beast = shape == "beast" ? 1 : 0;
 +					look.relief = shape == "relief" ? 1 : 0;
 +					look.smallTurret = shape == "turret" ? 1 : 0;
++					look.boxTank = shape == "tank" ? 1 : 0;
 +				}
 +				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 +				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
@@ -108394,6 +109121,7 @@ index 000000000..d398cb461
 +			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
 +			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 +			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
++			if (entry.second.boxTank != -1) look.boxTank = entry.second.boxTank;
 +			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 +			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 +			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
@@ -108430,6 +109158,12 @@ index 000000000..d398cb461
 +	{
 +		auto found = _stillWater.find(dataSet);
 +		return found != _stillWater.end() && (found->second.records.empty() || found->second.records.count(record) > 0) ? found->second.groups : (Uint16)0;
++	}
++	/// Is a terrain record a wall whose screen is still water standing on end (`liquidScreens:`)?
++	bool isLiquidScreen(const std::string &dataSet, int record) const
++	{
++		auto found = _liquidScreens.find(dataSet);
++		return found != _liquidScreens.end() && found->second.count(record) > 0;
 +	}
 +	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
 +	bool isWater(const std::string &dataSet, int record) const

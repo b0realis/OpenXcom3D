@@ -137,6 +137,7 @@ public:
 		int kneelLow = -1; // (kneeling, its body sat down on its heel, as low as the game's rules have a kneeling unit: 1; as its kneeling drawings have it, as ever: 0)
 		int flatTop = -1, flatUnder = -1; // (how much of what stands above its widest level, and of what hangs under it, the body keeps, in hundredths; 100 as ever)
 		int smallTurret = -1; // (one tile big and unable to move: made a plain block with its gun, as the big turrets are: 1; carved from its drawings, as ever: 0)
+		int boxTank = -1; // (a tank drawn in one picture a side: a hull box and a turret box fitted to its drawings, with its gun: 1; as ever: 0)
 		int onFloor = -1; // (standing, its body's lowest cube is on the floor: 1; as high over it as its drawings leave it, as ever: 0)
 		int waistDrawn = -1; // (the rows where its trunk meets its legs are as its drawings have them: 1; filled out to the trunk's fullest row near its foot, as ever: 0)
 		int earsApart = -1; // (an animal's ears stand apart as its front drawing has them, however thick its side drawing draws them: 1; only thin ones, as ever: 0)
@@ -184,6 +185,7 @@ private:
 	std::map<std::string, std::set<int>> _waterRecords; // terrain data set -> its records that are water (the sea round a ship, among its parts)
 	struct StillWater { Uint16 groups = 0; std::set<int> records; }; // the palette's colour groups (a bit each) that are water on a data set's floors; its records, or all
 	std::map<std::string, StillWater> _stillWater;  // terrain data set -> its still water (a pond, a swamp, a paddy)
+	std::map<std::string, std::set<int>> _liquidScreens; // terrain data set -> its walls whose screens are still water standing on end (the alien entertainment panels)
 	std::map<std::string, std::set<int>> _filler;   // terrain data set -> the palette colours its art fills where the map never shows it
 	std::vector<std::string> _combatMusic;       // tense tracks to try, first one the game has wins
 	std::set<std::string> _undergroundMissions;  // missions underground all the way up, whatever their map's edges show
@@ -289,6 +291,24 @@ public:
 			}
 		}
 
+		// Liquid screens (setting "Liquid screens"; a player, GitHub issue #261, of the alien entertainment panels: "could
+		// this trippy water effect apply to [them]? ... the panels in lore are supposed to make you feel weird looking
+		// at"): wall records whose screen, the pixels their animation changes, is still water standing on end: it
+		// ripples and mirrors the room (setting "Reflections"). Each `{ dataSet, records: [...] }`. A list replaces the
+		// earlier one.
+		if (const auto& screens = reader["liquidScreens"])
+		{
+			_liquidScreens.clear();
+			for (const auto& entry : screens.children())
+			{
+				std::string dataSet;
+				std::vector<int> records;
+				entry.tryRead("dataSet", dataSet);
+				entry.tryRead("records", records);
+				_liquidScreens[dataSet].insert(records.begin(), records.end());
+			}
+		}
+
 		// Filler: terrain data sets whose art paints, where the map never shows it (covered by the tiles beside it), a
 		// colour of no meaning (XPiratez's craft noses: a pink); seen in 3D from that side, such a part showed the pink
 		// (a player, GitHub issue #259: "pink for no texture??? should pull from common colors on craft"). Each
@@ -380,7 +400,8 @@ public:
 		// The unit table: groups of name patterns (see nameHas), each with what it says of the units whose names (the
 		// unit's type, its armor's, the armor's sprite sheet, its race) hold one: shape (beast: a long body on four legs;
 		// relief: its one drawing given volume, see VoxelBodies::Routine; turret: one tile big and unable to move, made a plain
-		// block with its gun as the big turrets are; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
+		// block with its gun as the big turrets are; tank: two tiles by two, a hull box and a turret box fitted to its
+		// drawings, with its gun, see boxTank in FirstPersonVoxelBodies.cpp; upright: carved from its drawings, as ever) and seeThrough (how much of the voxel body is left out, in hundredths: 50 for a ghost). A
 		// later entry overrides what it sets, and leaves the rest. What the voxel bodies do for one kind of unit they
 		// do for the units named here and no others (the owner: "The future voxelisation rules will be per unit ... if
 		// we dont have unit name in table we will apply some general rules").
@@ -398,6 +419,7 @@ public:
 					look.beast = shape == "beast" ? 1 : 0;
 					look.relief = shape == "relief" ? 1 : 0;
 					look.smallTurret = shape == "turret" ? 1 : 0;
+					look.boxTank = shape == "tank" ? 1 : 0;
 				}
 				if (entry.tryRead("seeThrough", seeThrough)) look.shows = 100 - std::clamp(seeThrough, 0, 90);
 				if (entry.tryRead("torsoDepth", torsoDepth)) look.torsoDepth = std::clamp(torsoDepth, 0, 200);
@@ -545,6 +567,7 @@ public:
 			if (entry.second.flatTop != -1) look.flatTop = entry.second.flatTop;
 			if (entry.second.flatUnder != -1) look.flatUnder = entry.second.flatUnder;
 			if (entry.second.smallTurret != -1) look.smallTurret = entry.second.smallTurret;
+			if (entry.second.boxTank != -1) look.boxTank = entry.second.boxTank;
 			if (entry.second.onFloor != -1) look.onFloor = entry.second.onFloor;
 			if (entry.second.waistDrawn != -1) look.waistDrawn = entry.second.waistDrawn;
 			if (entry.second.earsApart != -1) look.earsApart = entry.second.earsApart;
@@ -581,6 +604,12 @@ public:
 	{
 		auto found = _stillWater.find(dataSet);
 		return found != _stillWater.end() && (found->second.records.empty() || found->second.records.count(record) > 0) ? found->second.groups : (Uint16)0;
+	}
+	/// Is a terrain record a wall whose screen is still water standing on end (`liquidScreens:`)?
+	bool isLiquidScreen(const std::string &dataSet, int record) const
+	{
+		auto found = _liquidScreens.find(dataSet);
+		return found != _liquidScreens.end() && found->second.count(record) > 0;
 	}
 	/// Is a terrain record's floor water (the sea round islands, ports and ships)?
 	bool isWater(const std::string &dataSet, int record) const

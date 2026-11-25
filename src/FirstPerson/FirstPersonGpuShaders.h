@@ -452,6 +452,7 @@ uniform int uShaftSmoke;        // setting "Light shafts": there is smoke on the
 uniform float uShaftAir;        // ... how much of the light a voxel of clear air or water throws towards the eye (0 above the sea)
 #endif
 uniform int uReflections;       // setting "Reflections" (in full colour): the sea, still water and window glass mirror what stands by them, and a UFO's metal its surroundings
+uniform int uLiquidScreens;     // setting "Liquid screens" (with "Reflections"): the alien entertainment panels' screens are still water standing on end
 uniform int uMirrorUnits;       // ... and the units: where they begin in uMirrors (how many, then MirrorUnitNumbers each, then their pictures); -1: none
 uniform int uSmoothLight; // setting "Smooth light": the full-colour picture blends between the palette's shades (and into the haze) where the palette's picture dithers
 // (The coloured lights, the reflections and the light shafts are built into the program only when their settings are on
@@ -1072,6 +1073,7 @@ vec3 skyRgbTowards(vec3 direction, int pixelX, int pixelY)
 }
 
 const float PondSwell = 0.35; // still water's ripples, of the sea's waves (see seaMirror)
+const float ScreenSwell = 1.0, ScreenMirrorLeast = 0.35, ScreenMirrorMost = 0.75; // a liquid screen's ripples, and how much of it is the mirrored picture, seen straight on and looked along (see screenMirror)
 const float GlassMirror = 0.2, GlassMirrorMost = 0.85; // window glass: how much of it is the mirrored picture, seen straight on and at the most
 
 /**
@@ -1087,6 +1089,27 @@ vec3 seaMirror(vec3 rayDirection, float x, float y, float span, float swell, out
 	mirrored.z = max(mirrored.z, 0.03);
 	float glancing = 1.0 - clamp(-dot(rayDirection, waterNormal), 0.0, 1.0);
 	share = 0.1 + 0.65 * glancing * glancing * glancing;
+	return normalize(mirrored);
+}
+
+/**
+ * The way a liquid screen mirrors a ray at a point (setting "Liquid screens", with "Reflections"; a player, GitHub issue
+ * #261: "this trippy water effect" on the alien entertainment panels, "supposed to make you feel weird looking at"): as
+ * still water standing on end, off the screen's face tilted by the waves running over it, along the wall and up; more
+ * of the mirrored picture the more the face is looked along, and a good deal of it straight on, so the show swims.
+ */
+vec3 screenMirror(vec3 rayDirection, vec3 faceNormal, vec3 point, float span, out float share)
+{
+	vec3 ray = normalize(rayDirection);
+	vec3 alongAxis = faceNormal.x != 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+	float along = dot(point, alongAxis), up = point.z;
+	float slopeAlong = waveHeight(along + 1.0, up, span) - waveHeight(along - 1.0, up, span), slopeUp = waveHeight(along, up + 1.0, span) - waveHeight(along, up - 1.0, span);
+	vec3 screenNormal = normalize(faceNormal - (alongAxis * slopeAlong + vec3(0.0, 0.0, slopeUp)) * 0.5 * ScreenSwell);
+	vec3 mirrored = reflect(ray, screenNormal);
+	float outward = dot(mirrored, faceNormal);
+	if (outward < 0.03) mirrored += faceNormal * (0.03 - outward); // (never into the wall)
+	float glancing = 1.0 - clamp(-dot(ray, screenNormal), 0.0, 1.0);
+	share = ScreenMirrorLeast + (ScreenMirrorMost - ScreenMirrorLeast) * glancing * glancing;
 	return normalize(mirrored);
 }
 
@@ -1392,7 +1415,9 @@ uint wallPaintColor(Hit hit, int hitTile, uint parts[4], uint ownColor)
 	// The paint: the wall's model, the donor's, donorWest | openEnd << 1 | kind << 8 | paintGroup << 16, the wall's min x | min y << 8.
 	uvec4 paint = texelFetch(uWallPaints, int(paintIndex) - 1);
 	bool donorWest = (paint.z & 1u) != 0u, openEnd = (paint.z & 2u) != 0u;
-	if (int((paint.z >> 8) & 0xFFu) > uWallPaint || parts[part] != paint.x
+	// (Whether the wall still stands as it was found, in any frame of its animation, the tiles' paint numbers say: a
+	// wall's rubble has none. See encodeTiles.)
+	if (int((paint.z >> 8) & 0xFFu) > uWallPaint
 		|| (((paint.z >> 16) & 0xFFu) != uint(WallPaintWhole) && (ownColor >> 4) != ((paint.z >> 16) & 0xFFu)))
 	{
 		return 0u;
@@ -1620,6 +1645,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	float waveShade = 0.0;
 	bool onSea = false;
 	bool onPond = false; // (on still water: a pixel of a pond's, a swamp's or a paddy's face, see VoxelModel::stillWater)
+	bool onScreen = false; // (... and of a liquid screen's, still water standing on end: see screenMirror)
 	float hitHeight = rayOrigin.z + rayDirection.z * hit.t;
 	if (hit.part >= 0 && parts[hit.part] != 0u)
 	{
@@ -1707,10 +1733,17 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			reliefFrom = -1;
 #endif
 		}
-		else if ((info.x >> 16) != 0u && faceIndex == 4 && !hit.ghost)
+		else if ((info.x >> 16) != 0u && faceIndex == 4 && hit.part == 0 && !hit.ghost)
 		{
 			// (still water: the floor's top where its own colour is one of the water's groups)
 			onPond = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
+		}
+		else if ((info.x >> 16) != 0u && uLiquidScreens != 0 && ((hit.part == 1 && faceIndex == 0) || (hit.part == 2 && faceIndex == 2)) && !hit.ghost)
+		{
+			// (a liquid screen: a wall's shown face, the east of a west wall's, the south of a north wall's, where its own
+			// colour is one of the screen's groups; its back, in a plain wall's paint, never is)
+			onScreen = (((info.x >> 16) >> (baseColor >> 4)) & 1u) != 0u;
+			onPond = onScreen;
 		}
 #ifdef RELIEF
 		// The face's tilt: the slope of its drawing's brightness there, from the voxel's four neighbours along the face.
@@ -2022,7 +2055,8 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			}
 			else
 #endif
-			mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
+			if (onScreen) mirrored = screenMirror(rayDirection, normal, surfacePoint, hit.t, share);
+			else mirrored = seaMirror(rayDirection, surfacePoint.x, surfacePoint.y, hit.t, onPond ? PondSwell : 1.0, share);
 			Hit met;
 			int metTile, metAxis;
 			float metDistance;

@@ -104,6 +104,7 @@ public:
 		int colorLightCount;                      // ... how many this frame (0: none, or the setting off)
 		bool colorLightsOn;                       // ... the setting is on (the program for them is built ahead of the first light)
 		bool reflections;                         // setting "Reflections" (in full colour): the sea and still water mirror the sky and what stands by them, window glass what is in front of it, a UFO's metal (setting "Metallic surfaces") its surroundings
+		bool liquidScreens;                       // setting "Liquid screens" (with Reflections): the alien entertainment panels' screens mirror as still water standing on end
 		bool lightShafts, shaftSmoke;             // setting "Light shafts": this frame has light in smoke or water to show (in full colour); there is smoke on the map
 		float shaftAir;                           // ... how much of the light a voxel of clear water throws towards the eye (0 above the sea)
 		bool smoothLight;                         // setting "Smooth light": the full-colour picture blends where the palette's dithers

@@ -749,9 +749,10 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	// A tank (a big unit with a turret of its own that moves: see makeModel) stands about as high as the game's units
 	// do: its deck at a kneeling soldier's height, by the rules of the game's first kind of soldier (14 in the games
 	// themselves), its turret's top at TankTop, 20 voxels (a standing soldier is 22: the owner, "make tank only 20
-	// voxels tall"). See VoxelBodies::Routine::tankHull.
+	// voxels tall"). See VoxelBodies::Routine::tankHull. So does a tank the unit table makes of boxes, which has no turret
+	// of the game's own (XPiratez's: "Turret is too high!", the owner).
 	float tankHull = 0.0f, tankTop = 0.0f;
-	if (routine->big && unit->getTurretType() != -1 && unit->getArmor()->allowsMoving())
+	if (routine->big && ((unit->getTurretType() != -1 && unit->getArmor()->allowsMoving()) || look.boxTank == 1))
 	{
 		tankHull = 14.0f;
 		tankTop = (float)TankTop;
@@ -783,6 +784,12 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 	{
 		const Uint8 turret[2] = { 't', 1 };
 		hashBytes(hash, turret, 2);
+	}
+	// (a tank of two boxes, by the unit table: only said of a unit hashed in, as above)
+	if (look.boxTank == 1 && routine->big)
+	{
+		const Uint8 boxed[2] = { 'x', 1 };
+		hashBytes(hash, boxed, 2);
 	}
 	// (beating, by the unit table: only said of a unit hashed in, as above)
 	if (look.animated == 2)
@@ -883,6 +890,8 @@ const VoxelUnitModel *VoxelUnits::modelFor(BattleUnit *unit, UnitSprite &unitSpr
 		if (look.earsApart == 1) job->traits |= 131072;
 		// (no chin and neck looked for, by the unit table: see makeModel in FirstPersonVoxelBodies.cpp)
 		if (look.neckNone == 1) job->traits |= 262144;
+		// (a tank of two boxes fitted to its drawings, by the unit table: see boxTank in FirstPersonVoxelBodies.cpp)
+		if (look.boxTank == 1 && routine->big) job->traits |= 524288;
 		job->tankHull = tankHull;
 		job->tankTop = tankTop;
 		job->flatTop = flatTop / 100.0f;

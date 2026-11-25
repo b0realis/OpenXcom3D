@@ -385,7 +385,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
-			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
+			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLiquidScreens", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
 	};
 	struct Section { std::string heading, name; std::vector<OptionInfo> options; };
 	std::vector<Section> sorted;

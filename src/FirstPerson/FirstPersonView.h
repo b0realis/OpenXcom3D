@@ -83,6 +83,7 @@ class Tile;
 class Explosion;
 class Projectile;
 class RuleItem;
+class Armor;
 class BattleItem;
 namespace FirstPerson { class DamageNumbers; }
 struct AmbientScene;
@@ -196,7 +197,7 @@ public:
 		bool pulse = false;      // a frame of a part whose animation is a light pulsing, blinking or changing colour, not a thing in motion: it always cross-fades softly (see pulsingFrames, AnimatedNearShades)
 		bool wayThrough;         // a wall one goes through: a door, or a wall the game lets one walk through (a curtain); a hidden face never borrows its look (see mirroredColor)
 		bool water;              // a floor of the mod's water (RuleFirstPerson::isWater: TFTD's sea): its top is drawn as waves (see waterColor)
-		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; 0 for none
+		Uint16 stillWater;       // a floor with still water on it (RuleFirstPerson::getStillWater: a pond, a swamp): the palette's colour groups, a bit each, whose pixels on its top are water and mirror; on a wall, a liquid screen's on its shown face (RuleFirstPerson::isLiquidScreen); 0 for none
 		Uint8 liquidHeight;       // a floor the art draws as a box of liquid (XPiratez's sewer sludge, see liquidHeightOf): its surface's height in voxels; 0 for none
 		bool artFill;             // a floor or wall whose voxels leave out most of its art (a catwalk's grating, a fence: see sparseArt)
 		bool openingGlass;        // glass filled into an opening of the game's shape (lookOnly bits, see fillPaneOpenings): a round going through breaks it (see breakGlassAt)
@@ -204,6 +205,7 @@ public:
 		Uint8 cropBlock;          // an object the art draws as a block of crops (X-Com Files' wheat, see cropBlockOf): the block's height in voxels; 0 for none
 		Uint8 ghostKind;          // how a part without voxels was built (see buildModel): 0 not at all, 1 the mod's ghost shape, 2 a block of crops, 3 low art standing up, 4 a plain ghost, 6 a floor lying flat drawn solid (a pool's water), 7 a body made from the art (a console no one walks through), 5 not as a model: a flame, its art drawn as a sprite (see partKind)
 		bool reliefRises;         // ... low art that rises (see lowArt)
+		const VoxelModel *frameOf = nullptr; // a later animation frame's model: its record's first frame's, which a wall's paint goes by (see findWallPaints); null on a first frame
 		const VoxelModel *ghost;  // a ghost model of the part's own, in the same tile where the part has no voxels: the liquid's surface (buildLiquid), the rest of the art (buildArtFill) or a block of crops (buildCropBlock); null for none
 		float glow[3]; // centre of the brightest voxels in the top third (a lamp's bulb), in the tile
 		int glowCount;
@@ -218,6 +220,9 @@ public:
 		const Uint8 (*exposed)[16][16]; // [z][y][x]: the voxel's open faces (bit per face: +x -x +y -y +z -z), for smooth hull shading
 		Uint8 pulseKind;                // how its lights pulse: 1 small lights, 2 a big lit panel (a lift pad), 0 none
 	};
+	/// Wall paint: does a tile's wall part, the model it shows this frame, still stand as the wall a paint was found
+	/// for (that wall's first frame's model), in any frame of its animation? Its rubble doesn't (see findWallPaints).
+	static bool showsWall(const VoxelModel *shown, const VoxelModel *wall) { return shown && (shown->frameOf ? shown->frameOf : shown) == wall; }
 	/// A tile's solid mask: for each row of voxels, [z][y], a bit for each x where any of the
 	/// tile's parts has a voxel (window glass included). See TileView::solid.
 	typedef const Uint16 (*SolidRows)[16];
@@ -977,7 +982,7 @@ private:
 	std::vector<Uint16> _wallPaintOf;   // per tile, two (its west wall, its north wall): 1 + the wall's index in _wallPaints, 0 none
 
 	/// Gets (building on first use) the voxel model of a MapData record shown with a sprite.
-	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false);
+	const VoxelModel *getModel(const MapData *mapData, int spriteIndex = -1, bool cutout = false, bool loneLift = false);
 	/// Gets the leafy model of a mass of foliage hanging with no floor under it (a tree's crown).
 	const VoxelModel *leafyModel(const MapData *mapData, int spriteIndex);
 	/// Gets (building on first use) a model with the glass filled into its openings broken out.
@@ -987,11 +992,12 @@ private:
 	/// Is the glass in the openings of a tile part's window broken (see breakGlassAt)?
 	bool glassBroken(int tileIndex, int part) const;
 	/// Builds a voxel model: shapes from the LOFT templates, colours from the isometric sprite.
-	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr) const;
+	void buildModel(const MapData *mapData, int spriteIndex, bool cutout, VoxelModel &model, const VoxelModel *firstFrame = nullptr, bool loneLift = false) const;
 	/// The kind of ghost a part that animates and has no voxels is, in all its frames (null: not such a part).
-	const VoxelModel *partKind(const MapData *mapData, bool cutout);
+	const VoxelModel *partKind(const MapData *mapData, bool cutout, bool loneLift = false);
 	std::unordered_map<Uint64, VoxelModel> _partKinds; // ... by MapData and cut-out
 	bool liftInUse(const MapData *floor) const;         // is a grav lift's floor a lift somewhere on this map (another over or under it)?
+	bool liftAt(int tileIndex) const;                  // is a tile's floor a lift: a grav lift's, with another over or under it (GitHub issue #265)?
 	mutable std::map<const MapData*, bool> _liftRecords; // ... found once a record, for the battle
 	/// The art of an animated part that its model has no voxels for, drawn as a sprite standing in its tile (see
 	/// artOverlay): a torch's flame above its holder, a hologram over its base, bubbles the game gives no shape.
@@ -1208,8 +1214,10 @@ private:
 	bool isObliterated(const BattleUnit *unit) const { return !_obliterated.empty() && _obliterated.count(unit) != 0; }
 	/// A piece of a body blown apart: where it is (voxels) and its colour.
 	struct BodyPiece { float pos[3]; Uint8 color; };
+	std::map<std::pair<const Armor*, const RuleItem*>, std::vector<Uint8>> _bloodColors; // a body's blood, by its armour and its corpse (see bloodOf)
+	const std::vector<Uint8> &bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses);
 	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
-	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size);
+	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood);
 	Uint32 _hitMarkTick = 0;                            // when an enemy in sight was last hit
 	bool _hitMarkKill = false;                          // and whether that hit killed it
 	Uint32 _noHarmTick = 0;                             // when an enemy in sight was last struck to no harm

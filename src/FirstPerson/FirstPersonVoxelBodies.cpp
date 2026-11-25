@@ -5300,6 +5300,279 @@ void spreadLegs(const PartFrames &part, const PartFrames &thick, int perSide, Ui
 	}
 }
 
+/// A tank the unit table names "shape: tank" (see boxTank): the boxes' fit is a cell's step at a time, at most
+/// BoxTankSteps of them from each of three turrets to start from (BoxTurretStarts of the hull's width), and
+/// BoxTankFineSteps to finish, each box at least BoxTankLeast cells through; its gun starts BoxBarrelHalf thick each way,
+/// at most BoxBarrelHalfMost (thicker, it stood in for the turret's dome), and half way from the turret's front to the
+/// hull's. An outline's pixel the drawing hasn't costs BoxExtraCost of one the drawing has and the outlines miss.
+constexpr int BoxTankSteps = 2500, BoxTankFineSteps = 400, BoxTankLeast = 2;
+constexpr float BoxBarrelHalf = 1.0f * VOXELSCALE, BoxBarrelHalfMost = 1.5f * VOXELSCALE, BoxExtraCost = 0.6f, BoxTurretStarts[3] = { 0.3f, 0.5f, 0.7f };
+/// ... its belly hollow where its front and back drawings' lowest rows between the tracks are BellyLeast rows or more
+/// above the tracks' (see boxTank).
+constexpr int BellyLeast = 2 * VOXELSCALE;
+/**
+ * A tank the unit table names "shape: tank", by name (XPiratez's: hull, turret and gun drawn in one picture a side, by a
+ * walker's routine; carved from its eight drawings and painted as the gals are it was a lumpy purple loaf, "a lot more
+ * goofy", a player on the forum; the owner: "specifically for that tank try to build a good boxy tank model with boxy
+ * turret and barrel - lets optimise this"). Two boxes square to the tank's own axes on its middle line, the hull on the
+ * ground and the turret standing on its deck, and its gun, a bar from the turret's face ahead. Their sizes are found by
+ * optimising how well their outlines, seen along the slant as the eight drawings see the tank (see project; a box's
+ * outline is the hull of its eight corners'), match the drawings: over the eight, the pixels both have against those
+ * plus what the outlines add (BoxExtraCost each) and what they miss. (The plain overlap, extra and missed pixels alike,
+ * made the turret a tall narrow cube: drawn along the slant, a low wide turret's flanks lie inside the hull's outline,
+ * and only what of its dome rises over it counts; a tank's boxes should rather cover what is drawn.) From the box round
+ * what the drawings leave (see carve), its lower half the hull's and the middle of its top the turret's, each size
+ * steps a cell either way while that matches better; the hull and turret first, then the gun with them (a short gun
+ * lies over the hull's deck in the side drawings, where no thin end shows it, see findGun: the drawings from behind and
+ * the quarters, where it stands out past the turret, tell its length and height). Done from three turret widths to
+ * start from, the best kept. Then each box is cut by what the drawings leave of the tank (see carve): its flat faces
+ * stay, and what the drawings show sloped slopes (the owner, of the first, plain boxes: "too boxy! Now try to match
+ * the sprites and adapt the boxes a bit", "Turret is too high! It should roughly have the rhombus shape"); the belly
+ * between its tracks is hollow as its front and back drawings show it ("bottom should not be filled with voxels as it
+ * is empty space"); and it stands as high as the game's tanks (see standTank: its deck at a kneeling soldier's height,
+ * its turret's top at 20 voxels). About a second of the body builder's thread, once a battle. The gun is made a hollow
+ * barrel as a turret's (see mountBarrels), and the tank is painted from the eight drawings as any hull is.
+ * @param solid The tank's drawings, their thin detail left out (see keepSolid).
+ * @param wanted How many barrels it has by the unit table (0: none; else one).
+ * @param owner Set: the hull's cells to the body's code, the turret's to the second part's (see PartCodes).
+ * @param gun Set to its gun.
+ * @return True if it has a gun.
+ */
+static bool boxTank(const PartFrames &solid, int wanted, std::vector<Uint8> &owner, Gun &gun)
+{
+	gun = Gun();
+	// What the drawings leave: where to start from.
+	const std::vector<Uint8> carved = carve(solid, 0, std::vector<Uint8>(GridCells, 1));
+	int low[3] = { GridAcross, GridAlong, GridUp }, high[3] = { -1, -1, -1 };
+	for (int cell = 0; cell < GridCells; ++cell)
+	{
+		if (!carved[cell]) continue;
+		const int at[3] = { cell / (GridUp * GridAlong), (cell / GridUp) % GridAlong, cell % GridUp };
+		for (int axis = 0; axis < 3; ++axis) { low[axis] = std::min(low[axis], at[axis]); high[axis] = std::max(high[axis], at[axis]); }
+	}
+	if (high[0] < 0) return false;
+	// The sizes, in cells: the hull's half width (from the middle line), back and front (along the grid, the front
+	// past its last cell), bottom and deck (up the grid); the turret's half width, back, front and top; the gun's half
+	// thickness, its underside (up the grid) and its muzzle (along it: it starts at the turret's front).
+	enum { HullHalf, HullBack, HullFront, HullBottom, Deck, TurretHalf, TurretBack, TurretFront, TurretTop, GunHalf, GunLow, Muzzle, Sizes };
+	const int middleAcross = GridAcross / 2;
+	int first[Sizes];
+	first[HullHalf] = std::max(BoxTankLeast, std::max(middleAcross - low[0], high[0] + 1 - middleAcross));
+	first[HullBack] = low[1];
+	first[HullFront] = high[1] + 1;
+	first[HullBottom] = low[2];
+	first[Deck] = low[2] + (high[2] + 1 - low[2]) / 2;
+	first[TurretHalf] = first[HullHalf] / 2;
+	first[TurretBack] = low[1] + (high[1] + 1 - low[1]) / 4;
+	first[TurretFront] = high[1] + 1 - (high[1] + 1 - low[1]) / 4;
+	first[TurretTop] = high[2] + 1;
+	first[GunHalf] = std::max(1, (int)std::lround(BoxBarrelHalf / Cell));
+	first[GunLow] = (first[Deck] + first[TurretTop]) / 2 - first[GunHalf];
+	first[Muzzle] = (first[TurretFront] + first[HullFront]) / 2 + 1;
+	const bool armed = wanted != 0;
+	// A box's outline in a drawing: its corners seen along the slant, the hull round them, every pixel whose middle is in
+	// it; and the rectangle round all the outlines drawn so far.
+	auto outline = [](const float from[3], const float to[3], int d, int stride, std::vector<Uint8> &mask, int bounds[4]) {
+		std::pair<float, float> corners[8], round[16];
+		for (int corner = 0; corner < 8; ++corner)
+		{
+			float nearness;
+			project(corner & 1 ? to[0] : from[0], corner & 2 ? to[1] : from[1], corner & 4 ? to[2] : from[2], d, false, corners[corner].first, corners[corner].second, nearness);
+		}
+		std::sort(corners, corners + 8);
+		int count = 0;
+		auto turnsLeft = [](const std::pair<float, float> &a, const std::pair<float, float> &b, const std::pair<float, float> &c) {
+			return (b.first - a.first) * (c.second - a.second) - (b.second - a.second) * (c.first - a.first) > 0.0f;
+		};
+		for (int pass = 0; pass < 2; ++pass) // (the hull's lower side, then its upper: each ends where the other begins)
+		{
+			const int start = count;
+			for (int n = 0; n < 8; ++n)
+			{
+				const std::pair<float, float> &next = corners[pass == 0 ? n : 7 - n];
+				while (count >= start + 2 && !turnsLeft(round[count - 2], round[count - 1], next)) --count;
+				round[count++] = next;
+			}
+			--count;
+		}
+		float left = FrameSize, right = 0.0f, top = FrameSize, bottom = 0.0f;
+		for (int n = 0; n < count; ++n)
+		{
+			left = std::min(left, round[n].first); right = std::max(right, round[n].first);
+			top = std::min(top, round[n].second); bottom = std::max(bottom, round[n].second);
+		}
+		// (every stride'th pixel each way: see match)
+		const int rows[2] = { (std::max(0, (int)std::floor(top)) + stride - 1) / stride * stride, std::min(FrameSize, (int)std::ceil(bottom) + 1) };
+		const int columns[2] = { (std::max(0, (int)std::floor(left)) + stride - 1) / stride * stride, std::min(FrameSize, (int)std::ceil(right) + 1) };
+		for (int row = rows[0]; row < rows[1]; row += stride)
+			for (int column = columns[0]; column < columns[1]; column += stride)
+			{
+				const std::pair<float, float> middle(column + 0.5f, row + 0.5f);
+				bool inside = count >= 3;
+				for (int n = 0; n < count && inside; ++n) inside = turnsLeft(round[n], round[(n + 1) % count], middle);
+				if (inside) mask[row * FrameSize + column] = 1;
+			}
+		bounds[0] = std::min(bounds[0], columns[0]); bounds[1] = std::max(bounds[1], columns[1]);
+		bounds[2] = std::min(bounds[2], rows[0]); bounds[3] = std::max(bounds[3], rows[1]);
+	};
+	// A box's corners in the body's measure, from its sizes: across from the middle line, along and up the grid.
+	auto box = [](int half, int back, int front, int bottom, int top, float corners[2][3]) {
+		corners[0][0] = -half * Cell; corners[1][0] = half * Cell;
+		corners[0][1] = AlongFrom + back * Cell; corners[1][1] = AlongFrom + front * Cell;
+		corners[0][2] = UpFrom + bottom * Cell; corners[1][2] = UpFrom + top * Cell;
+	};
+	// How well the boxes match the drawings (see above), added up over the eight; read on every pixel (stride 1), or on
+	// every other one each way (2: a quarter of the work, for the first rough steps).
+	int drawn[8][2] = {};
+	for (int d = 0; d < 8; ++d)
+		for (int pixel = 0; pixel < FrameSize * FrameSize; ++pixel)
+		{
+			if (!solid.frame[d][pixel]) continue;
+			++drawn[d][0];
+			if ((pixel / FrameSize) % 2 == 0 && (pixel % FrameSize) % 2 == 0) ++drawn[d][1];
+		}
+	std::vector<Uint8> mask(FrameSize * FrameSize, 0);
+	auto match = [&](const int sizes[Sizes], bool withGun, int stride) {
+		float hull[2][3], turret[2][3], barrel[2][3];
+		box(sizes[HullHalf], sizes[HullBack], sizes[HullFront], sizes[HullBottom], sizes[Deck], hull);
+		box(sizes[TurretHalf], sizes[TurretBack], sizes[TurretFront], sizes[Deck], sizes[TurretTop], turret);
+		box(sizes[GunHalf], sizes[TurretFront], sizes[Muzzle], sizes[GunLow], sizes[GunLow] + 2 * sizes[GunHalf], barrel);
+		double sum = 0.0;
+		for (int d = 0; d < 8; ++d)
+		{
+			int bounds[4] = { FrameSize, 0, FrameSize, 0 };
+			outline(hull[0], hull[1], d, stride, mask, bounds);
+			outline(turret[0], turret[1], d, stride, mask, bounds);
+			if (withGun) outline(barrel[0], barrel[1], d, stride, mask, bounds);
+			int both = 0, outlined = 0;
+			for (int row = bounds[2]; row < bounds[3]; row += stride)
+				for (int column = bounds[0]; column < bounds[1]; column += stride)
+				{
+					Uint8 &in = mask[row * FrameSize + column];
+					if (!in) continue;
+					in = 0; // (cleared again for the next view)
+					++outlined;
+					both += solid.frame[d][row * FrameSize + column] != 0;
+				}
+			const double cost = both + BoxExtraCost * (outlined - both) + (drawn[d][stride - 1] - both);
+			sum += cost > 0.0 ? both / cost : 0.0;
+		}
+		return sum;
+	};
+	auto fits = [&](const int sizes[Sizes]) {
+		return sizes[HullHalf] >= BoxTankLeast && sizes[HullHalf] <= middleAcross && sizes[TurretHalf] >= BoxTankLeast && sizes[TurretHalf] <= middleAcross
+			&& sizes[HullBack] >= 0 && sizes[HullFront] - sizes[HullBack] >= BoxTankLeast && sizes[HullFront] <= GridAlong
+			&& sizes[TurretBack] >= 0 && sizes[TurretFront] - sizes[TurretBack] >= BoxTankLeast && sizes[TurretFront] <= GridAlong
+			&& sizes[HullBottom] >= 0 && sizes[Deck] - sizes[HullBottom] >= BoxTankLeast && sizes[TurretTop] - sizes[Deck] >= BoxTankLeast && sizes[TurretTop] <= GridUp
+			&& sizes[GunHalf] >= 1 && sizes[GunHalf] * Cell <= BoxBarrelHalfMost && sizes[GunHalf] < sizes[TurretHalf] && sizes[GunLow] >= sizes[Deck] && sizes[GunLow] + 2 * sizes[GunHalf] <= sizes[TurretTop]
+			&& sizes[Muzzle] >= sizes[TurretFront] + BoxTankLeast && sizes[Muzzle] <= GridAlong;
+	};
+	// A search: a size at a time, by the steps given, the first step that matches better taken, until none does or the
+	// steps run out. The score where it ends.
+	int steps = 0;
+	auto search = [&](int sizes[Sizes], bool withGun, int stride, std::initializer_list<int> bys, int most) {
+		const int count = withGun ? Sizes : GunHalf;
+		double best = match(sizes, withGun, stride);
+		for (bool better = true; better && steps < most; )
+		{
+			better = false;
+			for (int which = 0; which < count && !better && steps < most; ++which)
+				for (const int by : bys)
+				{
+					int tried[Sizes];
+					std::copy(sizes, sizes + Sizes, tried);
+					tried[which] += by;
+					if (!fits(tried)) continue;
+					++steps;
+					const double score = match(tried, withGun, stride);
+					if (score > best + 1e-9)
+					{
+						best = score;
+						std::copy(tried, tried + Sizes, sizes);
+						better = true;
+						break;
+					}
+				}
+		}
+		return best;
+	};
+	// From each turret to start from: the hull and turret, then the gun with them, in steps of two cells on every other
+	// pixel (on the game's finer bodies: on the coarse ones a cell on every pixel); the best of the three then a cell at a
+	// time on every pixel.
+	int size[Sizes];
+	std::copy(first, first + Sizes, size);
+	double bestOfAll = -1.0;
+	for (const float share : BoxTurretStarts)
+	{
+		int now[Sizes];
+		std::copy(first, first + Sizes, now);
+		now[TurretHalf] = std::max(BoxTankLeast, (int)std::lround(first[HullHalf] * share));
+		steps = 0;
+		double best = search(now, false, VOXELSCALE, { VOXELSCALE, -VOXELSCALE, 2 * VOXELSCALE, -2 * VOXELSCALE }, BoxTankSteps);
+		if (armed) best = search(now, true, VOXELSCALE, { VOXELSCALE, -VOXELSCALE, 2 * VOXELSCALE, -2 * VOXELSCALE }, BoxTankSteps);
+		if (best > bestOfAll)
+		{
+			bestOfAll = best;
+			std::copy(now, now + Sizes, size);
+		}
+	}
+	steps = 0;
+	if (VOXELSCALE > 1) bestOfAll = search(size, armed, 1, { 1, -1, 2, -2 }, BoxTankFineSteps);
+	// The hollow under its belly between its tracks, as its front and back drawings show it: the columns round its middle
+	// whose lowest drawn row is BellyLeast rows or more above the tracks' lowest; as wide as they, as high as the least of
+	// them is (the drawing's rows at its front end are heights). The narrower and lower of the two drawings'.
+	float bellyHalf = 1e9f, bellyHigh = 1e9f;
+	for (const int d : { Front, (Front + 4) % 8 })
+	{
+		std::vector<int> lowest(FrameSize, -1);
+		int tracks = -1;
+		for (int column = 0; column < FrameSize; ++column)
+			for (int row = 0; row < FrameSize; ++row)
+				if (solid.frame[d][row * FrameSize + column]) { lowest[column] = row; tracks = std::max(tracks, row); }
+		int left = FloorX, right = FloorX - 1, notch = tracks;
+		while (left - 1 >= 0 && lowest[left - 1] >= 0 && lowest[left - 1] <= tracks - BellyLeast) notch = std::min(notch, tracks - lowest[--left]);
+		while (right + 1 < FrameSize && lowest[right + 1] >= 0 && lowest[right + 1] <= tracks - BellyLeast) notch = std::min(notch, tracks - lowest[++right]);
+		if (right < left || tracks < 0)
+		{
+			bellyHalf = bellyHigh = 0.0f;
+			break;
+		}
+		bellyHalf = std::min(bellyHalf, (right + 1 - left) * 0.5f / PixelsAcross);
+		bellyHigh = std::min(bellyHigh, (float)notch);
+	}
+	// The hull's and the turret's cells: each box as far as the drawings leave it (see carve: a turret's sides slope as its
+	// drawings have them, the hull's ends too), the belly hollow. (The gun is made a barrel later: see mountBarrels.)
+	const float bellyTop = UpFrom + size[HullBottom] * Cell + bellyHigh;
+	for (int across = 0; across < GridAcross; ++across)
+		for (int along = 0; along < GridAlong; ++along)
+			for (int up = 0; up < GridUp; ++up)
+			{
+				const int cell = cellIndex(across, along, up);
+				if (!carved[cell]) continue;
+				const int fromMiddle = across < middleAcross ? middleAcross - across : across + 1 - middleAcross;
+				if (fromMiddle <= size[HullHalf] && along >= size[HullBack] && along < size[HullFront] && up >= size[HullBottom] && up < size[Deck])
+				{
+					if (std::abs(cellRight(across)) < bellyHalf && cellUp(up) < bellyTop) continue;
+					owner[cell] = PartCodes[0];
+				}
+				else if (fromMiddle <= size[TurretHalf] && along >= size[TurretBack] && along < size[TurretFront] && up >= size[Deck] && up < size[TurretTop])
+					owner[cell] = PartCodes[1];
+			}
+	if (!armed) return false;
+	// The gun, one barrel on the middle line; where its side drawing has it, for its colours (see mountBarrels).
+	gun.barrels = 1;
+	gun.right[0] = 0.0f;
+	gun.radius = size[GunHalf] * Cell;
+	gun.root = AlongFrom + size[TurretFront] * Cell;
+	gun.muzzle = AlongFrom + size[Muzzle] * Cell;
+	gun.height = UpFrom + (size[GunLow] + size[GunHalf]) * Cell;
+	gun.from = std::clamp((int)std::floor(FloorX + gun.root * PixelsAcross), 0, FrameSize - 1);
+	gun.to = std::clamp((int)std::floor(FloorX + gun.muzzle * PixelsAcross) - 1, gun.from, FrameSize - 1);
+	gun.top = std::clamp((int)std::floor(FloorY - gun.height - gun.radius), 0, FrameSize - 1);
+	gun.bottom = std::clamp((int)std::floor(FloorY - gun.height + gun.radius), gun.top, FrameSize - 1);
+	return true;
+}
+
 std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCount], const std::vector<Uint8> composite[8], const HeldItem items[2],
 	const std::vector<std::vector<Uint8>> &deaths, const std::vector<Uint8> &corpse, const HeldItem &lying, const WalkFrames &walks, bool aiming, const Routine &routine,
 	const SDL_Color *palette)
@@ -5307,9 +5580,12 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	if (!parts[0].any) return nullptr;
 	useGrid(routine.big ? 2 : 1);
 	if (routine.relief && routine.whole && !routine.big) return reliefModel(parts[0], deaths, corpse, lying, palette);
+	// (A tank the unit table names "shape: tank", hull, turret and gun drawn in one picture a side: two boxes fitted to
+	// its drawings, see boxTank. Drawn by a walker's routine, it walks on no legs.)
+	const bool boxed = routine.big && routine.whole && (routine.traits & 524288) != 0;
 	// (a hull: a big unit that doesn't walk. One drawn by a walker's routine but without walk frames is a hull too: XPiratez's
 	// truck turret, a turret drawn by the Sectopod's routine that never moves.)
-	const bool bigHull = routine.big && !(routine.legsSwing && walks.any);
+	const bool bigHull = routine.big && (boxed || !(routine.legsSwing && walks.any));
 	// (A turret: two tiles by two and unable to move, mounted on a vehicle. It alone is made a plain block and painted
 	// from all eight drawings (see levelOff): the owner, "leave all units as before only the turrets (2x2) that cant
 	// move make as simple shapes decorated from sprites and plop them on top of respective vehicles". Tanks, hover
@@ -5324,7 +5600,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	// Each is made a plain block as a turret is, the hull's and on it the turret's with its barrel, and painted from all
 	// eight drawings: "turret, and body as seperate voxel models stacked", a player, GitHub issue #188.) The hull keeps
 	// the shape its drawings leave, cut flat (see flattenHull); the turret is a plain block with its barrel (see levelOff).
-	const bool tank = bigHull && !turret && parts[1].any;
+	const bool tank = bigHull && !turret && (parts[1].any || boxed);
 	// (A big walker the unit table names "sculpt: sides", a frog: its shape is its four drawings' from front, back and
 	// sides alone, rounded between them (see roundPlan), and each of its cubes is painted by the drawing it is turned
 	// to, as a humanoid's. Cut by all eight with one forgiven, as big walkers are, it had no legs to tell and no gap
@@ -5374,7 +5650,14 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 	std::vector<Uint8> owner(GridCells, 0);
 	bool leaning = false; // (a creature on one frame whose drawings are no standing body's seen along the slant: see below)
 	float headBottom = 1e9f; // (a person's head begins here: see standardBody and the colours below)
-	if (routine.whole)
+	if (boxed)
+	{
+		// (a tank of two boxes fitted to its drawings, its gun found in them as a turret's: see boxTank)
+		PartFrames solid = parts[0];
+		if (!OneBody) keepSolid(solid);
+		if ((gunFound = boxTank(solid, barrelsWanted, owner, mounted))) gunFrames = solid;
+	}
+	else if (routine.whole)
 	{
 		// all of it on one frame: each run of each row its own slice (two legs stay two, an arm beside the body its own); a
 		// big unit's fine detail (the sparks and streaks of a hover field, a pixel or two wide) left out of its solid
@@ -6457,7 +6740,7 @@ std::unique_ptr<VoxelUnitModel> VoxelBodies::makeModel(PartFrames parts[PartCoun
 			turretLevels(stoodLow, stoodHigh);
 			if (madeHigh > madeLow && stoodHigh > stoodLow) level = stoodLow + (level - madeLow) * (float)(stoodHigh - stoodLow) / (float)(madeHigh - madeLow);
 		}
-		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank ? turretTurn : 0, gunFrames, palette);
+		mountBarrels(*model, owner, mounted, tank ? PartCodes[1] : PartCodes[0], level, tank && !boxed ? turretTurn : 0, gunFrames, palette);
 	}
 	// (a kneeling body sat low, by the unit table: see sitLow)
 	if (routine.kneeling && (routine.traits & 128) && !routine.whole && !routine.big) sitLow(*model, owner);

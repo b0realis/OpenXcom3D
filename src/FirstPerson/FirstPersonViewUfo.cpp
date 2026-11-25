@@ -62,6 +62,7 @@
  * pixel to know whether a UFO's light reaches it.
  */
 #include "FirstPersonView.h"
+#include "../Engine/Logger.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -363,8 +364,7 @@ void FirstPersonView::findUfos()
 		// each beam starts on the first floor below the lift (the ground under a landed UFO).
 		for (const int tileIndex : ufo.tiles)
 		{
-			const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
-			if (!floor || !floor->isGravLift()) continue;
+			if (!liftAt(tileIndex)) continue; // (a grav lift's floor with another over or under it: GitHub issue #265)
 			const int liftLevel = tileIndex / (mapSizeX * mapSizeY), column = tileIndex % (mapSizeX * mapSizeY);
 			int bottomLevel = liftLevel;
 			for (int level = liftLevel - 1; level >= 0; --level)
@@ -1096,7 +1096,8 @@ void FirstPersonView::spawnUfoAura(float elapsedSeconds)
  * Finds the lifts on the map, once per battle: every floor the game lets units float up through
  * (a UFO's grav lift, an alien base's, a building's elevator: XPiratez's mansion has blue pads
  * with yellow lines striking up), each with the height its beam starts at, the first floor below
- * it, and where it ends, the level above it. Their colours are picked when first needed.
+ * it, and where it ends, the level above it. Their colours are picked when first needed. A grav
+ * lift's floor with no other over or under it is no lift (see liftAt): no beam.
  */
 void FirstPersonView::findLifts()
 {
@@ -1106,10 +1107,16 @@ void FirstPersonView::findLifts()
 		return;
 	}
 	const int perLevel = _save->getMapSizeX() * _save->getMapSizeY(), tileCount = perLevel * _save->getMapSizeZ();
+	int lone = 0;
 	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
 	{
 		const MapData *floor = _save->getTile(tileIndex)->getMapData(O_FLOOR);
 		if (!floor || !floor->isGravLift()) continue;
+		if (!liftAt(tileIndex))
+		{
+			++lone;
+			continue;
+		}
 		const int liftLevel = tileIndex / perLevel, column = tileIndex % perLevel;
 		int bottomLevel = liftLevel;
 		for (int level = liftLevel - 1; level >= 0; --level)
@@ -1120,6 +1127,10 @@ void FirstPersonView::findLifts()
 		}
 		LiftSpot lift = { tileIndex, bottomLevel * 24.0f + GroundTop, (liftLevel + 1) * 24.0f + 8.0f, { 0, 0 }, false };
 		_lifts.push_back(lift);
+	}
+	if (!_lifts.empty() || lone)
+	{
+		Log(LOG_VERBOSE) << "OpenXcom3D: " << _lifts.size() << " lift floors, " << lone << " grav lift floors with none over or under them (floors like any other)";
 	}
 }
 
