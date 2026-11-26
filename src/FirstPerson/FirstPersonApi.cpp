@@ -1210,7 +1210,7 @@ void settlePresets()
  * transfers of crafts in the air, the globe's realistic light; stats in the inventory,
  * grenades saved primed, explosions at height 2, battles ended by themselves, the alternate
  * movement methods, the line of fire overridden, the smooth bullet camera, no "Next Turn"
- * screen; OXCE's links, the clip sizes, a craft's maintenance time (2), the base's name in
+ * screen, aliens and civilians bleeding from their wounds (so setting "Blood trails" shows theirs too); OXCE's links, the clip sizes, a craft's maintenance time (2), the base's name in
  * popups, the base's large bars scaled, the accuracy by the crosshair (2).
  * @param mod The mod.
  * @return How many options it changed.
@@ -1244,6 +1244,7 @@ int applyGameOptions(const Mod *mod)
 		{ "forceFire", &forceFire, nullptr, 1 },
 		{ "battleSmoothCamera", &battleSmoothCamera, nullptr, 1 },
 		{ "skipNextTurnScreen", &skipNextTurnScreen, nullptr, 1 },
+		{ "alienBleeding", &alienBleeding, nullptr, 1 }, // (the owner: "lets push alien bleeding to on under our apply recommended oxce settings")
 		{ "oxceLinks", &oxceLinks, nullptr, 1 },
 		{ "oxcePediaShowClipSize", &oxcePediaShowClipSize, nullptr, 1 },
 		{ "oxceInterceptGuiMaintenanceTime", nullptr, &oxceInterceptGuiMaintenanceTime, 2 },
@@ -2095,6 +2096,18 @@ void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position
 }
 
 /**
+ * A hit-log entry the game makes, for the Live command feed's hit log tab (see FirstPersonMode::hitLogged).
+ * @param state The battlescape screen.
+ * @param type The entry (HitLogEntryType).
+ * @param faction The side it is for.
+ * @param text Its words (the weapon, the turn's message, the hit's detail), or empty.
+ */
+void hitLogged(BattlescapeState *state, int type, int faction, const std::string &text)
+{
+	FirstPersonMode::hitLogged(state, type, faction, text);
+}
+
+/**
  * What the hit log adds after a hit's word with the setting "Detailed hit log" (see FirstPersonApi.h; the owner: the
  * original log "in 3D window exactly", enhanced inside its window, with who was hit, the damage numbers, and kills and
  * knock-outs). The game's own log says only 0, hit (up to a fifth of the unit's full health) or HIT for each unit a
@@ -2110,7 +2123,7 @@ void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position
  */
 std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut)
 {
-	if (!state || !target || !Options::fpsHitLogDetail)
+	if (!state || !target || (!Options::fpsHitLogDetail && !Options::fpsCommandFeed)) // (the Live command feed's hit log tab is the detailed log)
 	{
 		return std::string();
 	}

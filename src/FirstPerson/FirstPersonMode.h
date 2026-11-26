@@ -208,6 +208,8 @@ public:
 	static void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
 	/// Setting "Obliteration": a body on the floor a blast destroyed bursts in the 3D view (see FirstPerson::itemBlasted).
 	static void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
+	/// A hit-log entry the game makes, kept whole for the Live command feed's hit log tab (see FirstPersonModeFeed.cpp).
+	static void hitLogged(BattlescapeState *state, int type, int faction, const std::string &text);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);
 	/// A close-quarters check knocked a shot aside, told by the game (see FirstPerson::closeQuartersDeflected).
@@ -1371,8 +1373,10 @@ private:
 	bool _feedOverlays = false;    // drawing our overlays for the feed: only those it shows (see feedOverlay)
 	bool feedWanted() const;
 	bool feedShown() const;
-	/// Is the Live command feed's ISO up (its drone window enlarged and played as the isometric map: the keys the battle's)?
-	bool feedIsoShown() const;
+	/// Are the keys the battle's for the Live command feed's ISO (the isometric map in its drone window, the 3D window without the mouse)?
+	bool feedIsoHasKeys() const;
+	/// A key the battle takes with the feed's ISO, its panel's shortcuts too (shown for the key alone).
+	bool feedIsoKey(Action *action);
 	bool feedViewSize(int &width, int &height) const;
 	bool feedViewPicture(SDL_Rect &picture) const;
 	void updateFeed();
@@ -1389,7 +1393,7 @@ private:
 	bool feedOverlay(const Surface *surface) const;
 	void blitFeed(SDL_Surface *screen);
 	void blitFeedUnder(SDL_Surface *screen);
-	void blitFeedOver(SDL_Surface *screen, bool isoWindow = false);
+	void blitFeedOver(SDL_Surface *screen);
 	void drawFeedDoll(BattleUnit *unit);
 	void updateFeedInventory(BattleUnit *unit);
 	void feedInventoryMouse(Action *action, int x, int y);
@@ -1403,6 +1407,8 @@ private:
 	void pressFeedButton(int index, Action *action);
 	void updateFeedSquad();
 	void drawFeedSquad(SDL_Surface *screen);
+	/// The Live command feed's hit log tab: the battle's log, wrapped, the newest at the foot.
+	void drawFeedHitLog(SDL_Surface *screen);
 	void feedSquadMouse(int x, int y, int wheel, bool leftPress);
 	void releaseFeedItem();
 	BattleUnit *feedLookedUnit() const;
