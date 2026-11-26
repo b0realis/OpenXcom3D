@@ -45778,10 +45778,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..b3ed46c49
+index 000000000..5525569bd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,2544 @@
+@@ -0,0 +1,2653 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45988,14 +45988,30 @@ index 000000000..b3ed46c49
 +	/// The window at the top left: the squad's table, the selected soldier's inventory or the hit log (the player's choice).
 +	enum Tab { TAB_SQUAD, TAB_INVENTORY, TAB_HITLOG };
 +	/// A line of the hit log tab: a turn's start, a firing (the weapon, then its shots), reaction fire (then its shots), or
-+	/// shots with no firing before them (the enemy's, in their turn).
++	/// shots with no firing before them (the enemy's, in their turn); its parts, each in a style of its own (see
++	/// drawFeedHitLog: the words grey, the hits' words emphasised).
 +	enum HitLineKind { HIT_TURN, HIT_FIRING, HIT_REACTION, HIT_SHOTS };
-+	struct HitLine
++	enum HitStyle { HS_TEXT, HS_HEADER, HS_ZERO, HS_HIT, HS_BIG_HIT, HS_KILLED, HS_DOWN, HS_UNSEEN };
++	struct HitPart
 +	{
 +		std::string text;
++		HitStyle style;
++		bool glued = false; // (as drawn: right after the word before, with no space: "(unseen)", "killed)")
++	};
++	struct HitLine
++	{
++		std::vector<HitPart> parts;
 +		HitLineKind kind;
 +		int faction;
 +		bool shot; // (a shot is in it already)
++	};
++	/// A row of the hit log tab as drawn: a line's words that fit the window's width (in their styles), a turn's heading
++	/// (its side's mark before it), or the rule between two turns.
++	struct HitRow
++	{
++		std::vector<HitPart> words;
++		bool heading, rule;
++		int faction;
 +	};
 +	/// How the drone sees: black and white; night vision, all of it green (realistic) or the units and items in their own
 +	/// colours (enhanced); thermal, the units, explosions and fire white hot on a cool grey world.
@@ -46059,13 +46075,13 @@ index 000000000..b3ed46c49
 +	// thumb.
 +	Tab tab = TAB_SQUAD;
 +	// The hit log tab (the owner: "Top left window should have another tab: hit-log (expanded hit-log updating realtime)",
-+	// then "Only current turn!"): the turn's log as the game writes it, the aliens' turn too, each hit with whom it hurt
-+	// (see hitLogged); its lines wrapped into the window's rows (made again when a line changed, or the window), and how
-+	// many rows the wheel scrolled it back (0: the newest at the foot).
++	// then "the log should keep all turns"): the battle's log as the game writes it, the aliens' turns too, each hit with
++	// whom it hurt (see hitLogged); its lines wrapped into the window's rows (made again when a line changed, or the
++	// window), and how many rows the wheel scrolled it back (0: the newest at the foot).
 +	std::vector<HitLine> hitLines;
 +	std::string hitWeapon; // (the player's last firing: their shots after the enemy's go on a line of it again, as in the game's log)
 +	int hitVersion = 0, hitRowsVersion = -1, hitRowsWidth = 0, hitScroll = 0;
-+	std::vector<std::pair<std::string, Uint8>> hitRows;
++	std::vector<HitRow> hitRows;
 +	int squadScroll = 0;
 +	bool squadDragging = false;
 +	int dragFromY = 0, dragFromScroll = 0;
@@ -46097,6 +46113,7 @@ index 000000000..b3ed46c49
 +	Uint8 purple = 0, purpleLit = 0, turnColour = 0, clockColour = 0, dangerColour = 0, rowBack = 0;
 +	Uint8 tuColour = 0, healthColour = 0, energyColour = 0, moraleColour = 0, lowBack = 0, lowWords = 0, criticalBack = 0;
 +	Uint8 emerald = 0, emeraldLit = 0;
++	Uint8 logText = 0, logHit = 0, logBigHit = 0, logDown = 0, xcomMark = 0, enemyMark = 0;
 +	std::unique_ptr<Text> writer;
 +	Uint32 noise = 0x9E3779B9u;
 +	/// The snow's and the tears' dice.
@@ -47875,10 +47892,11 @@ index 000000000..b3ed46c49
 +
 +/**
 + * A hit-log entry the game makes (SavedBattleGame::appendToHitLog: its own log keeps only the player's turn), kept for
-+ * the Live command feed's hit log tab, the aliens' turn too, the current turn alone as the game's own (the owner: "Only
-+ * current turn!": each side's turn starts it again), as the game words it: a turn's start (with the turn's message), a firing (the weapon, then its shots on that line), reaction fire, a shot ("=>"), and
-+ * each hit's word (0, hit, HIT) with whom it hurt (see FirstPerson::hitLogDetail: in the feed always). Nothing without the
-+ * feed (made once it first showed; it keeps the log while the full 3D view is up).
++ * the Live command feed's hit log tab, every turn of the battle, the aliens' too (the owner: "the log should keep all
++ * turns"), as the game words it: a turn's start (with the turn's message), a firing (the weapon, then its shots on that
++ * line), reaction fire, a shot ("=>"), and each hit's word (0, hit, HIT) with whom it hurt (see FirstPerson::hitLogDetail:
++ * in the feed always), its "killed", "down" and "unseen" parts of their own for their colours (see drawFeedHitLog).
++ * Nothing without the feed (made once it first showed; it keeps the log while the full 3D view is up).
 + * @param state The battlescape screen.
 + * @param type The entry (HitLogEntryType).
 + * @param faction The side it is for.
@@ -47893,14 +47911,19 @@ index 000000000..b3ed46c49
 +	}
 +	CommandFeed &feed = *mode->_feed;
 +	std::vector<CommandFeed::HitLine> &lines = feed.hitLines;
-+	auto word = [state](const char *id) { return std::string(state->tr(id)); };
++	// (the game's words, without the spaces it ends them with)
++	auto word = [state](const char *id) {
++		std::string words = state->tr(id);
++		while (!words.empty() && words.back() == ' ') words.pop_back();
++		return words;
++	};
 +	// (the line shots go on: the last firing, reaction fire or shots of this side, else a new line: the player's last
 +	// firing again, as the game's own log has it after the enemy's reaction fire; else shots alone)
 +	auto shotLine = [&]() -> CommandFeed::HitLine & {
 +		if (lines.empty() || lines.back().kind == CommandFeed::HIT_TURN || lines.back().faction != faction)
 +		{
-+			if (faction == FACTION_PLAYER && !feed.hitWeapon.empty()) lines.push_back({ feed.hitWeapon + ":", CommandFeed::HIT_FIRING, faction, false });
-+			else lines.push_back({ std::string(), CommandFeed::HIT_SHOTS, faction, false });
++			if (faction == FACTION_PLAYER && !feed.hitWeapon.empty()) lines.push_back({ { { feed.hitWeapon + ":", CommandFeed::HS_TEXT } }, CommandFeed::HIT_FIRING, faction, false });
++			else lines.push_back({ {}, CommandFeed::HIT_SHOTS, faction, false });
 +		}
 +		return lines.back();
 +	};
@@ -47909,31 +47932,30 @@ index 000000000..b3ed46c49
 +	case HITLOG_NEW_TURN:
 +	case HITLOG_NEW_TURN_WITH_MESSAGE:
 +	{
-+		lines.clear(); // (the turn before is gone, as from the game's own log)
 +		feed.hitWeapon.clear();
 +		feed.hitScroll = 0;
 +		std::string header = std::string(state->tr("STR_FPS_FEED_TURN").arg(mode->_save->getTurn())) + "  "
 +			+ word(faction == FACTION_PLAYER ? "STR_FPS_FEED_SIDE_XCOM" : faction == FACTION_HOSTILE ? "STR_FPS_FEED_SIDE_ALIENS" : "STR_FPS_FEED_SIDE_CIVILIANS");
 +		if (type == HITLOG_NEW_TURN_WITH_MESSAGE && !text.empty()) header += "  " + text;
-+		lines.push_back({ header, CommandFeed::HIT_TURN, faction, false });
++		lines.push_back({ { { header, CommandFeed::HS_HEADER } }, CommandFeed::HIT_TURN, faction, false });
 +		break;
 +	}
 +	case HITLOG_PLAYER_FIRING:
 +		// (a firing chosen again with no shot yet, as the game's own log, says it once)
 +		if (!lines.empty() && lines.back().kind == CommandFeed::HIT_FIRING && !lines.back().shot) lines.pop_back();
-+		lines.push_back({ text + ":", CommandFeed::HIT_FIRING, faction, false });
++		lines.push_back({ { { text + ":", CommandFeed::HS_TEXT } }, CommandFeed::HIT_FIRING, faction, false });
 +		feed.hitWeapon = text;
 +		break;
 +	case HITLOG_REACTION_FIRE:
 +		if (lines.empty() || lines.back().kind != CommandFeed::HIT_REACTION || lines.back().shot)
 +		{
-+			lines.push_back({ word("STR_HIT_LOG_REACTION_FIRE"), CommandFeed::HIT_REACTION, faction, false });
++			lines.push_back({ { { word("STR_HIT_LOG_REACTION_FIRE"), CommandFeed::HS_TEXT } }, CommandFeed::HIT_REACTION, faction, false });
 +		}
 +		break;
 +	case HITLOG_NEW_SHOT:
 +	{
 +		CommandFeed::HitLine &line = shotLine();
-+		line.text += (line.text.empty() ? "" : " ") + word("STR_HIT_LOG_NEW_BULLET");
++		line.parts.push_back({ word("STR_HIT_LOG_NEW_BULLET"), CommandFeed::HS_TEXT });
 +		line.shot = true;
 +		break;
 +	}
@@ -47942,55 +47964,108 @@ index 000000000..b3ed46c49
 +	case HITLOG_BIG_DAMAGE:
 +	{
 +		CommandFeed::HitLine &line = shotLine();
-+		line.text += word(type == HITLOG_NO_DAMAGE ? "STR_HIT_LOG_NO_DAMAGE" : type == HITLOG_SMALL_DAMAGE ? "STR_HIT_LOG_SMALL_DAMAGE" : "STR_HIT_LOG_BIG_DAMAGE") + text;
++		line.parts.push_back({ word(type == HITLOG_NO_DAMAGE ? "STR_HIT_LOG_NO_DAMAGE" : type == HITLOG_SMALL_DAMAGE ? "STR_HIT_LOG_SMALL_DAMAGE" : "STR_HIT_LOG_BIG_DAMAGE"),
++			type == HITLOG_NO_DAMAGE ? CommandFeed::HS_ZERO : type == HITLOG_SMALL_DAMAGE ? CommandFeed::HS_HIT : CommandFeed::HS_BIG_HIT });
++		// (whom it hurt, its "killed", "down" or "unseen" a part of its own)
++		std::string detail = text;
++		while (!detail.empty() && detail.back() == ' ') detail.pop_back();
++		const std::pair<std::string, CommandFeed::HitStyle> marks[] = { { word("STR_FPS_HIT_LOG_KILLED"), CommandFeed::HS_KILLED },
++			{ word("STR_FPS_HIT_LOG_DOWN"), CommandFeed::HS_DOWN }, { word("STR_FPS_HIT_LOG_UNSEEN"), CommandFeed::HS_UNSEEN } };
++		size_t at = std::string::npos, length = 0;
++		CommandFeed::HitStyle style = CommandFeed::HS_TEXT;
++		for (const auto &mark : marks)
++		{
++			const size_t found = mark.first.empty() ? std::string::npos : detail.rfind(mark.first);
++			if (found != std::string::npos) { at = found; length = mark.first.size(); style = mark.second; break; }
++		}
++		if (at == std::string::npos)
++		{
++			if (!detail.empty()) line.parts.push_back({ detail, CommandFeed::HS_TEXT });
++		}
++		else
++		{
++			// (glued to the words before and after where the detail has no space between them: "(unseen)", "killed)")
++			if (at > 0) line.parts.push_back({ detail.substr(0, at), CommandFeed::HS_TEXT });
++			line.parts.push_back({ detail.substr(at, length), style, at > 0 && detail[at - 1] != ' ' });
++			if (at + length < detail.size()) line.parts.push_back({ detail.substr(at + length), CommandFeed::HS_TEXT, detail[at + length] != ' ' });
++		}
 +		line.shot = true;
 +		break;
 +	}
 +	default:
 +		return;
 +	}
-+	// (a long turn's oldest lines go first)
++	// (a long battle's oldest lines go first)
 +	if (lines.size() > 600) lines.erase(lines.begin(), lines.begin() + 100);
 +	++feed.hitVersion;
 +}
 +
 +/**
-+ * The hit log tab: the log's lines wrapped into the window's width, a turn's start in the turn's colour, the squad's
-+ * firing, reaction fire and shots in the HUD's green, the enemy's in danger red; the newest
-+ * at the foot, the wheel scrolling back through it (and following the newest again at the foot).
++ * The hit log tab (the owner: "do not colour whole strings red. The text is gray only hit. Emphasis is red", turns marked
++ * "yellow mark for xcom and red mark for AI", a rule between them): the log's lines wrapped into the window's width, the
++ * words grey; a hit's word emphasised, "0" dim, "hit" dark red, "HIT" bright red, "killed" bright red, "down" orange,
++ * "unseen" dim; each turn's heading in the turn's amber after its side's mark (a square, yellow for X-COM, red for the
++ * others), and a rule across the window before it (but the first); the newest at the foot, the wheel scrolling back
++ * through it (and following the newest again at the foot).
 + * @param screen The game's screen.
 + */
 +void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 +{
 +	CommandFeed &feed = *_feed;
-+	const int ui = feed.ui, rowH = (FeedWordsH + 1) * ui, margin = 3 * ui;
++	const int ui = feed.ui, rowH = (FeedWordsH + 1) * ui, margin = 3 * ui, markSide = (FeedWordsH - 3) * ui, indent = markSide + 3 * ui;
 +	const SDL_Rect &area = feed.inventoryPicture;
 +	fill(screen, area.x, area.y, area.w, area.h, feed.black);
-+	const int width = area.w - 2 * margin;
++	const int width = area.w - 2 * margin - indent;
++	auto textWidth = [&](const std::string &words) { feed.writer->setText(words); return feed.writer->getTextWidth() * ui; };
 +	if (feed.hitRowsVersion != feed.hitVersion || feed.hitRowsWidth != width)
 +	{
-+		// (each line in words, as many to a row as fit; a word wider than a row alone on its row)
++		// (each line in words, as many to a row as fit, each word in its part's style; a word wider than a row alone)
 +		feed.hitRows.clear();
 +		for (const CommandFeed::HitLine &line : feed.hitLines)
 +		{
-+			const Uint8 colour = line.kind == CommandFeed::HIT_TURN ? feed.turnColour : line.faction == FACTION_PLAYER ? feed.hudColour : feed.dangerColour;
-+			std::istringstream words(line.text);
-+			std::string word, row;
-+			while (words >> word)
++			if (line.kind == CommandFeed::HIT_TURN)
 +			{
-+				const std::string longer = row.empty() ? word : row + " " + word;
-+				feed.writer->setText(longer);
-+				if (!row.empty() && feed.writer->getTextWidth() * ui > width)
++				if (!feed.hitRows.empty()) feed.hitRows.push_back({ {}, false, true, line.faction });
++				feed.hitRows.push_back({ line.parts, true, false, line.faction });
++				continue;
++			}
++			// (the words of all its parts, a part's first glued to the word before when the part says so: the ")" after
++			// "killed"; a group of glued words wraps whole)
++			std::vector<std::vector<CommandFeed::HitPart>> groups;
++			for (const CommandFeed::HitPart &part : line.parts)
++			{
++				bool spaced = !part.glued;
++				for (size_t at = 0; at < part.text.size();)
 +				{
-+					feed.hitRows.push_back({ row, colour });
-+					row = word;
++					if (part.text[at] == ' ') { spaced = true; ++at; continue; }
++					const size_t end = std::min(part.text.find(' ', at), part.text.size());
++					CommandFeed::HitPart word = { part.text.substr(at, end - at), part.style };
++					if (spaced || groups.empty()) groups.push_back({ word });
++					else { word.glued = true; groups.back().push_back(word); }
++					spaced = false;
++					at = end;
++				}
++			}
++			CommandFeed::HitRow row = { {}, false, false, line.faction };
++			std::string rowText;
++			for (const std::vector<CommandFeed::HitPart> &group : groups)
++			{
++				std::string groupText;
++				for (const CommandFeed::HitPart &word : group) groupText += word.text;
++				const std::string longer = rowText.empty() ? groupText : rowText + " " + groupText;
++				if (!rowText.empty() && textWidth(longer) > width)
++				{
++					feed.hitRows.push_back(row);
++					row.words.clear();
++					rowText = groupText;
 +				}
 +				else
 +				{
-+					row = longer;
++					rowText = longer;
 +				}
++				row.words.insert(row.words.end(), group.begin(), group.end());
 +			}
-+			if (!row.empty()) feed.hitRows.push_back({ row, colour });
++			if (!row.words.empty()) feed.hitRows.push_back(row);
 +		}
 +		feed.hitRowsVersion = feed.hitVersion;
 +		feed.hitRowsWidth = width;
@@ -47998,16 +48073,44 @@ index 000000000..b3ed46c49
 +	if (feed.hitRows.empty())
 +	{
 +		const std::string words = _state->tr("STR_FPS_FEED_HIT_LOG_EMPTY");
-+		feed.writer->setText(words);
-+		feedWrite(screen, words, area.x + (area.w - feed.writer->getTextWidth() * ui) / 2, area.y + (area.h - FeedWordsH * ui) / 2, feed.dimColour);
++		feedWrite(screen, words, area.x + (area.w - textWidth(words)) / 2, area.y + (area.h - FeedWordsH * ui) / 2, feed.dimColour);
 +		return;
 +	}
++	auto colourOf = [&](CommandFeed::HitStyle style) {
++		switch (style)
++		{
++		case CommandFeed::HS_HEADER: return feed.turnColour;
++		case CommandFeed::HS_ZERO: case CommandFeed::HS_UNSEEN: return feed.dimColour;
++		case CommandFeed::HS_HIT: return feed.logHit;
++		case CommandFeed::HS_BIG_HIT: case CommandFeed::HS_KILLED: return feed.logBigHit;
++		case CommandFeed::HS_DOWN: return feed.logDown;
++		default: return feed.logText;
++		}
++	};
 +	const int shown = std::max(1, (area.h - 2 * margin) / rowH);
 +	feed.hitScroll = std::clamp(feed.hitScroll, 0, std::max(0, (int)feed.hitRows.size() - shown));
 +	const int last = (int)feed.hitRows.size() - feed.hitScroll, first = std::max(0, last - shown);
-+	for (int row = first; row < last; ++row)
++	const int space = std::max(ui, textWidth("a a") - 2 * textWidth("a"));
++	for (int index = first; index < last; ++index)
 +	{
-+		feedWrite(screen, feed.hitRows[row].first, area.x + margin, area.y + margin + (row - first) * rowH, feed.hitRows[row].second, width);
++		const CommandFeed::HitRow &row = feed.hitRows[index];
++		const int y = area.y + margin + (index - first) * rowH;
++		if (row.rule)
++		{
++			fill(screen, area.x + margin, y + rowH / 2 - ui / 2, area.w - 2 * margin, ui, feed.frameColour);
++			continue;
++		}
++		if (row.heading)
++		{
++			fill(screen, area.x + margin, y + ui, markSide, markSide, row.faction == FACTION_PLAYER ? feed.xcomMark : feed.enemyMark);
++		}
++		int x = area.x + margin + indent;
++		for (size_t at = 0; at < row.words.size() && x < area.x + area.w - margin; ++at)
++		{
++			const CommandFeed::HitPart &word = row.words[at];
++			if (at > 0 && !word.glued) x += space;
++			x += feedWrite(screen, word.text, x, y, colourOf(word.style), area.x + area.w - margin - x);
++		}
 +	}
 +}
 +
@@ -48083,6 +48186,12 @@ index 000000000..b3ed46c49
 +	feed.criticalBack = nearestColor(palette, 200, 20, 20);
 +	feed.emerald = nearestColor(palette, 20, 140, 90);
 +	feed.emeraldLit = bright(60, 215, 140);
++	feed.logText = bright(170, 172, 180);
++	feed.logHit = nearestColor(palette, 185, 45, 35);
++	feed.logBigHit = bright(255, 60, 45);
++	feed.logDown = bright(255, 150, 40);
++	feed.xcomMark = bright(255, 225, 40);
++	feed.enemyMark = nearestColor(palette, 230, 30, 30);
 +	if (!feed.writer)
 +	{
 +		feed.writer.reset(new Text(Options::baseXResolution, FeedWordsH, 0, 0));
