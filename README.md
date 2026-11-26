@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.15**, for Linux, Windows, the Steam Deck and macOS. See [New in 1.15](#new-in-115).
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.16**, for Linux, Windows, the Steam Deck and macOS. See [New in 1.16](#new-in-116).
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -40,6 +40,14 @@ The research and testing goal of this project was to bring the battlescape into 
 The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×40 pixel sprites, terrain is 16×16×24 voxels, and there are 256 colours. Good ideas for that are welcome (a few are listed in the manual, under [Known limits and ideas](OpenXcom3D_manual.md#9-known-limits-and-ideas)). Nevertheless the gameplay turned out to be quite engaging and deep: a dark UFO corridor, a door that slides open, a shape you can't make out yet, and your squad's time units ticking away.
 
 **But be careful!** It can be a traumatic experience.
+
+## New in 1.16
+
+A bug-fix and robustness release.
+
+- **Fixed:** units walk diagonally in 3D, as on the map; no falling into solid rock, and thin walls are not ground; *Obliteration* in UFO and TFTD only with the mod on; blood only on explored floors; *Recommended game options* says Apply while one isn't set; no crash quitting early on the GPU; trees, outer walls, lifts, window mirrors and voxel units' tails, backs and waists fixed; OK on the options screen keeps the window.
+- **Robustness:** four independent code reviews of every change since 1.15, and the full test suite (smoothness, about 1,150 game steps, memory and thread checks).
+- **New settings:** *Blood trails* (the wounded bleed where they walk and stand), *Obliteration*, overkill damage numbers, *Liquid screens*.
 
 ## New in 1.15
 

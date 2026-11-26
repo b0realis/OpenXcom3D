@@ -1119,7 +1119,7 @@ What `FirstPersonView` draws:
 
 ## 11. Version history
 
-### 1.16 (not released)
+### 1.16 (2026-11-26)
 
 - **Free walking steps diagonally** (the owner, play-testing: "units do not walk diagonally but zigzag ... units can and must walk diagonally!"): walking aslant, the camera seldom crosses a tile's corner, so it took a straight step at one edge and another at the next, two steps where the map walks one diagonal (the price was already a diagonal's). Now a straight edge crossed is held while the walk goes on to the other edge within 12 voxels (that step and the diagonal both open): the step is the diagonal, at 45 degrees always, at shallower angles straight and diagonal steps mixed, as the game's own paths. Checked: walking at 45 degrees three diagonal steps in a row; at 30 degrees diagonal, straight, diagonal; straight walking as before.
 
