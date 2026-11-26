@@ -52,6 +52,7 @@
 #include "FirstPersonView.h"
 #include <algorithm>
 #include <climits>
+#include <map>
 #include <cmath>
 #include <SDL.h>
 #include "../Engine/Game.h"
@@ -59,6 +60,7 @@
 #include "../Engine/Script.h"
 #include "../Engine/Surface.h"
 #include "../Engine/SurfaceSet.h"
+#include "../Mod/Armor.h"
 #include "../Mod/MapData.h"
 #include "../Mod/Mod.h"
 #include "../Mod/RuleDamageType.h"
@@ -502,15 +504,96 @@ void FirstPersonView::addDecal(const float pos[3], int size, int darkness)
 	}
 }
 
+/// Setting "Blood trails" (see drawBlood): a step's drops, at most BloodDropsMost to a place, each BloodDropLeast to
+/// BloodDropLeast + BloodDropMore voxels across, scattered up to BloodScatter voxels either way of the tile's middle; from
+/// BloodPoolLeast of blood a pool under them, its radius BloodPoolRadius plus BloodPoolGrowth for each square root of the blood
+/// past that, at most BloodPoolRadiusMost (a tile is 16 voxels across), of three overlapping lobes so it isn't a perfect circle.
+const int BloodDropsMost = 6, BloodPoolLeast = 4;
+const double BloodDropLeast = 0.5, BloodDropMore = 0.7, BloodScatter = 5.0;
+const double BloodPoolRadius = 1.5, BloodPoolGrowth = 0.8, BloodPoolRadiusMost = 6.5;
+
+/**
+ * Setting "Blood trails": the blood the wounded left on the floors (FirstPerson::bleed; kept in the save,
+ * SavedBattleGame::getBlood), each place drawn on its tile's floor in the colours of its unit's blood (see bloodOf;
+ * the game's red for a unit whose corpse shows none), the ground's own light and shade kept: drops for the steps, and
+ * once there is enough a pool that grows with it. Each place's drops lie where they lay the last time it was drawn
+ * (the same random numbers, from its tile and its unit), each on the surface right there (the top of the first solid
+ * voxel going down from GroundPlaneProbe voxels above the floor, as groundPlane finds the ground: on a ramp or a slope
+ * the drops lie on its slant, not under it).
+ */
+void FirstPersonView::drawBlood()
+{
+	const std::vector<int> &blood = _save->getBlood();
+	if (blood.empty())
+	{
+		return;
+	}
+	std::map<int, const BattleUnit*> units;
+	for (const BattleUnit *unit : *_save->getUnits())
+	{
+		units[unit->getId()] = unit;
+	}
+	const std::vector<Uint8> none;
+	for (size_t at = 0; at + 2 < blood.size(); at += 3)
+	{
+		const Position tilePos = _save->getTileCoords(blood[at]);
+		const Tile *tile = _save->getTile(tilePos);
+		if (!tile)
+		{
+			continue;
+		}
+		const auto found = units.find(blood[at + 1]);
+		const BattleUnit *unit = found != units.end() ? found->second : nullptr;
+		const std::vector<Uint8> &colors = unit ? bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()) : none;
+		Uint32 seed = (Uint32)blood[at] * 2654435761u ^ (Uint32)(blood[at + 1] + 1) * 40503u;
+		auto random = [&seed]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; };
+		auto color = [&]() { return colors.empty() ? _colors.blood[random() < 0.5 ? 0 : 1] : colors[std::min(colors.size() - 1, (size_t)(random() * colors.size()))]; };
+		const double middleX = tilePos.x * 16.0 + 8.0, middleY = tilePos.y * 16.0 + 8.0, floorZ = tilePos.z * 24.0 + GroundTop - tile->getTerrainLevel();
+		auto surfaceAt = [&](double x, double y)
+		{
+			const int voxelX = (int)std::floor(x), voxelY = (int)std::floor(y), top = (int)std::floor(floorZ) + GroundPlaneProbe;
+			if (solidVoxel(voxelX, voxelY, top)) return floorZ;
+			for (int z = top - 1; z >= top - 2 * GroundPlaneProbe; --z)
+			{
+				if (z < 0 || solidVoxel(voxelX, voxelY, z)) return (double)std::max(z + 1, 0);
+			}
+			return floorZ;
+		};
+		const int amount = blood[at + 2];
+		for (int drop = 0; drop < std::min(amount, BloodDropsMost); ++drop)
+		{
+			const double dropX = middleX + (random() * 2.0 - 1.0) * BloodScatter, dropY = middleY + (random() * 2.0 - 1.0) * BloodScatter;
+			const double centre[3] = { dropX, dropY, surfaceAt(dropX, dropY) };
+			const double radius = BloodDropLeast + random() * BloodDropMore;
+			drawGroundShade(centre, radius, 0, 1.6f, 0, 1 << 30, nullptr, 0.0, color());
+		}
+		if (amount >= BloodPoolLeast)
+		{
+			const double radius = std::min(BloodPoolRadiusMost, BloodPoolRadius + BloodPoolGrowth * std::sqrt((double)(amount - BloodPoolLeast + 1)));
+			for (int lobe = 0; lobe < 3; ++lobe)
+			{
+				const double angle = random() * 6.283185307, off = radius * 0.4;
+				const double lobeX = middleX + std::cos(angle) * off, lobeY = middleY + std::sin(angle) * off;
+				const double centre[3] = { lobeX, lobeY, surfaceAt(lobeX, lobeY) };
+				drawGroundShade(centre, radius * 0.75, 0, 2.2f, 0, 1 << 30, nullptr, 0.0, color());
+			}
+		}
+	}
+}
+
 /**
  * Bullet holes and scorch marks on whatever surface is there, and blackened ground around
- * explosions. Drawn before the units, which stand in front of them.
+ * explosions (and with the setting, the blood on the floors). Drawn before the units, which stand in front of them.
  */
 void FirstPersonView::drawDecals()
 {
 	const int width = getWidth(), height = getHeight();
 	const double focalLength = focalPixels(); // in pixels
 	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
+	if (Options::fpsBloodTrails)
+	{
+		drawBlood();
+	}
 	// Scorched ground around big explosions: up to four shades darker in a soft disc.
 	for (const auto &scorch : _scorches)
 	{

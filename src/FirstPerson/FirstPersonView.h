@@ -1336,7 +1336,7 @@ private:
 	/// Records a sprite standing in the world (see drawSprite).
 	void gpuRecordSprite(const SpriteDraw &draw);
 	/// Records a shade on the ground (see drawGroundShade).
-	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length);
+	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length, Uint8 paint = 0);
 	/// Records a bullet hole or a scorch mark (see drawDecals).
 	void gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
 		double drawnRadius, int reach, int coreShades, int edgeShades);
@@ -1508,9 +1508,9 @@ private:
 	void drawUnitOutlines();
 	/// The outlines over bands of rows taken from the shared counter (a job for runOnAllThreads).
 	void outlineBands();
-	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom).
+	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom), or paints it a colour.
 	void drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop = 0, int bandBottom = 1 << 30,
-		const double *away = nullptr, double length = 0.0);
+		const double *away = nullptr, double length = 0.0, Uint8 paint = 0);
 	/// Draws the top item lying on each discovered tile.
 	void drawFloorItems();
 	/// The discreet map edge (setting): small red dots on the floor along the edge.
@@ -1789,6 +1789,8 @@ private:
 	bool groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const;
 	/// Draws the bullet holes, scorch marks and blackened ground.
 	void drawDecals();
+	/// Setting "Blood trails": draws the blood the wounded left on the floors.
+	void drawBlood();
 	/// Spawns chunks and dust from a destroyed tile part.
 	void spawnDebris(const Position &tilePosition, int part, const MapData *destroyedMapData);
 	/// Breaks the glass in a tile part's window openings, if still whole (see breakGlassAt); true if it did.

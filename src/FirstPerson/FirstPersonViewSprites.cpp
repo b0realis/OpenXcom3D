@@ -2950,7 +2950,9 @@ bool FirstPersonView::groundShadeBox(const double centre[3], double reach, doubl
  * from a light (a unit's shadow from a flare, see recordFlareShadow): pixels whose floor lies
  * within it lose up to `steps` shades, thinning out (dithered) towards the edge (and a stretched
  * patch towards its end too, widening there). Only pixels showing the floor right there are
- * darkened, not a wall or a unit in front of it.
+ * darkened, not a wall or a unit in front of it. Or paints them a colour instead (blood, see
+ * drawBlood): its colour group, as dark as the colour or the pixel, whichever is darker (so the
+ * floor's light and shade stay).
  * @param centre The disc's centre on the ground, in voxels (a stretched patch's start).
  * @param radius The disc's radius, in voxels (a stretched patch's half width at its start).
  * @param steps How many shades darker it makes the ground.
@@ -2959,13 +2961,14 @@ bool FirstPersonView::groundShadeBox(const double centre[3], double reach, doubl
  *        are darkened (a band of the view, see replayDrawList).
  * @param away The direction a stretched patch runs along the ground (x, y; a unit vector), or null for a disc.
  * @param length How far a stretched patch runs, in voxels.
+ * @param paint The colour it paints the ground, or 0 to darken it by `steps`.
  */
 void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom,
-	const double *away, double length)
+	const double *away, double length, Uint8 paint)
 {
 	if (_gpuRecording)
 	{
-		gpuRecordGroundShade(centre, radius, steps, density, away, length);
+		gpuRecordGroundShade(centre, radius, steps, density, away, length, paint);
 		if (_gpuRecordOnly) return;
 	}
 	// The screen rectangle around it: the four corners of the box around the disc, or around the
@@ -3023,7 +3026,8 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 			// darkened within its colour group.
 			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])
 			{
-				pixelRow[pixelX] = (Uint8)((pixelRow[pixelX] & 0xF0) | std::min(15, (pixelRow[pixelX] & 15) + steps));
+				pixelRow[pixelX] = paint ? (Uint8)((paint & 0xF0) | std::max(paint & 15, pixelRow[pixelX] & 15))
+					: (Uint8)((pixelRow[pixelX] & 0xF0) | std::min(15, (pixelRow[pixelX] & 15) + steps));
 			}
 		}
 	}

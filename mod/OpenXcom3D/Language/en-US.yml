@@ -433,6 +433,8 @@ en-US:
   STR_FPS_FLASHLIGHT_FAR: "Far light"
   STR_FPS_OBLITERATION: "Obliteration"
   STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
+  STR_FPS_BLOOD_TRAILS: "Blood trails"
+  STR_FPS_BLOOD_TRAILS_DESC: "Wounded units leave blood where they stand and on the tiles they walk, in their own blood's colour, until a medikit patches them up."
   STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
   STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
   STR_FPS_SMOOTH_FIRE: "Smooth fire"

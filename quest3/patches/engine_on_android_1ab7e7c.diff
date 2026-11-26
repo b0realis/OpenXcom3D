@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..26e5e2109
+index 000000000..2329e7a3b
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,776 @@
+@@ -0,0 +1,778 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -601,6 +601,8 @@ index 000000000..26e5e2109
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_OBLITERATION: "Obliteration"
 +  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
++  STR_FPS_BLOOD_TRAILS: "Blood trails"
++  STR_FPS_BLOOD_TRAILS_DESC: "Wounded units leave blood where they stand and on the tiles they walk, in their own blood's colour, until a medikit patches them up."
 +  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
 +  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
@@ -944,10 +946,10 @@ index 000000000..26e5e2109
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..2f00a96ad
+index 000000000..a7f612b5a
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,776 @@
+@@ -0,0 +1,778 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1383,6 +1385,8 @@ index 000000000..2f00a96ad
 +  STR_FPS_FLASHLIGHT_FAR: "Far light"
 +  STR_FPS_OBLITERATION: "Obliteration"
 +  STR_FPS_OBLITERATION_DESC: "A unit killed beyond its overkill (no corpse, as on the map) bursts into pieces of its body; so do bodies a blast destroys."
++  STR_FPS_BLOOD_TRAILS: "Blood trails"
++  STR_FPS_BLOOD_TRAILS_DESC: "Wounded units leave blood where they stand and on the tiles they walk, in their own blood's colour, until a medikit patches them up."
 +  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
 +  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
@@ -23556,10 +23560,18 @@ index 599d9a24f..4ea0dc947 100644
  
  } //namespace OpenXcom
 diff --git a/src/Battlescape/UnitWalkBState.cpp b/src/Battlescape/UnitWalkBState.cpp
-index bc5f08f46..14a02f6f7 100644
+index bc5f08f46..bae8ae655 100644
 --- a/src/Battlescape/UnitWalkBState.cpp
 +++ b/src/Battlescape/UnitWalkBState.cpp
-@@ -97,7 +97,7 @@ void UnitWalkBState::think()
+@@ -33,6 +33,7 @@
+ #include "../Mod/Armor.h"
+ #include "../Mod/Mod.h"
+ #include "UnitFallBState.h"
++#include "../FirstPerson/FirstPersonApi.h"
+ 
+ namespace OpenXcom
+ {
+@@ -97,7 +98,7 @@ void UnitWalkBState::think()
  
  	bool unitSpotted = false;
  	int size = _unit->getArmor()->getSize() - 1;
@@ -23568,7 +23580,7 @@ index bc5f08f46..14a02f6f7 100644
  	if (_unit->isKneeled())
  	{
  		if (_parent->kneel(_unit))
-@@ -142,8 +142,13 @@ void UnitWalkBState::think()
+@@ -142,8 +143,13 @@ void UnitWalkBState::think()
  		if ((_parent->getSave()->getTile(_unit->getDestination())->getUnit() == 0) || // next tile must be not occupied
  			(_parent->getSave()->getTile(_unit->getDestination())->getUnit() == _unit))
  		{
@@ -23583,7 +23595,19 @@ index bc5f08f46..14a02f6f7 100644
  			playMovementSound();
  			if (_parent->getSave()->isPreview())
  			{
-@@ -519,6 +524,11 @@ void UnitWalkBState::postPathProcedures()
+@@ -213,6 +219,11 @@ void UnitWalkBState::think()
+ 				}
+ 			}
+ 
++			if (!_falling)
++			{
++				FirstPerson::bleed(_parent->getSave(), _unit, false); // (OpenXcom3D: setting "Blood trails", a step's drops)
++			}
++
+ 			if (_unit->getFaction() != FACTION_PLAYER)
+ 			{
+ 				_unit->setVisible(false);
+@@ -519,6 +530,11 @@ void UnitWalkBState::postPathProcedures()
   */
  void UnitWalkBState::setNormalWalkSpeed()
  {
@@ -23595,7 +23619,7 @@ index bc5f08f46..14a02f6f7 100644
  	if (_unit->getFaction() == FACTION_PLAYER)
  		_parent->setStateInterval(Options::battleXcomSpeed);
  	else
-@@ -531,6 +541,7 @@ void UnitWalkBState::setNormalWalkSpeed()
+@@ -531,6 +547,7 @@ void UnitWalkBState::setNormalWalkSpeed()
   */
  void UnitWalkBState::playMovementSound()
  {
@@ -24033,7 +24057,7 @@ index d6d327c0a..6accd397e 100644
  		{
  			// it doesn't matter what order the masters are in since
 diff --git a/src/Engine/Options.inc.h b/src/Engine/Options.inc.h
-index 0467dd243..f6ee1b2fe 100644
+index 0467dd243..b73903e0f 100644
 --- a/src/Engine/Options.inc.h
 +++ b/src/Engine/Options.inc.h
 @@ -125,6 +125,7 @@ OPT int oxceCrashedOrLanded;
@@ -24050,7 +24074,7 @@ index 0467dd243..f6ee1b2fe 100644
  OPT int battleAlienSpeedOrig;
 +
 +// OpenXcom3D first-person mode (only shown when the OpenXcom3D mod is active)
-+OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration, fpsLiquidScreens, fpsObliterationClassic, fpsCommandFeed;
++OPT bool fpsGameOptions, fpsDamageOverkill, fpsTacticalMap, fpsTacticalMapIso, fpsMapWheelLevels, fpsGhostOpenDoors, fpsRightClickDoors, fpsFacingIcons, fpsSidestepFaceView, fpsCloseEyeShots, fpsSmoothFire, fpsLiftBeams, fpsTrueColor, fpsSmoothLight, fpsColoredLights, fpsReflections, fpsLightShafts, fpsSoftShadows, fpsAllLightShadows, fpsAmbientOcclusion, fpsInvertMouse, fpsStartInFirstPerson, fpsSmoothLighting, fpsDoomMode, fpsCrosshair, fpsCrosshairInfo, fpsAimExact, fpsAlienTurn3D, fpsAlienTurnFacing, fpsSoldierPreview, fpsHeadBob, fpsShadows, fpsCombatMusic, fpsViewModel, fpsMuzzleFlash, fpsVault, fpsFalling, fpsFallDamage, fpsFaithfulTargeting, fpsDualWield, fpsUfoLights, fpsDoomIdkfa, fpsDoomIddqd, fpsAkimboRealistic, fpsFlightCostOverride, fpsSeeThroughSmoke, fpsTurnCost, fpsMeleeTerrain, fpsMeleeFloors, fpsSeeThroughCorpses, fpsSpriteHitboxes, fpsQuickDeaths, fpsLiveScanner, fpsAutoEquipGunsFirst, fpsCompass, fpsHitSounds, fpsDiscreetEdge, fpsLeanShots, fpsUnitNames, fpsMiddleClickIdentify, fpsConfirmFire, fpsAlienTurnCameras, fpsFallenSoldierCamera, fpsDoomPrimeOnThrow, fpsDoomFreeGrenades, fpsGlowingOutlines, fpsForceArcing, fpsForceBlocked, fpsPelletsInFlight, fpsEachPellet, fpsSafeLanding, fpsAkimboVolley, fpsCrosshairCosts, fpsAccuracyLine, fpsSeeThroughCrops, fpsCrosshairDamage, fpsCraftIcons, fpsInstantChains, fpsDoomIdclip, fpsHitFlash, fpsScreenShake, fpsRecoil, fpsNightVisionUnits, fpsCameraEyes, fpsDamageNumbers, fpsCompassCosts, fpsVoxelUnits, fpsVrWeapon, fpsVrLaser, fpsVrSmoothing, fpsVrCardEyes, fpsHitLogDetail, fpsObliteration, fpsLiquidScreens, fpsObliterationClassic, fpsCommandFeed, fpsBloodTrails;
 +OPT int fpsPreset, fpsPresetTables, fpsKeyDefaults, fpsMapZoom, fpsGraphicsDetail, fpsFlashlightReach, fpsThrowing, fpsRangefinder, fpsRenderer, fpsRenderScale, fpsMetallic, fpsSupersampling, fpsHudScale, fpsViewResolution, fpsMouseSensitivity, fpsFieldOfView, fpsWalkSpeed, fpsParticles, fpsPixelSize, fpsFlightCost, fpsSpriteUpscale, fpsEyeLower, fpsMovement, fpsHitboxes, fpsUnitSize, fpsHaze, fpsLean, fpsDownedIcons, fpsSmoke, fpsTrajectory, fpsDoomGrenadeFuse, fpsGhostParts, fpsMapCamera, fpsGhostOpacity, fpsStatBars, fpsSmokeOpacity, fpsNightSmokeOpacity, fpsAkimbo, fpsUnseenTerrain, fpsViewDistance, fpsFogOfWar, fpsWallPaint, fpsEnemyMarkers, fpsWoundedMarkers, fpsAmbientSounds, fpsCameraArtifacts, fpsVrFoveation, fpsVrMode, fpsVrEyeSize, fpsVrTurning, fpsQuestDefaults, fpsSurfaceRelief;
 +OPT std::string fpsCustomPreset, fpsCustomGraphics;
 +OPT SDL_Keycode keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
@@ -25080,10 +25104,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..6a345e188
+index 000000000..ee5f079dc
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2426 @@
+@@ -0,0 +1,2490 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -26625,6 +26649,7 @@ index 000000000..6a345e188
 +	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
 +	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
 +	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
++	options.push_back(OptionInfo(OPTION_OTHER, "fpsBloodTrails", &fpsBloodTrails, false, "STR_FPS_BLOOD_TRAILS", category));
 +	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
 +	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
 +	// obliteration for og games also"): a unit they take past minus three quarters of its health (the owner: "Make it 75%") leaves no corpse (and with
@@ -27244,6 +27269,69 @@ index 000000000..6a345e188
 +	return healthDamageNoted;
 +}
 +
++/// Setting "Blood trails": the most blood one unit leaves on one tile (a pool grows no bigger), and the most places kept in a
++/// battle (the oldest go first).
++const int BloodAmountMost = 40;
++const size_t BloodPlacesMost = 3000;
++
++/**
++ * Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, as much as its wounds (the owner: "put a puddle
++ * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
++ * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
++ * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
++ * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds; robots,
++ * tanks and the bleed-immune never have wounds), seen or not: it lies there to be found (the owner's ruling: track by blood).
++ * Kept in the save (SavedBattleGame::getBlood); the 3D view draws it (FirstPersonView::drawBlood). Nothing with the setting off.
++ * @param save The battle.
++ * @param unit The unit.
++ * @param turn True as its side's turn starts, false for a step.
++ */
++void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn)
++{
++	if (!Options::fpsBloodTrails || !save || !unit || unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_IGNORE_ME
++		|| unit->getFatalWounds() <= 0)
++	{
++		return;
++	}
++	Tile *tile = unit->getTile();
++	if (unit->isOut())
++	{
++		tile = nullptr;
++		for (const BattleItem *item : *save->getItems())
++		{
++			if (item->getUnit() == unit)
++			{
++				tile = item->getTile();
++				break;
++			}
++		}
++	}
++	while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
++	{
++		tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
++	}
++	if (!tile)
++	{
++		return;
++	}
++	const int amount = turn ? 2 * std::min(unit->getFatalWounds(), 5) : std::min(unit->getFatalWounds(), 3);
++	const int index = save->getTileIndex(tile->getPosition());
++	std::vector<int> &blood = save->getBlood();
++	for (size_t at = 0; at + 2 < blood.size(); at += 3)
++	{
++		if (blood[at] == index && blood[at + 1] == unit->getId())
++		{
++			blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
++			return;
++		}
++	}
++	if (blood.size() >= BloodPlacesMost * 3)
++	{
++		blood.erase(blood.begin(), blood.begin() + 3);
++	}
++	blood.insert(blood.end(), { index, unit->getId(), amount });
++}
++
 +/**
 + * The points left in a unit's energy shields (setting "Damage numbers"; a player's report, GitHub
 + * issue #133: a hit a shield took whole showed a 0). The big mods' shields (X-Com Files,
@@ -27512,10 +27600,10 @@ index 000000000..6a345e188
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..5b692639e
+index 000000000..cc7ec9b5a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,579 @@
+@@ -0,0 +1,583 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27933,6 +28021,9 @@ index 000000000..5b692639e
 +bool solidGroundBelow(const Mod *mod, const Tile *below);
 +/// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 +void noteHealthDamage(int health);
++/// Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, by its wounds: a step's drops (UnitWalkBState,
++/// each step finished) or, as its side's turn starts, the pool it bleeds where it stays (SavedBattleGame). See FirstPersonApi.cpp.
++void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn);
 +int lastHealthDamage();
 +/// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 +/// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
@@ -28040,6 +28131,7 @@ index 000000000..5b692639e
 +inline float overKillShare(float armorShare) { return armorShare; }
 +inline bool solidGroundBelow(const Mod *, const Tile *) { return false; }
 +inline void noteHealthDamage(int) { }
++inline void bleed(SavedBattleGame *, BattleUnit *, bool) { }
 +inline int lastHealthDamage() { return 0; }
 +inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
 +inline int armorPoints(const BattleUnit *) { return 0; }
@@ -34131,10 +34223,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..917f24c0a
+index 000000000..ed015895c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,3498 @@
+@@ -0,0 +1,3499 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -36951,6 +37043,7 @@ index 000000000..917f24c0a
 +	return shaded > 255u || ((shaded ^ color) & 0xF0u) != 0u ? 15u : shaded;
 +}
 +uint darkened(uint color, int shades) { return color == 0u ? color : (color & 0xF0u) | uint(min(15, int(color & 15u) + shades)); }
++uint painted(uint color, uint paint) { return color == 0u ? color : (paint & 0xF0u) | max(paint & 15u, color & 15u); }
 +uint seeThrough(int level, uint over, uint under)
 +{
 +	if (level >= SeeThroughLevels) return over;
@@ -37218,7 +37311,7 @@ index 000000000..917f24c0a
 +			}
 +			// (only on the floor right there: within GroundShadeHeight of the ground's height; t2.z is the ground's height from the eye, scaled)
 +			if (abs(depth - along) > max(GroundShadeDepth, GroundShadeHeight * along / max(1.0, -t2.z / ZScale))) continue;
-+			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
++			if (closeness * head.w > dither(pixel.x, pixel.y)) color = (flags & 2) != 0 ? painted(color, uint(head.z)) : darkened(color, int(head.z));
 +		}
 +		else if (kind == EffectDecal)
 +		{
@@ -68440,10 +68533,10 @@ index 000000000..cae24a92e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..39fb29cb2
+index 000000000..891581f7b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1969 @@
+@@ -0,0 +1,1971 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -69782,7 +69875,7 @@ index 000000000..39fb29cb2
 +	/// Records a sprite standing in the world (see drawSprite).
 +	void gpuRecordSprite(const SpriteDraw &draw);
 +	/// Records a shade on the ground (see drawGroundShade).
-+	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length);
++	void gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length, Uint8 paint = 0);
 +	/// Records a bullet hole or a scorch mark (see drawDecals).
 +	void gpuRecordDecal(double screenX, double screenY, double depth, double markRight, double markUp, double radius, double pixelSpan,
 +		double drawnRadius, int reach, int coreShades, int edgeShades);
@@ -69954,9 +70047,9 @@ index 000000000..39fb29cb2
 +	void drawUnitOutlines();
 +	/// The outlines over bands of rows taken from the shared counter (a job for runOnAllThreads).
 +	void outlineBands();
-+	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom).
++	/// Darkens the ground in a soft disc (all of it, or only the screen rows from bandTop up to bandBottom), or paints it a colour.
 +	void drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop = 0, int bandBottom = 1 << 30,
-+		const double *away = nullptr, double length = 0.0);
++		const double *away = nullptr, double length = 0.0, Uint8 paint = 0);
 +	/// Draws the top item lying on each discovered tile.
 +	void drawFloorItems();
 +	/// The discreet map edge (setting): small red dots on the floor along the edge.
@@ -70235,6 +70328,8 @@ index 000000000..39fb29cb2
 +	bool groundShadeBox(const double centre[3], double reach, double endX, double endY, int &left, int &top, int &right, int &bottom) const;
 +	/// Draws the bullet holes, scorch marks and blackened ground.
 +	void drawDecals();
++	/// Setting "Blood trails": draws the blood the wounded left on the floors.
++	void drawBlood();
 +	/// Spawns chunks and dust from a destroyed tile part.
 +	void spawnDebris(const Position &tilePosition, int part, const MapData *destroyedMapData);
 +	/// Breaks the glass in a tile part's window openings, if still whole (see breakGlassAt); true if it did.
@@ -73213,7 +73308,7 @@ index 000000000..32cd9b73f
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpuEffects.cpp b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 new file mode 100644
-index 000000000..d3a0b7e60
+index 000000000..e4193207b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpuEffects.cpp
 @@ -0,0 +1,1066 @@
@@ -73629,11 +73724,11 @@ index 000000000..d3a0b7e60
 +
 +/**
 + * Records a shade on the ground (drawGroundShade: a unit's, a scorch): its box as there.
-+ * Texel 0: kind, flags (1 stretched away from a light), the shades, the density.
++ * Texel 0: kind, flags (1 stretched away from a light, 2 painted), the shades (or the colour it paints), the density.
 + * Texel 2: its centre from the eye (across the map), the ground's height from the eye in true proportions, its radius.
 + * Texel 3: the way it stretches, and how long.
 + */
-+void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length)
++void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length, Uint8 paint)
 +{
 +	const bool stretched = away && length > 0.0;
 +	const double reach = stretched ? radius * FlareShadowWidening : radius;
@@ -73647,8 +73742,8 @@ index 000000000..d3a0b7e60
 +		return;
 +	}
 +	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::GroundShade, left, top, right + 1, bottom + 1);
-+	texels[1] = stretched ? 1.0f : 0.0f;
-+	texels[2] = (float)steps;
++	texels[1] = (stretched ? 1.0f : 0.0f) + (paint ? 2.0f : 0.0f);
++	texels[2] = paint ? (float)paint : (float)steps;
 +	texels[3] = density;
 +	texels[8] = (float)(centre[0] - _eye[0]);
 +	texels[9] = (float)(centre[1] - _eye[1]);
@@ -78465,10 +78560,10 @@ index 000000000..6aa16c2cb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..6f630badd
+index 000000000..5bd79851d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2334 @@
+@@ -0,0 +1,2417 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -78523,6 +78618,7 @@ index 000000000..6f630badd
 +#include "FirstPersonView.h"
 +#include <algorithm>
 +#include <climits>
++#include <map>
 +#include <cmath>
 +#include <SDL.h>
 +#include "../Engine/Game.h"
@@ -78530,6 +78626,7 @@ index 000000000..6f630badd
 +#include "../Engine/Script.h"
 +#include "../Engine/Surface.h"
 +#include "../Engine/SurfaceSet.h"
++#include "../Mod/Armor.h"
 +#include "../Mod/MapData.h"
 +#include "../Mod/Mod.h"
 +#include "../Mod/RuleDamageType.h"
@@ -78973,15 +79070,96 @@ index 000000000..6f630badd
 +	}
 +}
 +
++/// Setting "Blood trails" (see drawBlood): a step's drops, at most BloodDropsMost to a place, each BloodDropLeast to
++/// BloodDropLeast + BloodDropMore voxels across, scattered up to BloodScatter voxels either way of the tile's middle; from
++/// BloodPoolLeast of blood a pool under them, its radius BloodPoolRadius plus BloodPoolGrowth for each square root of the blood
++/// past that, at most BloodPoolRadiusMost (a tile is 16 voxels across), of three overlapping lobes so it isn't a perfect circle.
++const int BloodDropsMost = 6, BloodPoolLeast = 4;
++const double BloodDropLeast = 0.5, BloodDropMore = 0.7, BloodScatter = 5.0;
++const double BloodPoolRadius = 1.5, BloodPoolGrowth = 0.8, BloodPoolRadiusMost = 6.5;
++
++/**
++ * Setting "Blood trails": the blood the wounded left on the floors (FirstPerson::bleed; kept in the save,
++ * SavedBattleGame::getBlood), each place drawn on its tile's floor in the colours of its unit's blood (see bloodOf;
++ * the game's red for a unit whose corpse shows none), the ground's own light and shade kept: drops for the steps, and
++ * once there is enough a pool that grows with it. Each place's drops lie where they lay the last time it was drawn
++ * (the same random numbers, from its tile and its unit), each on the surface right there (the top of the first solid
++ * voxel going down from GroundPlaneProbe voxels above the floor, as groundPlane finds the ground: on a ramp or a slope
++ * the drops lie on its slant, not under it).
++ */
++void FirstPersonView::drawBlood()
++{
++	const std::vector<int> &blood = _save->getBlood();
++	if (blood.empty())
++	{
++		return;
++	}
++	std::map<int, const BattleUnit*> units;
++	for (const BattleUnit *unit : *_save->getUnits())
++	{
++		units[unit->getId()] = unit;
++	}
++	const std::vector<Uint8> none;
++	for (size_t at = 0; at + 2 < blood.size(); at += 3)
++	{
++		const Position tilePos = _save->getTileCoords(blood[at]);
++		const Tile *tile = _save->getTile(tilePos);
++		if (!tile)
++		{
++			continue;
++		}
++		const auto found = units.find(blood[at + 1]);
++		const BattleUnit *unit = found != units.end() ? found->second : nullptr;
++		const std::vector<Uint8> &colors = unit ? bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()) : none;
++		Uint32 seed = (Uint32)blood[at] * 2654435761u ^ (Uint32)(blood[at + 1] + 1) * 40503u;
++		auto random = [&seed]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; };
++		auto color = [&]() { return colors.empty() ? _colors.blood[random() < 0.5 ? 0 : 1] : colors[std::min(colors.size() - 1, (size_t)(random() * colors.size()))]; };
++		const double middleX = tilePos.x * 16.0 + 8.0, middleY = tilePos.y * 16.0 + 8.0, floorZ = tilePos.z * 24.0 + GroundTop - tile->getTerrainLevel();
++		auto surfaceAt = [&](double x, double y)
++		{
++			const int voxelX = (int)std::floor(x), voxelY = (int)std::floor(y), top = (int)std::floor(floorZ) + GroundPlaneProbe;
++			if (solidVoxel(voxelX, voxelY, top)) return floorZ;
++			for (int z = top - 1; z >= top - 2 * GroundPlaneProbe; --z)
++			{
++				if (z < 0 || solidVoxel(voxelX, voxelY, z)) return (double)std::max(z + 1, 0);
++			}
++			return floorZ;
++		};
++		const int amount = blood[at + 2];
++		for (int drop = 0; drop < std::min(amount, BloodDropsMost); ++drop)
++		{
++			const double dropX = middleX + (random() * 2.0 - 1.0) * BloodScatter, dropY = middleY + (random() * 2.0 - 1.0) * BloodScatter;
++			const double centre[3] = { dropX, dropY, surfaceAt(dropX, dropY) };
++			const double radius = BloodDropLeast + random() * BloodDropMore;
++			drawGroundShade(centre, radius, 0, 1.6f, 0, 1 << 30, nullptr, 0.0, color());
++		}
++		if (amount >= BloodPoolLeast)
++		{
++			const double radius = std::min(BloodPoolRadiusMost, BloodPoolRadius + BloodPoolGrowth * std::sqrt((double)(amount - BloodPoolLeast + 1)));
++			for (int lobe = 0; lobe < 3; ++lobe)
++			{
++				const double angle = random() * 6.283185307, off = radius * 0.4;
++				const double lobeX = middleX + std::cos(angle) * off, lobeY = middleY + std::sin(angle) * off;
++				const double centre[3] = { lobeX, lobeY, surfaceAt(lobeX, lobeY) };
++				drawGroundShade(centre, radius * 0.75, 0, 2.2f, 0, 1 << 30, nullptr, 0.0, color());
++			}
++		}
++	}
++}
++
 +/**
 + * Bullet holes and scorch marks on whatever surface is there, and blackened ground around
-+ * explosions. Drawn before the units, which stand in front of them.
++ * explosions (and with the setting, the blood on the floors). Drawn before the units, which stand in front of them.
 + */
 +void FirstPersonView::drawDecals()
 +{
 +	const int width = getWidth(), height = getHeight();
 +	const double focalLength = focalPixels(); // in pixels
 +	const double viewAxisX = axisX(), viewAxisY = axisY(); // where the view axis meets the picture (its middle, but in VR)
++	if (Options::fpsBloodTrails)
++	{
++		drawBlood();
++	}
 +	// Scorched ground around big explosions: up to four shades darker in a soft disc.
 +	for (const auto &scorch : _scorches)
 +	{
@@ -80805,10 +80983,10 @@ index 000000000..6f630badd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..daa567832
+index 000000000..c91790395
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
-@@ -0,0 +1,5012 @@
+@@ -0,0 +1,5016 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -83761,7 +83939,9 @@ index 000000000..daa567832
 + * from a light (a unit's shadow from a flare, see recordFlareShadow): pixels whose floor lies
 + * within it lose up to `steps` shades, thinning out (dithered) towards the edge (and a stretched
 + * patch towards its end too, widening there). Only pixels showing the floor right there are
-+ * darkened, not a wall or a unit in front of it.
++ * darkened, not a wall or a unit in front of it. Or paints them a colour instead (blood, see
++ * drawBlood): its colour group, as dark as the colour or the pixel, whichever is darker (so the
++ * floor's light and shade stay).
 + * @param centre The disc's centre on the ground, in voxels (a stretched patch's start).
 + * @param radius The disc's radius, in voxels (a stretched patch's half width at its start).
 + * @param steps How many shades darker it makes the ground.
@@ -83770,13 +83950,14 @@ index 000000000..daa567832
 + *        are darkened (a band of the view, see replayDrawList).
 + * @param away The direction a stretched patch runs along the ground (x, y; a unit vector), or null for a disc.
 + * @param length How far a stretched patch runs, in voxels.
++ * @param paint The colour it paints the ground, or 0 to darken it by `steps`.
 + */
 +void FirstPersonView::drawGroundShade(const double centre[3], double radius, int steps, float density, int bandTop, int bandBottom,
-+	const double *away, double length)
++	const double *away, double length, Uint8 paint)
 +{
 +	if (_gpuRecording)
 +	{
-+		gpuRecordGroundShade(centre, radius, steps, density, away, length);
++		gpuRecordGroundShade(centre, radius, steps, density, away, length, paint);
 +		if (_gpuRecordOnly) return;
 +	}
 +	// The screen rectangle around it: the four corners of the box around the disc, or around the
@@ -83834,7 +84015,8 @@ index 000000000..daa567832
 +			// darkened within its colour group.
 +			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])
 +			{
-+				pixelRow[pixelX] = (Uint8)((pixelRow[pixelX] & 0xF0) | std::min(15, (pixelRow[pixelX] & 15) + steps));
++				pixelRow[pixelX] = paint ? (Uint8)((paint & 0xF0) | std::max(paint & 15, pixelRow[pixelX] & 15))
++					: (Uint8)((pixelRow[pixelX] & 0xF0) | std::min(15, (pixelRow[pixelX] & 15) + steps));
 +			}
 +		}
 +	}
@@ -110672,7 +110854,7 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..2a1d93dc5
+index 000000000..36857a621
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
 @@ -0,0 +1,1357 @@
@@ -111054,7 +111236,7 @@ index 000000000..2a1d93dc5
 +			"fpsMeleeFloors", "fpsAimExact", "fpsCloseEyeShots", "fpsTrajectory", "fpsConfirmFire", "fpsForceArcing", "fpsForceBlocked", "fpsPelletsInFlight",
 +			"fpsEachPellet", "fpsInstantChains", "fpsSpriteHitboxes", "fpsQuickDeaths", "fpsLiveScanner", "fpsAutoEquipGunsFirst", "fpsObliterationClassic" } },
 +		{ "STR_FPS_SECTION_GRAPHICS", { "fpsSmoothLighting", "fpsHaze", "fpsUnseenTerrain", "fpsViewDistance", "fpsFogOfWar", "fpsWallPaint", "fpsSmoke", "fpsSmokeOpacity",
-+			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsObliteration", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
++			"fpsNightSmokeOpacity", "fpsViewModel", "fpsSpriteUpscale", "fpsUnitSize", "fpsMuzzleFlash", "fpsFlashlightReach", "fpsHitFlash", "fpsObliteration", "fpsBloodTrails", "fpsSmoothFire", "fpsScreenShake", "fpsNightVisionUnits", "fpsParticles", "fpsUfoLights",
 +			"fpsGhostParts", "fpsGhostOpacity", "fpsGhostOpenDoors", "fpsLiftBeams", "fpsSeeThroughCrops", "fpsSeeThroughCorpses", "fpsDiscreetEdge" } },
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
@@ -113390,7 +113572,7 @@ index 9bd96923e..cdf880271 100644
  		break;
  	}
 diff --git a/src/Savegame/SavedBattleGame.cpp b/src/Savegame/SavedBattleGame.cpp
-index 240b22a42..2bdabd8aa 100644
+index 240b22a42..7bce7c367 100644
 --- a/src/Savegame/SavedBattleGame.cpp
 +++ b/src/Savegame/SavedBattleGame.cpp
 @@ -31,6 +31,7 @@
@@ -113401,16 +113583,18 @@ index 240b22a42..2bdabd8aa 100644
  #include "../Battlescape/BattlescapeGame.h"
  #include "../Battlescape/Position.h"
  #include "../Battlescape/Inventory.h"
-@@ -168,6 +169,8 @@ void SavedBattleGame::load(const YAML::YamlNodeReader& node, Mod *mod, SavedGame
+@@ -168,6 +169,10 @@ void SavedBattleGame::load(const YAML::YamlNodeReader& node, Mod *mod, SavedGame
  	reader.tryRead("reinforcementsBlocks", _reinforcementsBlocks);
  	reader.tryRead("flattenedMapTerrainNames", _flattenedMapTerrainNames);
  	reader.tryRead("flattenedMapBlockNames", _flattenedMapBlockNames);
 +	reader.tryRead("openxcom3dBrokenGlass", _brokenGlass); // (OpenXcom3D: the 3D view's broken window glass)
 +	std::sort(_brokenGlass.begin(), _brokenGlass.end());
++	reader.tryRead("openxcom3dBlood", _blood); // (OpenXcom3D: setting "Blood trails", the blood on the floors)
++	_blood.resize(_blood.size() / 3 * 3);
  	reader.tryRead("globalshade", _globalShade);
  	reader.tryRead("turn", _turn);
  	reader.tryRead("bughuntMinTurn", _bughuntMinTurn);
-@@ -531,6 +534,10 @@ void SavedBattleGame::save(YAML::YamlNodeWriter writer) const
+@@ -531,6 +536,14 @@ void SavedBattleGame::save(YAML::YamlNodeWriter writer) const
  	writer.write("reinforcementsBlocks", _reinforcementsBlocks);
  	writer.write("flattenedMapTerrainNames", _flattenedMapTerrainNames);
  	writer.write("flattenedMapBlockNames", _flattenedMapBlockNames);
@@ -113418,18 +113602,31 @@ index 240b22a42..2bdabd8aa 100644
 +	{
 +		writer.write("openxcom3dBrokenGlass", _brokenGlass); // (OpenXcom3D: the 3D view's broken window glass)
 +	}
++	if (!_blood.empty())
++	{
++		writer.write("openxcom3dBlood", _blood); // (OpenXcom3D: setting "Blood trails", the blood on the floors)
++	}
  	writer.write("globalshade", _globalShade);
  	writer.write("turn", _turn);
  	writer.write("bughuntMinTurn", _bughuntMinTurn);
-@@ -648,6 +655,7 @@ void SavedBattleGame::initMap(int mapsize_x, int mapsize_y, int mapsize_z, bool
+@@ -648,6 +661,8 @@ void SavedBattleGame::initMap(int mapsize_x, int mapsize_y, int mapsize_z, bool
  	_mapsize_z = mapsize_z;
  
  	_tiles.clear();
 +	_brokenGlass.clear(); // (OpenXcom3D: a new map, its windows whole)
++	_blood.clear(); // (OpenXcom3D: a new map, no blood on it)
  	_tiles.reserve(_mapsize_z * _mapsize_y * _mapsize_x);
  	for (int i = 0; i < _mapsize_z * _mapsize_y * _mapsize_x; ++i)
  	{
-@@ -2699,6 +2707,10 @@ bool SavedBattleGame::eyesOnTarget(UnitFaction faction, BattleUnit* unit)
+@@ -1599,6 +1614,7 @@ void SavedBattleGame::endTurn()
+ 		if (bu->getFaction() == _side)
+ 		{
+ 			bu->prepareNewTurn();
++			FirstPerson::bleed(this, bu, true); // (OpenXcom3D: setting "Blood trails", the turn's blood where it stays)
+ 		}
+ 		else if (bu->getOriginalFaction() == _side)
+ 		{
+@@ -2699,6 +2715,10 @@ bool SavedBattleGame::eyesOnTarget(UnitFaction faction, BattleUnit* unit)
   */
  bool SavedBattleGame::addFallingUnit(BattleUnit* unit)
  {
@@ -113441,23 +113638,26 @@ index 240b22a42..2bdabd8aa 100644
  	for (auto* bu : _fallingUnits)
  	{
 diff --git a/src/Savegame/SavedBattleGame.h b/src/Savegame/SavedBattleGame.h
-index 6c121c7b9..be4276167 100644
+index 6c121c7b9..bbc3346f0 100644
 --- a/src/Savegame/SavedBattleGame.h
 +++ b/src/Savegame/SavedBattleGame.h
-@@ -91,6 +91,7 @@ private:
+@@ -91,6 +91,8 @@ private:
  	std::vector< std::vector<int> > _reinforcementsBlocks;
  	std::vector< std::vector<std::string> > _flattenedMapTerrainNames;
  	std::vector< std::vector<std::string> > _flattenedMapBlockNames;
 +	std::vector<int> _brokenGlass; // (OpenXcom3D) window glass the 3D view shows broken: tile index * 4 + tile part, sorted; the game itself never reads it
++	std::vector<int> _blood; // (OpenXcom3D) setting "Blood trails": the blood the wounded left on the floors, three numbers each: tile index, unit id, amount; the game itself never reads it
  	const RuleStartingCondition *_startingCondition;
  	const RuleEnviroEffects *_enviroEffects;
  	bool _ecEnabledFriendly, _ecEnabledHostile, _ecEnabledNeutral;
-@@ -212,6 +213,8 @@ public:
+@@ -212,6 +214,10 @@ public:
  	std::vector< std::vector<std::string> > &getFlattenedMapTerrainNames() { return _flattenedMapTerrainNames; }
  	/// Gets the flattened map block names generated by the BattlescapeGenerator.
  	std::vector< std::vector<std::string> > &getFlattenedMapBlockNames() { return _flattenedMapBlockNames; }
 +	/// (OpenXcom3D) Gets the window glass the 3D view shows broken: tile index * 4 + tile part, sorted (kept in the save, never read by the game itself).
 +	std::vector<int> &getBrokenGlass() { return _brokenGlass; }
++	/// (OpenXcom3D) Gets the blood the wounded left on the floors (setting "Blood trails"): three numbers each, tile index, unit id, amount (kept in the save, never read by the game itself).
++	std::vector<int> &getBlood() { return _blood; }
  
  	/// Sets the global shade.
  	void setGlobalShade(int shade);

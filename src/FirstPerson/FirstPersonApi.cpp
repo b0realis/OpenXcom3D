@@ -1539,6 +1539,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	// body, and a blast bursts the bodies lying on the floor (a player, GitHub issue #257; the owner: "Lets just do
 	// obliteration effect - also bodies on the floor"); off, it goes down and is gone, as on the map.
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsObliteration", &fpsObliteration, true, "STR_FPS_OBLITERATION", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsBloodTrails", &fpsBloodTrails, false, "STR_FPS_BLOOD_TRAILS", category));
 	// The original games' explosives, lasers and plasma (TFTD's Gauss and Sonic) with overkill, as the big mods give
 	// theirs (the owner: "make a setting ... obliteration in UEU and TFTD on/off. And replicate xpiratez and xcom files
 	// obliteration for og games also"): a unit they take past minus three quarters of its health (the owner: "Make it 75%") leaves no corpse (and with
@@ -2156,6 +2157,69 @@ void noteHealthDamage(int health)
 int lastHealthDamage()
 {
 	return healthDamageNoted;
+}
+
+/// Setting "Blood trails": the most blood one unit leaves on one tile (a pool grows no bigger), and the most places kept in a
+/// battle (the oldest go first).
+const int BloodAmountMost = 40;
+const size_t BloodPlacesMost = 3000;
+
+/**
+ * Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, as much as its wounds (the owner: "put a puddle
+ * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
+ * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
+ * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
+ * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds; robots,
+ * tanks and the bleed-immune never have wounds), seen or not: it lies there to be found (the owner's ruling: track by blood).
+ * Kept in the save (SavedBattleGame::getBlood); the 3D view draws it (FirstPersonView::drawBlood). Nothing with the setting off.
+ * @param save The battle.
+ * @param unit The unit.
+ * @param turn True as its side's turn starts, false for a step.
+ */
+void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn)
+{
+	if (!Options::fpsBloodTrails || !save || !unit || unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_IGNORE_ME
+		|| unit->getFatalWounds() <= 0)
+	{
+		return;
+	}
+	Tile *tile = unit->getTile();
+	if (unit->isOut())
+	{
+		tile = nullptr;
+		for (const BattleItem *item : *save->getItems())
+		{
+			if (item->getUnit() == unit)
+			{
+				tile = item->getTile();
+				break;
+			}
+		}
+	}
+	while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
+	{
+		tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
+	}
+	if (!tile)
+	{
+		return;
+	}
+	const int amount = turn ? 2 * std::min(unit->getFatalWounds(), 5) : std::min(unit->getFatalWounds(), 3);
+	const int index = save->getTileIndex(tile->getPosition());
+	std::vector<int> &blood = save->getBlood();
+	for (size_t at = 0; at + 2 < blood.size(); at += 3)
+	{
+		if (blood[at] == index && blood[at + 1] == unit->getId())
+		{
+			blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
+			return;
+		}
+	}
+	if (blood.size() >= BloodPlacesMost * 3)
+	{
+		blood.erase(blood.begin(), blood.begin() + 3);
+	}
+	blood.insert(blood.end(), { index, unit->getId(), amount });
 }
 
 /**

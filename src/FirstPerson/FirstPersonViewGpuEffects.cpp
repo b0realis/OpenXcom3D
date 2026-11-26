@@ -410,11 +410,11 @@ void FirstPersonView::gpuRecordSprite(const SpriteDraw &draw)
 
 /**
  * Records a shade on the ground (drawGroundShade: a unit's, a scorch): its box as there.
- * Texel 0: kind, flags (1 stretched away from a light), the shades, the density.
+ * Texel 0: kind, flags (1 stretched away from a light, 2 painted), the shades (or the colour it paints), the density.
  * Texel 2: its centre from the eye (across the map), the ground's height from the eye in true proportions, its radius.
  * Texel 3: the way it stretches, and how long.
  */
-void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length)
+void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius, int steps, float density, const double *away, double length, Uint8 paint)
 {
 	const bool stretched = away && length > 0.0;
 	const double reach = stretched ? radius * FlareShadowWidening : radius;
@@ -428,8 +428,8 @@ void FirstPersonView::gpuRecordGroundShade(const double centre[3], double radius
 		return;
 	}
 	float *texels = _gpuEffects->add(FirstPersonGpu::Effects::GroundShade, left, top, right + 1, bottom + 1);
-	texels[1] = stretched ? 1.0f : 0.0f;
-	texels[2] = (float)steps;
+	texels[1] = (stretched ? 1.0f : 0.0f) + (paint ? 2.0f : 0.0f);
+	texels[2] = paint ? (float)paint : (float)steps;
 	texels[3] = density;
 	texels[8] = (float)(centre[0] - _eye[0]);
 	texels[9] = (float)(centre[1] - _eye[1]);

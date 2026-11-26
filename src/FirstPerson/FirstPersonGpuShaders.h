@@ -2814,6 +2814,7 @@ uint shadeColor(uint color, int shade)
 	return shaded > 255u || ((shaded ^ color) & 0xF0u) != 0u ? 15u : shaded;
 }
 uint darkened(uint color, int shades) { return color == 0u ? color : (color & 0xF0u) | uint(min(15, int(color & 15u) + shades)); }
+uint painted(uint color, uint paint) { return color == 0u ? color : (paint & 0xF0u) | max(paint & 15u, color & 15u); }
 uint seeThrough(int level, uint over, uint under)
 {
 	if (level >= SeeThroughLevels) return over;
@@ -3081,7 +3082,7 @@ void main()
 			}
 			// (only on the floor right there: within GroundShadeHeight of the ground's height; t2.z is the ground's height from the eye, scaled)
 			if (abs(depth - along) > max(GroundShadeDepth, GroundShadeHeight * along / max(1.0, -t2.z / ZScale))) continue;
-			if (closeness * head.w > dither(pixel.x, pixel.y)) color = darkened(color, int(head.z));
+			if (closeness * head.w > dither(pixel.x, pixel.y)) color = (flags & 2) != 0 ? painted(color, uint(head.z)) : darkened(color, int(head.z));
 		}
 		else if (kind == EffectDecal)
 		{

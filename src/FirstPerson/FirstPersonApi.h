@@ -415,6 +415,9 @@ float overKillShare(float armorShare);
 bool solidGroundBelow(const Mod *mod, const Tile *below);
 /// The health a hit takes off a unit before the game's floor (BattleUnit::damage notes it; TileEngine::hitUnit sets 0 first and reads it): setting "Damage numbers" Overkill.
 void noteHealthDamage(int health);
+/// Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, by its wounds: a step's drops (UnitWalkBState,
+/// each step finished) or, as its side's turn starts, the pool it bleeds where it stays (SavedBattleGame). See FirstPersonApi.cpp.
+void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn);
 int lastHealthDamage();
 /// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 /// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
@@ -522,6 +525,7 @@ inline const RuleDamageType *overkillDamageType(const Mod *, const RuleDamageTyp
 inline float overKillShare(float armorShare) { return armorShare; }
 inline bool solidGroundBelow(const Mod *, const Tile *) { return false; }
 inline void noteHealthDamage(int) { }
+inline void bleed(SavedBattleGame *, BattleUnit *, bool) { }
 inline int lastHealthDamage() { return 0; }
 inline std::string hitLogDetail(BattlescapeState *, const BattleUnit *, int, int, bool) { return std::string(); }
 inline int armorPoints(const BattleUnit *) { return 0; }
