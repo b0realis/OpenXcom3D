@@ -1217,6 +1217,8 @@ private:
 	/// A piece of a body blown apart: where it is (voxels) and its colour.
 	struct BodyPiece { float pos[3]; Uint8 color; };
 	std::map<std::pair<const Armor*, const RuleItem*>, std::vector<Uint8>> _bloodColors; // a body's blood, by its armour and its corpse (see bloodOf)
+	std::map<int, const BattleUnit*> _bloodUnits; // setting "Blood trails": the battle's units by their ids (see drawBlood), made again when one is added
+	size_t _bloodUnitsCount = 0;
 	const std::vector<Uint8> &bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses);
 	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
 	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood);

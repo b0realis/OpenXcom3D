@@ -199,6 +199,8 @@ void rendererChanged();
 void settlePresets();
 /// Sets the game's own options to the recommended ones (the 3D VIEW tab's "Recommended game options"); how many it changed.
 int applyGameOptions(const Mod *mod);
+/// Are the game's own options all as the recommended ones (the row says Applied)?
+bool gameOptionsApplied(const Mod *mod);
 /// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 /// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 /// stays off.
@@ -425,6 +427,9 @@ int lastHealthDamage();
 /// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 /// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
 std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut);
+/// The detail of the hit just noted by hitLogDetail, for the Live command feed's hit log tab (the game's own log has it only
+/// with the setting), taken once.
+std::string takeHitDetailForFeed();
 
 /// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 /// it before and after a hit: what the hit took off the side it struck).

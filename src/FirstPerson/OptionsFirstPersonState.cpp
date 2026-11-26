@@ -518,7 +518,8 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		// The game's own options set to the recommended ones: a thing to do, not a switch.
 		if (option.id() == "fpsGameOptions")
 		{
-			return std::string(tr(*option.asBool() ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
+			// (Applied while they all are: one added to the list since, or changed back on the game's own tab, says Apply)
+			return std::string(tr(*option.asBool() && FirstPerson::gameOptionsApplied(_game->getMod()) ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
 		}
 		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
 		if (option.id() == "fpsFaithfulTargeting")

@@ -2505,6 +2505,7 @@ void FirstPersonMode::buttonClicked(TextButton *button, Action *action)
 	}
 	else if (button == _btnInventory)
 	{
+		if (_feed) releaseFeedItem(); // (an item held in the Live command feed's inventory window goes back first)
 		_state->btnInventoryClick(action);
 	}
 	else if (button == _btnEndTurn)

@@ -299,6 +299,10 @@ struct CommandFeed
 	std::string hitWeapon; // (the player's last firing: their shots after the enemy's go on a line of it again, as in the game's log)
 	int hitVersion = 0, hitRowsVersion = -1, hitRowsWidth = 0, hitScroll = 0;
 	std::vector<HitRow> hitRows;
+	// (each wrapped line's first row: a new entry wraps only the last line, which may have grown, and those after it; all
+	// again when the window's width changed or the oldest lines went, hitErased counting that)
+	std::vector<size_t> hitLineRow;
+	int hitErased = 0, hitRowsErased = 0;
 	int squadScroll = 0;
 	bool squadDragging = false;
 	int dragFromY = 0, dragFromScroll = 0;
@@ -466,6 +470,7 @@ bool FirstPersonMode::feedIsoHasKeys() const
  */
 bool FirstPersonMode::feedIsoKey(Action *action)
 {
+	releaseFeedItem(); // (a key may open the game's inventory, or throw: an item held in the window goes back first)
 	const bool overIcons = _state->_mouseOverIcons; // (where the mouse is stays as it was: the map's cursor shows or not)
 	hideGamePanel(false);
 	_feedDispatching = true;
@@ -900,14 +905,25 @@ void FirstPersonMode::feedButtons()
 	add(CommandFeed::FB_VIEW_MAX, feed.view, viewRight, "", false);
 	int inventoryRight = feed.inventory.x + feed.inventory.w - border;
 	add(CommandFeed::FB_INVENTORY, feed.inventory, inventoryRight, "", false);
-	// (the top left window's tabs, at the left of its title line)
+	// (the top left window's tabs, at the left of its title line, short where their words don't fit before its button:
+	// at 320x200 the window is narrow)
 	int tabLeft = feed.inventory.x + border + 2 * ui;
-	for (const CommandFeed::ButtonKind tab : { CommandFeed::FB_TAB_SQUAD, CommandFeed::FB_TAB_INVENTORY, CommandFeed::FB_TAB_HITLOG })
-	{
-		const std::string words = _state->tr(tab == CommandFeed::FB_TAB_SQUAD ? "STR_FPS_FEED_SQUAD" : tab == CommandFeed::FB_TAB_INVENTORY ? "STR_FPS_FEED_INVENTORY"
-			: "STR_FPS_FEED_HIT_LOG");
+	const CommandFeed::ButtonKind tabs[] = { CommandFeed::FB_TAB_SQUAD, CommandFeed::FB_TAB_INVENTORY, CommandFeed::FB_TAB_HITLOG };
+	auto tabWords = [&](CommandFeed::ButtonKind tab, bool shortWords) {
+		const char *id = tab == CommandFeed::FB_TAB_SQUAD ? "STR_FPS_FEED_SQUAD" : tab == CommandFeed::FB_TAB_INVENTORY ? "STR_FPS_FEED_INVENTORY" : "STR_FPS_FEED_HIT_LOG";
+		return std::string(_state->tr(shortWords ? std::string(id) + "_SHORT" : std::string(id)));
+	};
+	auto tabWide = [&](const std::string &words) {
 		feed.writer->setText(words);
-		const int wide = std::max(side, feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui);
+		return std::max(side, feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui);
+	};
+	int allWide = 0;
+	for (const CommandFeed::ButtonKind tab : tabs) allWide += tabWide(tabWords(tab, false)) + inset;
+	const bool shortTabs = tabLeft + allWide > inventoryRight - 2 * ui;
+	for (const CommandFeed::ButtonKind tab : tabs)
+	{
+		const std::string words = tabWords(tab, shortTabs);
+		const int wide = tabWide(words);
 		const bool lit = (tab == CommandFeed::FB_TAB_SQUAD && feed.tab == CommandFeed::TAB_SQUAD) || (tab == CommandFeed::FB_TAB_INVENTORY && feed.tab == CommandFeed::TAB_INVENTORY)
 			|| (tab == CommandFeed::FB_TAB_HITLOG && feed.tab == CommandFeed::TAB_HITLOG);
 		feed.buttons.push_back({ tab, makeRect(tabLeft, feed.inventory.y + border + inset, wide, side), words, 0, lit });
@@ -1038,6 +1054,13 @@ void FirstPersonMode::updateFeedInventory(BattleUnit *unit)
 	{
 		grid.setSelectedItem(nullptr);
 	}
+	// (an item held that is no longer in the soldier's inventory nor on their tile, or in no slot: loaded into a gun,
+	// thrown or gone off elsewhere (the game's inventory screen, the 3D window): let go, not dropped back from nowhere)
+	if (unit && grid.getSelectedItem())
+	{
+		const BattleItem *held = grid.getSelectedItem();
+		if (!held->getSlot() || (held->getOwner() != unit && held->getTile() != unit->getTile())) grid.setSelectedItem(nullptr);
+	}
 	if (unit && !grid.getSelectedItem())
 	{
 		// (what the inventory shows: the soldier's items in their places and their rounds, the ground's items)
@@ -1091,15 +1114,25 @@ void FirstPersonMode::updateFeedInventory(BattleUnit *unit)
 void FirstPersonMode::feedInventoryMouse(Action *action, int x, int y)
 {
 	CommandFeed &feed = *_feed;
-	if (!feed.inventoryGrid || !feed.inventoryUnit || !canAct() || !inside(feed.inventoryShown, x, y) || feed.inventoryColumns.empty())
+	// (not for a soldier down or gone from the map: their items have no tile to go to; see the death camera, which
+	// keeps the window on them a moment)
+	if (!feed.inventoryGrid || !feed.inventoryUnit || !canAct() || !inside(feed.inventoryShown, x, y) || feed.inventoryColumns.empty()
+		|| !feed.inventoryUnit->getTile() || feed.inventoryUnit->isOut())
 	{
 		return;
 	}
 	const int pictureX = feed.inventoryColumns[x - feed.inventoryShown.x], pictureY = feed.inventoryRows[y - feed.inventoryShown.y];
 	feed.inventoryTouched = true; // (its picture made again next frame)
+	const SDL_Event &details = *action->getDetails();
+	// A right click: the inventory's only to put an item held back. Its own screen closes itself with one (Inventory pops
+	// the state on top, which here is the battle: a player's habit would have ended it), so it never gets one here.
+	if ((details.type == SDL_MOUSEBUTTONDOWN || details.type == SDL_MOUSEBUTTONUP) && details.button.button == SDL_BUTTON_RIGHT)
+	{
+		if (details.type == SDL_MOUSEBUTTONDOWN && feed.inventoryGrid->getSelectedItem()) releaseFeedItem();
+		return;
+	}
 	// The buttons the background draws, as on the inventory's screen (a left press): the soldier before or the next
 	// (selected for the 3D window too), unload the weapon held, more of the ground (Shift: back).
-	const SDL_Event &details = *action->getDetails();
 	if (details.type == SDL_MOUSEBUTTONDOWN)
 	{
 		_state->_battleGame->cancelAllActions(); // (as the game's inventory button does first)
@@ -1290,6 +1323,7 @@ void FirstPersonMode::blitFeed(SDL_Surface *gameScreen)
 		}
 		feed.paletteScreen->setPalette(_game->getScreen()->getPalette()); // (the colours the game's screen shows)
 		screen = feed.paletteScreen->getSurface();
+		SDL_FillRect(screen, nullptr, 0); // (as the game clears its own screen each frame: the gaps between the windows)
 	}
 	blitFeedUnder(screen);
 	for (Surface *surface : _state->_surfaces)
@@ -1699,7 +1733,7 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 		if (inside(feed.inventory, x, y))
 		{
 			if (feed.tab == CommandFeed::TAB_SQUAD) feedSquadMouse(x, y, wheel, leftPress);
-			else if (feed.tab == CommandFeed::TAB_HITLOG) feed.hitScroll = std::max(0, feed.hitScroll + wheel * 3); // (the wheel back through it, see drawFeedHitLog)
+			else if (feed.tab == CommandFeed::TAB_HITLOG) feed.hitScroll = std::max(0, feed.hitScroll - wheel * 3); // (the wheel up back through it, see drawFeedHitLog)
 			else if (inside(feed.inventoryPicture, x, y) && wheel == 0) feedInventoryMouse(action, x, y);
 			return true;
 		}
@@ -2183,8 +2217,9 @@ void FirstPersonMode::hitLogged(BattlescapeState *state, int type, int faction, 
 		CommandFeed::HitLine &line = shotLine();
 		line.parts.push_back({ word(type == HITLOG_NO_DAMAGE ? "STR_HIT_LOG_NO_DAMAGE" : type == HITLOG_SMALL_DAMAGE ? "STR_HIT_LOG_SMALL_DAMAGE" : "STR_HIT_LOG_BIG_DAMAGE"),
 			type == HITLOG_NO_DAMAGE ? CommandFeed::HS_ZERO : type == HITLOG_SMALL_DAMAGE ? CommandFeed::HS_HIT : CommandFeed::HS_BIG_HIT });
-		// (whom it hurt, its "killed", "down" or "unseen" a part of its own)
-		std::string detail = text;
+		// (whom it hurt, its "killed", "down" or "unseen" a part of its own: the tab has it whatever "Detailed hit log" says)
+		std::string detail = text.empty() ? FirstPerson::takeHitDetailForFeed() : text;
+		if (!text.empty()) FirstPerson::takeHitDetailForFeed(); // (the same text: not taken again for the next hit)
 		while (!detail.empty() && detail.back() == ' ') detail.pop_back();
 		const std::pair<std::string, CommandFeed::HitStyle> marks[] = { { word("STR_FPS_HIT_LOG_KILLED"), CommandFeed::HS_KILLED },
 			{ word("STR_FPS_HIT_LOG_DOWN"), CommandFeed::HS_DOWN }, { word("STR_FPS_HIT_LOG_UNSEEN"), CommandFeed::HS_UNSEEN } };
@@ -2213,7 +2248,11 @@ void FirstPersonMode::hitLogged(BattlescapeState *state, int type, int faction, 
 		return;
 	}
 	// (a long battle's oldest lines go first)
-	if (lines.size() > 600) lines.erase(lines.begin(), lines.begin() + 100);
+	if (lines.size() > 600)
+	{
+		lines.erase(lines.begin(), lines.begin() + 100);
+		++feed.hitErased;
+	}
 	++feed.hitVersion;
 }
 
@@ -2237,10 +2276,26 @@ void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 	auto textWidth = [&](const std::string &words) { feed.writer->setText(words); return feed.writer->getTextWidth() * ui; };
 	if (feed.hitRowsVersion != feed.hitVersion || feed.hitRowsWidth != width)
 	{
-		// (each line in words, as many to a row as fit, each word in its part's style; a word wider than a row alone)
-		feed.hitRows.clear();
-		for (const CommandFeed::HitLine &line : feed.hitLines)
+		// (each line in words, as many to a row as fit, each word in its part's style; a word wider than a row alone.
+		// Only the last line wrapped before (its shots may have grown) and the lines after it, unless the width changed
+		// or the oldest lines went)
+		if (feed.hitRowsWidth != width || feed.hitRowsErased != feed.hitErased || feed.hitLineRow.size() > feed.hitLines.size())
 		{
+			feed.hitRows.clear();
+			feed.hitLineRow.clear();
+			feed.hitRowsErased = feed.hitErased;
+		}
+		size_t from = feed.hitLineRow.size();
+		if (from > 0)
+		{
+			--from;
+			feed.hitRows.resize(feed.hitLineRow[from]);
+			feed.hitLineRow.resize(from);
+		}
+		for (size_t lineIndex = from; lineIndex < feed.hitLines.size(); ++lineIndex)
+		{
+			const CommandFeed::HitLine &line = feed.hitLines[lineIndex];
+			feed.hitLineRow.push_back(feed.hitRows.size());
 			if (line.kind == CommandFeed::HIT_TURN)
 			{
 				if (!feed.hitRows.empty()) feed.hitRows.push_back({ {}, false, true, line.faction });
@@ -2631,12 +2686,32 @@ int FirstPersonMode::feedWrite(SDL_Surface *screen, const std::string &text, int
 	{
 		fill(screen, x - ui, y - ui, letters * ui + 2 * ui, FeedWordsH * ui + ui, feed.titleBack);
 	}
+	// (each lit pixel of the words a block of the magnification, written straight into the screen within its clip: the
+	// feed draws on a screen in the palette, see blitFeed)
+	const SDL_Rect &clip = screen->clip_rect;
+	const bool direct = screen->format->BytesPerPixel == 1;
 	for (int row = 0; row < writer.getHeight(); ++row)
 	{
 		for (int column = 0; column <= letters && column < writer.getWidth(); ++column)
 		{
 			const Uint8 pixel = writer.getPixel(column, row);
-			if (pixel) fill(screen, x + column * ui, y + row * ui, ui, ui, pixel);
+			if (!pixel) continue;
+			if (!direct)
+			{
+				fill(screen, x + column * ui, y + row * ui, ui, ui, pixel);
+				continue;
+			}
+			for (int down = 0; down < ui; ++down)
+			{
+				const int screenY = y + row * ui + down;
+				if (screenY < clip.y || screenY >= clip.y + (int)clip.h) continue;
+				Uint8 *line = (Uint8 *)screen->pixels + (size_t)screenY * screen->pitch;
+				for (int across = 0; across < ui; ++across)
+				{
+					const int screenX = x + column * ui + across;
+					if (screenX >= clip.x && screenX < clip.x + (int)clip.w) line[screenX] = pixel;
+				}
+			}
 		}
 	}
 	return letters * ui;

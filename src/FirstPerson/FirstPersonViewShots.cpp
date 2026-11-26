@@ -528,22 +528,42 @@ void FirstPersonView::drawBlood()
 	{
 		return;
 	}
-	std::map<int, const BattleUnit*> units;
-	for (const BattleUnit *unit : *_save->getUnits())
+	// (the units by their ids, kept between frames: made again when the battle has more, a unit spawned or turned)
+	if (_bloodUnitsCount != _save->getUnits()->size())
 	{
-		units[unit->getId()] = unit;
+		_bloodUnits.clear();
+		for (const BattleUnit *unit : *_save->getUnits()) _bloodUnits[unit->getId()] = unit;
+		_bloodUnitsCount = _save->getUnits()->size();
 	}
 	const std::vector<Uint8> none;
+	const int width = getWidth(), height = getHeight();
 	for (size_t at = 0; at + 2 < blood.size(); at += 3)
 	{
+		// (only on a floor the squad has found, as the items lying there: blood on unexplored ground would tell where an
+		// unseen wounded alien went before anyone could see it; and only a place on the screen, found once for its
+		// drops and pool: its tile's disc at its floor and down a slope's depth)
 		const Position tilePos = _save->getTileCoords(blood[at]);
 		const Tile *tile = _save->getTile(tilePos);
-		if (!tile)
+		if (!tile || blood[at] < 0 || blood[at] >= (int)_tileViews.size() || !_tileViews[blood[at]].discovered)
 		{
 			continue;
 		}
-		const auto found = units.find(blood[at + 1]);
-		const BattleUnit *unit = found != units.end() ? found->second : nullptr;
+		{
+			const double floorHere = tilePos.z * 24.0 + GroundTop - tile->getTerrainLevel();
+			bool onScreen = false;
+			for (const double drop : { 0.0, (double)GroundPlaneProbe })
+			{
+				const double middle[3] = { tilePos.x * 16.0 + 8.0, tilePos.y * 16.0 + 8.0, floorHere - drop };
+				int left = width, top = height, right = -1, bottom = -1;
+				if (groundShadeBox(middle, 12.0, middle[0], middle[1], left, top, right, bottom) && right >= 0 && bottom >= 0 && left < width && top < height) onScreen = true;
+			}
+			if (!onScreen)
+			{
+				continue;
+			}
+		}
+		const auto found = _bloodUnits.find(blood[at + 1]);
+		const BattleUnit *unit = found != _bloodUnits.end() ? found->second : nullptr;
 		const std::vector<Uint8> &colors = unit ? bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()) : none;
 		Uint32 seed = (Uint32)blood[at] * 2654435761u ^ (Uint32)(blood[at + 1] + 1) * 40503u;
 		auto random = [&seed]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; };

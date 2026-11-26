@@ -162,10 +162,10 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..a7ca3b766
+index 000000000..a692e3c13
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
-@@ -0,0 +1,785 @@
+@@ -0,0 +1,788 @@
 +en-GB:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -450,7 +450,7 @@ index 000000000..a7ca3b766
 +  STR_FPS_TMAP_CLOSE_TIP: "Back to the battle (Escape, the map key, the right button)"
 +  STR_FPS_TMAP_LEVEL: "LEVEL {0}/{1}"
 +  STR_FPS_TMAP_TURN: "TURN {0}"
-+  STR_FPS_TMAP_HINT: "Wheel: zoom.  Drag: scroll.  Click: centre, or a soldier (twice: 3D).  Right: back."
++  STR_FPS_TMAP_HINT: "Wheel: level (Ctrl: zoom).  Drag: scroll.  Click: centre, or a soldier (twice: 3D).  Right: back."
 +  STR_FPS_TMAP_HEALTH: "HEALTH {0}/{1}"
 +  STR_FPS_TMAP_TIME: "TU {0}/{1}"
 +  STR_FPS_TMAP_AWAY: "{0} tiles from the selected soldier"
@@ -604,7 +604,7 @@ index 000000000..a7ca3b766
 +  STR_FPS_BLOOD_TRAILS: "Blood trails"
 +  STR_FPS_BLOOD_TRAILS_DESC: "Wounded units leave blood where they stand and on the tiles they walk, in their own blood's colour, until a medikit patches them up."
 +  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
-+  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
++  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma leave no corpse of a unit hit far past its health; a blast destroys its gear too."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colours blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -697,6 +697,9 @@ index 000000000..a7ca3b766
 +  STR_FPS_FEED_ISO: "ISO"
 +  STR_FPS_FEED_ISO_VIEW: "ISOMETRIC VIEW"
 +  STR_FPS_FEED_HIT_LOG: "HIT LOG"
++  STR_FPS_FEED_SQUAD_SHORT: "SQ"
++  STR_FPS_FEED_INVENTORY_SHORT: "INV"
++  STR_FPS_FEED_HIT_LOG_SHORT: "LOG"
 +  STR_FPS_FEED_HIT_LOG_EMPTY: "No shots yet"
 +  STR_FPS_FEED_SIDE_XCOM: "X-COM"
 +  STR_FPS_FEED_SIDE_ALIENS: "ALIENS"
@@ -757,7 +760,7 @@ index 000000000..a7ca3b766
 +  STR_FPS_KEY_LIGHT: "Suit light"
 +  STR_FPS_KEY_LIGHT_DESC: "The game's personal light on/off, for the whole squad (SUIT LIGHT)."
 +  STR_FPS_KEY_NV_TOGGLE: "Night vision (map key)"
-+  STR_FPS_KEY_NV_TOGGLE_DESC: "The game's night vision toggle (needs the gear in 3D)."
++  STR_FPS_KEY_NV_TOGGLE_DESC: "The game's night vision toggle, in 3D too."
 +  STR_FPS_KEY_NEXT_UNIT: "Next soldier"
 +  STR_FPS_KEY_NEXT_UNIT_DESC: "Next soldier who can act (>)."
 +  STR_FPS_KEY_PREV_UNIT: "Previous soldier"
@@ -953,10 +956,10 @@ index 000000000..a7ca3b766
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..7522e12fa
+index 000000000..4eb7ae404
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
-@@ -0,0 +1,785 @@
+@@ -0,0 +1,788 @@
 +en-US:
 +  STR_OPENXCOM: "OpenXcom3D"
 +  STR_FIRST_PERSON: "3D VIEW"
@@ -1241,7 +1244,7 @@ index 000000000..7522e12fa
 +  STR_FPS_TMAP_CLOSE_TIP: "Back to the battle (Escape, the map key, the right button)"
 +  STR_FPS_TMAP_LEVEL: "LEVEL {0}/{1}"
 +  STR_FPS_TMAP_TURN: "TURN {0}"
-+  STR_FPS_TMAP_HINT: "Wheel: zoom.  Drag: scroll.  Click: center, or a soldier (twice: 3D).  Right: back."
++  STR_FPS_TMAP_HINT: "Wheel: level (Ctrl: zoom).  Drag: scroll.  Click: center, or a soldier (twice: 3D).  Right: back."
 +  STR_FPS_TMAP_HEALTH: "HEALTH {0}/{1}"
 +  STR_FPS_TMAP_TIME: "TU {0}/{1}"
 +  STR_FPS_TMAP_AWAY: "{0} tiles from the selected soldier"
@@ -1395,7 +1398,7 @@ index 000000000..7522e12fa
 +  STR_FPS_BLOOD_TRAILS: "Blood trails"
 +  STR_FPS_BLOOD_TRAILS_DESC: "Wounded units leave blood where they stand and on the tiles they walk, in their own blood's colour, until a medikit patches them up."
 +  STR_FPS_OBLITERATION_CLASSIC: "Obliteration in UFO and TFTD"
-+  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma (Gauss, Sonic) leave no corpse of a unit hit far past its health, as in the big mods."
++  STR_FPS_OBLITERATION_CLASSIC_DESC: "UFO and TFTD: explosives, lasers and plasma leave no corpse of a unit hit far past its health; a blast destroys its gear too."
 +  STR_FPS_SMOOTH_FIRE: "Smooth fire"
 +  STR_FPS_SMOOTH_FIRE_DESC: "Flames' colors blend from frame to frame. NO: the frames dissolve dot by dot, as before 1.14."
 +  STR_FPS_HIT_FLASH: "Hit flash"
@@ -1488,6 +1491,9 @@ index 000000000..7522e12fa
 +  STR_FPS_FEED_ISO: "ISO"
 +  STR_FPS_FEED_ISO_VIEW: "ISOMETRIC VIEW"
 +  STR_FPS_FEED_HIT_LOG: "HIT LOG"
++  STR_FPS_FEED_SQUAD_SHORT: "SQ"
++  STR_FPS_FEED_INVENTORY_SHORT: "INV"
++  STR_FPS_FEED_HIT_LOG_SHORT: "LOG"
 +  STR_FPS_FEED_HIT_LOG_EMPTY: "No shots yet"
 +  STR_FPS_FEED_SIDE_XCOM: "X-COM"
 +  STR_FPS_FEED_SIDE_ALIENS: "ALIENS"
@@ -1548,7 +1554,7 @@ index 000000000..7522e12fa
 +  STR_FPS_KEY_LIGHT: "Suit light"
 +  STR_FPS_KEY_LIGHT_DESC: "The game's personal light on/off, for the whole squad (SUIT LIGHT)."
 +  STR_FPS_KEY_NV_TOGGLE: "Night vision (map key)"
-+  STR_FPS_KEY_NV_TOGGLE_DESC: "The game's night vision toggle (needs the gear in 3D)."
++  STR_FPS_KEY_NV_TOGGLE_DESC: "The game's night vision toggle, in 3D too."
 +  STR_FPS_KEY_NEXT_UNIT: "Next soldier"
 +  STR_FPS_KEY_NEXT_UNIT_DESC: "Next soldier who can act (>)."
 +  STR_FPS_KEY_PREV_UNIT: "Previous soldier"
@@ -20014,7 +20020,7 @@ index b091fe7c5..87feb0032 100644
  	void mapOver(Action *action);
  	/// Handler for pressing the map.
 diff --git a/src/Battlescape/Camera.cpp b/src/Battlescape/Camera.cpp
-index 981ec7b0f..87f3b1e3f 100644
+index 981ec7b0f..ead2ac9c5 100644
 --- a/src/Battlescape/Camera.cpp
 +++ b/src/Battlescape/Camera.cpp
 @@ -116,12 +116,14 @@ void Camera::mouseRelease(Action *action, State *)
@@ -20170,7 +20176,7 @@ index 981ec7b0f..87f3b1e3f 100644
  	}
  }
  
-@@ -649,4 +658,33 @@ void Camera::stopMouseScrolling()
+@@ -649,4 +658,52 @@ void Camera::stopMouseScrolling()
  	_scrollMouseTimer->stop();
  }
  
@@ -20191,6 +20197,25 @@ index 981ec7b0f..87f3b1e3f 100644
 +	_windowHeight = width > 0 ? height : 0;
 +}
 +
++/**
++ * (OpenXcom3D) The view window's box on the screen (see setViewWindow), the icons at its foot left out: where the map
++ * follows a shot (Map::draw). Untouched when there is no window.
++ * @param left, top, right, bottom Set to its edges (right and bottom past its last pixel).
++ * @return True if the map is in a window.
++ */
++bool Camera::viewWindow(int &left, int &top, int &right, int &bottom) const
++{
++	if (_windowWidth <= 0)
++	{
++		return false;
++	}
++	left = _windowX;
++	top = _windowY;
++	right = _windowX + _windowWidth;
++	bottom = _windowY + _windowHeight - (_windowIcons ? _map->getIconHeight() : 0);
++	return true;
++}
++
 +/// (OpenXcom3D) Across, the point the camera centres on (see setViewWindow).
 +int Camera::viewCentreX() const
 +{
@@ -20205,7 +20230,7 @@ index 981ec7b0f..87f3b1e3f 100644
 +
  }
 diff --git a/src/Battlescape/Camera.h b/src/Battlescape/Camera.h
-index c6885903f..8d27afa11 100644
+index c6885903f..32975ba08 100644
 --- a/src/Battlescape/Camera.h
 +++ b/src/Battlescape/Camera.h
 @@ -44,6 +44,11 @@ private:
@@ -20220,12 +20245,14 @@ index c6885903f..8d27afa11 100644
  public:
  	static const int SCROLL_BORDER = 5;
  	static const int SCROLL_DIAGONAL_EDGE = 60;
-@@ -115,6 +120,8 @@ public:
+@@ -115,6 +120,10 @@ public:
  	void stopKeyScrolling();
  	/// stop mouse scrolling.
  	void stopMouseScrolling();
 +	/// (OpenXcom3D) Shows the map in a window of the screen (a width of 0: all over the screen, as ever).
 +	void setViewWindow(int x, int y, int width, int height, bool icons = true);
++	/// (OpenXcom3D) The view window's box on the screen, the icons at its foot left out (see setViewWindow): false if there is none.
++	bool viewWindow(int &left, int &top, int &right, int &bottom) const;
  };
  
  }
@@ -20408,7 +20435,7 @@ index c112ccbe8..0b212a6bc 100644
  	void optValue(int &oldValue, int newValue) const;
  public:
 diff --git a/src/Battlescape/Map.cpp b/src/Battlescape/Map.cpp
-index 9f1f1f58d..6271c30be 100644
+index 9f1f1f58d..dff75b91f 100644
 --- a/src/Battlescape/Map.cpp
 +++ b/src/Battlescape/Map.cpp
 @@ -52,6 +52,7 @@
@@ -20532,7 +20559,80 @@ index 9f1f1f58d..6271c30be 100644
  	{
  		int part = _projectile->getItem() ? 0 : BULLET_SPRITES-1;
  		for (int i = 0; i <= part; ++i)
-@@ -936,7 +1002,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -790,6 +856,9 @@ void Map::drawTerrain(Surface *surface)
+ 
+ 		if (_projectileInFOV && _followProjectile)
+ 		{
++			// (OpenXcom3D: with the map in a window of the screen, the window's edges and middle; else the screen's as ever)
++			int viewLeft = 0, viewTop = 0, viewRight = surface->getWidth(), viewBottom = _visibleMapHeight;
++			_camera->viewWindow(viewLeft, viewTop, viewRight, viewBottom);
+ 			Position newCam = _camera->getMapOffset();
+ 			if (newCam.z != bulletHighZ) //switch level
+ 			{
+@@ -805,8 +874,8 @@ void Map::drawTerrain(Surface *surface)
+ 				if (_launch)
+ 				{
+ 					_launch = false;
+-					if ((bulletPositionScreen.x < 1 || bulletPositionScreen.x > surface->getWidth() - 1 ||
+-						bulletPositionScreen.y < 1 || bulletPositionScreen.y > _visibleMapHeight - 1))
++					if ((bulletPositionScreen.x < viewLeft + 1 || bulletPositionScreen.x > viewRight - 1 ||
++						bulletPositionScreen.y < viewTop + 1 || bulletPositionScreen.y > viewBottom - 1))
+ 					{
+ 						_camera->centerOnPosition(Position(bulletLowX, bulletLowY, bulletHighZ), false);
+ 						_camera->convertVoxelToScreen(_projectile->getPosition(), &bulletPositionScreen);
+@@ -814,15 +883,15 @@ void Map::drawTerrain(Surface *surface)
+ 				}
+ 				if (!_smoothingEngaged)
+ 				{
+-					if (bulletPositionScreen.x < 1 || bulletPositionScreen.x > surface->getWidth() - 1 ||
+-						bulletPositionScreen.y < 1 || bulletPositionScreen.y > _visibleMapHeight - 1)
++					if (bulletPositionScreen.x < viewLeft + 1 || bulletPositionScreen.x > viewRight - 1 ||
++						bulletPositionScreen.y < viewTop + 1 || bulletPositionScreen.y > viewBottom - 1)
+ 					{
+ 						_smoothingEngaged = true;
+ 					}
+ 				}
+ 				else
+ 				{
+-					_camera->jumpXY(surface->getWidth() / 2 - bulletPositionScreen.x, _visibleMapHeight / 2 - bulletPositionScreen.y);
++					_camera->jumpXY((viewLeft + viewRight) / 2 - bulletPositionScreen.x, (viewTop + viewBottom) / 2 - bulletPositionScreen.y);
+ 				}
+ 			}
+ 			else
+@@ -831,24 +900,24 @@ void Map::drawTerrain(Surface *surface)
+ 				do
+ 				{
+ 					enough = true;
+-					if (bulletPositionScreen.x < 0)
++					if (bulletPositionScreen.x < viewLeft)
+ 					{
+-						_camera->jumpXY(+surface->getWidth(), 0);
++						_camera->jumpXY(+(viewRight - viewLeft), 0);
+ 						enough = false;
+ 					}
+-					else if (bulletPositionScreen.x > surface->getWidth())
++					else if (bulletPositionScreen.x > viewRight)
+ 					{
+-						_camera->jumpXY(-surface->getWidth(), 0);
++						_camera->jumpXY(-(viewRight - viewLeft), 0);
+ 						enough = false;
+ 					}
+-					else if (bulletPositionScreen.y < 0)
++					else if (bulletPositionScreen.y < viewTop)
+ 					{
+-						_camera->jumpXY(0, +_visibleMapHeight);
++						_camera->jumpXY(0, +(viewBottom - viewTop));
+ 						enough = false;
+ 					}
+-					else if (bulletPositionScreen.y > _visibleMapHeight)
++					else if (bulletPositionScreen.y > viewBottom)
+ 					{
+-						_camera->jumpXY(0, -_visibleMapHeight);
++						_camera->jumpXY(0, -(viewBottom - viewTop));
+ 						enough = false;
+ 					}
+ 					_camera->convertVoxelToScreen(_projectile->getPosition(), &bulletPositionScreen);
+@@ -936,7 +1005,7 @@ void Map::drawTerrain(Surface *surface)
  					tileColor = tile->getMarkerColor();
  
  					// Draw floor
@@ -20541,7 +20641,7 @@ index 9f1f1f58d..6271c30be 100644
  					if (tmpSurface)
  					{
  						if (tile->getObstacle(O_FLOOR))
-@@ -996,7 +1062,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -996,7 +1065,7 @@ void Map::drawTerrain(Surface *surface)
  					// Draw walls
  					{
  						// Draw west wall
@@ -20550,7 +20650,7 @@ index 9f1f1f58d..6271c30be 100644
  						if (tmpSurface)
  						{
  							int wallShade = getWallShade(O_WESTWALL, tile);
-@@ -1006,7 +1072,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1006,7 +1075,7 @@ void Map::drawTerrain(Surface *surface)
  								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_WESTWALL), wallShade, false, _nvColor);
  						}
  						// Draw north wall
@@ -20559,7 +20659,7 @@ index 9f1f1f58d..6271c30be 100644
  						if (tmpSurface)
  						{
  							int wallShade = getWallShade(O_NORTHWALL, tile);
-@@ -1016,7 +1082,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1016,7 +1085,7 @@ void Map::drawTerrain(Surface *surface)
  								Surface::blitRaw(surface, tmpSurface, screenPosition.x, screenPosition.y - tile->getYOffset(O_NORTHWALL), wallShade, bool(tile->getSprite(O_WESTWALL)), _nvColor);
  						}
  						// Draw object
@@ -20568,7 +20668,7 @@ index 9f1f1f58d..6271c30be 100644
  						if (tmpSurface)
  						{
  							if (tile->isBackTileObject(O_OBJECT))
-@@ -1028,7 +1094,8 @@ void Map::drawTerrain(Surface *surface)
+@@ -1028,7 +1097,8 @@ void Map::drawTerrain(Surface *surface)
  							}
  						}
  						// draw an item on top of the floor (if any)
@@ -20578,7 +20678,7 @@ index 9f1f1f58d..6271c30be 100644
  						if (item)
  						{
  							itemSprite.draw(item,
-@@ -1074,6 +1141,54 @@ void Map::drawTerrain(Surface *surface)
+@@ -1074,6 +1144,54 @@ void Map::drawTerrain(Surface *surface)
  						}
  					}
  
@@ -20633,7 +20733,7 @@ index 9f1f1f58d..6271c30be 100644
  					// check if we got bullet && it is in Field Of View
  					if (_projectile && _projectileInFOV)
  					{
-@@ -1122,52 +1237,19 @@ void Map::drawTerrain(Surface *surface)
+@@ -1122,52 +1240,19 @@ void Map::drawTerrain(Surface *surface)
  							// draw bullet on the correct tile
  							if (itX >= bulletLowX && itX <= bulletHighX && itY >= bulletLowY && itY <= bulletHighY)
  							{
@@ -20696,7 +20796,7 @@ index 9f1f1f58d..6271c30be 100644
  
  					//draw particle clouds
  					int pixelMaskArray[] = { 0, 2, 1, 3 };
-@@ -1177,6 +1259,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1177,6 +1262,7 @@ void Map::drawTerrain(Surface *surface)
  					const Uint8* const transparetPtr = _transparencies->data();
  
  					//draw particle clouds behind solder
@@ -20704,7 +20804,7 @@ index 9f1f1f58d..6271c30be 100644
  					for (const Particle& p : getVaporParticle(tile, 0))
  					{
  						int vaporX = vaporScreenOriginX + p.getOffsetX();
-@@ -1221,7 +1304,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1221,7 +1307,7 @@ void Map::drawTerrain(Surface *surface)
  					}
  
  					// Draw smoke/fire
@@ -20713,7 +20813,7 @@ index 9f1f1f58d..6271c30be 100644
  					{
  						frameNumber = 0;
  						int shade = 0;
-@@ -1263,6 +1346,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1263,6 +1349,7 @@ void Map::drawTerrain(Surface *surface)
  					}
  
  					//draw particle clouds on front of solder
@@ -20721,7 +20821,7 @@ index 9f1f1f58d..6271c30be 100644
  					for (const Particle& p : getVaporParticle(tile, topLayer ? 3 : 1))
  					{
  						int vaporX = vaporScreenOriginX + p.getOffsetX();
-@@ -1304,7 +1388,7 @@ void Map::drawTerrain(Surface *surface)
+@@ -1304,7 +1391,7 @@ void Map::drawTerrain(Surface *surface)
  
  					{
  						// Draw object
@@ -20730,7 +20830,7 @@ index 9f1f1f58d..6271c30be 100644
  						if (tmpSurface)
  						{
  							if (!tile->isBackTileObject(O_OBJECT))
-@@ -1850,6 +1934,8 @@ void Map::drawTerrain(Surface *surface)
+@@ -1850,6 +1937,8 @@ void Map::drawTerrain(Surface *surface)
  		}
  	}
  
@@ -20739,7 +20839,7 @@ index 9f1f1f58d..6271c30be 100644
  	surface->unlock();
  }
  
-@@ -2367,12 +2453,88 @@ CursorType Map::getCursorType() const
+@@ -2367,12 +2456,88 @@ CursorType Map::getCursorType() const
  void Map::setProjectile(Projectile *projectile)
  {
  	_projectile = projectile;
@@ -20828,7 +20928,7 @@ index 9f1f1f58d..6271c30be 100644
  /**
   * Gets the current projectile sprite on the map.
   * @return Projectile or 0 if there is no projectile sprite on the map.
-@@ -2469,7 +2631,7 @@ void Map::scrollKey()
+@@ -2469,7 +2634,7 @@ void Map::scrollKey()
   */
  void Map::fadeShade()
  {
@@ -20837,7 +20937,7 @@ index 9f1f1f58d..6271c30be 100644
  	if ((_nightVisionOn && !hold) || (!_nightVisionOn && hold))
  	{
  		_nvColor = Options::oxceNightVisionColor;
-@@ -2592,6 +2754,10 @@ int Map::getIconWidth() const
+@@ -2592,6 +2757,10 @@ int Map::getIconWidth() const
   */
  int Map::getSoundAngle(const Position& pos) const
  {
@@ -25118,10 +25218,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..0161f2083
+index 000000000..68e957059
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2508 @@
+@@ -0,0 +1,2596 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25272,8 +25372,11 @@ index 000000000..0161f2083
 + * @param state The battlescape screen the mode belongs to.
 + * @return The new mode, or nullptr when no active mod enables the add-on.
 + */
++static void forgetOverkillVerdict();
++
 +FirstPersonMode *create(Game *game, BattlescapeState *state)
 +{
++	forgetOverkillVerdict(); // (setting "Obliteration in UFO and TFTD": the loaded mods asked again, see modHasOverkill)
 +	if (!game->getMod()->getFirstPerson().isEnabled())
 +	{
 +		return nullptr;
@@ -25726,15 +25829,27 @@ index 000000000..0161f2083
 + * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
 + * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
 + * IgnoreOverKill: false`)? The original games' own damage types all ignore it. (Not every item: one that hurts no one
-+ * keeps a damage type nobody set, which ignores nothing.) Found once a mod.
++ * keeps a damage type nobody set, which ignores nothing.) Found once a battle: the game may load other mods between two
++ * (it made the rules again, likely at the very same address: so not kept by the address alone, see forgetOverkillVerdict).
 + * @param mod The game's rules.
 + * @return True if some item has overkill.
 + */
 +static bool ClassicOverkillHere = false; // (the last mod a hit was asked of has no overkill of its own: the setting holds, see overKillShare)
++static const Mod *OverkillModKnown = nullptr;
++static bool OverkillModHas = false;
++
++/// Setting "Obliteration in UFO and TFTD": the loaded mods are asked again whether they have overkill of their own (a
++/// battle starting, see FirstPerson::create).
++static void forgetOverkillVerdict()
++{
++	OverkillModKnown = nullptr;
++	ClassicOverkillHere = false;
++}
++
 +static bool modHasOverkill(const Mod *mod)
 +{
-+	static const Mod *known = nullptr;
-+	static bool has = false;
++	const Mod *&known = OverkillModKnown;
++	bool &has = OverkillModHas;
 +	if (mod == known) { ClassicOverkillHere = !has; return has; }
 +	known = mod;
 +	has = false;
@@ -25769,6 +25884,9 @@ index 000000000..0161f2083
 +	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
 +}
 +
++/// A block below a hole is ground when every layer of its shape has at least this many of its 256 voxels solid (see solidGroundBelow).
++const int SolidGroundVoxelsLeast = 240;
++
 +/**
 + * Is the tile below a hole the top of solid ground (Tile::hasNoFloor)? The game counts a tile whose floor is gone as
 + * having one only where the tile below is raised to its top (terrain level -24); a solid block that fills its tile
@@ -25791,9 +25909,19 @@ index 000000000..0161f2083
 +	{
 +		return false;
 +	}
++	// (solid from its foot to its top, filling the tile: every layer of its shape a full one, a few voxels short at the most;
++	// a UFO hull's diagonal or a slab, solid in every layer too but a thin line or a strip of it, is no ground to stand on)
++	const std::vector<Uint16> *voxels = mod->getVoxelData();
 +	for (int layer = 0; layer < 12; ++layer)
 +	{
-+		if (object->getLoftID(layer) == 0) return false; // (solid from its foot to its top: every layer of its shape)
++		const size_t loft = object->getLoftID(layer);
++		if (loft == 0 || !voxels || (loft + 1) * 16 > voxels->size()) return false;
++		int solid = 0;
++		for (int row = 0; row < 16; ++row)
++		{
++			for (Uint16 bits = (*voxels)[loft * 16 + row]; bits; bits &= (Uint16)(bits - 1)) ++solid;
++		}
++		if (solid < SolidGroundVoxelsLeast) return false;
 +	}
 +	return true;
 +}
@@ -25805,7 +25933,7 @@ index 000000000..0161f2083
 + * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
 + * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
 + * a stun): a unit they take below minus ClassicOverKill of its health (see overKillShare) dies leaving no corpse, as
-+ * the map burns it, and with "Obliteration" bursts in 3D.
++ * the map burns it, and with "Obliteration" bursts in 3D. Only with OpenXcom3D's mod on.
 + * @param mod The game's rules.
 + * @param type The hit's damage type.
 + * @param scratch Room for an altered copy.
@@ -25813,7 +25941,11 @@ index 000000000..0161f2083
 + */
 +const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
 +{
-+	if (!Options::fpsObliterationClassic || !type || !mod) return type;
++	if (!Options::fpsObliterationClassic || !type || !mod || !mod->getFirstPerson().isEnabled())
++	{
++		ClassicOverkillHere = false; // (without the setting, or OpenXcom3D's mod off: the game's own rules, see overKillShare)
++		return type;
++	}
 +	if (modHasOverkill(mod) || !type->IgnoreOverKill) return type; // (also notes whether the setting holds here: see overKillShare)
 +	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
 +	scratch = *type;
@@ -26287,8 +26419,11 @@ index 000000000..0161f2083
 +			bool all = true, changes = false;
 +			for (const PresetSwitch &presetSwitch : gameplay.switches())
 +			{
-+				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
-+				if (presetSwitch.onChoice) continue;
++				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked;
++				// nor one the tab no longer lists at a fixed value: fixHiddenSettings gave it its value already, Wall paint's
++				// All rooms, which no old preset had)
++				HiddenAs hidden;
++				if (presetSwitch.onChoice || (hiddenAs(presetSwitch.id, hidden) && hidden == HIDDEN_FIXED)) continue;
 +				const int now = presetSwitch.values[preset], was = presetValueIn(presetSwitch, preset, Options::fpsPresetTables);
 +				if (was != Kept) all = all && switchValue(presetSwitch) == was;
 +				changes = changes || (now != Kept && now != was);
@@ -26337,9 +26472,10 @@ index 000000000..0161f2083
 + * screen, aliens and civilians bleeding from their wounds (so setting "Blood trails" shows theirs too); OXCE's links, the clip sizes, a craft's maintenance time (2), the base's name in
 + * popups, the base's large bars scaled, the accuracy by the crosshair (2).
 + * @param mod The mod.
-+ * @return How many options it changed.
++ * @param apply True to set them, false only to count those not as recommended.
++ * @return How many options it changed (or would).
 + */
-+int applyGameOptions(const Mod *mod)
++static int recommendedGameOptions(const Mod *mod, bool apply)
 +{
 +	using namespace Options;
 +	struct GameOption { const char *id; bool *flag; int *number; int value; };
@@ -26383,16 +26519,30 @@ index 000000000..0161f2083
 +		if (option.flag)
 +		{
 +			if (*option.flag != (option.value != 0)) ++changed;
-+			*option.flag = option.value != 0;
++			if (apply) *option.flag = option.value != 0;
 +		}
 +		else
 +		{
 +			if (*option.number != option.value) ++changed;
-+			*option.number = option.value;
++			if (apply) *option.number = option.value;
 +		}
 +	}
-+	Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
++	if (apply) Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
 +	return changed;
++}
++
++/// Sets the game's own options to the recommended ones (the row "Recommended game options", see recommendedGameOptions).
++/// @return How many options it changed.
++int applyGameOptions(const Mod *mod)
++{
++	return recommendedGameOptions(mod, true);
++}
++
++/// Are the game's own options all as recommended (the row says Applied; one added to the list later, as Alien bleeding
++/// in 1.16, or one the player changed back on the game's own tab, and it says Apply again)?
++bool gameOptionsApplied(const Mod *mod)
++{
++	return recommendedGameOptions(mod, false) == 0;
 +}
 +
 +/**
@@ -26955,7 +27105,7 @@ index 000000000..0161f2083
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 +	// The flashlight on and off (F, as in the first-person shooters).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
-+	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
++	// Space is the map's night vision hold key; in 3D it jumps, and night vision has its own key (N).
 +	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
 +	// The emergency climb (the owner: "a bindable key ... 50 TUs ... sometimes units can get stuck in level depressions
 +	// with no way out"): out of a pit, up a ledge, over a fence (see FirstPersonMode::emergencyClimb). No key at first.
@@ -27231,6 +27381,9 @@ index 000000000..0161f2083
 +	FirstPersonMode::hitLogged(state, type, faction, text);
 +}
 +
++/// The detail of the last hit for the Live command feed's hit log tab (see hitLogDetail, takeHitDetailForFeed).
++static std::string HitDetailForFeed;
++
 +/**
 + * What the hit log adds after a hit's word with the setting "Detailed hit log" (see FirstPersonApi.h; the owner: the
 + * original log "in 3D window exactly", enhanced inside its window, with who was hit, the damage numbers, and kills and
@@ -27247,7 +27400,8 @@ index 000000000..0161f2083
 + */
 +std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut)
 +{
-+	if (!state || !target || (!Options::fpsHitLogDetail && !Options::fpsCommandFeed)) // (the Live command feed's hit log tab is the detailed log)
++	HitDetailForFeed.clear();
++	if (!state || !target || (!Options::fpsHitLogDetail && !Options::fpsCommandFeed))
 +	{
 +		return std::string();
 +	}
@@ -27270,7 +27424,23 @@ index 000000000..0161f2083
 +			text += ", " + std::string(lang->getString(target->getHealth() <= 0 ? "STR_FPS_HIT_LOG_KILLED" : "STR_FPS_HIT_LOG_DOWN"));
 +		}
 +	}
-+	return text + ") ";
++	text += ") ";
++	// (the Live command feed's hit log tab is the detailed log whatever the setting: kept aside for it, see takeHitDetailForFeed;
++	// the game's own log has it only with the setting)
++	HitDetailForFeed = text;
++	return Options::fpsHitLogDetail ? text : std::string();
++}
++
++/**
++ * The detail of the hit just noted (see hitLogDetail), for the Live command feed's hit log tab, taken once: the game's
++ * own hit log has it only with the setting "Detailed hit log", the tab always.
++ * @return The text, or empty.
++ */
++std::string takeHitDetailForFeed()
++{
++	std::string text;
++	text.swap(HitDetailForFeed);
++	return text;
 +}
 +
 +namespace
@@ -27307,7 +27477,7 @@ index 000000000..0161f2083
 + * Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, as much as its wounds (the owner: "put a puddle
 + * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
 + * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
-+ * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
++ * grows under one that doesn't move; a big unit on each of its tiles. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
 + * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds: soldiers;
 + * aliens and civilians only with OXCE's option "Alien bleeding", or where a mod's armour says so), seen or not: it lies
 + * there to be found (the owner's ruling: track by blood). Not a machine's, as Obliteration tells flesh (the owner: "Same as
@@ -27325,43 +27495,61 @@ index 000000000..0161f2083
 +	{
 +		return;
 +	}
-+	Tile *tile = unit->getTile();
++	// Where it bleeds: under it, every tile of a big unit's (a Reaper's four), or under its body lying out cold.
++	std::vector<Tile*> tiles;
 +	if (unit->isOut())
 +	{
-+		tile = nullptr;
 +		for (const BattleItem *item : *save->getItems())
 +		{
 +			if (item->getUnit() == unit)
 +			{
-+				tile = item->getTile();
++				if (item->getTile()) tiles.push_back(item->getTile());
 +				break;
 +			}
 +		}
 +	}
-+	while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
++	else if (unit->getTile())
 +	{
-+		tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
-+	}
-+	if (!tile)
-+	{
-+		return;
++		const int size = std::max(1, unit->getArmor()->getSize());
++		for (int x = 0; x < size; ++x)
++			for (int y = 0; y < size; ++y)
++			{
++				Tile *part = save->getTile(unit->getPosition() + Position(x, y, 0));
++				if (part) tiles.push_back(part);
++			}
 +	}
 +	const int amount = turn ? 2 * std::min(unit->getFatalWounds(), 5) : std::min(unit->getFatalWounds(), 3);
-+	const int index = save->getTileIndex(tile->getPosition());
 +	std::vector<int> &blood = save->getBlood();
-+	for (size_t at = 0; at + 2 < blood.size(); at += 3)
++	for (Tile *tile : tiles)
 +	{
-+		if (blood[at] == index && blood[at + 1] == unit->getId())
++		while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
 +		{
-+			blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
-+			return;
++			tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
 +		}
++		if (!tile)
++		{
++			continue;
++		}
++		const int index = save->getTileIndex(tile->getPosition());
++		bool added = false;
++		for (size_t at = 0; at + 2 < blood.size() && !added; at += 3)
++		{
++			if (blood[at] == index && blood[at + 1] == unit->getId())
++			{
++				blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
++				added = true;
++			}
++		}
++		if (added)
++		{
++			continue;
++		}
++		if (blood.size() >= BloodPlacesMost * 3)
++		{
++			blood.erase(blood.begin(), blood.begin() + 3);
++		}
++		blood.insert(blood.end(), { index, unit->getId(), amount });
 +	}
-+	if (blood.size() >= BloodPlacesMost * 3)
-+	{
-+		blood.erase(blood.begin(), blood.begin() + 3);
-+	}
-+	blood.insert(blood.end(), { index, unit->getId(), amount });
 +}
 +
 +/**
@@ -27632,10 +27820,10 @@ index 000000000..0161f2083
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..50c5bc2ae
+index 000000000..ca08df32d
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,592 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -27837,6 +28025,8 @@ index 000000000..50c5bc2ae
 +void settlePresets();
 +/// Sets the game's own options to the recommended ones (the 3D VIEW tab's "Recommended game options"); how many it changed.
 +int applyGameOptions(const Mod *mod);
++/// Are the game's own options all as the recommended ones (the row says Applied)?
++bool gameOptionsApplied(const Mod *mod);
 +/// Does a mod the game finds for the first time (one not yet in the player's mod list) start
 +/// switched on? Our own mod does, so a game set up by hand plays in 3D at once; switched off, it
 +/// stays off.
@@ -28063,6 +28253,9 @@ index 000000000..50c5bc2ae
 +/// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much
 +/// and whether it fell, "(Sectoid 23, killed) "; "(unseen) " for a unit the squad doesn't see; nothing with the setting off.
 +std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut);
++/// The detail of the hit just noted by hitLogDetail, for the Live command feed's hit log tab (the game's own log has it only
++/// with the setting), taken once.
++std::string takeHitDetailForFeed();
 +
 +/// Setting "Damage numbers": a unit's armour, all its sides' points together (TileEngine::hitUnit reads
 +/// it before and after a hit: what the hit took off the side it struck).
@@ -39442,7 +39635,7 @@ index 000000000..1115e02a2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..556e6352e
+index 000000000..12a2e6469
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
 @@ -0,0 +1,3696 @@
@@ -42305,7 +42498,7 @@ index 000000000..556e6352e
 +		if (pressed) toggleView();
 +		return true;
 +	}
-+	if (!active && key == Options::keyFpsHideHud)
++	if (!active && key == Options::keyFpsHideHud && !feedShown()) // (the Live command feed shows no map camera: the key leaves its setting alone)
 +	{
 +		if (pressed) toggleMapCamera();
 +		return true;
@@ -45834,10 +46027,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..272959805
+index 000000000..becd8880a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,2662 @@
+@@ -0,0 +1,2737 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -46139,6 +46332,10 @@ index 000000000..272959805
 +	std::string hitWeapon; // (the player's last firing: their shots after the enemy's go on a line of it again, as in the game's log)
 +	int hitVersion = 0, hitRowsVersion = -1, hitRowsWidth = 0, hitScroll = 0;
 +	std::vector<HitRow> hitRows;
++	// (each wrapped line's first row: a new entry wraps only the last line, which may have grown, and those after it; all
++	// again when the window's width changed or the oldest lines went, hitErased counting that)
++	std::vector<size_t> hitLineRow;
++	int hitErased = 0, hitRowsErased = 0;
 +	int squadScroll = 0;
 +	bool squadDragging = false;
 +	int dragFromY = 0, dragFromScroll = 0;
@@ -46306,6 +46503,7 @@ index 000000000..272959805
 + */
 +bool FirstPersonMode::feedIsoKey(Action *action)
 +{
++	releaseFeedItem(); // (a key may open the game's inventory, or throw: an item held in the window goes back first)
 +	const bool overIcons = _state->_mouseOverIcons; // (where the mouse is stays as it was: the map's cursor shows or not)
 +	hideGamePanel(false);
 +	_feedDispatching = true;
@@ -46740,14 +46938,25 @@ index 000000000..272959805
 +	add(CommandFeed::FB_VIEW_MAX, feed.view, viewRight, "", false);
 +	int inventoryRight = feed.inventory.x + feed.inventory.w - border;
 +	add(CommandFeed::FB_INVENTORY, feed.inventory, inventoryRight, "", false);
-+	// (the top left window's tabs, at the left of its title line)
++	// (the top left window's tabs, at the left of its title line, short where their words don't fit before its button:
++	// at 320x200 the window is narrow)
 +	int tabLeft = feed.inventory.x + border + 2 * ui;
-+	for (const CommandFeed::ButtonKind tab : { CommandFeed::FB_TAB_SQUAD, CommandFeed::FB_TAB_INVENTORY, CommandFeed::FB_TAB_HITLOG })
-+	{
-+		const std::string words = _state->tr(tab == CommandFeed::FB_TAB_SQUAD ? "STR_FPS_FEED_SQUAD" : tab == CommandFeed::FB_TAB_INVENTORY ? "STR_FPS_FEED_INVENTORY"
-+			: "STR_FPS_FEED_HIT_LOG");
++	const CommandFeed::ButtonKind tabs[] = { CommandFeed::FB_TAB_SQUAD, CommandFeed::FB_TAB_INVENTORY, CommandFeed::FB_TAB_HITLOG };
++	auto tabWords = [&](CommandFeed::ButtonKind tab, bool shortWords) {
++		const char *id = tab == CommandFeed::FB_TAB_SQUAD ? "STR_FPS_FEED_SQUAD" : tab == CommandFeed::FB_TAB_INVENTORY ? "STR_FPS_FEED_INVENTORY" : "STR_FPS_FEED_HIT_LOG";
++		return std::string(_state->tr(shortWords ? std::string(id) + "_SHORT" : std::string(id)));
++	};
++	auto tabWide = [&](const std::string &words) {
 +		feed.writer->setText(words);
-+		const int wide = std::max(side, feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui);
++		return std::max(side, feed.writer->getTextWidth() * ui + 2 * FeedButtonPad * ui);
++	};
++	int allWide = 0;
++	for (const CommandFeed::ButtonKind tab : tabs) allWide += tabWide(tabWords(tab, false)) + inset;
++	const bool shortTabs = tabLeft + allWide > inventoryRight - 2 * ui;
++	for (const CommandFeed::ButtonKind tab : tabs)
++	{
++		const std::string words = tabWords(tab, shortTabs);
++		const int wide = tabWide(words);
 +		const bool lit = (tab == CommandFeed::FB_TAB_SQUAD && feed.tab == CommandFeed::TAB_SQUAD) || (tab == CommandFeed::FB_TAB_INVENTORY && feed.tab == CommandFeed::TAB_INVENTORY)
 +			|| (tab == CommandFeed::FB_TAB_HITLOG && feed.tab == CommandFeed::TAB_HITLOG);
 +		feed.buttons.push_back({ tab, makeRect(tabLeft, feed.inventory.y + border + inset, wide, side), words, 0, lit });
@@ -46878,6 +47087,13 @@ index 000000000..272959805
 +	{
 +		grid.setSelectedItem(nullptr);
 +	}
++	// (an item held that is no longer in the soldier's inventory nor on their tile, or in no slot: loaded into a gun,
++	// thrown or gone off elsewhere (the game's inventory screen, the 3D window): let go, not dropped back from nowhere)
++	if (unit && grid.getSelectedItem())
++	{
++		const BattleItem *held = grid.getSelectedItem();
++		if (!held->getSlot() || (held->getOwner() != unit && held->getTile() != unit->getTile())) grid.setSelectedItem(nullptr);
++	}
 +	if (unit && !grid.getSelectedItem())
 +	{
 +		// (what the inventory shows: the soldier's items in their places and their rounds, the ground's items)
@@ -46931,15 +47147,25 @@ index 000000000..272959805
 +void FirstPersonMode::feedInventoryMouse(Action *action, int x, int y)
 +{
 +	CommandFeed &feed = *_feed;
-+	if (!feed.inventoryGrid || !feed.inventoryUnit || !canAct() || !inside(feed.inventoryShown, x, y) || feed.inventoryColumns.empty())
++	// (not for a soldier down or gone from the map: their items have no tile to go to; see the death camera, which
++	// keeps the window on them a moment)
++	if (!feed.inventoryGrid || !feed.inventoryUnit || !canAct() || !inside(feed.inventoryShown, x, y) || feed.inventoryColumns.empty()
++		|| !feed.inventoryUnit->getTile() || feed.inventoryUnit->isOut())
 +	{
 +		return;
 +	}
 +	const int pictureX = feed.inventoryColumns[x - feed.inventoryShown.x], pictureY = feed.inventoryRows[y - feed.inventoryShown.y];
 +	feed.inventoryTouched = true; // (its picture made again next frame)
++	const SDL_Event &details = *action->getDetails();
++	// A right click: the inventory's only to put an item held back. Its own screen closes itself with one (Inventory pops
++	// the state on top, which here is the battle: a player's habit would have ended it), so it never gets one here.
++	if ((details.type == SDL_MOUSEBUTTONDOWN || details.type == SDL_MOUSEBUTTONUP) && details.button.button == SDL_BUTTON_RIGHT)
++	{
++		if (details.type == SDL_MOUSEBUTTONDOWN && feed.inventoryGrid->getSelectedItem()) releaseFeedItem();
++		return;
++	}
 +	// The buttons the background draws, as on the inventory's screen (a left press): the soldier before or the next
 +	// (selected for the 3D window too), unload the weapon held, more of the ground (Shift: back).
-+	const SDL_Event &details = *action->getDetails();
 +	if (details.type == SDL_MOUSEBUTTONDOWN)
 +	{
 +		_state->_battleGame->cancelAllActions(); // (as the game's inventory button does first)
@@ -47130,6 +47356,7 @@ index 000000000..272959805
 +		}
 +		feed.paletteScreen->setPalette(_game->getScreen()->getPalette()); // (the colours the game's screen shows)
 +		screen = feed.paletteScreen->getSurface();
++		SDL_FillRect(screen, nullptr, 0); // (as the game clears its own screen each frame: the gaps between the windows)
 +	}
 +	blitFeedUnder(screen);
 +	for (Surface *surface : _state->_surfaces)
@@ -47539,7 +47766,7 @@ index 000000000..272959805
 +		if (inside(feed.inventory, x, y))
 +		{
 +			if (feed.tab == CommandFeed::TAB_SQUAD) feedSquadMouse(x, y, wheel, leftPress);
-+			else if (feed.tab == CommandFeed::TAB_HITLOG) feed.hitScroll = std::max(0, feed.hitScroll + wheel * 3); // (the wheel back through it, see drawFeedHitLog)
++			else if (feed.tab == CommandFeed::TAB_HITLOG) feed.hitScroll = std::max(0, feed.hitScroll - wheel * 3); // (the wheel up back through it, see drawFeedHitLog)
 +			else if (inside(feed.inventoryPicture, x, y) && wheel == 0) feedInventoryMouse(action, x, y);
 +			return true;
 +		}
@@ -48023,8 +48250,9 @@ index 000000000..272959805
 +		CommandFeed::HitLine &line = shotLine();
 +		line.parts.push_back({ word(type == HITLOG_NO_DAMAGE ? "STR_HIT_LOG_NO_DAMAGE" : type == HITLOG_SMALL_DAMAGE ? "STR_HIT_LOG_SMALL_DAMAGE" : "STR_HIT_LOG_BIG_DAMAGE"),
 +			type == HITLOG_NO_DAMAGE ? CommandFeed::HS_ZERO : type == HITLOG_SMALL_DAMAGE ? CommandFeed::HS_HIT : CommandFeed::HS_BIG_HIT });
-+		// (whom it hurt, its "killed", "down" or "unseen" a part of its own)
-+		std::string detail = text;
++		// (whom it hurt, its "killed", "down" or "unseen" a part of its own: the tab has it whatever "Detailed hit log" says)
++		std::string detail = text.empty() ? FirstPerson::takeHitDetailForFeed() : text;
++		if (!text.empty()) FirstPerson::takeHitDetailForFeed(); // (the same text: not taken again for the next hit)
 +		while (!detail.empty() && detail.back() == ' ') detail.pop_back();
 +		const std::pair<std::string, CommandFeed::HitStyle> marks[] = { { word("STR_FPS_HIT_LOG_KILLED"), CommandFeed::HS_KILLED },
 +			{ word("STR_FPS_HIT_LOG_DOWN"), CommandFeed::HS_DOWN }, { word("STR_FPS_HIT_LOG_UNSEEN"), CommandFeed::HS_UNSEEN } };
@@ -48053,7 +48281,11 @@ index 000000000..272959805
 +		return;
 +	}
 +	// (a long battle's oldest lines go first)
-+	if (lines.size() > 600) lines.erase(lines.begin(), lines.begin() + 100);
++	if (lines.size() > 600)
++	{
++		lines.erase(lines.begin(), lines.begin() + 100);
++		++feed.hitErased;
++	}
 +	++feed.hitVersion;
 +}
 +
@@ -48077,10 +48309,26 @@ index 000000000..272959805
 +	auto textWidth = [&](const std::string &words) { feed.writer->setText(words); return feed.writer->getTextWidth() * ui; };
 +	if (feed.hitRowsVersion != feed.hitVersion || feed.hitRowsWidth != width)
 +	{
-+		// (each line in words, as many to a row as fit, each word in its part's style; a word wider than a row alone)
-+		feed.hitRows.clear();
-+		for (const CommandFeed::HitLine &line : feed.hitLines)
++		// (each line in words, as many to a row as fit, each word in its part's style; a word wider than a row alone.
++		// Only the last line wrapped before (its shots may have grown) and the lines after it, unless the width changed
++		// or the oldest lines went)
++		if (feed.hitRowsWidth != width || feed.hitRowsErased != feed.hitErased || feed.hitLineRow.size() > feed.hitLines.size())
 +		{
++			feed.hitRows.clear();
++			feed.hitLineRow.clear();
++			feed.hitRowsErased = feed.hitErased;
++		}
++		size_t from = feed.hitLineRow.size();
++		if (from > 0)
++		{
++			--from;
++			feed.hitRows.resize(feed.hitLineRow[from]);
++			feed.hitLineRow.resize(from);
++		}
++		for (size_t lineIndex = from; lineIndex < feed.hitLines.size(); ++lineIndex)
++		{
++			const CommandFeed::HitLine &line = feed.hitLines[lineIndex];
++			feed.hitLineRow.push_back(feed.hitRows.size());
 +			if (line.kind == CommandFeed::HIT_TURN)
 +			{
 +				if (!feed.hitRows.empty()) feed.hitRows.push_back({ {}, false, true, line.faction });
@@ -48471,12 +48719,32 @@ index 000000000..272959805
 +	{
 +		fill(screen, x - ui, y - ui, letters * ui + 2 * ui, FeedWordsH * ui + ui, feed.titleBack);
 +	}
++	// (each lit pixel of the words a block of the magnification, written straight into the screen within its clip: the
++	// feed draws on a screen in the palette, see blitFeed)
++	const SDL_Rect &clip = screen->clip_rect;
++	const bool direct = screen->format->BytesPerPixel == 1;
 +	for (int row = 0; row < writer.getHeight(); ++row)
 +	{
 +		for (int column = 0; column <= letters && column < writer.getWidth(); ++column)
 +		{
 +			const Uint8 pixel = writer.getPixel(column, row);
-+			if (pixel) fill(screen, x + column * ui, y + row * ui, ui, ui, pixel);
++			if (!pixel) continue;
++			if (!direct)
++			{
++				fill(screen, x + column * ui, y + row * ui, ui, ui, pixel);
++				continue;
++			}
++			for (int down = 0; down < ui; ++down)
++			{
++				const int screenY = y + row * ui + down;
++				if (screenY < clip.y || screenY >= clip.y + (int)clip.h) continue;
++				Uint8 *line = (Uint8 *)screen->pixels + (size_t)screenY * screen->pitch;
++				for (int across = 0; across < ui; ++across)
++				{
++					const int screenX = x + column * ui + across;
++					if (screenX >= clip.x && screenX < clip.x + (int)clip.w) line[screenX] = pixel;
++				}
++			}
 +		}
 +	}
 +	return letters * ui;
@@ -48502,10 +48770,10 @@ index 000000000..272959805
 +}
 diff --git a/src/FirstPerson/FirstPersonModeHud.cpp b/src/FirstPerson/FirstPersonModeHud.cpp
 new file mode 100644
-index 000000000..736b43fc4
+index 000000000..ee5841182
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeHud.cpp
-@@ -0,0 +1,2840 @@
+@@ -0,0 +1,2841 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -51013,6 +51281,7 @@ index 000000000..736b43fc4
 +	}
 +	else if (button == _btnInventory)
 +	{
++		if (_feed) releaseFeedItem(); // (an item held in the Live command feed's inventory window goes back first)
 +		_state->btnInventoryClick(action);
 +	}
 +	else if (button == _btnEndTurn)
@@ -54799,10 +55068,10 @@ index 000000000..54d05d340
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeShooting.cpp b/src/FirstPerson/FirstPersonModeShooting.cpp
 new file mode 100644
-index 000000000..3001d61a1
+index 000000000..c27bd87a3
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeShooting.cpp
-@@ -0,0 +1,5773 @@
+@@ -0,0 +1,5772 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -59057,13 +59326,12 @@ index 000000000..3001d61a1
 +	const bool effects = mode->isActive();
 +	if (unit->getStatus() == STATUS_UNCONSCIOUS)
 +	{
-+		// (out cold: its body on the floor; one carried has none to burst)
++		// (out cold: its body on the floor, every part of a big unit's (a Reaper's four); one carried has none to burst)
 +		for (const BattleItem *item : *mode->_save->getItems())
 +		{
 +			if (item->getUnit() == unit && item->getTile())
 +			{
 +				mode->_view->obliterateBody(item, away, burn, burnsHot(type), !type->isDirect(), effects);
-+				break;
 +			}
 +		}
 +		mode->_view->hideObliterated(unit);
@@ -64641,7 +64909,7 @@ index 000000000..a6b76c652
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonParticles.h b/src/FirstPerson/FirstPersonParticles.h
 new file mode 100644
-index 000000000..ceb9fd4d9
+index 000000000..175dfc986
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonParticles.h
 @@ -0,0 +1,134 @@
@@ -64746,7 +65014,7 @@ index 000000000..ceb9fd4d9
 +	std::vector<Particle> _particles; // The living particles.
 +	Uint32 _seed;                     // State of the particles' own random number generator (never zero).
 +	bool _accepting = true;           // New particles are taken in (not while particles are off: see setAccepting).
-+	static const size_t Max = 6000;   // The most particles there can be at once; more are dropped.
++	static constexpr size_t Max = 6000; // The most particles there can be at once; more are dropped. (constexpr: a definition too, which std::min by reference needs where nothing is inlined: the ASan build)
 +public:
 +	/// Creates an empty particle system.
 +	FirstPersonParticles();
@@ -68004,10 +68272,10 @@ index 000000000..d43f8ffe8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..cae24a92e
+index 000000000..2c9e1e04c
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,935 @@
+@@ -0,0 +1,937 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -68205,6 +68473,8 @@ index 000000000..cae24a92e
 +	_watchedUnits.clear();
 +	_obliterated.clear();
 +	_bloodColors.clear();
++	_bloodUnits.clear();
++	_bloodUnitsCount = 0;
 +	_decals.clear();
 +	_scorches.clear();
 +	_burningLastFrame.clear();
@@ -68945,10 +69215,10 @@ index 000000000..cae24a92e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..891581f7b
+index 000000000..249329320
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,1971 @@
+@@ -0,0 +1,1973 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -70168,6 +70438,8 @@ index 000000000..891581f7b
 +	/// A piece of a body blown apart: where it is (voxels) and its colour.
 +	struct BodyPiece { float pos[3]; Uint8 color; };
 +	std::map<std::pair<const Armor*, const RuleItem*>, std::vector<Uint8>> _bloodColors; // a body's blood, by its armour and its corpse (see bloodOf)
++	std::map<int, const BattleUnit*> _bloodUnits; // setting "Blood trails": the battle's units by their ids (see drawBlood), made again when one is added
++	size_t _bloodUnitsCount = 0;
 +	const std::vector<Uint8> &bloodOf(const Armor *armor, const std::vector<const RuleItem*> &corpses);
 +	/// Throws the pieces of a body out from its middle (setting "Obliteration", see burstPieces).
 +	void burstPieces(const std::vector<BodyPiece> &pieces, const float middle[3], const float away[3], int burn, bool hot, bool blast, bool flesh, int size, const std::vector<Uint8> &blood);
@@ -78972,10 +79244,10 @@ index 000000000..6aa16c2cb
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewShots.cpp b/src/FirstPerson/FirstPersonViewShots.cpp
 new file mode 100644
-index 000000000..5bd79851d
+index 000000000..4dec74b2e
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewShots.cpp
-@@ -0,0 +1,2417 @@
+@@ -0,0 +1,2437 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -79506,22 +79778,42 @@ index 000000000..5bd79851d
 +	{
 +		return;
 +	}
-+	std::map<int, const BattleUnit*> units;
-+	for (const BattleUnit *unit : *_save->getUnits())
++	// (the units by their ids, kept between frames: made again when the battle has more, a unit spawned or turned)
++	if (_bloodUnitsCount != _save->getUnits()->size())
 +	{
-+		units[unit->getId()] = unit;
++		_bloodUnits.clear();
++		for (const BattleUnit *unit : *_save->getUnits()) _bloodUnits[unit->getId()] = unit;
++		_bloodUnitsCount = _save->getUnits()->size();
 +	}
 +	const std::vector<Uint8> none;
++	const int width = getWidth(), height = getHeight();
 +	for (size_t at = 0; at + 2 < blood.size(); at += 3)
 +	{
++		// (only on a floor the squad has found, as the items lying there: blood on unexplored ground would tell where an
++		// unseen wounded alien went before anyone could see it; and only a place on the screen, found once for its
++		// drops and pool: its tile's disc at its floor and down a slope's depth)
 +		const Position tilePos = _save->getTileCoords(blood[at]);
 +		const Tile *tile = _save->getTile(tilePos);
-+		if (!tile)
++		if (!tile || blood[at] < 0 || blood[at] >= (int)_tileViews.size() || !_tileViews[blood[at]].discovered)
 +		{
 +			continue;
 +		}
-+		const auto found = units.find(blood[at + 1]);
-+		const BattleUnit *unit = found != units.end() ? found->second : nullptr;
++		{
++			const double floorHere = tilePos.z * 24.0 + GroundTop - tile->getTerrainLevel();
++			bool onScreen = false;
++			for (const double drop : { 0.0, (double)GroundPlaneProbe })
++			{
++				const double middle[3] = { tilePos.x * 16.0 + 8.0, tilePos.y * 16.0 + 8.0, floorHere - drop };
++				int left = width, top = height, right = -1, bottom = -1;
++				if (groundShadeBox(middle, 12.0, middle[0], middle[1], left, top, right, bottom) && right >= 0 && bottom >= 0 && left < width && top < height) onScreen = true;
++			}
++			if (!onScreen)
++			{
++				continue;
++			}
++		}
++		const auto found = _bloodUnits.find(blood[at + 1]);
++		const BattleUnit *unit = found != _bloodUnits.end() ? found->second : nullptr;
 +		const std::vector<Uint8> &colors = unit ? bloodOf(unit->getArmor(), unit->getArmor()->getCorpseBattlescape()) : none;
 +		Uint32 seed = (Uint32)blood[at] * 2654435761u ^ (Uint32)(blood[at + 1] + 1) * 40503u;
 +		auto random = [&seed]() { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.0; };
@@ -111266,10 +111558,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..1f6cc8be4
+index 000000000..97c48f2e2
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1364 @@
+@@ -0,0 +1,1365 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -111790,7 +112082,8 @@ index 000000000..1f6cc8be4
 +		// The game's own options set to the recommended ones: a thing to do, not a switch.
 +		if (option.id() == "fpsGameOptions")
 +		{
-+			return std::string(tr(*option.asBool() ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
++			// (Applied while they all are: one added to the list since, or changed back on the game's own tab, says Apply)
++			return std::string(tr(*option.asBool() && FirstPerson::gameOptionsApplied(_game->getMod()) ? "STR_FPS_GAME_OPTIONS_APPLIED" : "STR_FPS_GAME_OPTIONS_APPLY"));
 +		}
 +		// Faithful targeting shows as "FPS-style shooting (easier)": YES when it's off.
 +		if (option.id() == "fpsFaithfulTargeting")

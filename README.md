@@ -6,7 +6,7 @@
 
 ![Night, through a soldier's eyes](docs/screenshots/night.png)
 
-*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.12**, for Linux, Windows and the Steam Deck, with a first, untested build for macOS. See [New in 1.12](#new-in-112).
+*UFO: Enemy Unknown* (X-COM: UFO Defense, 1994) is perhaps the greatest game of all time. OpenXcom3D adds a first-person 3D battlescape to **OpenXcom Extended**: you can switch between the isometric map and your soldier's view at any moment, and walk, fight and die in it. This is version **1.15**, for Linux, Windows, the Steam Deck and macOS. See [New in 1.15](#new-in-115).
 
 **Both games are supported,** *UFO: Enemy Unknown* and *X-COM: Terror From The Deep*, and the big mods built on OXCE run in it too (XPiratez is played and tested here).
 
@@ -21,10 +21,10 @@
 - **Switch at any moment:** **F8** takes you from the isometric map into the selected soldier's eyes and back, in the middle of a turn. Whatever you do in 3D is the game's own action, by its own rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale.
 - **Move:** walk and step sideways with **W A S D** in real time, each tile paid as you cross into it, or a tile at a time; sprint, jump, vault a fence, drop off a ledge, climb ladders and ride grav lifts, fly with flying armor, open doors (a little green door by the crosshair says it's on one), and lean round a corner.
 - **Fight:** fire at the crosshair in every mode the weapon has (snap, aimed, auto, throw, launch, melee, psi), with the game's accuracy and line of fire, the path shown before you fire; or FPS style, each round where the crosshair points. Zoom in, fire two guns at once or one after the other, watch a shotgun's pellets fly, and in a tank turn the turret alone.
-- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision gear, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
+- **See:** the original maps, sprites, palette and sounds, rebuilt in 3D from the game's own voxel data: light and shadow, a flashlight and flares, night vision, smoke as the map draws it, rain and snow under a grey sky, windows that shatter, swinging doors, glowing UFOs, bullet holes and scorch marks, out to 200 tiles; the stars over XPiratez's space stations; under the sea, bubbles, marine snow and caustics.
 - **Lead the squad:** every soldier's live helmet camera on the top bar (hover for their card, right click for the big soldier cam), a camera window over the isometric map, and the aliens' turn watched through the eyes of whoever sees the alien.
 - **Feel it:** recoil and muzzle flashes, marks on the crosshair (white ticks for a hit, red for a kill, a blue shield when a strike does no harm), each hit's damage rising over the unit, shots whizzing past, rain, wind and fires heard round you, blood on the view and a heartbeat when badly hurt, panic and berserk through your soldier's own eyes, and a helmet camera dying in static.
-- **Make it yours:** 121 settings and 46 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
+- **Make it yours:** 107 settings and 42 keys of its own (**Options → 3D VIEW**), and a controller layout made for the Steam Deck.
 
 | | |
 |---|---|
@@ -35,7 +35,7 @@
 
 ## The goal
 
-The research and testing goal of this project was to bring the battlescape into 3D while staying **faithful to the original game**: seamless, so that it feels as if it had been introduced the day *UFO: Enemy Unknown* was released. It uses **only the original assets** — the game's own maps, voxel shapes, sprites, palette and sounds (the few new sounds, such as the hit marker's tick, are made in code) — and no modern art spins that would split the game in two. Every action still goes through the original rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale. The few deliberate additions (jumping over low obstacles, free flight between levels, night vision as gear, falling off ledges, FPS-style shooting, dual wield) are settings. A real-time mode will be attempted in the future, as a setting too.
+The research and testing goal of this project was to bring the battlescape into 3D while staying **faithful to the original game**: seamless, so that it feels as if it had been introduced the day *UFO: Enemy Unknown* was released. It uses **only the original assets** — the game's own maps, voxel shapes, sprites, palette and sounds (the few new sounds, such as the hit marker's tick, are made in code) — and no modern art spins that would split the game in two. Every action still goes through the original rules: time units, energy, accuracy, reaction fire, line of sight, doors, morale. The few deliberate additions (jumping over low obstacles, free flight between levels, falling off ledges, FPS-style shooting, dual wield) are settings. A real-time mode will be attempted in the future, as a setting too.
 
 The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×40 pixel sprites, terrain is 16×16×24 voxels, and there are 256 colours. Good ideas for that are welcome (a few are listed in the manual, under [Known limits and ideas](OpenXcom3D_manual.md#9-known-limits-and-ideas)). Nevertheless the gameplay turned out to be quite engaging and deep: a dark UFO corridor, a door that slides open, a shape you can't make out yet, and your squad's time units ticking away.
 
@@ -46,7 +46,7 @@ The art, honestly, does not lend itself to full 3D: soldiers and aliens are 32×
 - **Voxel units (experimental)**, off by default; the switch is the last one in the 3D VIEW settings, under Advanced (EXPERIMENTAL): soldiers, aliens, civilians and tanks as 3D bodies of small cubes made from their own sprites, in both games and in mods: they turn smoothly, walk, kneel, fall and lie where they fell, and what you see is what a shot hits. **Tell us what looks wrong:** [open an issue](https://github.com/b0realis/OpenXcom3D/issues) with a screenshot and, if you can, the save. Save must be ZIPPED to upload, which can be done locally, or there are websites for it. saves can be found HERE in openxcom3d by clicking this line
 <img width="1280" height="800" alt="save" src="https://github.com/user-attachments/assets/48f0eeb2-6ec7-4e95-ba5f-df39ea638922" />
 
-- **The 3D VIEW settings redesigned:** a first page of eight rows, Controls, and Advanced by section; **Gameplay** in six presets (FAITHFUL, Extended+, TACTICUS, XMbl, FullQoL, FPS), **Graphics detail** Low, Medium or High, and **Recommended game options** on a click.
+- **The 3D VIEW settings redesigned:** a first page of nine rows, Controls, and Advanced by section; **Gameplay** in six presets (FAITHFUL, Extended+, TACTICUS, XMbl, FullQoL, FPS), **Graphics detail** Low, Medium or High, and **Recommended game options** on a click.
 - **Tactical map:** the map opened from the 3D view fills the screen, with soldiers' numbers, the enemies' classes and a view cone on every dot.
 - **On the graphics card:** *Surface relief* (walls and hulls catch the light by what is drawn on them), *Metallic surfaces* (a UFO's hull glints, sparkles and mirrors), reflections on window glass and still water, and no freeze on a battle's first 3D frame.
 - **Flashlight** as a beam or a far light; the flashlight, flares, zoom (now up to 8 times) and night vision are always there.
@@ -119,7 +119,7 @@ You need your own copy of the original game data (*UFO: Enemy Unknown / X-COM: U
 - **Linux (x86-64):** from the [latest release](https://github.com/b0realis/OpenXcom3D/releases/latest) take the **AppImage** (one file: make it executable and run it) or the **archive** (unpack it anywhere and run `./play.sh`). Nothing needs installing; it runs on any Linux from 2021 on (glibc 2.34: Ubuntu 22.04 and newer, Debian 12, Fedora, Arch, SteamOS).
 - **Windows 10 and 11 (64-bit):** take the **zip**, unpack it into a folder of yours (not *Program Files*) and double-click `play.bat`. It's not signed, so Windows may warn the first time: *More info*, then *Run anyway*.
 - **Steam Deck:** the Linux archive, set up once in Desktop Mode and added to Steam, played in Game Mode with its own controller layout.
-- **macOS (Apple silicon and Intel, macOS 11 and newer):** the **macOS zip** from the latest release: unpack it and open **OpenXcom3D.app**. A first build, made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and not yet tried on a real Mac.
+- **macOS (Apple silicon and Intel, macOS 11 and newer):** the **macOS zip** from the latest release: unpack it and open **OpenXcom3D.app**. Made by the [automatic builds](https://github.com/b0realis/OpenXcom3D/actions/workflows/build.yml?query=branch%3Amain) and played on an Apple silicon Mac; an Intel Mac hasn't been tried yet.
 - **From source:** `python3 install.py --from-source` clones OXCE at the commit below, applies the patch, builds and installs; the **[build guide](https://b0realis.github.io/OpenXcom3D/)** has every step by hand, for Linux and for Windows.
 - **Meta Quest 3 (experimental, *VR game design experimentation — not for gaming at the moment*):** a standalone headset build from source, installed with adb: [quest3/README.md](quest3/README.md).
 
@@ -129,7 +129,7 @@ The first time, it finds *X-COM: UFO Defense* and *Terror From The Deep* in your
 
 If someone in the ingenious OpenXcom community has the will to improve this further, help is very welcome: ideas for the art, translations, play-testing, and making the code better. Issues and pull requests are open.
 
-**Mac players** especially, and **reports from Windows:** GitHub's machines build a macOS version on every change, but none of us has a Mac, so it has only been started there, never played. The Windows zip is made on Linux (with llvm-mingw) and played under Wine; GitHub's Windows checks that it starts and finds the games in Steam, but nobody has played a battle on a real Windows machine yet. Trying either and saying how it went would help a lot.
+**Players on Intel Macs** especially, and **reports from Windows:** the macOS version is played on an Apple silicon Mac, but nobody has tried it on an Intel Mac yet. The Windows zip is made on Linux (with llvm-mingw) and played under Wine; GitHub's Windows checks that it starts and finds the games in Steam, but nobody has played a battle on a real Windows machine yet. Trying either and saying how it went would help a lot.
 
 ## What it is based on
 
@@ -145,7 +145,7 @@ OpenXcom3D stems from **OpenXcom Extended** at exactly this commit:
 All changes on top of it are in one file, [`openxcom3d.patch`](openxcom3d.patch) (it applies with `git apply` to a clean checkout of that commit):
 
 - [`src/FirstPerson/`](src/FirstPerson): the 3D view, an engine add-on (renderer, controller, sounds, options), one file per topic and commented throughout;
-- hooks in the core (48 files, about 1,900 lines, half of them the shot's own in `ProjectileFlyBState`): see the patch;
+- hooks in the core (56 files, about 2,300 lines, two fifths of them the shot's own in `ProjectileFlyBState`): see the patch;
 - [`mod/OpenXcom3D/`](mod/OpenXcom3D): the data mod that switches it on.
 
 `src/` and `mod/` in this repository are the same files as in the patch, for reading. Built with `-DOXCE_FIRSTPERSON=OFF`, it is plain OXCE again.

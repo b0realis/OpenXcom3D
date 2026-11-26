@@ -148,8 +148,11 @@ OptionInfo keyOption(OptionOwner owner, const std::string &id, SDL_Keycode *key,
  * @param state The battlescape screen the mode belongs to.
  * @return The new mode, or nullptr when no active mod enables the add-on.
  */
+static void forgetOverkillVerdict();
+
 FirstPersonMode *create(Game *game, BattlescapeState *state)
 {
+	forgetOverkillVerdict(); // (setting "Obliteration in UFO and TFTD": the loaded mods asked again, see modHasOverkill)
 	if (!game->getMod()->getFirstPerson().isEnabled())
 	{
 		return nullptr;
@@ -602,15 +605,27 @@ const float ClassicOverKill = 0.75f;
  * Does a mod set give any weapon overkill of its own: an item that hurts (a weapon, its ammunition, a grenade, a blade:
  * its power, or its melee power, above 0) whose damage type (or melee one) doesn't ignore it (the big mods' `damageAlter:
  * IgnoreOverKill: false`)? The original games' own damage types all ignore it. (Not every item: one that hurts no one
- * keeps a damage type nobody set, which ignores nothing.) Found once a mod.
+ * keeps a damage type nobody set, which ignores nothing.) Found once a battle: the game may load other mods between two
+ * (it made the rules again, likely at the very same address: so not kept by the address alone, see forgetOverkillVerdict).
  * @param mod The game's rules.
  * @return True if some item has overkill.
  */
 static bool ClassicOverkillHere = false; // (the last mod a hit was asked of has no overkill of its own: the setting holds, see overKillShare)
+static const Mod *OverkillModKnown = nullptr;
+static bool OverkillModHas = false;
+
+/// Setting "Obliteration in UFO and TFTD": the loaded mods are asked again whether they have overkill of their own (a
+/// battle starting, see FirstPerson::create).
+static void forgetOverkillVerdict()
+{
+	OverkillModKnown = nullptr;
+	ClassicOverkillHere = false;
+}
+
 static bool modHasOverkill(const Mod *mod)
 {
-	static const Mod *known = nullptr;
-	static bool has = false;
+	const Mod *&known = OverkillModKnown;
+	bool &has = OverkillModHas;
 	if (mod == known) { ClassicOverkillHere = !has; return has; }
 	known = mod;
 	has = false;
@@ -645,6 +660,9 @@ float overKillShare(float armorShare)
 	return Options::fpsObliterationClassic && ClassicOverkillHere ? ClassicOverKill : armorShare;
 }
 
+/// A block below a hole is ground when every layer of its shape has at least this many of its 256 voxels solid (see solidGroundBelow).
+const int SolidGroundVoxelsLeast = 240;
+
 /**
  * Is the tile below a hole the top of solid ground (Tile::hasNoFloor)? The game counts a tile whose floor is gone as
  * having one only where the tile below is raised to its top (terrain level -24); a solid block that fills its tile
@@ -667,9 +685,19 @@ bool solidGroundBelow(const Mod *mod, const Tile *below)
 	{
 		return false;
 	}
+	// (solid from its foot to its top, filling the tile: every layer of its shape a full one, a few voxels short at the most;
+	// a UFO hull's diagonal or a slab, solid in every layer too but a thin line or a strip of it, is no ground to stand on)
+	const std::vector<Uint16> *voxels = mod->getVoxelData();
 	for (int layer = 0; layer < 12; ++layer)
 	{
-		if (object->getLoftID(layer) == 0) return false; // (solid from its foot to its top: every layer of its shape)
+		const size_t loft = object->getLoftID(layer);
+		if (loft == 0 || !voxels || (loft + 1) * 16 > voxels->size()) return false;
+		int solid = 0;
+		for (int row = 0; row < 16; ++row)
+		{
+			for (Uint16 bits = (*voxels)[loft * 16 + row]; bits; bits &= (Uint16)(bits - 1)) ++solid;
+		}
+		if (solid < SolidGroundVoxelsLeast) return false;
 	}
 	return true;
 }
@@ -681,7 +709,7 @@ bool solidGroundBelow(const Mod *mod, const Tile *below)
  * overkill, as XPiratez and The X-Com Files give theirs (their overkill is on 137 of XPiratez's 200 explosives, 52 of its
  * 69 plasma weapons, 19 of its 83 lasers; The X-Com Files': 54 of 94, 33 of 38, 40 of 50; seldom a bullet, a blade or
  * a stun): a unit they take below minus ClassicOverKill of its health (see overKillShare) dies leaving no corpse, as
- * the map burns it, and with "Obliteration" bursts in 3D.
+ * the map burns it, and with "Obliteration" bursts in 3D. Only with OpenXcom3D's mod on.
  * @param mod The game's rules.
  * @param type The hit's damage type.
  * @param scratch Room for an altered copy.
@@ -689,7 +717,11 @@ bool solidGroundBelow(const Mod *mod, const Tile *below)
  */
 const RuleDamageType *overkillDamageType(const Mod *mod, const RuleDamageType *type, RuleDamageType &scratch)
 {
-	if (!Options::fpsObliterationClassic || !type || !mod) return type;
+	if (!Options::fpsObliterationClassic || !type || !mod || !mod->getFirstPerson().isEnabled())
+	{
+		ClassicOverkillHere = false; // (without the setting, or OpenXcom3D's mod off: the game's own rules, see overKillShare)
+		return type;
+	}
 	if (modHasOverkill(mod) || !type->IgnoreOverKill) return type; // (also notes whether the setting holds here: see overKillShare)
 	if (type->ResistType != DT_HE && type->ResistType != DT_LASER && type->ResistType != DT_PLASMA) return type;
 	scratch = *type;
@@ -1163,8 +1195,11 @@ void settlePresets()
 			bool all = true, changes = false;
 			for (const PresetSwitch &presetSwitch : gameplay.switches())
 			{
-				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked)
-				if (presetSwitch.onChoice) continue;
+				// (a setting only set on a choice is no part of a preset; one not listed before, or left as it is, isn't asked;
+				// nor one the tab no longer lists at a fixed value: fixHiddenSettings gave it its value already, Wall paint's
+				// All rooms, which no old preset had)
+				HiddenAs hidden;
+				if (presetSwitch.onChoice || (hiddenAs(presetSwitch.id, hidden) && hidden == HIDDEN_FIXED)) continue;
 				const int now = presetSwitch.values[preset], was = presetValueIn(presetSwitch, preset, Options::fpsPresetTables);
 				if (was != Kept) all = all && switchValue(presetSwitch) == was;
 				changes = changes || (now != Kept && now != was);
@@ -1213,9 +1248,10 @@ void settlePresets()
  * screen, aliens and civilians bleeding from their wounds (so setting "Blood trails" shows theirs too); OXCE's links, the clip sizes, a craft's maintenance time (2), the base's name in
  * popups, the base's large bars scaled, the accuracy by the crosshair (2).
  * @param mod The mod.
- * @return How many options it changed.
+ * @param apply True to set them, false only to count those not as recommended.
+ * @return How many options it changed (or would).
  */
-int applyGameOptions(const Mod *mod)
+static int recommendedGameOptions(const Mod *mod, bool apply)
 {
 	using namespace Options;
 	struct GameOption { const char *id; bool *flag; int *number; int value; };
@@ -1259,16 +1295,30 @@ int applyGameOptions(const Mod *mod)
 		if (option.flag)
 		{
 			if (*option.flag != (option.value != 0)) ++changed;
-			*option.flag = option.value != 0;
+			if (apply) *option.flag = option.value != 0;
 		}
 		else
 		{
 			if (*option.number != option.value) ++changed;
-			*option.number = option.value;
+			if (apply) *option.number = option.value;
 		}
 	}
-	Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
+	if (apply) Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
 	return changed;
+}
+
+/// Sets the game's own options to the recommended ones (the row "Recommended game options", see recommendedGameOptions).
+/// @return How many options it changed.
+int applyGameOptions(const Mod *mod)
+{
+	return recommendedGameOptions(mod, true);
+}
+
+/// Are the game's own options all as recommended (the row says Applied; one added to the list later, as Alien bleeding
+/// in 1.16, or one the player changed back on the game's own tab, and it says Apply again)?
+bool gameOptionsApplied(const Mod *mod)
+{
+	return recommendedGameOptions(mod, false) == 0;
 }
 
 /**
@@ -1831,7 +1881,7 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));
 	// The flashlight on and off (F, as in the first-person shooters).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlashlight", &keyFpsFlashlight, SDLK_f, "STR_FPS_KEY_FLASHLIGHT", category));
-	// Space is the map's night vision hold key; in 3D it jumps, and night vision is gear (N).
+	// Space is the map's night vision hold key; in 3D it jumps, and night vision has its own key (N).
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsJump", &keyFpsJump, SDLK_SPACE, "STR_FPS_KEY_JUMP", category));
 	// The emergency climb (the owner: "a bindable key ... 50 TUs ... sometimes units can get stuck in level depressions
 	// with no way out"): out of a pit, up a ledge, over a fence (see FirstPersonMode::emergencyClimb). No key at first.
@@ -2107,6 +2157,9 @@ void hitLogged(BattlescapeState *state, int type, int faction, const std::string
 	FirstPersonMode::hitLogged(state, type, faction, text);
 }
 
+/// The detail of the last hit for the Live command feed's hit log tab (see hitLogDetail, takeHitDetailForFeed).
+static std::string HitDetailForFeed;
+
 /**
  * What the hit log adds after a hit's word with the setting "Detailed hit log" (see FirstPersonApi.h; the owner: the
  * original log "in 3D window exactly", enhanced inside its window, with who was hit, the damage numbers, and kills and
@@ -2123,7 +2176,8 @@ void hitLogged(BattlescapeState *state, int type, int faction, const std::string
  */
 std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int healthDamage, int stunDamage, bool wasOut)
 {
-	if (!state || !target || (!Options::fpsHitLogDetail && !Options::fpsCommandFeed)) // (the Live command feed's hit log tab is the detailed log)
+	HitDetailForFeed.clear();
+	if (!state || !target || (!Options::fpsHitLogDetail && !Options::fpsCommandFeed))
 	{
 		return std::string();
 	}
@@ -2146,7 +2200,23 @@ std::string hitLogDetail(BattlescapeState *state, const BattleUnit *target, int 
 			text += ", " + std::string(lang->getString(target->getHealth() <= 0 ? "STR_FPS_HIT_LOG_KILLED" : "STR_FPS_HIT_LOG_DOWN"));
 		}
 	}
-	return text + ") ";
+	text += ") ";
+	// (the Live command feed's hit log tab is the detailed log whatever the setting: kept aside for it, see takeHitDetailForFeed;
+	// the game's own log has it only with the setting)
+	HitDetailForFeed = text;
+	return Options::fpsHitLogDetail ? text : std::string();
+}
+
+/**
+ * The detail of the hit just noted (see hitLogDetail), for the Live command feed's hit log tab, taken once: the game's
+ * own hit log has it only with the setting "Detailed hit log", the tab always.
+ * @return The text, or empty.
+ */
+std::string takeHitDetailForFeed()
+{
+	std::string text;
+	text.swap(HitDetailForFeed);
+	return text;
 }
 
 namespace
@@ -2183,7 +2253,7 @@ const size_t BloodPlacesMost = 3000;
  * Setting "Blood trails": a unit with fatal wounds leaves blood on the floor, as much as its wounds (the owner: "put a puddle
  * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
  * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
- * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
+ * grows under one that doesn't move; a big unit on each of its tiles. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
  * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds: soldiers;
  * aliens and civilians only with OXCE's option "Alien bleeding", or where a mod's armour says so), seen or not: it lies
  * there to be found (the owner's ruling: track by blood). Not a machine's, as Obliteration tells flesh (the owner: "Same as
@@ -2201,43 +2271,61 @@ void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn)
 	{
 		return;
 	}
-	Tile *tile = unit->getTile();
+	// Where it bleeds: under it, every tile of a big unit's (a Reaper's four), or under its body lying out cold.
+	std::vector<Tile*> tiles;
 	if (unit->isOut())
 	{
-		tile = nullptr;
 		for (const BattleItem *item : *save->getItems())
 		{
 			if (item->getUnit() == unit)
 			{
-				tile = item->getTile();
+				if (item->getTile()) tiles.push_back(item->getTile());
 				break;
 			}
 		}
 	}
-	while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
+	else if (unit->getTile())
 	{
-		tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
-	}
-	if (!tile)
-	{
-		return;
+		const int size = std::max(1, unit->getArmor()->getSize());
+		for (int x = 0; x < size; ++x)
+			for (int y = 0; y < size; ++y)
+			{
+				Tile *part = save->getTile(unit->getPosition() + Position(x, y, 0));
+				if (part) tiles.push_back(part);
+			}
 	}
 	const int amount = turn ? 2 * std::min(unit->getFatalWounds(), 5) : std::min(unit->getFatalWounds(), 3);
-	const int index = save->getTileIndex(tile->getPosition());
 	std::vector<int> &blood = save->getBlood();
-	for (size_t at = 0; at + 2 < blood.size(); at += 3)
+	for (Tile *tile : tiles)
 	{
-		if (blood[at] == index && blood[at + 1] == unit->getId())
+		while (tile && tile->getPosition().z > 0 && tile->hasNoFloor(save))
 		{
-			blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
-			return;
+			tile = save->getTile(tile->getPosition() + Position(0, 0, -1));
 		}
+		if (!tile)
+		{
+			continue;
+		}
+		const int index = save->getTileIndex(tile->getPosition());
+		bool added = false;
+		for (size_t at = 0; at + 2 < blood.size() && !added; at += 3)
+		{
+			if (blood[at] == index && blood[at + 1] == unit->getId())
+			{
+				blood[at + 2] = std::min(BloodAmountMost, blood[at + 2] + amount);
+				added = true;
+			}
+		}
+		if (added)
+		{
+			continue;
+		}
+		if (blood.size() >= BloodPlacesMost * 3)
+		{
+			blood.erase(blood.begin(), blood.begin() + 3);
+		}
+		blood.insert(blood.end(), { index, unit->getId(), amount });
 	}
-	if (blood.size() >= BloodPlacesMost * 3)
-	{
-		blood.erase(blood.begin(), blood.begin() + 3);
-	}
-	blood.insert(blood.end(), { index, unit->getId(), amount });
 }
 
 /**

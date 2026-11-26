@@ -99,7 +99,7 @@ private:
 	std::vector<Particle> _particles; // The living particles.
 	Uint32 _seed;                     // State of the particles' own random number generator (never zero).
 	bool _accepting = true;           // New particles are taken in (not while particles are off: see setAccepting).
-	static const size_t Max = 6000;   // The most particles there can be at once; more are dropped.
+	static constexpr size_t Max = 6000; // The most particles there can be at once; more are dropped. (constexpr: a definition too, which std::min by reference needs where nothing is inlined: the ASan build)
 public:
 	/// Creates an empty particle system.
 	FirstPersonParticles();

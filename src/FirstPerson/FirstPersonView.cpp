@@ -195,6 +195,8 @@ void FirstPersonView::setSavedBattleGame(SavedBattleGame *save)
 	_watchedUnits.clear();
 	_obliterated.clear();
 	_bloodColors.clear();
+	_bloodUnits.clear();
+	_bloodUnitsCount = 0;
 	_decals.clear();
 	_scorches.clear();
 	_burningLastFrame.clear();

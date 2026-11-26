@@ -48,7 +48,7 @@ KEYS = [
         ('<kbd>1</kbd> &hellip; <kbd>0</kbd>', 'Turn to visible enemy 1 to 10 (or, with the free cursor, click its red button at the right).', 'Find every alien in sight in one key.'),
         ('<kbd>Left Shift</kbd> + <kbd>A</kbd> / <kbd>D</kbd>, held', 'Lean out left / right to peek round a corner. Off until the setting <i>Lean</i> is Peek or Tilt; <i>Lean left</i> and <i>Lean right</i> can also get keys of their own. The eye moves up to six voxels; a shot from a lean leaves from that side.',
          'You see the street round the corner; who is seen is still the game\'s call.'),
-        ('<kbd>U</kbd> or the right button, held', 'Zoom: the view glides in four times closer. SCOPING shows how far.', 'Only the picture changes: aim and hit chance stay the same.'),
+        ('<kbd>U</kbd> or the right button, held', 'Zoom: the view glides in four times closer, eight with <kbd>Space</kbd> held too. SCOPING shows how far.', 'Only the picture changes: aim and hit chance stay the same.'),
         ('<kbd>Left Alt</kbd>, held', 'Show facing: a ring round every unit in sight with an arrow the way it faces, in its side\'s colour, and an arrow on the unit itself.', 'Where an alien looks decides whether it reacts to you.'),
         ('<i>Range (hold)</i>: a key of your choice', 'The rangefinder while held (setting <i>Rangefinder</i>; the digital one when that is Off).', 'No key until you give it one in Options, 3D VIEW.'),
         ('<kbd>N</kbd> or <kbd>Scroll Lock</kbd>', 'Night vision on/off (Scroll Lock: the game\'s own key for it).', ''),
@@ -62,7 +62,7 @@ KEYS = [
         ('<kbd>Y</kbd>', 'Akimbo off, and back on to the kind the setting <i>Akimbo</i> says (Full or One-hand); with the setting Off it does nothing. It marks the soldier\'s akimbo on the map along with it.', 'Two guns: more rounds, each 20% less accurate. Off to take an aimed shot. Reaction shots fire both guns too.'),
         ('<i>Akimbo style</i> (unbound)', 'Switch two guns between taking turns round by round and firing at once (<i>Akimbo volley</i>).', ''),
         ('<kbd>Ctrl</kbd>+<kbd>Shift</kbd> + click', 'With a spray weapon\'s auto shot (X-Com Files\' miniguns): mark the spray burst\'s points, as on the map.', ''),
-        ('Right button', 'Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, hold to zoom (with a free cursor: hold and drag to look round).', ''),
+        ('Right button', 'Cancel the current action, or forget a target marked for <i>Confirm fire</i>; with nothing to cancel, open the closed door you point at if it\'s in reach, as on the map, or else hold to zoom (with a free cursor: hold and drag to look round).', ''),
         ('<kbd>T</kbd>', 'Throw a tactical flare: free, as often as you like.', 'Lights the 3D view only.'),
         ('<kbd>Insert</kbd>', 'The Doom cheats off, and the same ones back on.', ''),
     ]),
@@ -87,15 +87,17 @@ KEYS = [
 ]
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Settings: (group, [(name, default, choices, what it does, how it plays)]), in the order Options > 3D VIEW > Settings lists
-# them (one list there; the groups are FirstPersonApi.cpp's, where the settings are registered).
+# Settings: (group, [(name, default, choices, what it does, how it plays)]). The groups are Advanced's sections
+# (OptionsFirstPersonState.cpp, sections[]: the tab lists them and their settings by the alphabet, the cheats and the
+# experimental last); the first group is the first page's own.
 # ---------------------------------------------------------------------------------------------------------------------
 SETTINGS = [
-    ('Presets (the first page)', [
-        ('Gameplay', 'Extended+', 'FAITHFUL / Extended+ / TACTICUS / XMbl / FullQoL / FPS / Custom', 'How it plays, as one choice setting 46 settings (XMbl, when chosen, two more). FAITHFUL: soldiers\' 3D view on top of OXCE. Extended+: the map camera, unit names, hitboxes shown, exact aim. TACTICUS: cameras as the eyes see, the accuracy line, the rangefinder, step costs. XMbl: akimbo, leaning with a tilt, lean shots, jumping low obstacles, fall damage, modern throwing, realistic hitboxes, damage numbers, smooth lighting, and a pixel size of 1 when chosen. FullQoL: every feature on. FPS: free turning and walking, FPS-style shooting, quick deaths.',
+    ('Presets and game options (the first page)', [
+        ('Gameplay', 'Extended+', 'FAITHFUL / Extended+ / TACTICUS / XMbl / FullQoL / FPS / Custom', 'How it plays, as one choice setting 45 settings (XMbl, when chosen, two more). FAITHFUL: soldiers\' 3D view on top of OXCE. Extended+: the map camera, unit names, hitboxes shown, exact aim. TACTICUS: cameras as the eyes see, the accuracy line, the rangefinder, step costs. XMbl: akimbo, leaning with a tilt, lean shots, jumping low obstacles, fall damage, modern throwing, realistic hitboxes, damage numbers, smooth lighting, and, when chosen, a pixel size of 1 and the flashlight\'s far light. FullQoL: every feature on. FPS: free turning and walking, FPS-style shooting, quick deaths.',
          'Change one of its settings by hand and it becomes Custom; your mix is kept while you try the others.'),
         ('Graphics detail', 'Medium', 'Low / Medium / High / Custom', 'How finely the 3D world is drawn, as one choice setting fourteen Screen settings, by the Renderer. CPU: Low has pixels twice as big and no sun shadows, Medium the HUD\'s resolution, High the battlescape\'s. GPU: Low the HUD\'s resolution, Medium the display\'s with Render scale on Auto, High that with true colour, smooth colours, soft shadows, ambient occlusion and the lights\' effects.',
          'Low on a slow machine; with Renderer GPU, Medium on built-in graphics and High on a dedicated card.'),
+        ('Recommended game options', 'Apply', 'Apply / Applied', 'A click sets OpenXcom\'s own options (the game\'s other tabs) to a recommended lot: Geoscape and Battlescape at 640x400, the path\'s arrows and costs, tooltips, the middle button to drag, auto-end battle, no "Next Turn" screen, aliens bleeding from their wounds, the building queue, inventory stats, accuracy by the crosshair and more. Kept with OK, dropped with Cancel. No Gameplay preset touches them, and what a mod fixes stays as the mod has it.', 'One click instead of thirty; change any of them back on the game\'s own tabs.'),
     ]),
     ('View and camera', [
         ('Soldier camera preview', 'YES', 'YES / NO', 'Hovering a soldier\'s button shows their card with a live helmet camera. A right click opens their SOLDIER CAM, big.',
@@ -110,7 +112,6 @@ SETTINGS = [
         ('Invert mouse', 'NO', 'YES / NO', 'Mouse forward looks down, as in a flight simulator.', ''),
         ('Field of view', '75', '50 to 110', 'How wide the 3D view is, in degrees.', 'Wider shows more around you; narrower makes far targets bigger.'),
         ('Start battles in 3D', 'NO', 'YES / NO', 'Begin every battle in the first-person view.', ''),
-        ('Recommended game options', 'Apply', 'Apply / Applied', 'A click sets OpenXcom\'s own options (the game\'s other tabs) to a recommended lot: Geoscape and Battlescape at 640x400, the path\'s arrows and costs, tooltips, the middle button to drag, auto-end battle, no "Next Turn" screen, aliens bleeding from their wounds, the building queue, inventory stats, accuracy by the crosshair and more. Kept with OK, dropped with Cancel. No Gameplay preset touches them, and what a mod fixes stays as the mod has it.', 'One click instead of thirty; change any of them back on the game\'s own tabs.'),
         ('Alien turn', '3D', 'Map / 3D / Facing', 'Map: the aliens\' turn on the isometric map. 3D: in 3D through your last soldier\'s eyes. Facing: so, the view held to your soldier\'s facing, at most 45 degrees to either side: you see what they can see.', ''),
         ('Aliens\' turn cameras', 'YES', 'YES / NO', 'In their turn the view cuts to where the action is: a soldier firing back, the nearest soldier who sees a moving alien, a soldier shot at by an alien nobody sees; helmet camera cards pop up for soldiers shot at, hit or mind controlled, and for a soldier going down out of view (DECEASED or UNCONSCIOUS).', ''),
         ('Head bob', 'YES', 'YES / NO', 'The view bobs with the soldier\'s steps.', 'Off if it makes you queasy.'),
@@ -125,6 +126,7 @@ SETTINGS = [
         ('Flight cost per level', 'Rules', 'Rules / 0 to 24', 'What a flying (or swimming) soldier pays to rise or sink a level in 3D. Rules: each its armor\'s own cost, as the game has it. A number: that for every flyer (0: free).', 'Rules keeps the game\'s slower flyers slow; the original game charges about 8.'),
         ('Jump over low obstacles', 'NO', 'YES / NO', 'Jump while walking forwards or sideways into something low (up to 15 voxels high) vaults over it, for 30 TU.', 'Bends the rules a little: on the map a fence makes you walk round.'),
         ('Falling', 'YES', 'YES / NO', 'Walk off a ledge and fall to the level below.', 'A shortcut the map never offers, at the price of the fall.'),
+        ('Fall damage', 'NO', 'YES / NO', 'With Falling, the landing hurts by the height fallen. NO: a fall never hurts.', 'NO makes every ledge a free shortcut.'),
     ]),
     ('Aiming and combat', [
         ('FPS-style shooting (easier)', 'NO', 'YES / NO', 'NO: the game\'s own accuracy, its hit chance by the crosshair. YES: FPS-style shooting, far easier: rounds along the crosshair with a spread, recoil, from your eye.',
@@ -150,13 +152,11 @@ SETTINGS = [
          'What you see is what you hit: a shot between the legs passes, one at a gun held out hits, and a kneeling soldier is as small as he looks: a shot just over his head goes over. Only the art a unit\'s picture lays flat on the floor in front of its feet is never hit. Arcs too: a bow\'s arrow hits the picture it comes down on, a big unit aimed at its middle. NO: the game\'s own hit shapes.'),
         ('Quick deaths', 'NO', 'YES / NO', 'Units killed or knocked out are down at once: bursts fire on, falls play on their own and together, in 3D and on the map; your soldier falls on their camera card while the view goes on to the next.', 'Doom-style pace: chaingun through a group without waiting for each fall.'),
         ('Live motion scanner', 'NO', 'YES / NO', 'YES: the motion scanner stays up as you move and through the aliens\' turn, a live radar for one use. NO: one look from where it was used, as the game\'s own scanner.', 'An edge the game never gives; on from the FullQoL preset.'),
-        ('Obliteration in UFO and TFTD', 'NO', 'YES / NO', 'In the original games explosives, lasers and plasma (Gauss, Sonic) have overkill, as in XPiratez and The X-Com Files: a unit they take below minus three quarters of its health leaves no corpse, and with Obliteration bursts.', 'Changes the rules: corpses lost to plasma. Nothing where a mod has overkill of its own.'),
+        ('Obliteration in UFO and TFTD', 'NO', 'YES / NO', 'In the original games explosives, lasers and plasma (Gauss, Sonic) have overkill, as in XPiratez and The X-Com Files: a unit they take below minus three quarters of its health leaves no corpse, and with Obliteration bursts; a blast destroys its gear too.', 'Changes the rules: corpses and gear lost to plasma and explosives. Nothing where a mod has overkill of its own.'),
         ('Auto-equip guns first', 'YES', 'YES / NO', 'Soldiers with no saved loadout take guns before melee weapons, the hardest-hitting first, launchers last. NO: OpenXcom\'s own auto-equip.', 'OXCE has no ranking: its order changes between builds, so in XPiratez or X-Com Files it often hands out staffs and swords first.'),
-        ('Fall damage', 'NO', 'YES / NO', 'With Falling, the landing hurts by the height fallen. NO: a fall never hurts.', 'NO makes every ledge a free shortcut.'),
     ]),
     ('Graphics and light', [
         ('Smooth lighting', 'YES', 'YES / NO', 'The battle\'s light blends smoothly from tile to tile. NO: tile by tile, as the map shades it.', ''),
-        ('Shadows', 'On', 'Off / On; Soft / Lamps / Soft+lamps (GPU)', 'Ray-traced shadows from the sun, lamps, your flashlight and flares, and under every unit; a flare throws a unit\'s soft shadow along the ground. With Renderer GPU also Soft: the sun\'s shadows get a soft edge, wider the further they fall; Lamps: the three strongest lamps and every flare in reach throw shadows, not only the strongest; Soft+lamps: both.', 'Off on slow machines; Soft is cheap on the card, Lamps for night missions in towns.'),
         ('Distance haze', 'Normal', 'Normal / Light / Clear', 'How soon far terrain fades into the haze, and how thick Unseen terrain\'s Fog is (Clear: none).', ''),
         ('Unseen terrain', 'Mist', 'Mist / Fog / Visible', 'Terrain your squad hasn\'t seen. Mist: slate shapes, misty further off. Fog: 0.9\'s dark shapes in a fog rising from the edge of sight to the view\'s end, as thick as the haze. Visible: drawn as it is, a little greyer.',
          'Units and items stay hidden until seen. Visible is the slowest; with a long View distance it shows a whole map.'),
@@ -177,7 +177,7 @@ SETTINGS = [
         ('Flashlight', 'Beam', 'Beam / Far light', 'Beam: a spot from your weapon that fades with range. Far light: a light where you aim, a pool six tiles across, as bright at any range.', ''),
         ('Screen shake', 'YES', 'YES / NO', 'Explosions, hits, falls and your own shots shake the view. NO: nothing shakes it.', ''),
         ('Obliteration', 'YES', 'YES / NO', 'A unit killed beyond its overkill (the game leaves no corpse: the big mods\' heavy weapons) bursts into the pieces of its body, away from the hit, charring as they fly; flesh bleeds in its own blood\'s colour (a Sectoid green), machines spark. A blast that destroys a body on the floor bursts it too. NO: it falls and is gone, as on the map.', 'None with Particles Off.'),
-        ('Blood trails', 'NO', 'YES / NO', 'Units with fatal wounds leave blood on the floor in their own blood\'s colour (a Sectoid green; aliens bleed with the game\'s Alien bleeding, which Recommended game options switch on): drops on every tile they walk, more with more wounds, and a pool that grows each turn where they stay or lie. A medikit that patches every wound stops it. Every bleeder\'s, seen or not: follow a wounded alien\'s trail. Kept the whole battle and in the save.', 'Only in 3D: the isometric map looks as ever.'),
+        ('Blood trails', 'NO', 'YES / NO', 'Units with fatal wounds leave blood on the floor in their own blood\'s colour (a Sectoid green; aliens bleed with the game\'s Alien bleeding, which Recommended game options switch on; machines, tanks and a Cyberdisc, leave none): drops on every tile they walk, more with more wounds, and a pool that grows each turn where they stay or lie. A medikit that patches every wound stops it. Every bleeder\'s, seen or not: follow a wounded alien\'s trail, on the floors your squad has found. A big unit bleeds on each of its tiles. Kept the whole battle and in the save.', 'Only in 3D: the isometric map looks as ever.'),
         ('Futuristic night vision', 'YES', 'YES / NO', 'YES: under night vision units, bodies and items keep their colours, as on the map; the world goes green. NO: realistic, all green.', ''),
         ('Particles', 'All', 'All / Effects / Off', 'Effects: sparks, debris, smoke, fire, trails. All: also dust, fireflies, bubbles and weather. Every lift shows a beam of light rising through it, in its pad\'s colours.', ''),
         ('UFO lights and aura', 'NO', 'YES / NO', 'UFOs glow: steady hulls with pulsing lights, their own coloured light, evenly inside them, and an aura of motes outside; only once a UFO has been seen.', 'Inside a UFO the view stays sharp: its light only colours it.'),
@@ -186,7 +186,6 @@ SETTINGS = [
         ('Open doors as ghosts', 'YES', 'YES / NO', 'What is left of a sliding door once it is open (a UFO\'s door, a mod\'s electric door) is seen through and never in the way, as the parts without shape. NO: solid, as the picture draws it.', 'Leave on; NO if you prefer the door\'s rim solid.'),
         ('See-through', 'Crops', 'Off / Crops / All', 'Crops: crops, flower beds and rubble without a real 3D shape, drawn solid as on the map, shown a bit see-through instead, so units in a field show. All: also a corpse or item under the crosshair turns faint while you aim past it.', 'All sees past the big mods\' tall corpses to what your shot reaches.'),
         ('Discreet map edge', 'NO', 'YES / NO', 'Small red dots along the map\'s edge instead of the yellow tape.', ''),
-        ('Pixel size', '1', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above (with Renderer GPU always full detail). The small cameras always have full detail. A click goes round them.'),
     ]),
     ('HUD', [
         ('Crosshair', 'YES', 'YES / NO', 'The crosshair; its shape tells the fire mode.', ''),
@@ -221,6 +220,8 @@ SETTINGS = [
         ('3D resolution', 'HUD', 'HUD / Battle / Display', 'How fine the 3D world is drawn: as its HUD (magnified with it), as the battlescape, or as the display itself whatever the Battlescape scale. Display is heavy on the CPU; made for Renderer GPU. The game\'s Display Filter (xBRZ, HQx, the CRT shaders) changes the 3D world only where it is drawn into the game\'s own screen: at HUD, not at Display.', 'On a 1920×1080 screen: HUD draws 640×360 (shown ×3), Battle whatever the isometric map is drawn at, Display always 1920×1080. Display with a small Battlescape scale: a big map and menus, and a sharp 3D world.'),
         ('HUD scale', 'Auto', 'Auto / x1 / x2 / x3 / x4', 'How many times the 3D HUD is magnified on a big screen. Auto: as big as fits (x3 at 1920×1080). With 3D resolution at Display it counts the display\'s own pixels, whatever the Battlescape scale.', 'x2 on a big screen: a smaller HUD, more room.'),
         ('Render scale', '100%', 'Auto / 50% / 60% / 67% / 75% / 85% / 100%', 'Renderer GPU only. The 3D world drawn with fewer rays and magnified on the card; units, effects and the HUD stay sharp. 50% is a quarter of the rays. Auto picks the scale that holds the frame rate.', 'Auto on a Steam Deck or integrated graphics; 100% on a good card.'),
+        ('Pixel size', '1', 'Auto / 1 / 2 / 3', 'Each ray colours a block of pixels: chunkier, much faster on big screens.', 'Auto: full detail up to 640&times;400, blocks of 2 above (with Renderer GPU always full detail). The small cameras always have full detail. A click goes round them.'),
+        ('Shadows', 'On', 'Off / On; Soft / Lamps / Soft+lamps (GPU)', 'Ray-traced shadows from the sun, lamps, your flashlight and flares, and under every unit; a flare throws a unit\'s soft shadow along the ground. With Renderer GPU also Soft: the sun\'s shadows get a soft edge, wider the further they fall; Lamps: the three strongest lamps and every flare in reach throw shadows, not only the strongest; Soft+lamps: both.', 'Off on slow machines; Soft is cheap on the card, Lamps for night missions in towns.'),
         ('Supersampling', 'Off', 'Off / x2 / x4', 'Renderer GPU only. Two or four rays a pixel, blended: edges, far fences and fine texture stop shimmering as you turn. Costs as many times the rays.', 'x2 costs little on a good card; x4 for the cleanest picture.'),
         ('Ambient occlusion', 'NO', 'YES / NO', 'Renderer GPU only. Corners, the foot of walls and the gaps between things are darker: the blocky world gets depth.', 'YES: cheap, and rooms look solid.'),
         ('True colour', 'NO', 'YES / NO', 'With Renderer GPU and 3D resolution Display (the display is then opened in full colour by itself). The 3D world in full colour, past the palette\'s 256; units, effects and the HUD stay the palette\'s.', 'YES with Smooth light and Supersampling: the cleanest picture.'),
@@ -242,7 +243,7 @@ SETTINGS = [
         ('Doom grenade fuse (seconds)', '3', '1 to 5', 'In Doom mode, how long a grenade burns.', ''),
     ]),
     ('Experimental', [
-        ('Voxel units (experimental)', 'NO', 'YES / NO', 'Experimental, the last setting under Advanced. YES: units are 3D bodies of little cubes made from their own sprites, walking and going down as their frames show. NO: the game\'s pictures. Tell us what looks wrong: <a href="https://github.com/b0realis/OpenXcom3D/issues">open an issue</a> with a screenshot and, if you can, the save.', 'What shots hit is set by Realistic hitboxes: NO the original shapes, YES the whole body.'),
+        ('Voxel units', 'NO', 'YES / NO', 'Experimental, the last setting under Advanced. YES: units are 3D bodies of little cubes made from their own sprites, walking and going down as their frames show. NO: the game\'s pictures. Tell us what looks wrong: <a href="https://github.com/b0realis/OpenXcom3D/issues">open an issue</a> with a screenshot and, if you can, the save.', 'What shots hit is set by Realistic hitboxes: NO the original shapes, YES the whole body.'),
     ]),
 ]
 
@@ -252,7 +253,7 @@ SETTINGS = [
 HUD_MARKS = [
     (1, 11, 9, 'ISO, HUD, INV', 'The map and back, the classic HUD, the inventory.'),
     (2, 51, 9, 'The squad', 'Your soldiers in the middle of the top bar: click to select, hover for the card with a live helmet camera, right click for the SOLDIER CAM; &#9664; and &#9654; for the previous and next. A skull marks the dead, a caduceus the unconscious, an orange alien face one under mind control.'),
-    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, the end of the turn, and when the soldier has them NIGHT VISION, SUIT FLY and a tank\'s TURRET (the view turns the turret alone).'),
+    (3, 80, 9, 'LIGHT, END and the rest', 'The suit light, NIGHT VISION, the end of the turn, and when the soldier has them SUIT FLY and a tank\'s TURRET (the view turns the turret alone).'),
     (4, 85, 22, 'The compass', 'Your heading under the white arrow, the way the soldier faces (a yellow triangle), and a shot\'s turn and its cost.'),
     (5, 44, 46, 'The crosshair', 'Its shape is the fire mode; the accuracy line under it; the shot info beside it (mode, hit chance, time units, the other costs below); the name of the unit pointed at under all that. A little green door at its left: it\'s on a door. A blue shield at its lower left: your strike did no harm. To its left: the range (setting Rangefinder), and OFF or BLOCKED when the shot previewed won\'t land under it.'),
     (6, 27, 76, 'The soldier', 'Rank and name, what matters now (KNEELING, BURNING, WOUNDS, PANIC), a line per hand with its ammo (a cannon or launcher says the loaded kind: [AP], [HE], [IN]), the four stat bars, and a mod\'s mana as a thin bar under them.'),
@@ -314,15 +315,15 @@ FEATURES = [
      'Falls and vaults are shortcuts the map doesn\'t have (each a setting). Sprint costs less time and more energy, and like en passant keeps walking when an enemy shows up; being shot at stops any walk, as on the map.'),
     ('fly', 'Lifts, ladders and flight', [('ufo_flight_climb_arrow.png', 'A flying suit: the arrow left of the compass lit yellow, W climbs')],
      '<kbd>Page Up</kbd> <kbd>Page Down</kbd>, <kbd>B</kbd>, <kbd>W</kbd> looking up',
-     'Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways. Flight stays on through a save and a load, and when you touch down: Page Down on the ground switches it off. With <i>Lift beams</i> (and <i>Particles</i>), motes and streaks of light rise from a grav lift\'s floor.',
+     'Ride a grav lift, climb a ladder, fly with SUIT FLY on: W looking up climbs, looking down sinks, each level paid as on the map. Purple arrows show the ways. Flight stays on through a save and a load, and when you touch down: Page Down on the ground switches it off. With <i>Particles</i>, motes and streaks of light rise from a grav lift\'s floor.',
      ''),
     ('tank', 'Tanks and their turrets', [],
      'TURRET on the top bar; <i>Turret only (tanks)</i> (set a key)',
      'A tank with a turret gets a TURRET button on the top bar, off at first. On, turning the view turns the turret alone, by the game\'s own turret turn and at its cost (with <i>Turning costs TU</i>), the hull staying as it is; off, the whole tank turns. Each tank keeps its switch in the save. A tank has no hands, so no weapon is drawn at the bottom of the view; the crosshair, aiming and firing work as with any gun.',
      'In the big mods (XPiratez) a tank\'s own turn can cost far more than its turret\'s.'),
     ('doors', 'Doors', [],
-     '<kbd>O</kbd>, or walk into it',
-     'Doors open as you walk into them, or with O from where you stand (the one you look at). They swing to where the game has them; UFO doors slide. Glass doors are seen through, while they swing too. A little green door left of the crosshair says it\'s on a door you have seen.',
+     '<kbd>O</kbd> or the right button, or walk into it',
+     'Doors open as you walk into them, or with O or a right click from where you stand (the one you look at). They swing to where the game has them; UFO doors slide. Glass doors are seen through, while they swing too. A little green door left of the crosshair says it\'s on a door you have seen.',
      'Open a door without stepping into the room behind it.'),
     ('melee', 'Melee, medi-kits and items', [('ufo_medikit_teammate.png', 'A medi-kit by the crosshair: USE: and the teammate\'s name'), ('ufo_motion_scanner.png', 'The motion scanner held up: the sweep going out, two blips behind the soldier')],
      'Left button in the melee or use mode',
@@ -333,7 +334,7 @@ FEATURES = [
      'Anything in a hand can be thrown along the game\'s arc (the cyan path shows it). Aimed at the open sky, a throw or an arcing shot goes through the air on the crosshair\'s line and comes down wherever that arc falls. In Doom mode grenades burn in real time, and with free grenades fly wherever the crosshair points and burst in the air.',
      ''),
     ('zoom', 'Zoom', [('scope_night.png', 'SCOPING at night, the blue scope cross on the crosshair')],
-     '<kbd>U</kbd> or the right button, held', 'The view glides in four times closer, the weapon lowers, the mouse slows.', 'Only the picture: the shot and its odds don\'t change.'),
+     '<kbd>U</kbd> or the right button, held', 'The view glides in four times closer (eight with Space held too), the weapon lowers, the mouse slows.', 'Only the picture: the shot and its odds don\'t change.'),
     ('light', 'Light and night', [('night_vision_laser.png', 'Night vision: the laser sight light in the goggles')],
      '<kbd>F</kbd>, <kbd>N</kbd>, <kbd>T</kbd>, <kbd>L</kbd>',
      'Your flashlight (on F, a tight spot on the crosshair), night vision (all green, or with <i>Futuristic night vision</i> units and items in their own colours), red tactical flares, and the game\'s suit light (L). Light and shadow come from lamps, the sun, your flashlight and flares, a unit lit by a flare throwing a long soft shadow; indoors (a roof overhead, or rock) no sun shines, and rooms are lit by their own light, as on the map. Flames\' colours blend from frame to frame.',
@@ -381,7 +382,7 @@ FEATURES = [
      'The long, clear view: <i>View distance</i> 200, <i>Distance haze</i> Clear, <i>Unseen terrain</i> Visible. As the map plays: <i>Fog of war in 3D</i> As map.'),
     ('hitboxes', 'Hit as drawn', [('hitbox_outlines_112.png', 'TFTD: the squad and two Aquatoids outlined as the shots test them')],
      'Settings <i>Realistic hitboxes</i> and <i>Hitboxes</i>',
-     'With <i>Realistic hitboxes</i> a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too. <i>Hitboxes</i> (Off, Aimed, Always, Blink) outlines what the shots really test, in the colour of the unit\'s side; <i>Glowing outlines</i> makes the outline shine. The outlines keep their colours under night vision.',
+     'With <i>Realistic hitboxes</i> a unit is hit exactly where its picture shows, between two tiles while it walks or flies, by arrows and other arcing shots too. <i>Hitboxes</i> (Off, Aimed at, Blink, Always) outlines what the shots really test, in the colour of the unit\'s side; <i>Glowing outlines</i> makes the outline shine. The outlines keep their colours under night vision.',
      'Aim at what you see; check a doubtful shot with the outline.'),
     ('sounds', 'Ambient sounds', [],
      'Setting <i>Ambient sounds</i>',
@@ -433,7 +434,7 @@ STYLES = '''<section id="styles" class="sec gutter"><div class="col">
   </div>
 </div>
 <h3>Settings that bend the rules a little</h3>
-<p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Akimbo</i>, <i>Melee hits walls and downed</i>, <i>Force blocked shots</i> (as Ctrl on the map; an arcing shot the game would refuse always fires, as with Ctrl), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
+<p>Each a setting, so you choose: <i>Jump over low obstacles</i> (vault a fence for the walk), <i>Falling</i> (step off a ledge), <i>Lean shots</i> and <i>Lean</i> (shoot from the side of your tile), <i>Akimbo</i>, <i>Melee hits walls and downed</i>, <i>Obliteration in UFO and TFTD</i> (no corpse from a unit hit far past its health), <i>Force blocked shots</i> (as Ctrl on the map; an arcing shot the game would refuse always fires, as with Ctrl), <i>Turning costs TU</i> off (free turns), and the Doom cheats. Everything else only changes what you see.</p>
 </div></section>'''
 
 def size_in(folder, name):
@@ -500,7 +501,7 @@ def sections():
         w('<tr class="row"><th>%s</th><td>%s</td></tr>' % (name, text))
     w('</tbody></table></div>\n<figure class="pair"><img src="%strajectory.png" width="1280" height="800" loading="lazy" alt="The trajectory of a throw: a light cyan arc onto a diamond where it lands."><figcaption>The trajectory: a grenade\'s arc, and where it lands.</figcaption></figure>\n</div></section>' % IMG)
     # settings
-    w('<section id="settings" class="sec gutter"><div class="col">\n<h2>Settings</h2>\n<p class="intro"><b>Options &rarr; 3D VIEW</b>, from the main menu or in a battle: the first page (<b>Settings</b>) has the two presets and the few settings changed most; <b>Advanced</b> has them all, in these groups. A left click flips YES / NO or raises a number, a right click lowers it; the default is in bold.</p>')
+    w('<section id="settings" class="sec gutter"><div class="col">\n<h2>Settings</h2>\n<p class="intro"><b>Options &rarr; 3D VIEW</b>, from the main menu or in a battle: the first page (<b>Settings</b>) has the two presets, <i>Recommended game options</i> and the few settings changed most; <b>Advanced</b> has every one but those three, in these groups. A left click flips YES / NO or raises a number, a right click lowers it; the default is in bold.</p>')
     for group, rows in SETTINGS:
         w('<h3>%s</h3>\n<div class="tablewrap"><table class="grid settings"><thead><tr><th>Setting</th><th>Choices</th><th>What it does</th><th>How it plays</th></tr></thead><tbody>' % group)
         for name, default, choices, what, plays in rows:

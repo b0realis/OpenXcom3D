@@ -2857,7 +2857,7 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 		if (pressed) toggleView();
 		return true;
 	}
-	if (!active && key == Options::keyFpsHideHud)
+	if (!active && key == Options::keyFpsHideHud && !feedShown()) // (the Live command feed shows no map camera: the key leaves its setting alone)
 	{
 		if (pressed) toggleMapCamera();
 		return true;

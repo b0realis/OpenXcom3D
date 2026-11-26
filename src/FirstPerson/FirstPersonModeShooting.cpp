@@ -4252,13 +4252,12 @@ void FirstPersonMode::unitObliterated(BattlescapeState *state, BattleUnit *unit,
 	const bool effects = mode->isActive();
 	if (unit->getStatus() == STATUS_UNCONSCIOUS)
 	{
-		// (out cold: its body on the floor; one carried has none to burst)
+		// (out cold: its body on the floor, every part of a big unit's (a Reaper's four); one carried has none to burst)
 		for (const BattleItem *item : *mode->_save->getItems())
 		{
 			if (item->getUnit() == unit && item->getTile())
 			{
 				mode->_view->obliterateBody(item, away, burn, burnsHot(type), !type->isDirect(), effects);
-				break;
 			}
 		}
 		mode->_view->hideObliterated(unit);
