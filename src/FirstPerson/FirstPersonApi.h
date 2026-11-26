@@ -419,7 +419,7 @@ void noteHealthDamage(int health);
 /// each step finished) or, as its side's turn starts, the pool it bleeds where it stays (SavedBattleGame). See FirstPersonApi.cpp.
 void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn);
 /// A hit-log entry the game makes (SavedBattleGame::appendToHitLog, either side's turn: its own log keeps only the player's),
-/// kept whole for the Live command feed's hit log tab. See FirstPersonApi.cpp.
+/// kept for the Live command feed's hit log tab (the current turn's). See FirstPersonApi.cpp.
 void hitLogged(BattlescapeState *state, int type, int faction, const std::string &text);
 int lastHealthDamage();
 /// Setting "Detailed hit log": what the game's hit log adds after a hit's word (0, hit, HIT): whom it hurt, by how much

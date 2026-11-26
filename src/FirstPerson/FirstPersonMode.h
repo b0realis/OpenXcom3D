@@ -208,7 +208,7 @@ public:
 	static void unitObliterated(BattlescapeState *state, BattleUnit *unit, const Position &relative, const RuleDamageType *type);
 	/// Setting "Obliteration": a body on the floor a blast destroyed bursts in the 3D view (see FirstPerson::itemBlasted).
 	static void itemBlasted(BattlescapeState *state, const BattleItem *item, const Position &center, const RuleDamageType *type);
-	/// A hit-log entry the game makes, kept whole for the Live command feed's hit log tab (see FirstPersonModeFeed.cpp).
+	/// A hit-log entry the game makes, kept for the Live command feed's hit log tab, the current turn's (see FirstPersonModeFeed.cpp).
 	static void hitLogged(BattlescapeState *state, int type, int faction, const std::string &text);
 	/// A soldier panics or goes berserk, asked by the game (see FirstPerson::breakdown).
 	static bool breakdown(BattlescapeState *state, BattleUnit *unit);

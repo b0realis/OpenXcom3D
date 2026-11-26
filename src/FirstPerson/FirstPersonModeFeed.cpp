@@ -274,10 +274,10 @@ struct CommandFeed
 	// in sight; this frame's squad (as the squad buttons number it), the rows' place, how many show, the bar's track and
 	// thumb.
 	Tab tab = TAB_SQUAD;
-	// The hit log tab (the owner: "Top left window should have another tab: hit-log (expanded hit-log updating realtime)"):
-	// the whole battle's log as the game writes it, both sides' turns, each hit with whom it hurt (see hitLogged); its
-	// lines wrapped into the window's rows (made again when a line changed, or the window), and how many rows the wheel
-	// scrolled it back (0: the newest at the foot).
+	// The hit log tab (the owner: "Top left window should have another tab: hit-log (expanded hit-log updating realtime)",
+	// then "Only current turn!"): the turn's log as the game writes it, the aliens' turn too, each hit with whom it hurt
+	// (see hitLogged); its lines wrapped into the window's rows (made again when a line changed, or the window), and how
+	// many rows the wheel scrolled it back (0: the newest at the foot).
 	std::vector<HitLine> hitLines;
 	std::string hitWeapon; // (the player's last firing: their shots after the enemy's go on a line of it again, as in the game's log)
 	int hitVersion = 0, hitRowsVersion = -1, hitRowsWidth = 0, hitScroll = 0;
@@ -2090,9 +2090,9 @@ std::vector<std::pair<BattleUnit*, int>> FirstPersonMode::feedSquad() const
 }
 
 /**
- * A hit-log entry the game makes (SavedBattleGame::appendToHitLog: its own log keeps only the player's turn and starts
- * again each turn), kept whole for the Live command feed's hit log tab, both sides' turns, as the game words it: a turn's
- * start (with the turn's message), a firing (the weapon, then its shots on that line), reaction fire, a shot ("=>"), and
+ * A hit-log entry the game makes (SavedBattleGame::appendToHitLog: its own log keeps only the player's turn), kept for
+ * the Live command feed's hit log tab, the aliens' turn too, the current turn alone as the game's own (the owner: "Only
+ * current turn!": each side's turn starts it again), as the game words it: a turn's start (with the turn's message), a firing (the weapon, then its shots on that line), reaction fire, a shot ("=>"), and
  * each hit's word (0, hit, HIT) with whom it hurt (see FirstPerson::hitLogDetail: in the feed always). Nothing without the
  * feed (made once it first showed; it keeps the log while the full 3D view is up).
  * @param state The battlescape screen.
@@ -2125,6 +2125,9 @@ void FirstPersonMode::hitLogged(BattlescapeState *state, int type, int faction, 
 	case HITLOG_NEW_TURN:
 	case HITLOG_NEW_TURN_WITH_MESSAGE:
 	{
+		lines.clear(); // (the turn before is gone, as from the game's own log)
+		feed.hitWeapon.clear();
+		feed.hitScroll = 0;
 		std::string header = std::string(state->tr("STR_FPS_FEED_TURN").arg(mode->_save->getTurn())) + "  "
 			+ word(faction == FACTION_PLAYER ? "STR_FPS_FEED_SIDE_XCOM" : faction == FACTION_HOSTILE ? "STR_FPS_FEED_SIDE_ALIENS" : "STR_FPS_FEED_SIDE_CIVILIANS");
 		if (type == HITLOG_NEW_TURN_WITH_MESSAGE && !text.empty()) header += "  " + text;
@@ -2162,14 +2165,14 @@ void FirstPersonMode::hitLogged(BattlescapeState *state, int type, int faction, 
 	default:
 		return;
 	}
-	// (the battle's whole log is kept, a long battle's oldest lines going first)
+	// (a long turn's oldest lines go first)
 	if (lines.size() > 600) lines.erase(lines.begin(), lines.begin() + 100);
 	++feed.hitVersion;
 }
 
 /**
- * The hit log tab: the log's lines wrapped into the window's width, a turn's start in the turn's colour, the player's
- * firing in the HUD's green, reaction fire and the enemy's shots in danger red, the rest in the words' colour; the newest
+ * The hit log tab: the log's lines wrapped into the window's width, a turn's start in the turn's colour, the squad's
+ * firing, reaction fire and shots in the HUD's green, the enemy's in danger red; the newest
  * at the foot, the wheel scrolling back through it (and following the newest again at the foot).
  * @param screen The game's screen.
  */
@@ -2186,8 +2189,7 @@ void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 		feed.hitRows.clear();
 		for (const CommandFeed::HitLine &line : feed.hitLines)
 		{
-			const Uint8 colour = line.kind == CommandFeed::HIT_TURN ? feed.turnColour : line.kind == CommandFeed::HIT_FIRING ? feed.hudColour
-				: (line.kind == CommandFeed::HIT_REACTION || line.faction != FACTION_PLAYER) ? feed.dangerColour : feed.wordsColour;
+			const Uint8 colour = line.kind == CommandFeed::HIT_TURN ? feed.turnColour : line.faction == FACTION_PLAYER ? feed.hudColour : feed.dangerColour;
 			std::istringstream words(line.text);
 			std::string word, row;
 			while (words >> word)
