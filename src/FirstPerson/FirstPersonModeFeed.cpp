@@ -221,13 +221,14 @@ struct CommandFeed
 		int faction;
 		bool shot; // (a shot is in it already)
 	};
-	/// A row of the hit log tab as drawn: a line's words that fit the window's width (in their styles), a turn's heading
-	/// (its side's mark before it), or the rule between two turns.
+	/// A row of the hit log tab as drawn: a line's words that fit the window's width (in their styles; its first row with
+	/// the mark of the side that fired), a turn's heading (its side's mark before it), or the rule between two turns.
 	struct HitRow
 	{
 		std::vector<HitPart> words;
 		bool heading, rule;
 		int faction;
+		bool lineStart = false;
 	};
 	/// How the drone sees: black and white; night vision, all of it green (realistic) or the units and items in their own
 	/// colours (enhanced); thermal, the units, explosions and fire white hot on a cool grey world.
@@ -2221,14 +2222,15 @@ void FirstPersonMode::hitLogged(BattlescapeState *state, int type, int faction, 
  * "yellow mark for xcom and red mark for AI", a rule between them): the log's lines wrapped into the window's width, the
  * words grey; a hit's word emphasised, "0" dim, "hit" dark red, "HIT" bright red, "killed" bright red, "down" orange,
  * "unseen" dim; each turn's heading in the turn's amber after its side's mark (a square, yellow for X-COM, red for the
- * others), and a rule across the window before it (but the first); the newest at the foot, the wheel scrolling back
+ * others), and a rule across the window before it (but the first); each line of shots after a smaller mark of the side
+ * that fired (the owner: "mark also our team vs alien shots": the squad green, the enemy red); the newest at the foot, the wheel scrolling back
  * through it (and following the newest again at the foot).
  * @param screen The game's screen.
  */
 void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 {
 	CommandFeed &feed = *_feed;
-	const int ui = feed.ui, rowH = (FeedWordsH + 1) * ui, margin = 3 * ui, markSide = (FeedWordsH - 3) * ui, indent = markSide + 3 * ui;
+	const int ui = feed.ui, rowH = (FeedWordsH + 1) * ui, margin = 3 * ui, markSide = (FeedWordsH - 3) * ui, shotMark = 4 * ui, indent = markSide + 3 * ui;
 	const SDL_Rect &area = feed.inventoryPicture;
 	fill(screen, area.x, area.y, area.w, area.h, feed.black);
 	const int width = area.w - 2 * margin - indent;
@@ -2262,7 +2264,7 @@ void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 					at = end;
 				}
 			}
-			CommandFeed::HitRow row = { {}, false, false, line.faction };
+			CommandFeed::HitRow row = { {}, false, false, line.faction, true };
 			std::string rowText;
 			for (const std::vector<CommandFeed::HitPart> &group : groups)
 			{
@@ -2273,6 +2275,7 @@ void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 				{
 					feed.hitRows.push_back(row);
 					row.words.clear();
+					row.lineStart = false;
 					rowText = groupText;
 				}
 				else
@@ -2319,6 +2322,12 @@ void FirstPersonMode::drawFeedHitLog(SDL_Surface *screen)
 		if (row.heading)
 		{
 			fill(screen, area.x + margin, y + ui, markSide, markSide, row.faction == FACTION_PLAYER ? feed.xcomMark : feed.enemyMark);
+		}
+		else if (row.lineStart)
+		{
+			// (who fired: the squad green, the enemy red; smaller than a turn's mark)
+			fill(screen, area.x + margin + (markSide - shotMark) / 2, y + ui + (markSide - shotMark) / 2, shotMark, shotMark,
+				row.faction == FACTION_PLAYER ? feed.hudColour : feed.enemyMark);
 		}
 		int x = area.x + margin + indent;
 		for (size_t at = 0; at < row.words.size() && x < area.x + area.w - margin; ++at)
