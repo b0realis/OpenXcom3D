@@ -1303,7 +1303,10 @@ static int recommendedGameOptions(const Mod *mod, bool apply)
 			if (apply) *option.number = option.value;
 		}
 	}
-	if (apply) Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
+	if (apply)
+	{
+		Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
+	}
 	return changed;
 }
 

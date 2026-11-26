@@ -2650,7 +2650,9 @@ void FirstPersonMode::think()
 	if (playerTurn)
 	{
 		openDoorAfterTurn(unit);
-		if (vrOn()) vrFaceBody(unit, elapsedSeconds); else faceLookDirection(unit);
+		if (feedIsoHasKeys()) viewFollowsFacing(unit); // (the game's turns lead: a right click on the map, say)
+		else if (vrOn()) vrFaceBody(unit, elapsedSeconds);
+		else faceLookDirection(unit);
 		updateFireMode(unit);
 		updateAim(unit);
 	}

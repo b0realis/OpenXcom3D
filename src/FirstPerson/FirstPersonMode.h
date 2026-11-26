@@ -521,6 +521,8 @@ private:
 	void turnWithKeys(double elapsedSeconds);
 	/// In the enemy's turn: the view stays within the head's turn of the soldier's facing (setting).
 	void holdViewToFacing(BattleUnit *unit);
+	/// While the feed's ISO has the keys: the view turns with the soldier (the game's own turns), not the other way round.
+	void viewFollowsFacing(BattleUnit *unit);
 	/// Turns the soldier to face where the camera looks (free, or by the rules).
 	void faceLookDirection(BattleUnit *unit);
 	/// Turns the soldier to face a way at once, for free (a tank's turret alone, with its switch on).

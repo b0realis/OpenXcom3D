@@ -250,8 +250,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			// Nothing of the card below the floor it stands on (see SpriteDraw::floorCut): the art's
 			// rows under a unit's feet would hang through the ceiling of the room below.
 			// (nor at or above the floor over its head, see SpriteDraw::ceilingCut)
-			const double height = _eye[2] + ray[2] * distance / ZScale;
-			if (height < draw.floorCut || height >= draw.ceilingCut) return false;
+			const double pointHeight = _eye[2] + ray[2] * distance / ZScale;
+			if (pointHeight < draw.floorCut || pointHeight >= draw.ceilingCut) return false;
 		}
 		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
 	};

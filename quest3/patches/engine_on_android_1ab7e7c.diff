@@ -25220,10 +25220,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..68e957059
+index 000000000..24b905a41
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2596 @@
+@@ -0,0 +1,2599 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -26529,7 +26529,10 @@ index 000000000..68e957059
 +			if (apply) *option.number = option.value;
 +		}
 +	}
-+	if (apply) Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
++	if (apply)
++	{
++		Log(LOG_INFO) << "OpenXcom3D: the recommended game options set, " << changed << " changed, " << fixed << " left as the mod fixes them";
++	}
 +	return changed;
 +}
 +
@@ -39637,10 +39640,10 @@ index 000000000..1115e02a2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..12a2e6469
+index 000000000..998a95045
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,3696 @@
+@@ -0,0 +1,3698 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -42293,7 +42296,9 @@ index 000000000..12a2e6469
 +	if (playerTurn)
 +	{
 +		openDoorAfterTurn(unit);
-+		if (vrOn()) vrFaceBody(unit, elapsedSeconds); else faceLookDirection(unit);
++		if (feedIsoHasKeys()) viewFollowsFacing(unit); // (the game's turns lead: a right click on the map, say)
++		else if (vrOn()) vrFaceBody(unit, elapsedSeconds);
++		else faceLookDirection(unit);
 +		updateFireMode(unit);
 +		updateAim(unit);
 +	}
@@ -43339,10 +43344,10 @@ index 000000000..12a2e6469
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonMode.h b/src/FirstPerson/FirstPersonMode.h
 new file mode 100644
-index 000000000..8905d1d95
+index 000000000..ed7330a66
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.h
-@@ -0,0 +1,1685 @@
+@@ -0,0 +1,1687 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -43866,6 +43871,8 @@ index 000000000..8905d1d95
 +	void turnWithKeys(double elapsedSeconds);
 +	/// In the enemy's turn: the view stays within the head's turn of the soldier's facing (setting).
 +	void holdViewToFacing(BattleUnit *unit);
++	/// While the feed's ISO has the keys: the view turns with the soldier (the game's own turns), not the other way round.
++	void viewFollowsFacing(BattleUnit *unit);
 +	/// Turns the soldier to face where the camera looks (free, or by the rules).
 +	void faceLookDirection(BattleUnit *unit);
 +	/// Turns the soldier to face a way at once, for free (a tank's turret alone, with its switch on).
@@ -45030,10 +45037,10 @@ index 000000000..8905d1d95
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeCamera.cpp b/src/FirstPerson/FirstPersonModeCamera.cpp
 new file mode 100644
-index 000000000..b5965a948
+index 000000000..166ab0ff7
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeCamera.cpp
-@@ -0,0 +1,996 @@
+@@ -0,0 +1,1018 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -45250,6 +45257,28 @@ index 000000000..b5965a948
 +	{
 +		_view->rotate((offFacing > 0.0 ? HeadTurn : -HeadTurn) - offFacing, 0.0);
 +		_snapTurnDegrees = 0.0; // (a snap turn further that way ends here)
++	}
++}
++
++/**
++ * While the feed's ISO has the keys (see feedIsoHasKeys) the soldier is turned as on the isometric map: a right click, a
++ * walk's last step, a shot, each the game's own turn. The 3D window's view turns with them, the other way round from
++ * faceLookDirection, which would turn them back at once to where the view looked (the owner, play-testing: "when right
++ * clicking on the tile the soldier does not face that tile ... This turn in iso should also turn the 3d"). The view keeps
++ * a look that the soldier's facing allows (the compass point it rounds to; with "Turning costs TU", the head's turn) and is
++ * turned to the facing past it, step by step as the game's turn goes.
++ * @param unit The soldier.
++ */
++void FirstPersonMode::viewFollowsFacing(BattleUnit *unit)
++{
++	const int facing = turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection();
++	const double facingYaw = facing * 45.0 - 90.0;
++	const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
++	if (std::abs(offFacing) > (Options::fpsTurnCost ? HeadTurn : 22.5))
++	{
++		_view->rotate(-offFacing, 0.0);
++		_snapTurnDegrees = 0.0;
++		_snapTurnFacing = false;
 +	}
 +}
 +
@@ -46032,10 +46061,10 @@ index 000000000..b5965a948
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonModeFeed.cpp b/src/FirstPerson/FirstPersonModeFeed.cpp
 new file mode 100644
-index 000000000..aecd4d5e0
+index 000000000..0404f182f
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonModeFeed.cpp
-@@ -0,0 +1,2842 @@
+@@ -0,0 +1,2844 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -47360,15 +47389,17 @@ index 000000000..aecd4d5e0
 +	CommandFeed &feed = *_feed;
 +	SDL_Rect picture = feed.dronePictureNow();
 +	feed.swayX = feed.swayY = 0;
-+	if (feed.iso)
++	if (feed.iso && !_state->_map->showsHiddenMovement())
 +	{
-+		// (ISO: the map as the isometric map draws it, in its own colours, still: the game's own hidden movement too)
++		// (ISO: the map as the isometric map draws it, in its own colours, still. Not the game's hidden movement: its box
++		// stands in the screen's middle, and the window showed a corner of it (the owner, play-testing: "It should just
++		// say hidden movement like drone feed does"): the drone's own screen, below)
 +		SDL_SetClipRect(screen, &picture);
 +		_state->_map->blit(screen);
 +		SDL_SetClipRect(screen, nullptr);
 +		return;
 +	}
-+	if (!feed.stabiliser)
++	if (!feed.stabiliser && !feed.iso)
 +	{
 +		const double now = SDL_GetTicks(), most = FeedSwayMost * feed.ui, turn = 6.283185307179586;
 +		feed.swayX = (int)std::lround(most * (0.65 * std::sin(turn * now / FeedSwayPeriods[0]) + 0.35 * std::sin(turn * now / FeedSwayPeriods[1] + 0.7)));
@@ -73255,10 +73286,10 @@ index 000000000..66b431a69
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..32cd9b73f
+index 000000000..da108bab1
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,867 @@
+@@ -0,0 +1,870 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -73821,7 +73852,10 @@ index 000000000..32cd9b73f
 +	_renderScaleTime = 0.0;
 +	// (OPENXCOM3D_GPU_TIMING: each change in the log.)
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
-+	if (timed) Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
++	if (timed)
++	{
++		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
++	}
 +}
 +
 +/**
@@ -81823,7 +81857,7 @@ index 000000000..4dec74b2e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewSprites.cpp b/src/FirstPerson/FirstPersonViewSprites.cpp
 new file mode 100644
-index 000000000..c91790395
+index 000000000..6a3b28f65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewSprites.cpp
 @@ -0,0 +1,5016 @@
@@ -82079,8 +82113,8 @@ index 000000000..c91790395
 +			// Nothing of the card below the floor it stands on (see SpriteDraw::floorCut): the art's
 +			// rows under a unit's feet would hang through the ceiling of the room below.
 +			// (nor at or above the floor over its head, see SpriteDraw::ceilingCut)
-+			const double height = _eye[2] + ray[2] * distance / ZScale;
-+			if (height < draw.floorCut || height >= draw.ceilingCut) return false;
++			const double pointHeight = _eye[2] + ray[2] * distance / ZScale;
++			if (pointHeight < draw.floorCut || pointHeight >= draw.ceilingCut) return false;
 +		}
 +		return distance >= 1.0 && spriteRow >= 0.0 && spriteRow < spriteHeight;
 +	};
@@ -86845,7 +86879,7 @@ index 000000000..c91790395
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewStereo.cpp b/src/FirstPerson/FirstPersonViewStereo.cpp
 new file mode 100644
-index 000000000..c98895a8a
+index 000000000..6786e4c99
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewStereo.cpp
 @@ -0,0 +1,985 @@
@@ -87762,8 +87796,8 @@ index 000000000..c98895a8a
 +				for (int column = 0; column < width; ++column)
 +				{
 +					const SDL_Color &color = palette[cpuRow[column]];
-+					const Uint8 *card = (const Uint8 *)&cardRow[column];
-+					differentColors += card[0] != color.r || card[1] != color.g || card[2] != color.b;
++					const Uint8 *cardPixel = (const Uint8 *)&cardRow[column];
++					differentColors += cardPixel[0] != color.r || cardPixel[1] != color.g || cardPixel[2] != color.b;
 +					const float apart = std::abs(cardDepthRow[column] - FirstPerson::vrProjectionDepth(cpuDepth[column] * depthToMetres, nearMetres, farMetres));
 +					differentDepths += apart > 1e-5f;
 +					mostApart = std::max(mostApart, apart);
@@ -96262,7 +96296,7 @@ index 000000000..a0e2da1ec
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonVoxelBodies.cpp b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 new file mode 100644
-index 000000000..37f7ec185
+index 000000000..da9465882
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonVoxelBodies.cpp
 @@ -0,0 +1,6980 @@
@@ -100029,7 +100063,7 @@ index 000000000..37f7ec185
 +	// little cubes side by side as the body's are, no gaps between them from any side. A cell is the item's when its
 +	// middle, in the item's own measures (along it, across it, through it), lies on a drawn pixel within the item's
 +	// thickness there, or within most of a cell of the picture's plane: a thin item is a cell thick at the least.
-+	const float (*frame[3]) = { along, across, through };
++	const float *frame[3] = { along, across, through };
 +	float inverse[3][3]; // (rows: what a place off the item's middle is along, across and through it)
 +	{
 +		const float *u = frame[0], *v = frame[1], *w = frame[2];
@@ -100048,8 +100082,8 @@ index 000000000..37f7ec185
 +		const float a = (corner & 1 ? 1.0f : -1.0f) * (halfLength + scale), c = (corner & 2 ? 1.0f : -1.0f) * (halfAcross + scale), t = (corner & 4 ? 1.0f : -1.0f) * thickest;
 +		for (int axis = 0; axis < 3; ++axis)
 +		{
-+			const float at = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
-+			low[axis] = std::min(low[axis], at); high[axis] = std::max(high[axis], at);
++			const float cornerAt = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
++			low[axis] = std::min(low[axis], cornerAt); high[axis] = std::max(high[axis], cornerAt);
 +		}
 +	}
 +	const float from[3] = { AcrossFrom, AlongFrom, UpFrom };

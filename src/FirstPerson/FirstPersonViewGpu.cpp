@@ -560,7 +560,10 @@ void FirstPersonView::noteDrawTime(double milliseconds)
 	_renderScaleTime = 0.0;
 	// (OPENXCOM3D_GPU_TIMING: each change in the log.)
 	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
-	if (timed) Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
+	if (timed)
+	{
+		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
+	}
 }
 
 /**

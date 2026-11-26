@@ -911,8 +911,8 @@ bool FirstPersonView::presentEyeOnCard(int eye, const CardRequest &card)
 				for (int column = 0; column < width; ++column)
 				{
 					const SDL_Color &color = palette[cpuRow[column]];
-					const Uint8 *card = (const Uint8 *)&cardRow[column];
-					differentColors += card[0] != color.r || card[1] != color.g || card[2] != color.b;
+					const Uint8 *cardPixel = (const Uint8 *)&cardRow[column];
+					differentColors += cardPixel[0] != color.r || cardPixel[1] != color.g || cardPixel[2] != color.b;
 					const float apart = std::abs(cardDepthRow[column] - FirstPerson::vrProjectionDepth(cpuDepth[column] * depthToMetres, nearMetres, farMetres));
 					differentDepths += apart > 1e-5f;
 					mostApart = std::max(mostApart, apart);

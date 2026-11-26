@@ -218,6 +218,28 @@ void FirstPersonMode::holdViewToFacing(BattleUnit *unit)
 }
 
 /**
+ * While the feed's ISO has the keys (see feedIsoHasKeys) the soldier is turned as on the isometric map: a right click, a
+ * walk's last step, a shot, each the game's own turn. The 3D window's view turns with them, the other way round from
+ * faceLookDirection, which would turn them back at once to where the view looked (the owner, play-testing: "when right
+ * clicking on the tile the soldier does not face that tile ... This turn in iso should also turn the 3d"). The view keeps
+ * a look that the soldier's facing allows (the compass point it rounds to; with "Turning costs TU", the head's turn) and is
+ * turned to the facing past it, step by step as the game's turn goes.
+ * @param unit The soldier.
+ */
+void FirstPersonMode::viewFollowsFacing(BattleUnit *unit)
+{
+	const int facing = turretTurning(unit) ? unit->getTurretDirection() : unit->getDirection();
+	const double facingYaw = facing * 45.0 - 90.0;
+	const double offFacing = std::remainder(_view->getYawDegrees() - facingYaw, 360.0);
+	if (std::abs(offFacing) > (Options::fpsTurnCost ? HeadTurn : 22.5))
+	{
+		_view->rotate(-offFacing, 0.0);
+		_snapTurnDegrees = 0.0;
+		_snapTurnFacing = false;
+	}
+}
+
+/**
  * Looking around turns the soldier to face where the camera looks. Called every frame on the
  * player's turn. Nothing happens while the player can't act, while the soldier isn't simply
  * standing (walking, turning, falling...), or when the selected unit can't be played.

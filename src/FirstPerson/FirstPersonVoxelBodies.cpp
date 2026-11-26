@@ -3761,7 +3761,7 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 	// little cubes side by side as the body's are, no gaps between them from any side. A cell is the item's when its
 	// middle, in the item's own measures (along it, across it, through it), lies on a drawn pixel within the item's
 	// thickness there, or within most of a cell of the picture's plane: a thin item is a cell thick at the least.
-	const float (*frame[3]) = { along, across, through };
+	const float *frame[3] = { along, across, through };
 	float inverse[3][3]; // (rows: what a place off the item's middle is along, across and through it)
 	{
 		const float *u = frame[0], *v = frame[1], *w = frame[2];
@@ -3780,8 +3780,8 @@ void addItem(VoxelUnitModel &model, const HeldItem &held, const ItemPlace &place
 		const float a = (corner & 1 ? 1.0f : -1.0f) * (halfLength + scale), c = (corner & 2 ? 1.0f : -1.0f) * (halfAcross + scale), t = (corner & 4 ? 1.0f : -1.0f) * thickest;
 		for (int axis = 0; axis < 3; ++axis)
 		{
-			const float at = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
-			low[axis] = std::min(low[axis], at); high[axis] = std::max(high[axis], at);
+			const float cornerAt = middle[axis] + a * along[axis] + c * across[axis] + t * through[axis];
+			low[axis] = std::min(low[axis], cornerAt); high[axis] = std::max(high[axis], cornerAt);
 		}
 	}
 	const float from[3] = { AcrossFrom, AlongFrom, UpFrom };

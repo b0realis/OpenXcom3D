@@ -1322,15 +1322,17 @@ void FirstPersonMode::blitFeedUnder(SDL_Surface *screen)
 	CommandFeed &feed = *_feed;
 	SDL_Rect picture = feed.dronePictureNow();
 	feed.swayX = feed.swayY = 0;
-	if (feed.iso)
+	if (feed.iso && !_state->_map->showsHiddenMovement())
 	{
-		// (ISO: the map as the isometric map draws it, in its own colours, still: the game's own hidden movement too)
+		// (ISO: the map as the isometric map draws it, in its own colours, still. Not the game's hidden movement: its box
+		// stands in the screen's middle, and the window showed a corner of it (the owner, play-testing: "It should just
+		// say hidden movement like drone feed does"): the drone's own screen, below)
 		SDL_SetClipRect(screen, &picture);
 		_state->_map->blit(screen);
 		SDL_SetClipRect(screen, nullptr);
 		return;
 	}
-	if (!feed.stabiliser)
+	if (!feed.stabiliser && !feed.iso)
 	{
 		const double now = SDL_GetTicks(), most = FeedSwayMost * feed.ui, turn = 6.283185307179586;
 		feed.swayX = (int)std::lround(most * (0.65 * std::sin(turn * now / FeedSwayPeriods[0]) + 0.35 * std::sin(turn * now / FeedSwayPeriods[1] + 0.7)));
