@@ -1394,6 +1394,9 @@ private:
 	void blitFeed(SDL_Surface *screen);
 	void blitFeedUnder(SDL_Surface *screen);
 	void blitFeedOver(SDL_Surface *screen);
+	/// The Live command feed's HUD: the game's panel in the drone's window (placeHudPanel), or back where the game had it.
+	void placeHudPanel();
+	void restoreHudPanel();
 	void drawFeedDoll(BattleUnit *unit);
 	void updateFeedInventory(BattleUnit *unit);
 	void feedInventoryMouse(Action *action, int x, int y);

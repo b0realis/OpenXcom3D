@@ -1995,7 +1995,29 @@ void FirstPersonMode::updateMovement(BattleUnit *unit, bool canMove, double elap
 	// Which neighbouring tile the new position falls into, per axis: -1, 0 (still this tile) or 1.
 	const int crossingX = std::clamp((int)std::floor((newEyeX - sizeOffset) / 16.0) - _trackedTile.x, -1, 1);
 	const int crossingY = std::clamp((int)std::floor((newEyeY - sizeOffset) / 16.0) - _trackedTile.y, -1, 1);
-	if (crossingX != 0 || crossingY != 0)
+
+	// Walking diagonally the camera seldom crosses a tile's corner: one edge, then the other, two straight steps where
+	// the map's soldiers walk one diagonal step, and the map showed the soldier zigzag (the owner, play-testing: "units
+	// do not walk diagonally but zigzag ... units can and must walk diagonally"). So an edge crossed alone is held while
+	// the walk goes on to the other edge within DiagonalWalkLead voxels (the camera walking on past the first one, that
+	// step and the diagonal both open): crossing the second, the step is the diagonal one, the game's own. Walking more
+	// along one axis, the steps mix straight and diagonal ones, as the game's paths do; tile by tile, as ever.
+	bool heldForDiagonal = false;
+	if (!tileMoves && driving && canMove && canAct() && unit->getStatus() == STATUS_STANDING && !noclipOn(unit) && (crossingX != 0) != (crossingY != 0))
+	{
+		const int otherX = crossingX != 0 ? crossingX : (_velocityX > 0.0 ? 1 : _velocityX < 0.0 ? -1 : 0);
+		const int otherY = crossingY != 0 ? crossingY : (_velocityY > 0.0 ? 1 : _velocityY < 0.0 ? -1 : 0);
+		if (otherX != 0 && otherY != 0)
+		{
+			// (how far the walk goes on before it crosses the other edge: along that axis to its edge, over the walk's speed there)
+			const bool otherIsY = crossingX != 0;
+			const double eye = otherIsY ? newEyeY : newEyeX, edge = (otherIsY ? _trackedTile.y : _trackedTile.x) * 16.0 + sizeOffset + ((otherIsY ? otherY : otherX) > 0 ? 16.0 : 0.0);
+			const double alongOther = std::abs(otherIsY ? _velocityY : _velocityX), speed = std::sqrt(_velocityX * _velocityX + _velocityY * _velocityY);
+			const double walkOn = alongOther > 1e-6 ? std::abs(edge - eye) / alongOther * speed : 1e9;
+			heldForDiagonal = walkOn <= DiagonalWalkLead && stepAllowed(unit, crossingX, crossingY) && stepAllowed(unit, otherX, otherY);
+		}
+	}
+	if ((crossingX != 0 || crossingY != 0) && !heldForDiagonal)
 	{
 		// Try the step the camera crosses into; for a diagonal, if that one isn't allowed, slide
 		// along either axis instead (east-west first, then north-south).

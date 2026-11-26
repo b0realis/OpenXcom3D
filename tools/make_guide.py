@@ -120,7 +120,7 @@ SETTINGS = [
         ('Sidesteps face the view', 'NO', 'YES / NO', 'With Turning costs TU. YES: before a sidestep the soldier turns to face where you look (the turn costs TU), front armour forward; a step back becomes a sidestep side-on, never the back.', 'YES to play defensively against reaction fire; NO for the cheapest steps.'),
         ('Turning costs TU', 'YES', 'YES / NO', 'YES: the head turns 45&deg; for free, beyond that the soldier turns at the game\'s cost, as on the map. NO: the soldier turns with the view for free.',
          'YES is the classic rule: facing costs time units and decides reaction fire. NO is relaxed play.'),
-        ('Movement', 'Tiles', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it. Tiles: a press walks one tile.',
+        ('Movement', 'Tiles', 'Free / Tiles', 'Free: walk anywhere, stepping into the next tile when you cross into it (aslant, a diagonal step, as on the map). Tiles: a press walks one tile.',
          'Tiles feels like the map; Free lets you stand to one side of a tile (lean shots, peeking).'),
         ('Walking speed', '4', '1 to 8 tiles a second', 'How fast the soldier walks in 3D. Every tile still costs its time units.', ''),
         ('Flight cost per level', 'Rules', 'Rules / 0 to 24', 'What a flying (or swimming) soldier pays to rise or sink a level in 3D. Rules: each its armor\'s own cost, as the game has it. A number: that for every flyer (0: free).', 'Rules keeps the game\'s slower flyers slow; the original game charges about 8.'),

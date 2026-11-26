@@ -143,6 +143,8 @@ const int FeedRowH = 13, FeedScrollW = 4, FeedColumnGap = 4, FeedNameLeast = 36;
 /// A step of the 3D view's walked on the drone's map: the game's ticks round its phases (a turn, the start, the end; see
 /// feedStepPhaseMs).
 const int FeedStepTicks = 4;
+/// HUD: the game's panel rises into the drone's window (or sinks out of it) in this many milliseconds.
+const double FeedHudSlideMs = 250.0;
 /// The squad tab's values: low under this share of their most (on an amber ground), critical under this one (on red).
 const double FeedLowShare = 0.5, FeedCriticalShare = 0.25;
 const double FeedSwayPeriods[4] = { 5300.0, 2100.0, 6900.0, 2900.0 };
@@ -200,7 +202,7 @@ struct CommandFeed
 	/// A button: what it does, its place on the screen, its words (none: a drawn sign), a value, and whether it shows
 	/// lit (a switch that is on).
 	enum ButtonKind { FB_NIGHT, FB_THERMAL, FB_STABILISER, FB_NAMES, FB_BOXES, FB_DRONE_MAX, FB_FLY_TO, FB_FOLLOW, FB_DYNAMIC, FB_MOVE_UP, FB_MOVE_DOWN, FB_MOVE_LEFT, FB_MOVE_RIGHT,
-		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY, FB_TAB_SQUAD, FB_TAB_INVENTORY, FB_ISO, FB_TAB_HITLOG };
+		FB_LEVEL_UP, FB_LEVEL_DOWN, FB_MAP_MAX, FB_VIEW_MAX, FB_INVENTORY, FB_TAB_SQUAD, FB_TAB_INVENTORY, FB_ISO, FB_TAB_HITLOG, FB_HUD };
 	/// The window at the top left: the squad's table, the selected soldier's inventory or the hit log (the player's choice).
 	enum Tab { TAB_SQUAD, TAB_INVENTORY, TAB_HITLOG };
 	/// A line of the hit log tab: a turn's start, a firing (the weapon, then its shots), reaction fire (then its shots), or
@@ -248,6 +250,14 @@ struct CommandFeed
 	// "just draws the normal iso map in its bottom left window - no resizing"): the drone's window shows the isometric map
 	// as the game draws it, in its own colours, and the keys are the battle's (see feedIsoHasKeys).
 	bool iso = false;
+	// HUD (the owner, play-testing: "a HUD button (colored purple) besides iso - that brings up smoothly the hud so tester
+	// can have full normal game control"): with ISO, the game's own panel in the drone's window, at its foot, rising into
+	// view: wanted or not, how far up it is (0 down and hidden .. 1 up), and the battle's surfaces as the game had placed
+	// them (put back when it goes); the map's camera told the panel is there.
+	bool hud = false;
+	double hudShown = 0.0;
+	std::vector<std::pair<Surface*, std::pair<int, int>>> hudPlaces;
+	bool cameraIcons = false;
 	std::vector<Button> buttons;
 	// Flying the drone: the arrow held (one of FB_MOVE_*, else none), and a glide to a soldier (FLY TO): from where to
 	// where (the map's offsets), since when; the mouse's last point (to light what it is over); the last frame's time.
@@ -361,7 +371,7 @@ namespace
 /// Is a button one of the drone's (shown, and clicked, with its picture all over the screen too)?
 bool droneButton(CommandFeed::ButtonKind kind)
 {
-	return kind == CommandFeed::FB_ISO || kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
+	return kind == CommandFeed::FB_ISO || kind == CommandFeed::FB_HUD || kind == CommandFeed::FB_NIGHT || kind == CommandFeed::FB_THERMAL || kind == CommandFeed::FB_STABILISER || kind == CommandFeed::FB_NAMES
 		|| kind == CommandFeed::FB_BOXES || kind == CommandFeed::FB_DRONE_MAX || kind == CommandFeed::FB_FLY_TO || kind == CommandFeed::FB_FOLLOW || kind == CommandFeed::FB_DYNAMIC || kind == CommandFeed::FB_MOVE_UP
 		|| kind == CommandFeed::FB_MOVE_DOWN || kind == CommandFeed::FB_MOVE_LEFT || kind == CommandFeed::FB_MOVE_RIGHT || kind == CommandFeed::FB_LEVEL_UP
 		|| kind == CommandFeed::FB_LEVEL_DOWN;
@@ -472,11 +482,12 @@ bool FirstPersonMode::feedIsoKey(Action *action)
 {
 	releaseFeedItem(); // (a key may open the game's inventory, or throw: an item held in the window goes back first)
 	const bool overIcons = _state->_mouseOverIcons; // (where the mouse is stays as it was: the map's cursor shows or not)
-	hideGamePanel(false);
+	const bool panelUp = _feed->hudShown > 0.0; // (HUD: shown already)
+	if (!panelUp) hideGamePanel(false);
 	_feedDispatching = true;
 	_state->handle(action);
 	_feedDispatching = false;
-	hideGamePanel(true);
+	if (!panelUp) hideGamePanel(true);
 	_state->_mouseOverIcons = overIcons;
 	return true;
 }
@@ -562,6 +573,12 @@ void FirstPersonMode::updateFeed()
 	const double seconds = feed.lastFrame ? std::min<Uint32>(100, now - feed.lastFrame) / 1000.0 : 0.0;
 	feed.lastFrame = now;
 	if (seconds > 0.0) feed.frameMs += (seconds * 1000.0 - feed.frameMs) * 0.1;
+	// HUD: the game's panel rising into the drone's window, or sinking out of it.
+	{
+		const double wanted = feed.iso && feed.hud ? 1.0 : 0.0, by = seconds * 1000.0 / FeedHudSlideMs;
+		feed.hudShown = wanted > feed.hudShown ? std::min(wanted, feed.hudShown + by) : std::max(wanted, feed.hudShown - by);
+		if (!feed.iso) feed.hudShown = 0.0; // (ISO gone: at once)
+	}
 	// (a button let go somewhere the feed didn't hear: an arrow, the squad table's thumb, a press on the drone)
 	const Uint8 buttons = SDL_GetMouseState(nullptr, nullptr);
 	if (!(buttons & SDL_BUTTON(SDL_BUTTON_LEFT)))
@@ -730,6 +747,10 @@ int FirstPersonMode::feedStepPhaseMs(bool run, bool diagonal, int &phaseStep) co
 void FirstPersonMode::leaveFeed()
 {
 	CommandFeed &feed = *_feed;
+	restoreHudPanel();
+	feed.hud = false;
+	feed.hudShown = 0.0;
+	feed.cameraIcons = false;
 	hideGamePanel(false);
 	_state->_map->setMaskTarget(nullptr, false);
 	Camera *camera = _state->_map->getCamera();
@@ -868,6 +889,10 @@ void FirstPersonMode::feedButtons()
 	int right = drone.x + drone.w - border;
 	add(CommandFeed::FB_DRONE_MAX, drone, right, "", feed.maximised == CommandFeed::MAX_DRONE);
 	add(CommandFeed::FB_ISO, drone, right, _state->tr("STR_FPS_FEED_ISO"), feed.iso);
+	if (feed.iso)
+	{
+		add(CommandFeed::FB_HUD, drone, right, _state->tr("STR_FPS_FEED_HUD"), feed.hud);
+	}
 	if (!feed.iso)
 	{
 		// (the drone's own switches; with ISO the map is the game's, its camera the battle's)
@@ -886,7 +911,9 @@ void FirstPersonMode::feedButtons()
 	const int along = FeedArrowLong * ui, deep = FeedArrowDeep * ui, arrowInset = FeedArrowInset * ui, levelSide = FeedLevelButton * ui;
 	const int middleX = picture.x + picture.w / 2, middleY = picture.y + picture.h / 2;
 	feed.buttons.push_back({ CommandFeed::FB_MOVE_UP, makeRect(middleX - along / 2, picture.y + arrowInset, along, deep), std::string(), 0, false });
-	feed.buttons.push_back({ CommandFeed::FB_MOVE_DOWN, makeRect(middleX - along / 2, picture.y + picture.h - arrowInset - deep, along, deep), std::string(), 1, false });
+	// (the bottom one above the game's panel while HUD shows it: the panel's buttons are under its place)
+	const int panelUp = feed.hudShown > 0.0 ? _state->_map->getIconHeight() : 0;
+	feed.buttons.push_back({ CommandFeed::FB_MOVE_DOWN, makeRect(middleX - along / 2, picture.y + picture.h - panelUp - arrowInset - deep, along, deep), std::string(), 1, false });
 	feed.buttons.push_back({ CommandFeed::FB_MOVE_LEFT, makeRect(picture.x + arrowInset, middleY - along / 2, deep, along), std::string(), 2, false });
 	feed.buttons.push_back({ CommandFeed::FB_MOVE_RIGHT, makeRect(picture.x + picture.w - arrowInset - deep, middleY - along / 2, deep, along), std::string(), 3, false });
 	const int levelX = picture.x + picture.w - arrowInset - levelSide, levelY = picture.y + arrowInset + deep + 4 * ui;
@@ -932,6 +959,60 @@ void FirstPersonMode::feedButtons()
 }
 
 /**
+ * HUD: the game's panel in the drone's window, at the foot of its picture and in its middle across, as far up as it has
+ * risen (see updateFeed); the special actions' buttons the game keeps at the screen's top right (launch, psi, ...) at
+ * the picture's top right, left of the level buttons. The battle's surfaces as the game placed them are noted the first
+ * time (see restoreHudPanel).
+ */
+void FirstPersonMode::placeHudPanel()
+{
+	CommandFeed &feed = *_feed;
+	if (feed.hudPlaces.empty())
+	{
+		for (Surface *surface : _state->_surfaces)
+		{
+			if (surface == _state->_map || surface == _state->_warning || feedEdgeSurface(surface) || _ownSurfaces.count(surface)) continue;
+			feed.hudPlaces.push_back({ surface, { surface->getX(), surface->getY() } });
+		}
+	}
+	const SDL_Rect &picture = feed.dronePictureNow();
+	const int width = Options::baseXResolution, height = Options::baseYResolution;
+	const double eased = feed.hudShown * feed.hudShown * (3.0 - 2.0 * feed.hudShown);
+	const int byX = picture.x + picture.w / 2 - width / 2;
+	const int byY = (picture.y + picture.h - height) + (int)std::lround((1.0 - eased) * (_state->_map->getIconHeight() + 2 * feed.ui));
+	const int topRight = picture.x + picture.w - (FeedArrowInset + FeedLevelButton + 2) * feed.ui;
+	for (const auto &place : feed.hudPlaces)
+	{
+		Surface *surface = place.first;
+		const bool corner = surface == _state->_btnLaunch || surface == _state->_btnPsi || surface == _state->_btnSpecial || surface == _state->_btnSkills;
+		if (corner)
+		{
+			surface->setX(topRight - (width - place.second.first));
+			surface->setY(picture.y + place.second.second + FeedArrowInset * feed.ui);
+		}
+		else
+		{
+			surface->setX(place.second.first + byX);
+			surface->setY(place.second.second + byY);
+		}
+	}
+}
+
+/**
+ * HUD gone: the battle's surfaces back where the game had placed them (see placeHudPanel).
+ */
+void FirstPersonMode::restoreHudPanel()
+{
+	CommandFeed &feed = *_feed;
+	for (const auto &place : feed.hudPlaces)
+	{
+		place.first->setX(place.second.first);
+		place.first->setY(place.second.second);
+	}
+	feed.hudPlaces.clear();
+}
+
+/**
  * Puts the battle's screen right for the feed: the game's panel hidden (the classic HUD: the top bar and the windows
  * stand for it), its warnings at the foot of the drone's picture, and the map's camera told to show its middle in the
  * drone's picture (see Camera::setViewWindow, the icons no longer at its foot): what it looked at stays in the middle of
@@ -940,18 +1021,29 @@ void FirstPersonMode::feedButtons()
 void FirstPersonMode::placeFeedScreen()
 {
 	CommandFeed &feed = *_feed;
-	hideGamePanel(true);
 	const SDL_Rect &picture = feed.dronePictureNow();
+	const bool panelUp = feed.hudShown > 0.0;
+	hideGamePanel(!panelUp);
+	if (panelUp)
+	{
+		placeHudPanel();
+	}
+	else
+	{
+		restoreHudPanel();
+	}
 	WarningMessage *warning = _state->_warning;
 	warning->setX(picture.x + (picture.w - warning->getWidth()) / 2);
-	warning->setY(picture.y + picture.h - warning->getHeight() - 4 * feed.ui);
-	if (!sameRect(picture, feed.cameraWindow))
+	warning->setY((panelUp ? (int)_state->_icons->getY() : picture.y + picture.h) - warning->getHeight() - 4 * feed.ui);
+	const bool icons = feed.iso && feed.hud;
+	if (!sameRect(picture, feed.cameraWindow) || icons != feed.cameraIcons)
 	{
 		Camera *camera = _state->_map->getCamera();
 		const Position centre = camera->getCenterPosition();
-		camera->setViewWindow(picture.x, picture.y, picture.w, picture.h, false);
+		camera->setViewWindow(picture.x, picture.y, picture.w, picture.h, icons);
 		camera->centerOnPosition(centre, false);
 		feed.cameraWindow = picture;
+		feed.cameraIcons = icons;
 	}
 }
 
@@ -1185,7 +1277,8 @@ void FirstPersonMode::feedInventoryMouse(Action *action, int x, int y)
  */
 bool FirstPersonMode::feedDrawsGameSurface(const Surface *surface) const
 {
-	return surface == _state->_warning;
+	// (HUD: the game's panel and its buttons too, in the drone's window, see blitFeed)
+	return surface == _state->_warning || (_feed->hudShown > 0.0 && surface != _state->_map && !feedEdgeSurface(surface));
 }
 
 /**
@@ -1326,10 +1419,17 @@ void FirstPersonMode::blitFeed(SDL_Surface *gameScreen)
 		SDL_FillRect(screen, nullptr, 0); // (as the game clears its own screen each frame: the gaps between the windows)
 	}
 	blitFeedUnder(screen);
+	// (with HUD the game's panel too, within the drone's picture: nothing of it over the other windows)
+	if (feed.hudShown > 0.0)
+	{
+		SDL_Rect picture = feed.dronePictureNow();
+		SDL_SetClipRect(screen, &picture);
+	}
 	for (Surface *surface : _state->_surfaces)
 	{
 		if (!_ownSurfaces.count(surface) && feedDrawsGameSurface(surface)) surface->blit(screen);
 	}
+	SDL_SetClipRect(screen, nullptr);
 	blitFeedOver(screen);
 	_feedOverlays = true;
 	drawOverlays(screen, false, false);
@@ -1381,12 +1481,12 @@ void FirstPersonMode::blitFeedOver(SDL_Surface *screen)
 
 	// (a title line's button: its words or sign (all over the screen: a square; back: a square in a square), lit when on)
 	auto drawButton = [&](const CommandFeed::Button &button) {
-		if (button.kind == CommandFeed::FB_ISO)
+		if (button.kind == CommandFeed::FB_ISO || button.kind == CommandFeed::FB_HUD)
 		{
-			// (ISO: emerald, to stand out; brighter while it is up, or under the mouse)
-			const bool over = inside(button.box, feed.mouseX, feed.mouseY);
-			fill(screen, button.box.x, button.box.y, button.box.w, button.box.h, button.lit || over ? feed.emeraldLit : feed.emerald);
-			outline(screen, button.box, ui, button.lit ? feed.wordsColour : feed.emeraldLit);
+			// (ISO emerald, HUD purple, to stand out; brighter while up, or under the mouse)
+			const bool over = inside(button.box, feed.mouseX, feed.mouseY), iso = button.kind == CommandFeed::FB_ISO;
+			fill(screen, button.box.x, button.box.y, button.box.w, button.box.h, button.lit || over ? (iso ? feed.emeraldLit : feed.purpleLit) : (iso ? feed.emerald : feed.purple));
+			outline(screen, button.box, ui, button.lit ? feed.wordsColour : (iso ? feed.emeraldLit : feed.purpleLit));
 			feed.writer->setText(button.words);
 			feedWrite(screen, button.words, button.box.x + (button.box.w - feed.writer->getTextWidth() * ui) / 2, button.box.y + (button.box.h - FeedWordsH * ui) / 2 + ui, feed.lowWords);
 			return;
@@ -1673,13 +1773,16 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 		return true;
 	}
 	const bool onDrone = inside(feed.dronePictureNow(), x, y);
+	// (HUD: the game's panel in the drone's picture is the panel's, as on the isometric map)
+	const bool overIcons = feed.hudShown > 0.0 && _state->_icons
+		&& inside(makeRect(_state->_icons->getX(), _state->_icons->getY(), _state->_icons->getWidth(), _state->_icons->getHeight()), x, y);
 	if (feed.pressedOnDrone)
 	{
 		// (the map's until the button comes up; let go off the drone's picture, not an order on a tile hidden there: the
 		// game takes the mouse to be over its panel, see below)
-		if (_state->_mouseOverIcons == onDrone)
+		if (_state->_mouseOverIcons != (!onDrone || overIcons))
 		{
-			_state->_mouseOverIcons = !onDrone;
+			_state->_mouseOverIcons = !onDrone || overIcons;
 			_state->_map->invalidate();
 		}
 		if (event.type == SDL_MOUSEBUTTONUP) feed.pressedOnDrone = false;
@@ -1693,7 +1796,7 @@ bool FirstPersonMode::handleFeedMouse(Action *action)
 	{
 		if ((feed.maximised == CommandFeed::MAX_NONE || droneButton(each.kind)) && inside(each.box, x, y)) onButton = true;
 	}
-	const bool offMap = !onDrone || onButton;
+	const bool offMap = !onDrone || onButton || overIcons;
 	if (_state->_mouseOverIcons != offMap)
 	{
 		_state->_mouseOverIcons = offMap;
@@ -1817,11 +1920,13 @@ void FirstPersonMode::pressFeedButton(int index, Action *action)
 	case CommandFeed::FB_BOXES: feed.boxes = !feed.boxes; break;
 	case CommandFeed::FB_DRONE_MAX: feed.maximised = feed.maximised == CommandFeed::MAX_DRONE ? CommandFeed::MAX_NONE : CommandFeed::MAX_DRONE; break;
 	case CommandFeed::FB_ISO:
-		// (the isometric map in the drone's window, or the drone's feed again)
+		// (the isometric map in the drone's window, or the drone's feed again, without the game's panel)
 		feed.iso = !feed.iso;
+		if (!feed.iso) feed.hud = false;
 		feed.gliding = false;
 		_state->_map->invalidate();
 		break;
+	case CommandFeed::FB_HUD: feed.hud = !feed.hud; break; // (rises or sinks, see updateFeed)
 	case CommandFeed::FB_MAP_MAX: showTacticalMap(); break;
 	case CommandFeed::FB_VIEW_MAX: toggleView(); return; // (to the full 3D view: the feed is let go of)
 	case CommandFeed::FB_TAB_SQUAD: case CommandFeed::FB_TAB_INVENTORY: case CommandFeed::FB_TAB_HITLOG:
