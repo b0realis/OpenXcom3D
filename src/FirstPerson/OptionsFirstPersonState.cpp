@@ -422,6 +422,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	const auto debugLast = [](const OptionInfo &option) { return option.id() == "fpsCommandFeed" ? 1 : 0; };
 	for (Section &section : sorted)
 	{
+		// (a section none of whose settings is listed here has no heading either: VR on a desktop, whose settings are all
+		// the Meta Quest build's; the owner: "Complete VR section along with VR should be hidden in non-VR targets")
+		if (section.options.empty()) continue;
 		std::stable_sort(section.options.begin(), section.options.end(), [this, &debugLast](const OptionInfo &one, const OptionInfo &two)
 			{ return debugLast(one) != debugLast(two) ? debugLast(one) < debugLast(two) : label(one) < label(two); });
 		_settingHeadings.push_back({ _settings.size(), section.heading });

@@ -1371,6 +1371,8 @@ private:
 	bool _feedOverlays = false;    // drawing our overlays for the feed: only those it shows (see feedOverlay)
 	bool feedWanted() const;
 	bool feedShown() const;
+	/// Is the Live command feed's ISO up (its drone window enlarged and played as the isometric map: the keys the battle's)?
+	bool feedIsoShown() const;
 	bool feedViewSize(int &width, int &height) const;
 	bool feedViewPicture(SDL_Rect &picture) const;
 	void updateFeed();
@@ -1387,7 +1389,7 @@ private:
 	bool feedOverlay(const Surface *surface) const;
 	void blitFeed(SDL_Surface *screen);
 	void blitFeedUnder(SDL_Surface *screen);
-	void blitFeedOver(SDL_Surface *screen);
+	void blitFeedOver(SDL_Surface *screen, bool isoWindow = false);
 	void drawFeedDoll(BattleUnit *unit);
 	void updateFeedInventory(BattleUnit *unit);
 	void feedInventoryMouse(Action *action, int x, int y);

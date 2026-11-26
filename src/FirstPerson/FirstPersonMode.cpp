@@ -2641,7 +2641,7 @@ void FirstPersonMode::think()
 
 	// The camera follows the soldier (and walks them on your turn); on your turn the soldier
 	// also faces where you look, and the fire mode and aim are kept up to date.
-	updateCamera(unit, playerTurn, elapsedSeconds);
+	updateCamera(unit, playerTurn && !feedIsoShown(), elapsedSeconds); // (no walking from the 3D window under the feed's ISO)
 	updateNoclipView(unit);
 	if (!playerTurn)
 	{
@@ -2776,7 +2776,7 @@ bool FirstPersonMode::handle(Action *action)
 	// and wheel) isn't ours.
 	if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
 	{
-		return handleKey(action, active);
+		return handleKey(action, active && !feedIsoShown()); // (the feed's ISO up: the keys as on the isometric map)
 	}
 	if (event.type != SDL_MOUSEMOTION && !isMouseButtonOrWheel(event))
 	{
