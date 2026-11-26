@@ -2395,7 +2395,7 @@ index 000000000..e8ae2afad
 +        color: 144
 diff --git a/mod/OpenXcom3D/metadata.yml b/mod/OpenXcom3D/metadata.yml
 new file mode 100644
-index 000000000..106d33b91
+index 000000000..b1a33a83c
 --- /dev/null
 +++ b/mod/OpenXcom3D/metadata.yml
 @@ -0,0 +1,11 @@
@@ -2403,13 +2403,13 @@ index 000000000..106d33b91
 +# metadata.yml for OpenXcom3D
 +
 +name: "OpenXcom3D - First-Person View"
-+version: 1.15
++version: 1.16
 +description: "Adds a first-person 3D view of the battlescape (F8): mouse look, real-time movement paid with time units (WASD), firing from the crosshair, a squad bar with soldier camera cards, lights, shadows, flashlight, particles, weather, tactical flares, combat music and its own 3D View options tab. Needs the OpenXcom3D build of OXCE; on a standard OXCE build this mod reports an unsupported engine and stays off."
 +author: OpenXcom3D project
 +
 +master: "*"
 +requiredExtendedEngine: OpenXcom3D
-+requiredExtendedVersion: "1.0.15"
++requiredExtendedVersion: "1.0.16"
 diff --git a/res/linux/icons/openxcom.svg b/res/linux/icons/openxcom.svg
 index 444f7387b..9196ac813 100644
 --- a/res/linux/icons/openxcom.svg
@@ -23945,7 +23945,7 @@ index 0595954e6..d34146aeb 100644
  	{
  		_buttonsPressed |= SDL_BUTTON(button);
 diff --git a/src/Engine/ModInfo.cpp b/src/Engine/ModInfo.cpp
-index cca815d3e..695d8318d 100644
+index cca815d3e..eb80efdbb 100644
 --- a/src/Engine/ModInfo.cpp
 +++ b/src/Engine/ModInfo.cpp
 @@ -181,6 +181,9 @@ struct EngineData
@@ -23953,7 +23953,7 @@ index cca815d3e..695d8318d 100644
  const EngineData supportedEngines[] = {
  	{ OPENXCOM_VERSION_ENGINE, { OPENXCOM_VERSION_NUMBER }},
 +#ifndef OXCE_NO_FIRSTPERSON
-+	{ "OpenXcom3D", { 1, 0, 15, 0 } }, // first-person add-on 1.15, see src/FirstPerson
++	{ "OpenXcom3D", { 1, 0, 16, 0 } }, // first-person add-on 1.16, see src/FirstPerson
 +#endif
  	{ "", { 0, 0, 0, 0 } }, // assume that every engine support mods from base game, remove if its not true.
  };
