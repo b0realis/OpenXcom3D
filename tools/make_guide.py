@@ -399,7 +399,7 @@ FEATURES = [
 # The gallery at the end: the collages (pages/img/gallery/), (file, title, caption)
 GALLERY_IMG = 'img/gallery/'
 GALLERY = [
-    ('battle_116.png', 'Blood trails: 1.16', 'A terror site from the Skyranger\'s ramp: a shot leaving the rifle at a Sectoid, a wounded squadmate standing in their own blood, red drops on the ramp, a Cyberdisc over burning grass.'),
+    ('mars_116.png', 'Blood on Mars: 1.16', 'Cydonia under the stars: a shot at a wounded Sectoid in a pyramid\'s doorway, its green blood across the red sand, a squadmate in a power suit standing in their own blood, a Cyberdisc beside them.'),
     ('street_114.png', 'On the graphics card: 1.14', 'A street at dusk drawn by the graphics card with every new setting on: true colour, smooth light, soft shadows, a shadow from every lamp, ambient occlusion, coloured lights, light shafts.'),
     ('collage_112.png', 'Who\'s hurt, who\'s hidden: 1.12', 'A town out to 200 tiles with the unseen in mist, our wounded in blue and purple in an alien colony (TFTD), enemies in the buttons\' colours at dusk, a hit\'s damage rising on a cruise ship\'s deck (TFTD), a house from behind in its brick, the squad and two Aquatoids outlined as the shots test them (TFTD).'),
     ('collage_111.png', 'Under the right sky: 1.11', 'Snow under cloud, the Earth from orbit (XPiratez), the sea floor (TFTD), deep woods (X-Com Files), Cydonia, the city of T\'leth.'),
