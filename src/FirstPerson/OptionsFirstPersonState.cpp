@@ -381,8 +381,8 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
-		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits", "fpsCommandFeed" } },
+		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse", "fpsCommandFeed" } },
+		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
 			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLiquidScreens", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
@@ -417,9 +417,13 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 	const auto last = [](const Section &section) { return section.heading == "STR_FPS_SECTION_CHEATS" ? 1 : section.heading == "STR_FPS_SECTION_EXPERIMENTAL" ? 2 : 0; };
 	std::sort(sorted.begin(), sorted.end(), [&last](const Section &one, const Section &two) { return last(one) != last(two) ? last(one) < last(two) : one.name < two.name; });
 	if (!other.options.empty()) sorted.insert(std::find_if(sorted.begin(), sorted.end(), [&last](const Section &section) { return last(section) > 0; }), other);
+	// The debug setting Live command feed is the last of the cheats, whatever its name (the owner: "move the command feed
+	// option from experimental to cheats - last item").
+	const auto debugLast = [](const OptionInfo &option) { return option.id() == "fpsCommandFeed" ? 1 : 0; };
 	for (Section &section : sorted)
 	{
-		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });
+		std::stable_sort(section.options.begin(), section.options.end(), [this, &debugLast](const OptionInfo &one, const OptionInfo &two)
+			{ return debugLast(one) != debugLast(two) ? debugLast(one) < debugLast(two) : label(one) < label(two); });
 		_settingHeadings.push_back({ _settings.size(), section.heading });
 		_settings.insert(_settings.end(), section.options.begin(), section.options.end());
 	}

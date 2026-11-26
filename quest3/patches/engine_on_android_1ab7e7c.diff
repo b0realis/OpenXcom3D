@@ -162,7 +162,7 @@ eZys|21o1z&+8gZ#Kkl^v0000<MNUMnLSTY=0A&#X
 
 diff --git a/mod/OpenXcom3D/Language/en-GB.yml b/mod/OpenXcom3D/Language/en-GB.yml
 new file mode 100644
-index 000000000..2329e7a3b
+index 000000000..5421fe108
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-GB.yml
 @@ -0,0 +1,778 @@
@@ -538,8 +538,8 @@ index 000000000..2329e7a3b
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
-+  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "Warning - this disables normal ISO mode and presents a \"SWAT style\" command feed instead. Hard and annoying!"
++  STR_FPS_COMMAND_FEED: "Live command feed (debug)"
++  STR_FPS_COMMAND_FEED_DESC: "Warning - replaces normal ISO mode with a \"SWAT style\" command feed. Only meant for bug analysis and testing, not for gameplay."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -946,7 +946,7 @@ index 000000000..2329e7a3b
 +  STR_FPS_KEY_HIDE_HUD_DESC: "Hides the top bar, panel, compass and markers, then the crosshair too: a clean view. On the map: the map camera on or off."
 diff --git a/mod/OpenXcom3D/Language/en-US.yml b/mod/OpenXcom3D/Language/en-US.yml
 new file mode 100644
-index 000000000..a7f612b5a
+index 000000000..1af328463
 --- /dev/null
 +++ b/mod/OpenXcom3D/Language/en-US.yml
 @@ -0,0 +1,778 @@
@@ -1322,8 +1322,8 @@ index 000000000..a7f612b5a
 +  STR_FPS_UNIT_SIZE_DESC: "Soldiers, aliens, corpses and items drawn smaller (80-100%). Hitboxes stay the same."
 +  STR_FPS_VOXEL_UNITS: "Voxel units"
 +  STR_FPS_VOXEL_UNITS_DESC: "Units as 3D bodies of little cubes made from their sprites. Hit as a whole body only with Realistic hitboxes. {ALT}Takes a few seconds."
-+  STR_FPS_COMMAND_FEED: "Live command feed"
-+  STR_FPS_COMMAND_FEED_DESC: "Warning - this disables normal ISO mode and presents a \"SWAT style\" command feed instead. Hard and annoying!"
++  STR_FPS_COMMAND_FEED: "Live command feed (debug)"
++  STR_FPS_COMMAND_FEED_DESC: "Warning - replaces normal ISO mode with a \"SWAT style\" command feed. Only meant for bug analysis and testing, not for gameplay."
 +  STR_FPS_UPSCALE_OFF: "Off"
 +  STR_FPS_UPSCALE_SMOOTH: "Smooth"
 +  STR_FPS_UPSCALE_DETAIL: "Smooth+"
@@ -25104,10 +25104,10 @@ index 000000000..bff3b6898
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.cpp b/src/FirstPerson/FirstPersonApi.cpp
 new file mode 100644
-index 000000000..ee5f079dc
+index 000000000..6afc8a66a
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.cpp
-@@ -0,0 +1,2490 @@
+@@ -0,0 +1,2495 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -25177,6 +25177,8 @@ index 000000000..ee5f079dc
 +#include "../Engine/State.h"
 +#include "../Interface/Text.h"
 +#include "FirstPersonModeShared.h"
++#include "FirstPersonSpriteHits.h"
++#include "../Mod/Armor.h"
 +#include "../Mod/RuleDamageType.h"
 +#include "../Mod/RuleItem.h"
 +#include "../Savegame/BattleItem.h"
@@ -27279,8 +27281,11 @@ index 000000000..ee5f079dc
 + * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
 + * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
 + * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
-+ * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds; robots,
-+ * tanks and the bleed-immune never have wounds), seen or not: it lies there to be found (the owner's ruling: track by blood).
++ * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds: soldiers;
++ * aliens and civilians only with OXCE's option "Alien bleeding", or where a mod's armour says so), seen or not: it lies
++ * there to be found (the owner's ruling: track by blood). Not a machine's, as Obliteration tells flesh (the owner: "Same as
++ * obliteration"): a vehicle (a hull, see hullLayBack: the Cyberdisc, tanks) or armour named immune to bleeding; with
++ * "Alien bleeding" the game wounds a Cyberdisc too.
 + * Kept in the save (SavedBattleGame::getBlood); the 3D view draws it (FirstPersonView::drawBlood). Nothing with the setting off.
 + * @param save The battle.
 + * @param unit The unit.
@@ -27289,7 +27294,7 @@ index 000000000..ee5f079dc
 +void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn)
 +{
 +	if (!Options::fpsBloodTrails || !save || !unit || unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_IGNORE_ME
-+		|| unit->getFatalWounds() <= 0)
++		|| unit->getFatalWounds() <= 0 || hullLayBack(unit) > 0.0 || unit->getArmor()->getBleedImmune(false))
 +	{
 +		return;
 +	}
@@ -110854,10 +110859,10 @@ index 000000000..3559cb7dd
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/OptionsFirstPersonState.cpp b/src/FirstPerson/OptionsFirstPersonState.cpp
 new file mode 100644
-index 000000000..36857a621
+index 000000000..113f5eac0
 --- /dev/null
 +++ b/src/FirstPerson/OptionsFirstPersonState.cpp
-@@ -0,0 +1,1357 @@
+@@ -0,0 +1,1361 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -111241,8 +111246,8 @@ index 000000000..36857a621
 +		{ "STR_FPS_SECTION_HUD", { "fpsCrosshair", "fpsCrosshairInfo", "fpsCrosshairCosts", "fpsCrosshairDamage", "fpsRangefinder", "fpsAccuracyLine", "fpsUnitNames", "fpsStatBars", "fpsCraftIcons",
 +			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 +		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
-+		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse" } },
-+		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits", "fpsCommandFeed" } },
++		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse", "fpsCommandFeed" } },
++		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
 +		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 +		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
 +			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLiquidScreens", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
@@ -111277,9 +111282,13 @@ index 000000000..36857a621
 +	const auto last = [](const Section &section) { return section.heading == "STR_FPS_SECTION_CHEATS" ? 1 : section.heading == "STR_FPS_SECTION_EXPERIMENTAL" ? 2 : 0; };
 +	std::sort(sorted.begin(), sorted.end(), [&last](const Section &one, const Section &two) { return last(one) != last(two) ? last(one) < last(two) : one.name < two.name; });
 +	if (!other.options.empty()) sorted.insert(std::find_if(sorted.begin(), sorted.end(), [&last](const Section &section) { return last(section) > 0; }), other);
++	// The debug setting Live command feed is the last of the cheats, whatever its name (the owner: "move the command feed
++	// option from experimental to cheats - last item").
++	const auto debugLast = [](const OptionInfo &option) { return option.id() == "fpsCommandFeed" ? 1 : 0; };
 +	for (Section &section : sorted)
 +	{
-+		std::stable_sort(section.options.begin(), section.options.end(), [this](const OptionInfo &one, const OptionInfo &two) { return label(one) < label(two); });
++		std::stable_sort(section.options.begin(), section.options.end(), [this, &debugLast](const OptionInfo &one, const OptionInfo &two)
++			{ return debugLast(one) != debugLast(two) ? debugLast(one) < debugLast(two) : label(one) < label(two); });
 +		_settingHeadings.push_back({ _settings.size(), section.heading });
 +		_settings.insert(_settings.end(), section.options.begin(), section.options.end());
 +	}

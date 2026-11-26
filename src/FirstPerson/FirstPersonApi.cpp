@@ -67,6 +67,8 @@
 #include "../Engine/State.h"
 #include "../Interface/Text.h"
 #include "FirstPersonModeShared.h"
+#include "FirstPersonSpriteHits.h"
+#include "../Mod/Armor.h"
 #include "../Mod/RuleDamageType.h"
 #include "../Mod/RuleItem.h"
 #include "../Savegame/BattleItem.h"
@@ -2169,8 +2171,11 @@ const size_t BloodPlacesMost = 3000;
  * of blood where unit is standing and tiles unit walks over. If unit is patched bleeding stops"): each step finished, a drop
  * for each wound (at most three); as its side's turn starts, twice that for each wound (at most five) where it stays, so a pool
  * grows under one that doesn't move. A body out cold bleeds where it lies (not while it is carried). The blood falls through a
- * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds; robots,
- * tanks and the bleed-immune never have wounds), seen or not: it lies there to be found (the owner's ruling: track by blood).
+ * floorless tile to the floor below. Every unit's that bleeds by the game's rules (BattleUnit::getFatalWounds: soldiers;
+ * aliens and civilians only with OXCE's option "Alien bleeding", or where a mod's armour says so), seen or not: it lies
+ * there to be found (the owner's ruling: track by blood). Not a machine's, as Obliteration tells flesh (the owner: "Same as
+ * obliteration"): a vehicle (a hull, see hullLayBack: the Cyberdisc, tanks) or armour named immune to bleeding; with
+ * "Alien bleeding" the game wounds a Cyberdisc too.
  * Kept in the save (SavedBattleGame::getBlood); the 3D view draws it (FirstPersonView::drawBlood). Nothing with the setting off.
  * @param save The battle.
  * @param unit The unit.
@@ -2179,7 +2184,7 @@ const size_t BloodPlacesMost = 3000;
 void bleed(SavedBattleGame *save, BattleUnit *unit, bool turn)
 {
 	if (!Options::fpsBloodTrails || !save || !unit || unit->getStatus() == STATUS_DEAD || unit->getStatus() == STATUS_IGNORE_ME
-		|| unit->getFatalWounds() <= 0)
+		|| unit->getFatalWounds() <= 0 || hullLayBack(unit) > 0.0 || unit->getArmor()->getBleedImmune(false))
 	{
 		return;
 	}
