@@ -3534,10 +3534,17 @@ bool FirstPersonMode::blit()
 				if (++frames == 120)
 				{
 					const SDL_Surface *display = SDL_GetVideoSurface();
+					// (SDL's video driver too: x11, wayland, ... a slow flip may be the desktop's way of showing the window)
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+					const char *videoDriver = SDL_GetCurrentVideoDriver();
+#else
+					char videoName[64] = {};
+					const char *videoDriver = SDL_VideoDriverName(videoName, (int)sizeof(videoName));
+#endif
 					Log(LOG_INFO) << "OpenXcom3D: the frame every " << everySum / frames << " ms (" << (int)std::lround(1000.0 * frames / std::max(1.0, everySum))
 						<< " fps, worst " << worst << " ms): the battlescape drawn in " << drawnSum / frames << " ms, the flip " << flipSum / frames << " ms (display "
 						<< (display ? display->w : 0) << "x" << (display ? display->h : 0) << "x" << (display ? (int)display->format->BitsPerPixel : 0) << ", the game's screen "
-						<< game->getScreen()->getWidth() << "x" << game->getScreen()->getHeight() << ")";
+						<< game->getScreen()->getWidth() << "x" << game->getScreen()->getHeight() << ", SDL video " << (videoDriver ? videoDriver : "?") << ")";
 					everySum = worst = drawnSum = flipSum = 0.0;
 					frames = 0;
 				}
