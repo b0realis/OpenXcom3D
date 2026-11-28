@@ -301,7 +301,9 @@ void presentAtFlipOpenGl(SDL_Surface *screen, int x, int y, int width, int heigh
 		const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 		for (int column = 0; column < width; ++column)
 		{
-			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? full[column] : colors[seen[column]];
+			// (a full colour opaque, whatever its top byte holds: 3DIso's have none there, and drawn with their own as the
+			// opacity the picture was see-through, the key's black showing: the owner's Mac, OpenGL output with True colour)
+			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? 0xFF000000u | (full[column] & 0xFFFFFFu) : colors[seen[column]];
 		}
 	}
 

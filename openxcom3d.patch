@@ -30436,10 +30436,10 @@ index 000000000..59002ea0a
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonGpu.cpp b/src/FirstPerson/FirstPersonGpu.cpp
 new file mode 100644
-index 000000000..43ecde306
+index 000000000..bfd8fbcdd
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpu.cpp
-@@ -0,0 +1,4282 @@
+@@ -0,0 +1,4309 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -31313,7 +31313,7 @@ index 000000000..43ecde306
 +// their size: a program of the rays 4 (3DIso's 8: the biggest), any other 1, the card itself 1.
 +std::atomic<int> progressDone{ 0 }, progressTotal{ 0 };
 +constexpr int RaysWeight = 4, IsoRaysWeight = 8;
-+constexpr int OpeningWeight = 1 + 1 + 1 + RaysWeight * 2 + 1 + 3 + 1 + 1; // (the card, supersampling, render scale, the rays twice, the effects, the bloom's three, the wash, the frame)
++constexpr int OpeningWeight = 1 + 1 + 2 + RaysWeight * 2 + 1 + 3 + 1 + 1; // (the card, supersampling, render scale (3DIso's too), the rays twice, the effects, the bloom's three, the wash, the frame)
 +void progressMade(int weight) { progressDone += weight; }
 +}
 +
@@ -31345,6 +31345,7 @@ index 000000000..43ecde306
 +	bool isoResultsBroken = false;
 +	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 +	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
++	Gl::UInt upscaleIsoProgram = 0; // ... the same with 3DIso's packed findings (3DIso at the display's resolution)
 +	Program *program = &programs[0];
 +	Gl::UInt vertexArray = 0;
 +	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -31867,6 +31868,19 @@ index 000000000..43ecde306
 +		Gl::Uniform1i(Gl::GetUniformLocation(built, names[which]), BufferCount + 1 + which);
 +	}
 +	upscaleProgram = built;
++	// (and 3DIso's, its packed findings too, on the unit after: 3DIso at the display's resolution follows the setting; none if
++	// this one won't build: 3DIso then casts a ray a pixel)
++	const Gl::UInt iso = compileFragment(std::string("#define ISO_RESULTS\n") + UpscaleSource, "3DIso's render scale shader");
++	if (iso)
++	{
++		Gl::UseProgram(iso);
++		for (int which = 0; which < 4; ++which)
++		{
++			Gl::Uniform1i(Gl::GetUniformLocation(iso, names[which]), BufferCount + 1 + which);
++		}
++		Gl::Uniform1i(Gl::GetUniformLocation(iso, "uIsoResults"), BufferCount + 5);
++		upscaleIsoProgram = iso;
++	}
 +	return true;
 +}
 +
@@ -32535,7 +32549,10 @@ index 000000000..43ecde306
 +	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
 +	// (Nor for a VR eye: its picture's size is the headset's, and "VR foveation" thins its rays its own way.)
 +	const int resultsKind = output.isoResults ? 2 : output.results ? 1 : 0; // (the check's results, or 3DIso's packed: see Output)
-+	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !resultsKind && !output.perRay && frame.eyeFocal <= 0.0f;
++	// (3DIso's frames too, at the display's resolution, the owner's word: its packed findings taken a pixel's own ray's, as the
++	// palette colours are)
++	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && (!resultsKind || (resultsKind == 2 && upscaleIsoProgram))
++		&& !output.perRay && frame.eyeFocal <= 0.0f;
 +	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
 +	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
 +	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
@@ -32543,6 +32560,15 @@ index 000000000..43ecde306
 +	{
 +		rays.width = rayColumnsCast * frame.pixelSize;
 +		rays.height = rayRowsCast * frame.pixelSize;
++		if (resultsKind == 2)
++		{
++			// (3DIso's original art: a ray's map pixel the one at the middle of its share of the picture, its steps as many
++			// view pixels as it spans)
++			const float acrossEach = (float)fullColumns / rayColumnsCast, downEach = (float)fullRows / rayRowsCast;
++			rays.isoMapPart[0] += (0.5f * acrossEach - 0.5f) * frame.isoMapStep;
++			rays.isoMapPart[1] += (0.5f * downEach - 0.5f) * frame.isoMapStep;
++			rays.isoMapStep = frame.isoMapStep * acrossEach;
++		}
 +	}
 +	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
 +	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
@@ -32792,7 +32818,7 @@ index 000000000..43ecde306
 +	{
 +		const Targets cast = targets[{ rayColumnsCast, rayRowsCast, 0 }];
 +		keepTargets = true; // (the rays' own pictures are read next)
-+		const bool set = setTargets(blockColumns, blockRows, false);
++		const bool set = setTargets(blockColumns, blockRows, resultsKind == 2 ? 2 : 0);
 +		keepTargets = false;
 +		if (!set)
 +		{
@@ -32800,9 +32826,10 @@ index 000000000..43ecde306
 +			return false;
 +		}
 +		Gl::Viewport(0, 0, blockColumns, blockRows);
-+		Gl::UseProgram(upscaleProgram);
-+		Gl::Uniform2f(Gl::GetUniformLocation(upscaleProgram, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
-+		for (int which = 0; which < 4; ++which) // (colour, depth, glow, full colour)
++		const Gl::UInt upscale = resultsKind == 2 ? upscaleIsoProgram : upscaleProgram;
++		Gl::UseProgram(upscale);
++		Gl::Uniform2f(Gl::GetUniformLocation(upscale, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
++		for (int which = 0; which < (resultsKind == 2 ? 5 : 4); ++which) // (colour, depth, glow, full colour; 3DIso's findings)
 +		{
 +			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
 +			Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);
@@ -35306,10 +35333,10 @@ index 000000000..82e9da00f
 +}
 diff --git a/src/FirstPerson/FirstPersonGpuShaders.h b/src/FirstPerson/FirstPersonGpuShaders.h
 new file mode 100644
-index 000000000..319108c39
+index 000000000..5ecf49595
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonGpuShaders.h
-@@ -0,0 +1,4096 @@
+@@ -0,0 +1,4104 @@
 +#pragma once
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
@@ -38530,6 +38557,11 @@ index 000000000..319108c39
 +layout(location = 1) out float outDepth;
 +layout(location = 2) out uint outGlow;
 +layout(location = 3) out vec4 outTrue;
++#ifdef ISO_RESULTS
++// (3DIso at the display's resolution: its packed findings, a pixel's own ray's, as its palette colour: see outIsoResult)
++uniform usampler2D uIsoResults;
++layout(location = 4) out uint outIsoResult;
++#endif
 +
 +void main()
 +{
@@ -38541,6 +38573,9 @@ index 000000000..319108c39
 +	outColor = texelFetch(uColor, own, 0).r;
 +	outDepth = depth;
 +	outGlow = texelFetch(uGlow, own, 0).r;
++#ifdef ISO_RESULTS
++	outIsoResult = texelFetch(uIsoResults, own, 0).r;
++#endif
 +	vec2 between = place - 0.5;
 +	ivec2 low = ivec2(floor(between));
 +	vec2 along = between - vec2(low);
@@ -41086,10 +41121,10 @@ index 000000000..1115e02a2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..af4827f7f
+index 000000000..db62ff8a0
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,5048 @@
+@@ -0,0 +1,5070 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -43533,21 +43568,32 @@ index 000000000..af4827f7f
 +	const bool isoFirst = Options::fpsIso && !isActive();
 +	const int waitMs = !first ? 0 : isoFirst ? PrimeIsoCardWaitMs : PrimeCardWaitMs;
 +	bool ready = false;
++	// How far the screen's bar is: the card's programs to CardShare (a driver building them all as they are made), then the
++	// units' bodies, the 3D view's first frame and 3DIso's: each frame drawn ahead of its kinds too, which is where Apple's
++	// driver finishes the programs (the owner: on his Mac the bar stood at 100% while the screen still waited).
++	constexpr int CardShare = 60, BodiesTo = 70, ViewTo = 85;
++	bool showing = false;
++	auto progressTo = [&](int percent) {
++		if (!showing) return;
++		showPreparing(std::clamp(percent, 0, 100));
++		SDL_PumpEvents();
++	};
++	struct NoPrimeProgress { ~NoPrimeProgress() { FirstPersonView::setPrimeProgress(nullptr); } } noPrimeProgress; // (on every way out)
 +	if (first && someone && (FirstPersonView::gpuOpening() || (!preparedBefore && FirstPersonView::gpuReady(0))))
 +	{
 +		// The screen, with how far the card has got (the owner: "show progress on preparing 3D"), drawn again a few times a
 +		// second while it gets ready; the window answers the desktop meanwhile (its events left for the game).
++		showing = true;
 +		for (;;)
 +		{
 +			ready = FirstPersonView::gpuReady(0);
-+			showPreparing(ready ? 100 : FirstPersonView::gpuProgress());
++			progressTo(ready ? CardShare : FirstPersonView::gpuProgress() * CardShare / 100);
 +			if (ready || !FirstPersonView::gpuOpening()) break;
 +			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= waitMs) break;
-+			SDL_PumpEvents();
 +			ready = FirstPersonView::gpuReady(100);
 +			if (ready)
 +			{
-+				showPreparing(100);
++				progressTo(CardShare);
 +				break;
 +			}
 +		}
@@ -43583,7 +43629,11 @@ index 000000000..af4827f7f
 +		}
 +		makeVoxelBodies(VoxelBodiesMs); // (takes what the builder made last)
 +	}
++	progressTo(BodiesTo);
 +	const double bodiesWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
++	// (each kind of frame drawn ahead moves the bar on, within the frame's part of it)
++	int stageFrom = BodiesTo, stageTo = isoFirst ? ViewTo : 100, kindsDrawn = 0;
++	FirstPersonView::setPrimeProgress([&]() { ++kindsDrawn; progressTo(std::min(stageTo - 1, stageFrom + kindsDrawn * 4)); });
 +	// The view as the first click will have it: in full colour if 3D is laid into the display then (see think), from
 +	// the middle of the soldier's tile at their eyes' height, the way they face (see updateCamera, aimHelmetCamera).
 +	const auto frameBegan = std::chrono::steady_clock::now();
@@ -43609,6 +43659,10 @@ index 000000000..af4827f7f
 +	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
 +		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "
 +		<< (int)cardWait << " ms, the units' bodies " << (int)bodiesWait << " ms)";
++	progressTo(stageTo);
++	stageFrom = stageTo;
++	stageTo = 100;
++	kindsDrawn = 0;
 +	// 3DIso on (research): its first frame drawn on the card here too, unseen, as the battle's first shown frame will draw
 +	// it: the map's frames sent to the card, its sun map made, its kind of frame drawn ahead; so 3DIso shows on the card from
 +	// its first frame, the game never standing still for it.
@@ -43625,6 +43679,7 @@ index 000000000..af4827f7f
 +			Log(LOG_INFO) << "OpenXcom3D: 3DIso's first frame drawn ahead in "
 +				<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - isoBegan).count() << " ms";
 +		}
++		progressTo(100);
 +	}
 +#endif
 +}
@@ -44619,6 +44674,8 @@ index 000000000..af4827f7f
 +			if (begun)
 +			{
 +				const double every = std::chrono::duration<double, std::milli>(started - previous).count();
++				// (a frame over a tenth of a second on its own line: a freeze, with what the log says just before it)
++				if (every >= 100.0) { Log(LOG_INFO) << "OpenXcom3D: a slow frame, " << (int)every << " ms"; }
 +				everySum += every;
 +				worst = std::max(worst, every);
 +				drawnSum += std::chrono::duration<double, std::milli>(now - started).count();
@@ -68159,10 +68216,10 @@ index 000000000..175dfc986
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonPresent.cpp b/src/FirstPerson/FirstPersonPresent.cpp
 new file mode 100644
-index 000000000..85c372351
+index 000000000..864522b65
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonPresent.cpp
-@@ -0,0 +1,355 @@
+@@ -0,0 +1,357 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68466,7 +68523,9 @@ index 000000000..85c372351
 +		const Uint32 *full = fullColors ? fullColors + (size_t)row * width : nullptr;
 +		for (int column = 0; column < width; ++column)
 +		{
-+			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? full[column] : colors[seen[column]];
++			// (a full colour opaque, whatever its top byte holds: 3DIso's have none there, and drawn with their own as the
++			// opacity the picture was see-through, the key's black showing: the owner's Mac, OpenGL output with True colour)
++			made[column] = (screenRow[screenColumn[column]] & colorBits) != key ? 0 : full && full[column] ? 0xFF000000u | (full[column] & 0xFFFFFFu) : colors[seen[column]];
 +		}
 +	}
 +
@@ -71404,7 +71463,7 @@ index 000000000..d43f8ffe8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..b993d8350
+index 000000000..c0dda59da
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
 @@ -0,0 +1,1690 @@
@@ -72167,7 +72226,7 @@ index 000000000..b993d8350
 +	{
 +		FirstPersonView *view;
 +		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
-+		~ScaleTimer() { view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
++		~ScaleTimer() { if (!view->_iso && !view->_isoTurned) view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
 +	} scaleTimer { this };
 +	_gpuCastRays = false;
 +	// The frame's shared work, then its one picture (VR's renderEyes draws two of them from the one shared part): all
@@ -73100,10 +73159,10 @@ index 000000000..b993d8350
 +}
 diff --git a/src/FirstPerson/FirstPersonView.h b/src/FirstPerson/FirstPersonView.h
 new file mode 100644
-index 000000000..b53fa8aa2
+index 000000000..120c94a11
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.h
-@@ -0,0 +1,2201 @@
+@@ -0,0 +1,2208 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -73467,6 +73526,8 @@ index 000000000..b53fa8aa2
 +	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
 +	/// How far the card has got with getting ready: 0 to 100 (100 ready), -1 nothing to tell (see FirstPersonGpu::openingProgress).
 +	static int gpuProgress();
++	/// While the battle's first frames are drawn ahead ("PREPARING 3D"): called after each kind of frame drawn ahead for the card, to show it.
++	static void setPrimeProgress(std::function<void()> progress) { _primeProgress = std::move(progress); }
 +	static bool gpuOpening();
 +	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 +	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one,
@@ -73915,6 +73976,7 @@ index 000000000..b53fa8aa2
 +	void draw() override;
 +
 +private:
++	static inline std::function<void()> _primeProgress; // (see setPrimeProgress)
 +	// =====================================================================================
 +	// The battle, the camera and the frame (FirstPersonView.cpp)
 +	// =====================================================================================
@@ -74655,6 +74717,10 @@ index 000000000..b53fa8aa2
 +	int _renderScaleStep = 0;
 +	double _renderScaleTime = 0.0;
 +	int _renderScaleWait = 90, _renderScaleHold = 0; // (the first frames on the card are slow ones: programs still being built)
++	// (3DIso: the time at the step before the last step coarser, to judge whether it paid; the coarsest step that does, and for
++	// how many more frames that holds; see noteDrawTime)
++	double _renderScaleBefore = 0.0;
++	int _renderScaleFloor = 99, _renderScaleFloorHold = 0;
 +	bool _gpuCastRays = false;                         // this frame's rays were the card's
 +	/// The share of the view's pixels, each way, the card casts rays for (setting "Render scale"), in percent.
 +	int renderScalePercent() const;
@@ -77300,10 +77366,10 @@ index 000000000..ebd0fc18e
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonViewGpu.cpp b/src/FirstPerson/FirstPersonViewGpu.cpp
 new file mode 100644
-index 000000000..e83bd7022
+index 000000000..c0a7eb417
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonViewGpu.cpp
-@@ -0,0 +1,1019 @@
+@@ -0,0 +1,1051 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -77520,7 +77586,8 @@ index 000000000..e83bd7022
 +	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,
 +	// and so has an eye's picture.)
 +	frame.pixelSize = scale > 1 || view._eyePass || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
-+	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
++	// (3DIso: only at the display's resolution, the owner's word; at the map's it is cast in full)
++	frame.rayScale = scale > 1 || ((view._iso || view._isoTurned) && !(view._isoExtras & FirstPersonView::IsoExtraDisplay)) ? 1.0f : 100.0f / view.renderScalePercent();
 +	frame.goggles = view._nightVision;
 +	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 +	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
@@ -77700,7 +77767,7 @@ index 000000000..e83bd7022
 +			frame.orthoSpan = (float)view._isoBack;
 +		}
 +		frame.pixelSize = 1;
-+		frame.rayScale = 1.0f;
++		// (setting "Render scale" at the display's resolution only: see where rayScale is set above)
 +		frame.reflections = false;
 +		frame.mirrorUnits = nullptr;
 +	}
@@ -77892,8 +77959,31 @@ index 000000000..e83bd7022
 +		return;
 +	}
 +	auto rays = [](int step) { return (double)RenderScaleSteps[step] * RenderScaleSteps[step]; };
-+	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1)
++	// 3DIso: much of the card's part doesn't get shorter with fewer rays (its pictures read back at the display's size), and
++	// a step coarser that saves under a tenth of the time is taken back and not tried again for a while: the picture stays as
++	// fine as fewer rays are worth (else it went to the coarsest and stayed, no faster).
++	const bool iso = _iso || _isoTurned;
++	const double timeThen = _renderScaleTime; // (for the log)
++	if (iso && _renderScaleFloorHold > 0 && --_renderScaleFloorHold == 0) _renderScaleFloor = 99;
++	if (iso && _renderScaleBefore > 0.0)
 +	{
++		const bool paid = _renderScaleTime < _renderScaleBefore * 0.9;
++		_renderScaleBefore = 0.0;
++		if (!paid)
++		{
++			--_renderScaleStep;
++			_renderScaleFloor = _renderScaleStep;
++			_renderScaleFloorHold = 1800;
++			_renderScaleWait = 20;
++			_renderScaleTime = 0.0;
++			static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
++			if (timed) { Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (3DIso: the step coarser saved too little)"; }
++			return;
++		}
++	}
++	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1 && (!iso || _renderScaleStep < _renderScaleFloor))
++	{
++		if (iso) _renderScaleBefore = _renderScaleTime;
 +		++_renderScaleStep;
 +		_renderScaleHold = 240;
 +	}
@@ -77911,7 +78001,7 @@ index 000000000..e83bd7022
 +	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 +	if (timed)
 +	{
-+		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
++		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms, took " << timeThen << ")";
 +	}
 +}
 +
@@ -77965,7 +78055,10 @@ index 000000000..e83bd7022
 +	{
 +		static std::set<int> warmed; // (the card is one for every view)
 +		const bool shaftsOn = Options::fpsLightShafts && _wantsTrueColor;
-+		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0);
++		// (3DIso's frames are another program and other pictures than the 3D view's: each kind drawn ahead for each, and in full
++		// colour or not, as Apple's driver finishes a program for the pictures it draws into)
++		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0)
++			| (isoFrame ? 256 : 0) | (output.trueColor ? 512 : 0);
 +		const auto start = std::chrono::steady_clock::now();
 +		int drawn = 0;
 +		for (int kind = 0; kind < 4; ++kind)
@@ -77988,6 +78081,7 @@ index 000000000..e83bd7022
 +				return false;
 +			}
 +			++drawn;
++			if (_primeProgress) _primeProgress(); // (the "PREPARING 3D" screen drawn again: see FirstPersonMode::primeView)
 +		}
 +		const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 +		if (drawn && milliseconds >= 50.0)
@@ -77995,10 +78089,14 @@ index 000000000..e83bd7022
 +			Log(LOG_INFO) << "OpenXcom3D GPU: " << drawn << " kinds of frame drawn ahead in " << (int)milliseconds << " ms";
 +		}
 +	}
++	// (3DIso: its "Render scale" on Auto goes by the card's part alone, the rays and their reading back: the rest of its frame
++	// is the CPU's and no fewer rays make it shorter; see FirstPersonView.cpp's ScaleTimer for the 3D view's)
++	const auto castBegan = std::chrono::steady_clock::now();
 +	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 +	{
 +		return false;
 +	}
++	if (isoFrame || _isoTurned) noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - castBegan).count());
 +	if (timed && getWidth() >= 320)
 +	{
 +		static double upload = 0.0, draw = 0.0, read = 0.0;

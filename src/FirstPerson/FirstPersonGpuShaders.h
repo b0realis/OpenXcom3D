@@ -3218,6 +3218,11 @@ layout(location = 0) out uint outColor;
 layout(location = 1) out float outDepth;
 layout(location = 2) out uint outGlow;
 layout(location = 3) out vec4 outTrue;
+#ifdef ISO_RESULTS
+// (3DIso at the display's resolution: its packed findings, a pixel's own ray's, as its palette colour: see outIsoResult)
+uniform usampler2D uIsoResults;
+layout(location = 4) out uint outIsoResult;
+#endif
 
 void main()
 {
@@ -3229,6 +3234,9 @@ void main()
 	outColor = texelFetch(uColor, own, 0).r;
 	outDepth = depth;
 	outGlow = texelFetch(uGlow, own, 0).r;
+#ifdef ISO_RESULTS
+	outIsoResult = texelFetch(uIsoResults, own, 0).r;
+#endif
 	vec2 between = place - 0.5;
 	ivec2 low = ivec2(floor(between));
 	vec2 along = between - vec2(low);

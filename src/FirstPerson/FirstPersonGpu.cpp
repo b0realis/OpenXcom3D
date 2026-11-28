@@ -871,7 +871,7 @@ namespace
 // their size: a program of the rays 4 (3DIso's 8: the biggest), any other 1, the card itself 1.
 std::atomic<int> progressDone{ 0 }, progressTotal{ 0 };
 constexpr int RaysWeight = 4, IsoRaysWeight = 8;
-constexpr int OpeningWeight = 1 + 1 + 1 + RaysWeight * 2 + 1 + 3 + 1 + 1; // (the card, supersampling, render scale, the rays twice, the effects, the bloom's three, the wash, the frame)
+constexpr int OpeningWeight = 1 + 1 + 2 + RaysWeight * 2 + 1 + 3 + 1 + 1; // (the card, supersampling, render scale (3DIso's too), the rays twice, the effects, the bloom's three, the wash, the frame)
 void progressMade(int weight) { progressDone += weight; }
 }
 
@@ -903,6 +903,7 @@ struct FirstPersonGpu::State
 	bool isoResultsBroken = false;
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
+	Gl::UInt upscaleIsoProgram = 0; // ... the same with 3DIso's packed findings (3DIso at the display's resolution)
 	Program *program = &programs[0];
 	Gl::UInt vertexArray = 0;
 	// The pictures the rays are drawn into, kept for each size asked (the main view's, the small camera views').
@@ -1425,6 +1426,19 @@ bool FirstPersonGpu::State::buildUpscale()
 		Gl::Uniform1i(Gl::GetUniformLocation(built, names[which]), BufferCount + 1 + which);
 	}
 	upscaleProgram = built;
+	// (and 3DIso's, its packed findings too, on the unit after: 3DIso at the display's resolution follows the setting; none if
+	// this one won't build: 3DIso then casts a ray a pixel)
+	const Gl::UInt iso = compileFragment(std::string("#define ISO_RESULTS\n") + UpscaleSource, "3DIso's render scale shader");
+	if (iso)
+	{
+		Gl::UseProgram(iso);
+		for (int which = 0; which < 4; ++which)
+		{
+			Gl::Uniform1i(Gl::GetUniformLocation(iso, names[which]), BufferCount + 1 + which);
+		}
+		Gl::Uniform1i(Gl::GetUniformLocation(iso, "uIsoResults"), BufferCount + 5);
+		upscaleIsoProgram = iso;
+	}
 	return true;
 }
 
@@ -2093,7 +2107,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
 	// (Nor for a VR eye: its picture's size is the headset's, and "VR foveation" thins its rays its own way.)
 	const int resultsKind = output.isoResults ? 2 : output.results ? 1 : 0; // (the check's results, or 3DIso's packed: see Output)
-	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !resultsKind && !output.perRay && frame.eyeFocal <= 0.0f;
+	// (3DIso's frames too, at the display's resolution, the owner's word: its packed findings taken a pixel's own ray's, as the
+	// palette colours are)
+	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && (!resultsKind || (resultsKind == 2 && upscaleIsoProgram))
+		&& !output.perRay && frame.eyeFocal <= 0.0f;
 	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
 	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
 	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
@@ -2101,6 +2118,15 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	{
 		rays.width = rayColumnsCast * frame.pixelSize;
 		rays.height = rayRowsCast * frame.pixelSize;
+		if (resultsKind == 2)
+		{
+			// (3DIso's original art: a ray's map pixel the one at the middle of its share of the picture, its steps as many
+			// view pixels as it spans)
+			const float acrossEach = (float)fullColumns / rayColumnsCast, downEach = (float)fullRows / rayRowsCast;
+			rays.isoMapPart[0] += (0.5f * acrossEach - 0.5f) * frame.isoMapStep;
+			rays.isoMapPart[1] += (0.5f * downEach - 0.5f) * frame.isoMapStep;
+			rays.isoMapStep = frame.isoMapStep * acrossEach;
+		}
 	}
 	// More than the shader takes at once (doors swinging, UFOs with their own light, models: a part's
 	// number is sixteen bits): this frame is the CPU's. None of the games' maps comes near.
@@ -2350,7 +2376,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	{
 		const Targets cast = targets[{ rayColumnsCast, rayRowsCast, 0 }];
 		keepTargets = true; // (the rays' own pictures are read next)
-		const bool set = setTargets(blockColumns, blockRows, false);
+		const bool set = setTargets(blockColumns, blockRows, resultsKind == 2 ? 2 : 0);
 		keepTargets = false;
 		if (!set)
 		{
@@ -2358,9 +2384,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			return false;
 		}
 		Gl::Viewport(0, 0, blockColumns, blockRows);
-		Gl::UseProgram(upscaleProgram);
-		Gl::Uniform2f(Gl::GetUniformLocation(upscaleProgram, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
-		for (int which = 0; which < 4; ++which) // (colour, depth, glow, full colour)
+		const Gl::UInt upscale = resultsKind == 2 ? upscaleIsoProgram : upscaleProgram;
+		Gl::UseProgram(upscale);
+		Gl::Uniform2f(Gl::GetUniformLocation(upscale, "uRaysPerBlock"), (float)rayColumnsCast / blockColumns, (float)rayRowsCast / blockRows);
+		for (int which = 0; which < (resultsKind == 2 ? 5 : 4); ++which) // (colour, depth, glow, full colour; 3DIso's findings)
 		{
 			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 1 + which);
 			Gl::BindTexture(Gl::TEXTURE_2D, cast.textures[which]);

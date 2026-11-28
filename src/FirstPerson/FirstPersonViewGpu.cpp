@@ -214,7 +214,8 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	// (Auto on the card: a ray a pixel whatever the view's size, which is what the card is for; a small view always has one,
 	// and so has an eye's picture.)
 	frame.pixelSize = scale > 1 || view._eyePass || width * height <= SmallViewPixels || Options::fpsPixelSize == 0 ? 1 : std::clamp(Options::fpsPixelSize, 1, 3);
-	frame.rayScale = scale > 1 ? 1.0f : 100.0f / view.renderScalePercent();
+	// (3DIso: only at the display's resolution, the owner's word; at the map's it is cast in full)
+	frame.rayScale = scale > 1 || ((view._iso || view._isoTurned) && !(view._isoExtras & FirstPersonView::IsoExtraDisplay)) ? 1.0f : 100.0f / view.renderScalePercent();
 	frame.goggles = view._nightVision;
 	frame.ghostScale = std::clamp(Options::fpsGhostOpacity, 10, 100) / (GhostNearOpacity * 100.0f);
 	frame.seeThroughCrops = Options::fpsSeeThroughCrops;
@@ -394,7 +395,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 			frame.orthoSpan = (float)view._isoBack;
 		}
 		frame.pixelSize = 1;
-		frame.rayScale = 1.0f;
+		// (setting "Render scale" at the display's resolution only: see where rayScale is set above)
 		frame.reflections = false;
 		frame.mirrorUnits = nullptr;
 	}
@@ -586,8 +587,31 @@ void FirstPersonView::noteDrawTime(double milliseconds)
 		return;
 	}
 	auto rays = [](int step) { return (double)RenderScaleSteps[step] * RenderScaleSteps[step]; };
-	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1)
+	// 3DIso: much of the card's part doesn't get shorter with fewer rays (its pictures read back at the display's size), and
+	// a step coarser that saves under a tenth of the time is taken back and not tried again for a while: the picture stays as
+	// fine as fewer rays are worth (else it went to the coarsest and stayed, no faster).
+	const bool iso = _iso || _isoTurned;
+	const double timeThen = _renderScaleTime; // (for the log)
+	if (iso && _renderScaleFloorHold > 0 && --_renderScaleFloorHold == 0) _renderScaleFloor = 99;
+	if (iso && _renderScaleBefore > 0.0)
 	{
+		const bool paid = _renderScaleTime < _renderScaleBefore * 0.9;
+		_renderScaleBefore = 0.0;
+		if (!paid)
+		{
+			--_renderScaleStep;
+			_renderScaleFloor = _renderScaleStep;
+			_renderScaleFloorHold = 1800;
+			_renderScaleWait = 20;
+			_renderScaleTime = 0.0;
+			static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
+			if (timed) { Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (3DIso: the step coarser saved too little)"; }
+			return;
+		}
+	}
+	if (_renderScaleTime > budget && _renderScaleStep < RenderScaleStepCount - 1 && (!iso || _renderScaleStep < _renderScaleFloor))
+	{
+		if (iso) _renderScaleBefore = _renderScaleTime;
 		++_renderScaleStep;
 		_renderScaleHold = 240;
 	}
@@ -605,7 +629,7 @@ void FirstPersonView::noteDrawTime(double milliseconds)
 	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
 	if (timed)
 	{
-		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms)";
+		Log(LOG_INFO) << "OpenXcom3D GPU: render scale " << RenderScaleSteps[_renderScaleStep] << "% (a frame may take " << budget << " ms, took " << timeThen << ")";
 	}
 }
 
@@ -659,7 +683,10 @@ bool FirstPersonView::gpuCastAllRays()
 	{
 		static std::set<int> warmed; // (the card is one for every view)
 		const bool shaftsOn = Options::fpsLightShafts && _wantsTrueColor;
-		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0);
+		// (3DIso's frames are another program and other pictures than the 3D view's: each kind drawn ahead for each, and in full
+		// colour or not, as Apple's driver finishes a program for the pictures it draws into)
+		const int settings = (frame.reflections ? 4 : 0) | frame.samples << 3 | (frame.pixelSize == 1 ? 64 : 0) | (output.keep ? 128 : 0)
+			| (isoFrame ? 256 : 0) | (output.trueColor ? 512 : 0);
 		const auto start = std::chrono::steady_clock::now();
 		int drawn = 0;
 		for (int kind = 0; kind < 4; ++kind)
@@ -682,6 +709,7 @@ bool FirstPersonView::gpuCastAllRays()
 				return false;
 			}
 			++drawn;
+			if (_primeProgress) _primeProgress(); // (the "PREPARING 3D" screen drawn again: see FirstPersonMode::primeView)
 		}
 		const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 		if (drawn && milliseconds >= 50.0)
@@ -689,10 +717,14 @@ bool FirstPersonView::gpuCastAllRays()
 			Log(LOG_INFO) << "OpenXcom3D GPU: " << drawn << " kinds of frame drawn ahead in " << (int)milliseconds << " ms";
 		}
 	}
+	// (3DIso: its "Render scale" on Auto goes by the card's part alone, the rays and their reading back: the rest of its frame
+	// is the CPU's and no fewer rays make it shorter; see FirstPersonView.cpp's ScaleTimer for the 3D view's)
+	const auto castBegan = std::chrono::steady_clock::now();
 	if (!gpu->castRays(frame, output, timed ? &timing : nullptr))
 	{
 		return false;
 	}
+	if (isoFrame || _isoTurned) noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - castBegan).count());
 	if (timed && getWidth() >= 320)
 	{
 		static double upload = 0.0, draw = 0.0, read = 0.0;

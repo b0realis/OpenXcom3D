@@ -2441,21 +2441,32 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	const bool isoFirst = Options::fpsIso && !isActive();
 	const int waitMs = !first ? 0 : isoFirst ? PrimeIsoCardWaitMs : PrimeCardWaitMs;
 	bool ready = false;
+	// How far the screen's bar is: the card's programs to CardShare (a driver building them all as they are made), then the
+	// units' bodies, the 3D view's first frame and 3DIso's: each frame drawn ahead of its kinds too, which is where Apple's
+	// driver finishes the programs (the owner: on his Mac the bar stood at 100% while the screen still waited).
+	constexpr int CardShare = 60, BodiesTo = 70, ViewTo = 85;
+	bool showing = false;
+	auto progressTo = [&](int percent) {
+		if (!showing) return;
+		showPreparing(std::clamp(percent, 0, 100));
+		SDL_PumpEvents();
+	};
+	struct NoPrimeProgress { ~NoPrimeProgress() { FirstPersonView::setPrimeProgress(nullptr); } } noPrimeProgress; // (on every way out)
 	if (first && someone && (FirstPersonView::gpuOpening() || (!preparedBefore && FirstPersonView::gpuReady(0))))
 	{
 		// The screen, with how far the card has got (the owner: "show progress on preparing 3D"), drawn again a few times a
 		// second while it gets ready; the window answers the desktop meanwhile (its events left for the game).
+		showing = true;
 		for (;;)
 		{
 			ready = FirstPersonView::gpuReady(0);
-			showPreparing(ready ? 100 : FirstPersonView::gpuProgress());
+			progressTo(ready ? CardShare : FirstPersonView::gpuProgress() * CardShare / 100);
 			if (ready || !FirstPersonView::gpuOpening()) break;
 			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= waitMs) break;
-			SDL_PumpEvents();
 			ready = FirstPersonView::gpuReady(100);
 			if (ready)
 			{
-				showPreparing(100);
+				progressTo(CardShare);
 				break;
 			}
 		}
@@ -2491,7 +2502,11 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 		}
 		makeVoxelBodies(VoxelBodiesMs); // (takes what the builder made last)
 	}
+	progressTo(BodiesTo);
 	const double bodiesWait = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - bodiesBegan).count();
+	// (each kind of frame drawn ahead moves the bar on, within the frame's part of it)
+	int stageFrom = BodiesTo, stageTo = isoFirst ? ViewTo : 100, kindsDrawn = 0;
+	FirstPersonView::setPrimeProgress([&]() { ++kindsDrawn; progressTo(std::min(stageTo - 1, stageFrom + kindsDrawn * 4)); });
 	// The view as the first click will have it: in full colour if 3D is laid into the display then (see think), from
 	// the middle of the soldier's tile at their eyes' height, the way they face (see updateCamera, aimHelmetCamera).
 	const auto frameBegan = std::chrono::steady_clock::now();
@@ -2517,6 +2532,10 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
 		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "
 		<< (int)cardWait << " ms, the units' bodies " << (int)bodiesWait << " ms)";
+	progressTo(stageTo);
+	stageFrom = stageTo;
+	stageTo = 100;
+	kindsDrawn = 0;
 	// 3DIso on (research): its first frame drawn on the card here too, unseen, as the battle's first shown frame will draw
 	// it: the map's frames sent to the card, its sun map made, its kind of frame drawn ahead; so 3DIso shows on the card from
 	// its first frame, the game never standing still for it.
@@ -2533,6 +2552,7 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 			Log(LOG_INFO) << "OpenXcom3D: 3DIso's first frame drawn ahead in "
 				<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - isoBegan).count() << " ms";
 		}
+		progressTo(100);
 	}
 #endif
 }
@@ -3527,6 +3547,8 @@ bool FirstPersonMode::blit()
 			if (begun)
 			{
 				const double every = std::chrono::duration<double, std::milli>(started - previous).count();
+				// (a frame over a tenth of a second on its own line: a freeze, with what the log says just before it)
+				if (every >= 100.0) { Log(LOG_INFO) << "OpenXcom3D: a slow frame, " << (int)every << " ms"; }
 				everySum += every;
 				worst = std::max(worst, every);
 				drawnSum += std::chrono::duration<double, std::milli>(now - started).count();

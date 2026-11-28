@@ -361,6 +361,8 @@ public:
 	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
 	/// How far the card has got with getting ready: 0 to 100 (100 ready), -1 nothing to tell (see FirstPersonGpu::openingProgress).
 	static int gpuProgress();
+	/// While the battle's first frames are drawn ahead ("PREPARING 3D"): called after each kind of frame drawn ahead for the card, to show it.
+	static void setPrimeProgress(std::function<void()> progress) { _primeProgress = std::move(progress); }
 	static bool gpuOpening();
 	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one,
@@ -809,6 +811,7 @@ public:
 	void draw() override;
 
 private:
+	static inline std::function<void()> _primeProgress; // (see setPrimeProgress)
 	// =====================================================================================
 	// The battle, the camera and the frame (FirstPersonView.cpp)
 	// =====================================================================================
@@ -1549,6 +1552,10 @@ private:
 	int _renderScaleStep = 0;
 	double _renderScaleTime = 0.0;
 	int _renderScaleWait = 90, _renderScaleHold = 0; // (the first frames on the card are slow ones: programs still being built)
+	// (3DIso: the time at the step before the last step coarser, to judge whether it paid; the coarsest step that does, and for
+	// how many more frames that holds; see noteDrawTime)
+	double _renderScaleBefore = 0.0;
+	int _renderScaleFloor = 99, _renderScaleFloorHold = 0;
 	bool _gpuCastRays = false;                         // this frame's rays were the card's
 	/// The share of the view's pixels, each way, the card casts rays for (setting "Render scale"), in percent.
 	int renderScalePercent() const;

@@ -757,7 +757,7 @@ void FirstPersonView::draw()
 	{
 		FirstPersonView *view;
 		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
-		~ScaleTimer() { view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
+		~ScaleTimer() { if (!view->_iso && !view->_isoTurned) view->noteDrawTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
 	} scaleTimer { this };
 	_gpuCastRays = false;
 	// The frame's shared work, then its one picture (VR's renderEyes draws two of them from the one shared part): all
