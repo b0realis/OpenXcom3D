@@ -3508,6 +3508,46 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 
 bool FirstPersonMode::blit()
 {
+	// (OXC3D_ISO3D_TIME, or OPENXCOM3D_GPU_TIMING: the whole frame in the log, averaged over 120 frames, for a slow game: how often
+	// a frame comes, its worst, the battlescape's drawing here and the screen's flip after it, at the display's size; the rest
+	// is the game's own work and its wait for the next frame)
+	struct FrameLog
+	{
+		bool on;
+		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
+		Game *game;
+		~FrameLog()
+		{
+			if (!on) return;
+			static double everySum = 0.0, worst = 0.0, drawnSum = 0.0, flipSum = 0.0;
+			static int frames = 0;
+			static std::chrono::steady_clock::time_point previous;
+			static bool begun = false;
+			const auto now = std::chrono::steady_clock::now();
+			if (begun)
+			{
+				const double every = std::chrono::duration<double, std::milli>(started - previous).count();
+				everySum += every;
+				worst = std::max(worst, every);
+				drawnSum += std::chrono::duration<double, std::milli>(now - started).count();
+				flipSum += FirstPerson::lastFlipTime();
+				if (++frames == 120)
+				{
+					const SDL_Surface *display = SDL_GetVideoSurface();
+					Log(LOG_INFO) << "OpenXcom3D: the frame every " << everySum / frames << " ms (" << (int)std::lround(1000.0 * frames / std::max(1.0, everySum))
+						<< " fps, worst " << worst << " ms): the battlescape drawn in " << drawnSum / frames << " ms, the flip " << flipSum / frames << " ms (display "
+						<< (display ? display->w : 0) << "x" << (display ? display->h : 0) << "x" << (display ? (int)display->format->BitsPerPixel : 0) << ", the game's screen "
+						<< game->getScreen()->getWidth() << "x" << game->getScreen()->getHeight() << ")";
+					everySum = worst = drawnSum = flipSum = 0.0;
+					frames = 0;
+				}
+			}
+			previous = started;
+			begun = true;
+		}
+	};
+	static const bool frameTime = (getenv("OXC3D_ISO3D_TIME") && *getenv("OXC3D_ISO3D_TIME")) || (getenv("OPENXCOM3D_GPU_TIMING") && *getenv("OPENXCOM3D_GPU_TIMING"));
+	FrameLog frameLog{ frameTime, std::chrono::steady_clock::now(), _game };
 	SDL_Surface *screen = _game->getScreen()->getSurface();
 	// The Live command feed: the whole screen is its (the 3D view in its window, see blitFeed).
 	if (feedShown())

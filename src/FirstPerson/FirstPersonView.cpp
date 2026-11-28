@@ -1498,6 +1498,10 @@ void FirstPersonView::drawIsoCursor()
 	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), cursorSize = std::max(1, _map->getCursorSize());
 	const int level = _map->getCamera()->getViewLevel(); // (the map's view level: with all levels shown, not the top)
 	const int animFrame = _map->getAnimFrame(), halfAnimFrame = (animFrame / 2) % 4, halfAnimFrameRest = animFrame % 2;
+	// (the cursor built in 3D blinks slower, the owner: "blinks too fast": a big box swapping yellow and red ten times a second
+	// reads as a flicker. Its steps at the original's slowest, the marks' 0.4 s: the box's colours and the crosshairs'
+	// frames. The original's own sprites keep the map's pace.)
+	const int slowStep = animFrame / 4, slowCrosshair = slowStep % 4, slowBoxRest = slowStep % 2;
 	// (a frame's own colour: the one most of its pixels have, for the box turned)
 	auto colourOf = [](const Surface *frame) {
 		static std::unordered_map<const Surface*, Uint8> known;
@@ -1545,7 +1549,7 @@ void FirstPersonView::drawIsoCursor()
 				// The original's cursor built in 3D: its box round the tile (aiming, only its floor), the lines as thick as the
 				// sprite's, in its colour shading down from the top as the sprite's edges do (the unit's yellow and red by turns);
 				// the crosshairs and the marks the original's own frames, standing up in the world from the tile's middle.
-				const Surface *colourFrame = frames->getFrame(z < level ? 2 : cursor == CT_AIM ? (unitSeen ? 7 + halfAnimFrame : 6) : back);
+				const Surface *colourFrame = frames->getFrame(z < level ? 2 : cursor == CT_AIM ? (unitSeen ? 7 + slowCrosshair : 6) : unitSeen ? slowBoxRest : 0);
 				if (!colourFrame) continue;
 				const Uint8 colour = colourOf(colourFrame), group = colour & 0xF0, shade = colour & 15;
 				auto shaded = [&](int step) { return (Uint8)(group | std::clamp((int)shade + step, 0, 15)); };
@@ -1593,7 +1597,7 @@ void FirstPersonView::drawIsoCursor()
 					}
 				}
 				const double middle[3] = { x0 + 8.0, y0 + 8.0, floor };
-				if (cursor == CT_AIM && z == level) drawIsoCursorFrame(frames->getFrame(unitSeen ? 7 + halfAnimFrame : 6), middle);
+				if (cursor == CT_AIM && z == level) drawIsoCursorFrame(frames->getFrame(unitSeen ? 7 + slowCrosshair : 6), middle);
 				if (mark >= 0) drawIsoCursorFrame(frames->getFrame(mark), middle);
 			}
 		}

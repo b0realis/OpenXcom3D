@@ -121,6 +121,9 @@ Uint32 presentKey(SDL_Surface *screen);
 void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 /// Screen::flip's hook: lays the view asked for into the display.
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
+/// Screen::flip's time, all of it (the magnifying, the view laid in, SDL's flip), for the frame's timing log (see FirstPersonMode::blit).
+void noteFlipTime(double milliseconds);
+double lastFlipTime();
 /// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
 bool wantsFullColorDisplay();
 /// 3DIso (research): its extra "true colour" asks for the display in full colour too.
@@ -490,6 +493,7 @@ bool tacticalMap(BattlescapeState *state);
 
 // Stock OXCE: the add-on is left out, and every hook does nothing.
 inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
+inline void noteFlipTime(double) { }
 inline bool wantsFullColorDisplay() { return false; }
 inline void setIsoFullColour(bool) { }
 inline bool keepsVideoMode() { return false; }

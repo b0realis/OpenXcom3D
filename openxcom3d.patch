@@ -24547,7 +24547,7 @@ index a08796ced..a4f02ab06 100644
 +OPT SDLKey keyBattleFirstPerson, keyBattleFirstPerson2, keyFpsMouseMode, keyFpsClassicHud, keyFpsForward, keyFpsBack, keyFpsStrafeLeft, keyFpsStrafeRight, keyFpsDoomMode, keyFpsLookLeft, keyFpsLookRight, keyFpsLookUp, keyFpsLookDown;
 +OPT SDLKey keyFpsNextFireMode, keyFpsModeSnap, keyFpsModeAimed, keyFpsModeAuto, keyFpsSwitchHand, keyFpsUp, keyFpsDown, keyFpsOpenDoor, keyFpsFlare, keyFpsFlight, keyFpsTurret, keyFpsJump, keyFpsEmergencyClimb, keyFpsNightVision, keyFpsAkimbo, keyFpsTurnLeft, keyFpsTurnRight, keyFpsHideHud, keyFpsLeanHold, keyFpsLeanLeftOwn, keyFpsLeanRightOwn, keyFpsZoom, keyFpsRange, keyFpsFlashlight, keyFpsNextMode, keyFpsSprint, keyFpsEnPassant, keyFpsShowFacing, keyFpsAkimboStyle, keyFpsGrabItem, keyFpsIsoToggle, keyFpsIsoArt, keyFpsIsoEffects, keyFpsIsoZoomIn, keyFpsIsoZoomOut, keyFpsIsoTurnLeft, keyFpsIsoTurnRight, keyFpsIsoTiltFlatter, keyFpsIsoTiltSteeper, keyFpsIsoReset, keyFpsIsoFree;
 diff --git a/src/Engine/Screen.cpp b/src/Engine/Screen.cpp
-index ae9083dcb..d3bd63e63 100644
+index ae9083dcb..0f0a15466 100644
 --- a/src/Engine/Screen.cpp
 +++ b/src/Engine/Screen.cpp
 @@ -17,6 +17,7 @@
@@ -24558,7 +24558,15 @@ index ae9083dcb..d3bd63e63 100644
  #include "../resource.h"
  #include <algorithm>
  #include <sstream>
-@@ -102,7 +103,8 @@ void Screen::makeVideoFlags()
+@@ -35,6 +36,7 @@
+ #include "Zoom.h"
+ #include "Timer.h"
+ #include <SDL.h>
++#include <chrono> // OpenXcom3D: the flip's time (see flip)
+ 
+ namespace OpenXcom
+ {
+@@ -102,7 +104,8 @@ void Screen::makeVideoFlags()
  		_flags |= SDL_NOFRAME;
  	}
  
@@ -24568,7 +24576,20 @@ index ae9083dcb..d3bd63e63 100644
  	_baseWidth = Options::baseXResolution;
  	_baseHeight = Options::baseYResolution;
  }
-@@ -201,7 +203,15 @@ void Screen::flip()
+@@ -190,6 +193,12 @@ void Screen::handle(Action *action)
+  */
+ void Screen::flip()
+ {
++	// OpenXcom3D: the flip's own time, for the frame's timing log (see FirstPerson::noteFlipTime).
++	struct FlipTimer
++	{
++		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
++		~FlipTimer() { FirstPerson::noteFlipTime(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()); }
++	} flipTimer;
+ 	// perform any requested palette update
+ 	if (_flickerFix && _pushPalette && _numColors && _screen->format->BitsPerPixel == 8)
+ 	{
+@@ -201,7 +210,15 @@ void Screen::flip()
  		_pushPalette = false;
  	}
  
@@ -24585,7 +24606,7 @@ index ae9083dcb..d3bd63e63 100644
  	{
  		Zoom::flipWithZoom(_surface.get(), _screen, _topBlackBand, _bottomBlackBand, _leftBlackBand, _rightBlackBand, &glOutput);
  	}
-@@ -223,12 +233,31 @@ void Screen::flip()
+@@ -223,12 +240,31 @@ void Screen::flip()
  
  
  
@@ -24617,7 +24638,7 @@ index ae9083dcb..d3bd63e63 100644
  /**
   * Clears all the contents out of the internal buffer.
   */
-@@ -328,6 +357,7 @@ void Screen::resetDisplay(bool resetVideo, bool noShaders)
+@@ -328,6 +364,7 @@ void Screen::resetDisplay(bool resetVideo, bool noShaders)
  
  	int width = Options::displayWidth;
  	int height = Options::displayHeight;
@@ -24625,7 +24646,7 @@ index ae9083dcb..d3bd63e63 100644
  	makeVideoFlags();
  
  	if (!_surface || (_surface->format->BitsPerPixel != _bpp ||
-@@ -350,6 +380,12 @@ void Screen::resetDisplay(bool resetVideo, bool noShaders)
+@@ -350,6 +387,12 @@ void Screen::resetDisplay(bool resetVideo, bool noShaders)
  	}
  	SDL_SetColorKey(_surface.get(), 0, 0); // turn off color key!
  
@@ -28238,10 +28259,10 @@ index 000000000..151f1ec88
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonApi.h b/src/FirstPerson/FirstPersonApi.h
 new file mode 100644
-index 000000000..2a6f8a1de
+index 000000000..5aae16555
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonApi.h
-@@ -0,0 +1,595 @@
+@@ -0,0 +1,599 @@
 +#pragma once
 +/*
 + * ==============================================================================================
@@ -28365,6 +28386,9 @@ index 000000000..2a6f8a1de
 +void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 +/// Screen::flip's hook: lays the view asked for into the display.
 +void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
++/// Screen::flip's time, all of it (the magnifying, the view laid in, SDL's flip), for the frame's timing log (see FirstPersonMode::blit).
++void noteFlipTime(double milliseconds);
++double lastFlipTime();
 +/// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
 +bool wantsFullColorDisplay();
 +/// 3DIso (research): its extra "true colour" asks for the display in full colour too.
@@ -28734,6 +28758,7 @@ index 000000000..2a6f8a1de
 +
 +// Stock OXCE: the add-on is left out, and every hook does nothing.
 +inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
++inline void noteFlipTime(double) { }
 +inline bool wantsFullColorDisplay() { return false; }
 +inline void setIsoFullColour(bool) { }
 +inline bool keepsVideoMode() { return false; }
@@ -41061,10 +41086,10 @@ index 000000000..1115e02a2
 +}
 diff --git a/src/FirstPerson/FirstPersonMode.cpp b/src/FirstPerson/FirstPersonMode.cpp
 new file mode 100644
-index 000000000..178f8c68f
+index 000000000..e65aa7bba
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonMode.cpp
-@@ -0,0 +1,5001 @@
+@@ -0,0 +1,5041 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -44575,6 +44600,46 @@ index 000000000..178f8c68f
 +
 +bool FirstPersonMode::blit()
 +{
++	// (OXC3D_ISO3D_TIME, or OPENXCOM3D_GPU_TIMING: the whole frame in the log, averaged over 120 frames, for a slow game: how often
++	// a frame comes, its worst, the battlescape's drawing here and the screen's flip after it, at the display's size; the rest
++	// is the game's own work and its wait for the next frame)
++	struct FrameLog
++	{
++		bool on;
++		std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
++		Game *game;
++		~FrameLog()
++		{
++			if (!on) return;
++			static double everySum = 0.0, worst = 0.0, drawnSum = 0.0, flipSum = 0.0;
++			static int frames = 0;
++			static std::chrono::steady_clock::time_point previous;
++			static bool begun = false;
++			const auto now = std::chrono::steady_clock::now();
++			if (begun)
++			{
++				const double every = std::chrono::duration<double, std::milli>(started - previous).count();
++				everySum += every;
++				worst = std::max(worst, every);
++				drawnSum += std::chrono::duration<double, std::milli>(now - started).count();
++				flipSum += FirstPerson::lastFlipTime();
++				if (++frames == 120)
++				{
++					const SDL_Surface *display = SDL_GetVideoSurface();
++					Log(LOG_INFO) << "OpenXcom3D: the frame every " << everySum / frames << " ms (" << (int)std::lround(1000.0 * frames / std::max(1.0, everySum))
++						<< " fps, worst " << worst << " ms): the battlescape drawn in " << drawnSum / frames << " ms, the flip " << flipSum / frames << " ms (display "
++						<< (display ? display->w : 0) << "x" << (display ? display->h : 0) << "x" << (display ? (int)display->format->BitsPerPixel : 0) << ", the game's screen "
++						<< game->getScreen()->getWidth() << "x" << game->getScreen()->getHeight() << ")";
++					everySum = worst = drawnSum = flipSum = 0.0;
++					frames = 0;
++				}
++			}
++			previous = started;
++			begun = true;
++		}
++	};
++	static const bool frameTime = (getenv("OXC3D_ISO3D_TIME") && *getenv("OXC3D_ISO3D_TIME")) || (getenv("OPENXCOM3D_GPU_TIMING") && *getenv("OPENXCOM3D_GPU_TIMING"));
++	FrameLog frameLog{ frameTime, std::chrono::steady_clock::now(), _game };
 +	SDL_Surface *screen = _game->getScreen()->getSurface();
 +	// The Live command feed: the whole screen is its (the 3D view in its window, see blitFeed).
 +	if (feedShown())
@@ -68087,10 +68152,10 @@ index 000000000..175dfc986
 +// Thanks mom and dad! You were the ones who exposed me to my first comp.
 diff --git a/src/FirstPerson/FirstPersonPresent.cpp b/src/FirstPerson/FirstPersonPresent.cpp
 new file mode 100644
-index 000000000..4e1129ef0
+index 000000000..85c372351
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonPresent.cpp
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,355 @@
 +/*
 + * Copyright 2010-2026 OpenXcom Developers.
 + *
@@ -68274,6 +68339,21 @@ index 000000000..4e1129ef0
 + * palette on a 32-bit display. Nothing if no view asked, or if it isn't the picture area's size
 + * (the display just changed: the next frame's view will be).
 + */
++namespace
++{
++double flipTime = 0.0;
++}
++
++void noteFlipTime(double milliseconds)
++{
++	flipTime = milliseconds;
++}
++
++double lastFlipTime()
++{
++	return flipTime;
++}
++
 +void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
 +{
 +	const Surface *view = viewToPresent;
@@ -71317,10 +71397,10 @@ index 000000000..d43f8ffe8
 +}
 diff --git a/src/FirstPerson/FirstPersonView.cpp b/src/FirstPerson/FirstPersonView.cpp
 new file mode 100644
-index 000000000..39c009135
+index 000000000..e8aa2e90b
 --- /dev/null
 +++ b/src/FirstPerson/FirstPersonView.cpp
-@@ -0,0 +1,1646 @@
+@@ -0,0 +1,1650 @@
 +/*
 + * ==============================================================================================
 + *  OpenXcom3D: a first-person 3D battlescape for OpenXcom Extended
@@ -72821,6 +72901,10 @@ index 000000000..39c009135
 +	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), cursorSize = std::max(1, _map->getCursorSize());
 +	const int level = _map->getCamera()->getViewLevel(); // (the map's view level: with all levels shown, not the top)
 +	const int animFrame = _map->getAnimFrame(), halfAnimFrame = (animFrame / 2) % 4, halfAnimFrameRest = animFrame % 2;
++	// (the cursor built in 3D blinks slower, the owner: "blinks too fast": a big box swapping yellow and red ten times a second
++	// reads as a flicker. Its steps at the original's slowest, the marks' 0.4 s: the box's colours and the crosshairs'
++	// frames. The original's own sprites keep the map's pace.)
++	const int slowStep = animFrame / 4, slowCrosshair = slowStep % 4, slowBoxRest = slowStep % 2;
 +	// (a frame's own colour: the one most of its pixels have, for the box turned)
 +	auto colourOf = [](const Surface *frame) {
 +		static std::unordered_map<const Surface*, Uint8> known;
@@ -72868,7 +72952,7 @@ index 000000000..39c009135
 +				// The original's cursor built in 3D: its box round the tile (aiming, only its floor), the lines as thick as the
 +				// sprite's, in its colour shading down from the top as the sprite's edges do (the unit's yellow and red by turns);
 +				// the crosshairs and the marks the original's own frames, standing up in the world from the tile's middle.
-+				const Surface *colourFrame = frames->getFrame(z < level ? 2 : cursor == CT_AIM ? (unitSeen ? 7 + halfAnimFrame : 6) : back);
++				const Surface *colourFrame = frames->getFrame(z < level ? 2 : cursor == CT_AIM ? (unitSeen ? 7 + slowCrosshair : 6) : unitSeen ? slowBoxRest : 0);
 +				if (!colourFrame) continue;
 +				const Uint8 colour = colourOf(colourFrame), group = colour & 0xF0, shade = colour & 15;
 +				auto shaded = [&](int step) { return (Uint8)(group | std::clamp((int)shade + step, 0, 15)); };
@@ -72916,7 +73000,7 @@ index 000000000..39c009135
 +					}
 +				}
 +				const double middle[3] = { x0 + 8.0, y0 + 8.0, floor };
-+				if (cursor == CT_AIM && z == level) drawIsoCursorFrame(frames->getFrame(unitSeen ? 7 + halfAnimFrame : 6), middle);
++				if (cursor == CT_AIM && z == level) drawIsoCursorFrame(frames->getFrame(unitSeen ? 7 + slowCrosshair : 6), middle);
 +				if (mark >= 0) drawIsoCursorFrame(frames->getFrame(mark), middle);
 +			}
 +		}

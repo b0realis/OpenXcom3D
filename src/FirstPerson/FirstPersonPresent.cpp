@@ -181,6 +181,21 @@ void presentView(const Surface *view, const Uint32 *fullColors)
  * palette on a 32-bit display. Nothing if no view asked, or if it isn't the picture area's size
  * (the display just changed: the next frame's view will be).
  */
+namespace
+{
+double flipTime = 0.0;
+}
+
+void noteFlipTime(double milliseconds)
+{
+	flipTime = milliseconds;
+}
+
+double lastFlipTime()
+{
+	return flipTime;
+}
+
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height)
 {
 	const Surface *view = viewToPresent;
