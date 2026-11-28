@@ -1582,22 +1582,62 @@ void FirstPersonView::drawIsoCursor()
 					drawLine3D(from, to, lineColour, thickness, 1.0f, 0.0f, 0, 1 << 30, false, false);
 				};
 				for (int edge = 0; edge < 4; ++edge) line(corners[edge], corners[(edge + 1) % 4], shaded(1)); // (the floor)
-				if (cursor != CT_AIM)
+				for (int edge = 0; edge < 4; ++edge) line(corners[4 + edge], corners[4 + (edge + 1) % 4], shaded(-1)); // (the top)
+				for (int edge = 0; edge < 4; ++edge)
 				{
-					for (int edge = 0; edge < 4; ++edge) line(corners[4 + edge], corners[4 + (edge + 1) % 4], shaded(-1)); // (the top)
-					for (int edge = 0; edge < 4; ++edge)
+					// (the uprights, darker down: in four steps)
+					for (int step = 0; step < 4; ++step)
 					{
-						// (the uprights, darker down: in four steps)
-						for (int step = 0; step < 4; ++step)
-						{
-							const float from[3] = { corners[4 + edge][0], corners[4 + edge][1], z1 + (z0 - z1) * step / 4.0f };
-							const float to[3] = { corners[4 + edge][0], corners[4 + edge][1], z1 + (z0 - z1) * (step + 1) / 4.0f };
-							line(from, to, shaded(step - 1));
-						}
+						const float from[3] = { corners[4 + edge][0], corners[4 + edge][1], z1 + (z0 - z1) * step / 4.0f };
+						const float to[3] = { corners[4 + edge][0], corners[4 + edge][1], z1 + (z0 - z1) * (step + 1) / 4.0f };
+						line(from, to, shaded(step - 1));
+					}
+				}
+				if (cursor == CT_AIM)
+				{
+					// Aiming: a target inside the box (the owner: "draw a target inside from bolder lines that adapts more
+					// beautifully to 3D"; the original's crosshairs as a picture standing up looked strange turned): the
+					// original's crosshairs' shape, a ring and four spokes pointing in, thick outside and thinner in, in bolder
+					// lines than the box's, in the box's middle, always facing the camera however it is turned and tilted (in
+					// the plane of its right and up), over everything as the original's are. On a unit seen, yellow, the spokes
+					// going in and out by the cursor's steps (as the original's frames do); else red and still.
+					const float centre[3] = { x0 + 7.0f, y0 + 7.0f, (z0 + z1) * 0.5f };
+					float across[3], upward[3]; // (the camera's right and up as world steps: z is ZScale times taller in its frame)
+					for (int axis = 0; axis < 3; ++axis)
+					{
+						across[axis] = (float)(_right[axis] / (axis == 2 ? ZScale : 1.0));
+						upward[axis] = (float)(_up[axis] / (axis == 2 ? ZScale : 1.0));
+					}
+					auto at = [&](float rightward, float up, float *point) {
+						for (int axis = 0; axis < 3; ++axis) point[axis] = centre[axis] + across[axis] * rightward + upward[axis] * up;
+					};
+					const int bold = thickness + 1;
+					const Uint8 ringColour = shaded(-1), spokeColour = shaded(-2);
+					constexpr int RingSegments = 40;
+					constexpr float RingRadius = 6.0f, SpokeOut = 8.0f;
+					static const float spokeIn[4] = { 1.5f, 2.6f, 3.7f, 2.6f };
+					const float inner = unitSeen ? spokeIn[slowCrosshair] : 2.6f;
+					for (int segment = 0; segment < RingSegments; ++segment)
+					{
+						const float a = segment * 2.0f * (float)Pi / RingSegments, b = (segment + 1) * 2.0f * (float)Pi / RingSegments;
+						float from[3], to[3];
+						at(RingRadius * std::cos(a), RingRadius * std::sin(a), from);
+						at(RingRadius * std::cos(b), RingRadius * std::sin(b), to);
+						drawLine3D(from, to, ringColour, bold, 1.0f, 0.0f, 0, 1 << 30, false, true);
+					}
+					for (int spoke = 0; spoke < 4; ++spoke)
+					{
+						const float alongX = spoke == 0 ? 1.0f : spoke == 2 ? -1.0f : 0.0f, alongY = spoke == 1 ? 1.0f : spoke == 3 ? -1.0f : 0.0f;
+						const float halfway = (SpokeOut + inner) * 0.5f;
+						float out[3], mid[3], in[3];
+						at(alongX * SpokeOut, alongY * SpokeOut, out);
+						at(alongX * halfway, alongY * halfway, mid);
+						at(alongX * inner, alongY * inner, in);
+						drawLine3D(out, mid, spokeColour, bold + 1, 1.0f, 0.0f, 0, 1 << 30, false, true);
+						drawLine3D(mid, in, spokeColour, bold, 1.0f, 0.0f, 0, 1 << 30, false, true);
 					}
 				}
 				const double middle[3] = { x0 + 8.0, y0 + 8.0, floor };
-				if (cursor == CT_AIM && z == level) drawIsoCursorFrame(frames->getFrame(unitSeen ? 7 + slowCrosshair : 6), middle);
 				if (mark >= 0) drawIsoCursorFrame(frames->getFrame(mark), middle);
 			}
 		}
