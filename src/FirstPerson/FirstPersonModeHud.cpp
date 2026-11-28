@@ -2210,7 +2210,8 @@ void FirstPersonMode::layoutTopBar()
 	TextButton *suitButtons[5] = { _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret };
 	// Previous's leftmost place: after INV, wherever INV stands (in HUD's place on the map, see
 	// updateTopBar).
-	const int squadX = SquadX - (InventoryButtonX - _btnInventory->getX());
+	const int squadX = SquadX - (InventoryButtonX - (_isoArtButtonShown ? InventoryButtonX : _btnInventory->getX())) // (3DIso's ART stands in INV's 3D place)
+		+ (_isoFreeButtonShown ? ToolButtonW + 1 : 0); // (and FREE after it)
 	const int squadLeft = squadX + PrevNextW + 1;
 	int freeRight = 0;
 	for (int pass = 0; pass < 2; ++pass)
@@ -2436,9 +2437,30 @@ void FirstPersonMode::updateTopBar(BattleUnit *selected)
 	// and the view button names the view a click switches to.
 	const bool active = isActive();
 	const int inventoryX = active ? InventoryButtonX : HudButtonX;
-	if (_btnInventory->getX() != inventoryX)
+	// (3DIso research: ART after INV on the map while 3DIso shows, see updateIsoView)
+	const bool artShown = !active && iso3DOn() && _isoView->getVisible();
+	_btnIsoArt->setVisible(artShown);
+	// (and FREE after it, where the free camera can be had: with the extra "turn")
+	const bool freeShown = artShown && _isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraTurn);
+	_btnIsoFree->setVisible(freeShown);
+	updateIsoFreeMarks(); // (3DIso research: the free camera's marks)
+	TextButton *artGroup = _isoArt3D == 0 ? _btnIsoArt : nullptr;
+	if (artGroup != _isoArtButtonGroup)
+	{
+		_isoArtButtonGroup = artGroup;
+		_btnIsoArt->invalidate();
+	}
+	TextButton *freeGroup = _isoFree ? _btnIsoFree : nullptr;
+	if (freeGroup != _isoFreeButtonGroup)
+	{
+		_isoFreeButtonGroup = freeGroup;
+		_btnIsoFree->invalidate();
+	}
+	if (_btnInventory->getX() != inventoryX || artShown != _isoArtButtonShown || freeShown != _isoFreeButtonShown)
 	{
 		_btnInventory->setX(inventoryX);
+		_isoArtButtonShown = artShown;
+		_isoFreeButtonShown = freeShown;
 		layoutTopBar();
 	}
 	TextButton *hudGroup = _classicHud ? _btnHud : nullptr;
@@ -2473,7 +2495,7 @@ TextButton *FirstPersonMode::buttonAt(double x, double y) const
 			&& y >= button->getY() && y < button->getY() + button->getHeight();
 	};
 	// The fixed buttons first, then the squad buttons.
-	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
+	for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnIsoArt, _btnIsoFree, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 	{
 		if (inside(button)) return button;
 	}
@@ -2502,6 +2524,14 @@ void FirstPersonMode::buttonClicked(TextButton *button, Action *action)
 	else if (button == _btnHud)
 	{
 		setClassicHud(!_classicHud);
+	}
+	else if (button == _btnIsoArt)
+	{
+		toggleIsoArt(); // (3DIso research: our 3D art or the original art)
+	}
+	else if (button == _btnIsoFree)
+	{
+		setIsoFree(!_isoFree); // (3DIso research: the free camera)
 	}
 	else if (button == _btnInventory)
 	{
@@ -2690,6 +2720,7 @@ void FirstPersonMode::updateEnemyMarkers()
 		}
 	}
 	_view->setMarkers(markers);
+	if (_isoView) _isoView->setMarkers(markers); // (3DIso's extra, research)
 }
 
 /**

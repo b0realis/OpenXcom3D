@@ -4787,6 +4787,7 @@ void FirstPersonView::snapshotTiles()
 	// Then keep only the nearest lamps, and put the swinging doors into the snapshot (their
 	// tiles are marked in the flags too).
 	keepNearestLights();
+	updateDoorSwings(tileCount);
 }
 
 /**
@@ -4882,7 +4883,7 @@ bool FirstPersonView::noticeTileChanges(int index, Tile *tile)
 		if (partNow && partNow != destroyedVersion) continue;
 		// dx, dy: from the camera to the middle of the tile, in voxels.
 		const Position tilePos = tile->getPosition();
-		const double dx = tilePos.x * 16.0 + 8.0 - _eye[0], dy = tilePos.y * 16.0 + 8.0 - _eye[1];
+		const double dx = tilePos.x * 16.0 + 8.0 - (_iso ? _isoMiddle[0] : _eye[0]), dy = tilePos.y * 16.0 + 8.0 - (_iso ? _isoMiddle[1] : _eye[1]); // (3DIso: from the view's middle, its eye is far)
 		if (dx * dx + dy * dy < 480.0 * 480.0) spawnDebris(tilePos, part, partBefore);
 		// A pane of glass among it (on the game's own voxels, see paneOfGlass; or filled into its
 		// openings, still whole): its shards fly too, and it's heard (the owner: "same shards and
@@ -5059,7 +5060,7 @@ void FirstPersonView::snapshotTile(int index, Tile *tile, bool trackWalls)
 		// next, to dissolve into over the step (not for UFO doors, nor for a steady UFO model): the
 		// memo's, unless the frame, the cut-out or the steady model changed. A UFO part shows its
 		// steady model instead with the UFO lights option: no frames, only its lights glow.
-		const VoxelModel *steady = _ufoLightsOn ? frames.steady : nullptr;
+		const VoxelModel *steady = _ufoLightsOn || frames.steadyAlways ? frames.steady : nullptr;
 		if (memo.frame != frame || memo.cutout != cutout || memo.steady != steady)
 		{
 			memo.frame = frame;
@@ -5181,6 +5182,9 @@ void FirstPersonView::snapshotTileLight(int index, Tile *tile)
 	// A UFO's light (the UFO lights option), once that UFO has been seen (see findUfos).
 	tileView.ufoGlow = _ufoLightsOn && _ufoOfTile[index] && _ufos[_ufoOfTile[index] - 1].seen ? _ufoGlowOfTile[index] : 0;
 	tileView.discovered = debug || tile->isDiscovered(O_FLOOR);
+	tileView.seenDoors = 0;
+	for (const TilePart wall : { O_WESTWALL, O_NORTHWALL })
+		if ((debug || tile->isDiscovered(wall)) && (tile->isDoor(wall) || tile->isUfoDoor(wall))) tileView.seenDoors |= (Uint8)(1 << wall);
 	tileView.seen = (Uint8)((tileView.discovered ? (1 << O_FLOOR) | (1 << O_OBJECT) : 0)
 		| (debug || tile->isDiscovered(O_WESTWALL) ? 1 << O_WESTWALL : 0)
 		| (debug || tile->isDiscovered(O_NORTHWALL) ? 1 << O_NORTHWALL : 0));

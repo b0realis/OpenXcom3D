@@ -80,7 +80,8 @@ const double UpscaleFrom = 1.6;
 const int FinestUpscaleFactor = 6;
 /// How many upscaled frames are kept (the least recently used goes; a unit's 64x64 frame is 64 KB
 /// at 4x, 147 KB at 6x: about 26 or 59 MB when full).
-const size_t UpscaleCacheFrames = 400;
+const size_t UpscaleCacheFrames = 400;     // the smoothed frames a view keeps (see upscaledSprite)
+const size_t IsoUpscaleCacheFrames = 1200; // ...3DIso's, its terrain's frames too: a map's worth (see prepareIsoSmoothArt)
 /// The softened shading inside a ramp: a neighbour more than this many shades from a pixel's own
 /// (an outline, a highlight) never mixes in; each colour moves this much of the way (all of it) to
 /// the neighbours' Gaussian average.
@@ -676,7 +677,6 @@ const float Bayer[4][4] = {
  * screen is drawn on the pixels where dither(x, y) < f.
  */
 inline float dither(int x, int y) { return Bayer[y & 3][x & 3]; }
-
 /**
  * Darkens a palette colour within its 16-colour group, like the game's StandardShade (each
  * group runs from bright to dark): anything that would spill into the next group becomes black.

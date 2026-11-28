@@ -87,6 +87,7 @@ const int CompassCostDearPercent = 160;
 /// head's limit (HeadTurn), where looking further turns the soldier.
 const double CompassWarnDegrees = 10.0;
 const int ViewButtonX = 1, HudButtonX = 24, InventoryButtonX = 47, ToolButtonW = 22;
+const int IsoFreeMarkSize = 17, IsoFreeMarksWidth = IsoFreeMarkSize * 3 + 4; // 3DIso research: the free camera's three marks under the top bar (see FirstPersonMode::updateIsoFreeMarks)
 /// Where the squad buttons start, and the widths of the END and the previous / next buttons.
 const int SquadX = 72;
 const int EndTurnW = 30;
@@ -471,6 +472,7 @@ const double VoxelBodiesMs = 2.0;
 /// waited for this long at most while it is still being opened (the driver building the shaders: under a second
 /// where it kept them from last time), and the units' bodies this long at most.
 const int PrimeCardWaitMs = 8000;
+const int PrimeIsoCardWaitMs = 45000; // (3DIso on, research: its program is built with the rest, a big one: see FirstPersonGpu::prebuild)
 const double PrimeBodiesMs = 1000.0;
 /// The ammo tag's colour by damage type (see FirstPersonMode::ammoTag; GitHub issue #51): none, armor piercing (grey-white),
 /// incendiary (red), high explosive (orange), laser (pink), plasma (green), stun (light blue), melee (grey), acid

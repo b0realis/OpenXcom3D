@@ -96,10 +96,13 @@ FirstPersonGpu *sharedGpu(bool open, bool *opened = nullptr)
 		shared.tried = true;
 		shared.opening = std::thread([&shared] {
 			const char *device = getenv("OPENXCOM3D_GPU_DEVICE");
-			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
 			// (The programs for "Coloured lights", "Reflections", "Light shafts" and "Surface relief", if those are on, before the card is called ready.)
-			if (shared.gpu) shared.gpu->prebuild((Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
-				| (Options::fpsSupersampling > 0 ? 4 : 0) | (Options::fpsSurfaceRelief > 0 ? 16 : 0) | (Options::fpsMetallic > 0 ? 128 : 0));
+			const int extras = (Options::fpsTrueColor && Options::fpsColoredLights ? 1 : 0) | (Options::fpsTrueColor && Options::fpsReflections ? 2 : 0) | (Options::fpsTrueColor && Options::fpsLightShafts ? 8 : 0)
+				| (Options::fpsSupersampling > 0 ? 4 : 0) | (Options::fpsSurfaceRelief > 0 ? 16 : 0) | (Options::fpsMetallic > 0 ? 128 : 0)
+				| (Options::fpsIso ? 256 : 0); // (3DIso's too, research)
+			FirstPersonGpu::beginProgress(extras); // (for "PREPARING 3D...": see FirstPersonView::gpuProgress)
+			shared.gpu = device ? FirstPersonGpu::open(atoi(device)) : FirstPersonGpu::openAny();
+			if (shared.gpu) shared.gpu->prebuild(extras);
 			shared.ready = shared.gpu.get();
 			shared.opened = true;
 		});
@@ -187,6 +190,8 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.size[1] = view._save->getMapSizeY();
 	frame.size[2] = view._save->getMapSizeZ();
 	frame.maxDistance = view._maxDistance;
+	frame.clipTop = view._flight ? view._isoTop : 0.0f; // (3DIso's flight: see FirstPersonView::setFlightCamera)
+	frame.isoTurned = view._isoTurned ? 1 : 0; // (3DIso turned: see FirstPersonView::setIsoTurn)
 	for (int axis = 0; axis < 3; ++axis)
 	{
 		frame.eye[axis] = (float)view._eye[axis];
@@ -244,102 +249,24 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	frame.relief = Options::fpsSurfaceRelief >= 2 ? ReliefStrong : Options::fpsSurfaceRelief == 1 ? ReliefSubtle : 0.0f;
 	frame.metal = view._ufos.empty() || Options::fpsMetallic <= 0 ? 0 : 2; // (only where there is a UFO; an older profile's Sheen, 1, is on too)
 	frame.palette = view.getPalette();
-	frame.smoothLight = Options::fpsSmoothLight && view._wantsTrueColor;
+	frame.smoothLight = (Options::fpsSmoothLight || ((view._iso || view._isoTurned) && (view._isoExtras & FirstPersonView::IsoExtraSmoothLight))) && view._wantsTrueColor;
 	frame.reflections = Options::fpsReflections && view._wantsTrueColor && (view._waterColors[0] != 0 || view._anyGlass || frame.metal >= 2); // (only where there is a sea, window glass or still water, or a UFO's metal to mirror: "Reflections" is every mirror's switch)
 	frame.liquidScreens = Options::fpsLiquidScreens;
 	// The coloured lights (setting "Coloured lights", in full colour): the shots in flight (but plain bullets and arrows), a thrown thing that burns, the
 	// explosions, the muzzle flash, and the nearest fires; sixteen at most, in that order.
 	frame.colorLightCount = 0;
-	frame.colorLightsOn = Options::fpsColoredLights && view._wantsTrueColor;
-	if (Options::fpsColoredLights && view._wantsTrueColor && view._map)
+	const bool isoLights = (view._iso || view._isoTurned) && (view._isoExtras & FirstPersonView::IsoExtraColouredLight); // (3DIso's extra "coloured light")
+	const bool isoFrame = view._iso || view._isoTurned;
+	frame.colorLightsOn = (isoFrame ? isoLights : Options::fpsColoredLights) && view._wantsTrueColor; // (3DIso: its own switch, see IsoExtraColouredLight)
+	// (3DIso on the map's slant: its own coloured light, in the palette's picture too, as renderRows adds it; not under the map's
+	// night vision)
+	const bool isoColour = view._iso && isoLights && view._map && !view._map->getNightVisionColor();
+	if ((frame.colorLightsOn || isoColour) && view._map)
 	{
-		const SDL_Color *palette = view.getPalette();
-		auto add = [&](float x, float y, float z, float reach, float red, float green, float blue, float strength)
-		{
-			if (frame.colorLightCount >= 16 || strength <= 0.0f) return;
-			const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
-			std::copy(light, light + 8, frame.colorLights[frame.colorLightCount++]);
-		};
-		// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
-		// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
-		// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
-		auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
-		{
-			if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
-			float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
-			if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
-			{
-				const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
-				red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
-			}
-			add(head[0], head[1], head[2], 72.0f + 12.0f * std::min(3.0f, calibre), red, green, blue, 0.9f);
-		};
-		// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
-		static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
-		if (testLight) add((float)(view._eye[0] + view._forward[0] * 48.0), (float)(view._eye[1] + view._forward[1] * 48.0), (float)view._eye[2], 120.0f, 255, 130, 45, 1.0f);
-		// A thrown thing that burns (a grenade whose damage is fire: a mod's Molotov cocktail, an incendiary grenade)
-		// lights as a round of fire does on its way (the owner, after the rockets: "Molotov yes", and all that
-		// burns in flight; a burning arrow is a round of fire already).
-		auto burning = [](const BattleItem *item) { return FirstPersonView::burnsInFlight(item); };
-		if (burning(view._freeGrenade))
-		{
-			const float seconds = std::min(0.05f, (SDL_GetTicks() - view._freeGrenadeTick) / 1000.0f);
-			add(view._freeGrenadePos[0] + view._freeGrenadeVelocity[0] * seconds, view._freeGrenadePos[1] + view._freeGrenadeVelocity[1] * seconds,
-				view._freeGrenadePos[2] + view._freeGrenadeVelocity[2] * seconds, 84.0f, 255, 150, 60, 0.9f);
-		}
-		if (Projectile *projectile = view.flyingProjectile())
-		{
-			if (burning(projectile->getItem()))
-			{
-				const Position at = projectile->getPosition(0);
-				add((float)at.x, (float)at.y, (float)at.z, 84.0f, 255, 150, 60, 0.9f);
-			}
-			else if (!projectile->getItem())
-			{
-				float head[3];
-				view.shotHead(projectile, head);
-				addShot(head, view._shotTrail, view._shotTrailColor, view._shotCalibre);
-			}
-		}
-		if (view._map->getPartnerProjectile()) addShot(view._partnerHead, view._partnerTrail, view._partnerColor, view._partnerCalibre);
-		for (const Explosion *explosion : *view._map->getExplosions())
-		{
-			const int step = explosion->getCurrentFrame();
-			if (step < 0) continue;
-			const Position at = explosion->getPosition();
-			const float fading = std::max(0.15f, 1.0f - step / 8.0f);
-			if (explosion->isBig()) add((float)at.x, (float)at.y, (float)at.z + 6.0f, 176.0f, 255, 170, 70, 1.6f * fading);
-			else add((float)at.x, (float)at.y, (float)at.z, 44.0f, 255, 215, 150, 0.6f * fading);
-		}
-		if (view._muzzleFlashLight > 0.0f) add(view._muzzleFlashPos[0], view._muzzleFlashPos[1], view._muzzleFlashPos[2], 96.0f, 255, 220, 150, 0.5f * view._muzzleFlashLight);
-		// The fires nearest the eye, each flickering by its own clock.
-		struct Fire { float distance; int tile; };
-		Fire nearest[8];
-		int fires = 0;
-		const int tileCount = view._save->getMapSizeXYZ();
-		for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
-		{
-			Tile *tile = view._save->getTile(tileIndex);
-			if (!tile->getFire() || !view._tileViews[tileIndex].discovered) continue;
-			const Position place = tile->getPosition();
-			const float dx = place.x * 16.0f + 8.0f - (float)view._eye[0], dy = place.y * 16.0f + 8.0f - (float)view._eye[1], dz = place.z * 24.0f + 8.0f - (float)view._eye[2];
-			const Fire fire = { dx * dx + dy * dy + dz * dz, tileIndex };
-			int slot;
-			if (fires < 8) slot = fires++;
-			else if (fire.distance < nearest[7].distance) slot = 7;
-			else continue;
-			while (slot > 0 && nearest[slot - 1].distance > fire.distance) { nearest[slot] = nearest[slot - 1]; --slot; }
-			nearest[slot] = fire;
-		}
-		const float seconds = SDL_GetTicks() / 1000.0f;
-		for (int fire = 0; fire < fires; ++fire)
-		{
-			Tile *tile = view._save->getTile(nearest[fire].tile);
-			const Position place = tile->getPosition();
-			const float flicker = 0.5f + 0.12f * std::sin(seconds * 9.0f + tile->getAnimationOffset() * 1.7f) + 0.06f * std::sin(seconds * 23.0f + nearest[fire].tile);
-			add(place.x * 16.0f + 8.0f, place.y * 16.0f + 8.0f, place.z * 24.0f - tile->getTerrainLevel() + 8.0f, 60.0f, 255, 135, 45, flicker);
-		}
+		const double isoFrom[3] = { view._isoMiddle[0], view._isoMiddle[1], view._isoViewLevel * 24.0 };
+		view.gatherColouredLights(frame.colorLights, frame.colorLightCount, 16, isoLights ? isoFrom : view._eye);
 	}
+	frame.isoColourLights = isoColour ? frame.colorLightCount : 0;
 	frame.lampCount = (int)std::min<size_t>(16, view._nearbyLights.size());
 	for (int lamp = 0; lamp < 16; ++lamp)
 	{
@@ -384,6 +311,7 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	std::copy(&view._ufoPulse[0][0], &view._ufoPulse[0][0] + 32, frame.ufoPulse);
 	frame.ufoBreath = view._ufoBreath;
 	std::copy(view._ufoFaceShade, view._ufoFaceShade + 64, frame.ufoFaceShade);
+	std::copy(view._ufoRoofedFaceShade, view._ufoRoofedFaceShade + 64, frame.ufoRoofedFaceShade);
 	frame.ufoCount = (int)view._ufos.size(); // (more than eight: the CPU draws, see FirstPersonGpu's limits)
 	for (int ufo = 0; ufo < std::min(frame.ufoCount, 8); ++ufo)
 	{
@@ -431,6 +359,116 @@ void FirstPersonViewGpuAccess::fillFrame(const FirstPersonView &view, FirstPerso
 	if (frame.reflections && frame.palette && !view._eyePass) view.mirrorUnits(mirrorUnits);
 	frame.mirrorUnits = mirrorUnits.size() > 1 && mirrorUnits[0] > 0 ? mirrorUnits.data() : nullptr;
 	frame.mirrorUnitNumbers = (int)mirrorUnits.size();
+	// 3DIso (research), turned or not: its own camera on the card: parallel rays (see uOrtho) clipped as renderRows clips them,
+	// the map's rules (black past it and where the squad hasn't been), a ray a pixel; no mirrors (their own goes are cast
+	// from the eye).
+	// 3DIso's flight (research): its far eye's rays cast from a plane near the map (see uOrtho 2), its ceiling fading in.
+	if (view._flight && !view._isoTurned)
+	{
+		frame.cutFade = view._flightCeiling;
+		frame.unknownDark = view._flightUnknownDark;
+		frame.distanceShare = view._flightDistanceShare;
+		const double middle[3] = { view._save->getMapSizeX() * 8.0, view._save->getMapSizeY() * 8.0, view._save->getMapSizeZ() * 12.0 };
+		double ahead = 0.0;
+		for (int axis = 0; axis < 3; ++axis) ahead += (middle[axis] - view._eye[axis]) * (axis == 2 ? ZScale : 1.0) * view._forward[axis];
+		if (ahead > 4096.0)
+		{
+			frame.ortho = 2;
+			frame.orthoSpan = (float)ahead;
+			for (int axis = 0; axis < 3; ++axis) frame.orthoCentre[axis] = (float)(view._eye[axis] + view._forward[axis] * ahead / (axis == 2 ? ZScale : 1.0));
+		}
+	}
+	if (view._iso || view._isoTurned)
+	{
+		frame.clipTop = view._isoTop;
+		frame.clipSoftness = view._isoCutSoftness;
+		frame.clipBottom = view._isoLowLevel * 24.0f;
+		frame.isoTurned = view._iso ? 2 : 1; // (2: on the map's slant, ghosts solid as on the map)
+		frame.ortho = 1;
+		for (int axis = 0; axis < 3; ++axis) frame.orthoCentre[axis] = (float)view._isoCentre[axis];
+		frame.orthoSpan = (float)view._isoBack; // (the eye's distance its field of view was made for: see setIsoCamera)
+		// (tilted flat, its slight perspective: the eye's rays from the plane through the view's middle, as the flight's)
+		if (view._isoTurned && view._isoBack < FirstPersonView::IsoFarBack * 0.5)
+		{
+			frame.ortho = 2;
+			frame.orthoSpan = (float)view._isoBack;
+		}
+		frame.pixelSize = 1;
+		frame.rayScale = 1.0f;
+		frame.reflections = false;
+		frame.mirrorUnits = nullptr;
+	}
+	// 3DIso's original art painted on the card too (see FirstPersonView::IsoCardArt): the share of it, the store, the map's
+	// pixels under the view's, the levels, the map's night vision, the smooth frames, and the extras that light it.
+	const FirstPersonView::IsoCardArt &cardArt = view._isoCardArt;
+	if (view._iso && cardArt.wanted && cardArt.tiles.size() == tileCount * 4 && view._map)
+	{
+		frame.isoArt = true;
+		frame.isoVoxelShare = view._isoVoxelShare;
+		frame.isoArtBytes = &cardArt.bytes;
+		frame.isoArtInfo = &cardArt.info;
+		frame.isoArtTiles = &cardArt.tiles;
+		frame.isoArtGeneration = cardArt.generation;
+		frame.isoMapOffset[0] = (int)view._isoOffset[0];
+		frame.isoMapOffset[1] = (int)view._isoOffset[1];
+		// (whole pixels taken at the view's middle, the rest small: single precision holds it to a fraction of a pixel)
+		const double first[2] = { view.isoMapX(0) - frame.isoMapOffset[0], view.isoMapY(0) - frame.isoMapOffset[1] };
+		const double middle[2] = { view.isoMapX(view.getWidth() / 2) - frame.isoMapOffset[0], view.isoMapY(view.getHeight() / 2) - frame.isoMapOffset[1] };
+		for (int axis = 0; axis < 2; ++axis)
+		{
+			frame.isoMapWhole[axis] = (int)std::floor(middle[axis]);
+			frame.isoMapPart[axis] = (float)(first[axis] - frame.isoMapWhole[axis]);
+		}
+		frame.isoMapStep = (float)(1.0 / view._isoZoomTotal);
+		frame.isoViewLevel = view._isoViewLevel;
+		frame.isoLowLevel = view._isoLowLevel;
+		frame.isoNightVision = view._map->getNightVisionColor();
+		frame.isoSmooth = view._isoSmoothFactor;
+		frame.isoSmoothShare = view._isoSmoothShare;
+		const bool nightVision = frame.isoNightVision != 0;
+		frame.isoLight = ((view._isoExtras & FirstPersonView::IsoExtraSmoothLight) && !nightVision ? 1 : 0)
+			| ((view._isoExtras & FirstPersonView::IsoExtraTrueColour) && view._isoFull.size() == (size_t)view.getWidth() * view.getHeight() && !nightVision ? 2 : 0);
+	}
+}
+
+/**
+ * 3DIso on the card (research): each pixel's place in the map's order from what its ray met (see isoKeyOf; nothing met:
+ * none), its marks' depth, and with full colour the palette colour it came with (one drawn over shows the palette's).
+ */
+void FirstPersonView::isoKeysFromCard(bool fullColor)
+{
+	const Uint32 *results = _isoCardResults.data();
+	const size_t pixels = (size_t)getWidth() * getHeight();
+	if (_isoKeys.size() != pixels || _isoMarkDepth.size() != pixels || _isoCardResults.size() != pixels) return;
+	if (fullColor) _isoPainted.resize(pixels);
+	// (each tile's object: behind the units or in front of them, see isoKeyOf; found once a frame)
+	const int tiles = _save->getMapSizeXYZ();
+	static std::vector<Uint8> objectSlot;
+	objectSlot.resize(tiles);
+	for (int tile = 0; tile < tiles; ++tile) objectSlot[tile] = (Uint8)(isoKeyOf(tile, O_OBJECT) & 15);
+	static const Uint8 partSlot[8] = { 0, 4, 6, 0, 0, 0, 0, 6 }; // (floor, west wall, north wall; 3: the object's own; 7: a door swinging, a wall)
+	// (the art's floor lies 20 voxels in front of its depth, see paintIso: along the parallel rays that's 20 over their length
+	// in the voxel grid)
+	const double rayLength = std::sqrt(_forward[0] * _forward[0] + _forward[1] * _forward[1] + (_forward[2] / ZScale) * (_forward[2] / ZScale));
+	const float floorBack = (float)(20.0 / rayLength);
+	for (int y = 0; y < getHeight(); ++y)
+	{
+		const Uint8 *row = getRaw(0, y);
+		for (int x = 0; x < getWidth(); ++x)
+		{
+			const size_t at = (size_t)y * getWidth() + x;
+			// (packed on the card, ISO_RESULTS: the tile | the part << 26 | met << 29 | the art's floor << 30 | no marks << 31)
+			const Uint32 result = results[at], tile = result & 0x3FFFFFFu, part = (result >> 26) & 7;
+			Uint32 key = 0;
+			if ((result & (1u << 29)) && row[x] && (int)tile < tiles)
+			{
+				key = tile * 16 + (part == O_OBJECT ? objectSlot[tile] : partSlot[part]);
+			}
+			_isoKeys[at] = key;
+			_isoMarkDepth[at] = !key || (result & (1u << 31)) ? Infinity : (result & (1u << 30)) ? _depthBuffer[at] - floorBack : _depthBuffer[at];
+			if (fullColor) _isoPainted[at] = row[x];
+		}
+	}
 }
 
 void FirstPersonView::gpuWarmUp()
@@ -475,6 +513,11 @@ bool FirstPersonView::gpuReady(int waitMilliseconds)
  * the wait in gpuReady is for this.
  * @return True while it is; false once it is open, or once it is known that there is none.
  */
+int FirstPersonView::gpuProgress()
+{
+	return Options::fpsRenderer != 1 ? -1 : sharedGpu(false) ? 100 : FirstPersonGpu::openingProgress();
+}
+
 bool FirstPersonView::gpuOpening()
 {
 	if (Options::fpsRenderer != 1)
@@ -589,12 +632,22 @@ bool FirstPersonView::gpuCastAllRays()
 	output.perRay = false;
 	// The units and effects on the card too: the rays' pictures stay there, and come back finished (see gpuDrawEffects).
 	output.keep = gpuEffectsWanted();
+	// (3DIso, research: the picture back on the CPU, which draws the units and the map's overlays over it in the map's
+	// order: each ray's tile and part come back too, see isoKeysFromCard)
+	const bool isoFrame = _iso;
+	if (isoFrame)
+	{
+		_isoCardResults.resize((size_t)getWidth() * getHeight());
+		output.isoResults = _isoCardResults.data(); // (packed: a number a pixel, see isoKeysFromCard)
+		output.keep = 0;
+	}
 	_gpuRaysPixelSize = frame.pixelSize;
 	_gpuCastRays = true;
 	// The picture in full colour too, if the mode shows this view that way (setting "True colour"; a ray a pixel).
-	const bool fullColor = _wantsTrueColor && frame.pixelSize == 1;
-	if (fullColor) _trueColor.resize((size_t)getWidth() * getHeight());
-	output.trueColor = fullColor ? _trueColor.data() : nullptr;
+	const bool isoFull = isoFrame && (_isoExtras & IsoExtraTrueColour) && _isoFull.size() == (size_t)getWidth() * getHeight();
+	const bool fullColor = (_wantsTrueColor && frame.pixelSize == 1 && !isoFrame) || isoFull;
+	if (fullColor && !isoFull) _trueColor.resize((size_t)getWidth() * getHeight());
+	output.trueColor = isoFull ? _isoFull.data() : fullColor ? _trueColor.data() : nullptr;
 	// (OPENXCOM3D_GPU_TIMING: where the card's time goes, in the log every 60 frames: sending, drawing, reading back.
 	// The card is waited for after each step, so the frame is slower than it is without.)
 	static const bool timed = getenv("OPENXCOM3D_GPU_TIMING") != nullptr;
@@ -653,6 +706,7 @@ bool FirstPersonView::gpuCastAllRays()
 			frames = 0;
 		}
 	}
+	if (isoFrame) isoKeysFromCard(isoFull);
 	// The rays' palette colours are kept beside it: a pixel that still has its ray's colour when the frame is done
 	// (nothing was drawn over it, no wash went over it) is shown in its full colour (see trueColor).
 	if (output.keep)
@@ -662,7 +716,7 @@ bool FirstPersonView::gpuCastAllRays()
 		_gpuChecking = output.keep == 2;
 		_gpuRecordOnly = !_gpuChecking;
 	}
-	if (output.keep != 1 && fullColor)
+	if (output.keep != 1 && fullColor && !isoFrame) // (3DIso's full colour is its own, see isoKeysFromCard)
 	{
 		_rayColors.resize(_trueColor.size());
 		for (int row = 0; row < getHeight(); ++row)
@@ -865,6 +919,101 @@ void FirstPersonView::gpuShadowRays(double cpuMilliseconds)
 	}
 }
 
+
+/**
+ * The coloured lights (setting "Coloured lights"; 3DIso's extra "coloured light"): the shots in flight (but plain bullets
+ * and arrows), a thrown thing that burns, the explosions, the muzzle flash, and the fires nearest a point; `most` at most,
+ * in that order. Each: its place (voxels), its reach, its colour (0..1 each) and strength.
+ */
+void FirstPersonView::gatherColouredLights(float lights[][8], int &count, int most, const double from[3]) const
+{
+	count = 0;
+	const SDL_Color *palette = getPalette();
+	auto add = [&](float x, float y, float z, float reach, float red, float green, float blue, float strength)
+	{
+		if (count >= most || strength <= 0.0f) return;
+		const float light[8] = { x, y, z, reach, red / 255.0f, green / 255.0f, blue / 255.0f, strength };
+		std::copy(light, light + 8, lights[count++]);
+	};
+	// A shot's colour: its trail's, made as bright as it goes (a dark red bolt still lights red). A rocket or
+	// another explosive round lights by the flame it flies on, not by its smoke's grey (a player: a rocket
+	// "should also make a light trail", as fire and plasma do; it was left out with the plain bullets).
+	auto addShot = [&](const float *head, FirstPersonView::Trail trail, Uint8 color, float calibre)
+	{
+		if (trail == FirstPersonView::TRAIL_NONE || trail == FirstPersonView::TRAIL_FLYING) return;
+		float red = 255, green = 150, blue = 60; // (a rocket's flame, fire)
+		if (trail != FirstPersonView::TRAIL_FIRE && trail != FirstPersonView::TRAIL_SMOKE && color)
+		{
+			const float top = std::max({ 1, (int)palette[color].r, (int)palette[color].g, (int)palette[color].b });
+			red = palette[color].r * 255.0f / top; green = palette[color].g * 255.0f / top; blue = palette[color].b * 255.0f / top;
+		}
+		add(head[0], head[1], head[2], 72.0f + 12.0f * std::min(3.0f, calibre), red, green, blue, 0.9f);
+	};
+	// (OPENXCOM3D_GPU_TESTLIGHT: an orange light three tiles ahead of the eye, to look at the lights without a fire at hand.)
+	static const bool testLight = getenv("OPENXCOM3D_GPU_TESTLIGHT") != nullptr;
+	if (testLight) add((float)(_eye[0] + _forward[0] * 48.0), (float)(_eye[1] + _forward[1] * 48.0), (float)_eye[2], 120.0f, 255, 130, 45, 1.0f);
+	// A thrown thing that burns (a grenade whose damage is fire: a mod's Molotov cocktail, an incendiary grenade)
+	// lights as a round of fire does on its way (the owner, after the rockets: "Molotov yes", and all that
+	// burns in flight; a burning arrow is a round of fire already).
+	auto burning = [](const BattleItem *item) { return FirstPersonView::burnsInFlight(item); };
+	if (burning(_freeGrenade))
+	{
+		const float seconds = std::min(0.05f, (SDL_GetTicks() - _freeGrenadeTick) / 1000.0f);
+		add(_freeGrenadePos[0] + _freeGrenadeVelocity[0] * seconds, _freeGrenadePos[1] + _freeGrenadeVelocity[1] * seconds,
+			_freeGrenadePos[2] + _freeGrenadeVelocity[2] * seconds, 84.0f, 255, 150, 60, 0.9f);
+	}
+	if (Projectile *projectile = flyingProjectile())
+	{
+		if (burning(projectile->getItem()))
+		{
+			const Position at = projectile->getPosition(0);
+			add((float)at.x, (float)at.y, (float)at.z, 84.0f, 255, 150, 60, 0.9f);
+		}
+		else if (!projectile->getItem())
+		{
+			float head[3];
+			shotHead(projectile, head);
+			addShot(head, _shotTrail, _shotTrailColor, _shotCalibre);
+		}
+	}
+	if (_map->getPartnerProjectile()) addShot(_partnerHead, _partnerTrail, _partnerColor, _partnerCalibre);
+	for (const Explosion *explosion : *_map->getExplosions())
+	{
+		const int step = explosion->getCurrentFrame();
+		if (step < 0) continue;
+		const Position at = explosion->getPosition();
+		const float fading = std::max(0.15f, 1.0f - step / 8.0f);
+		if (explosion->isBig()) add((float)at.x, (float)at.y, (float)at.z + 6.0f, 176.0f, 255, 170, 70, 1.6f * fading);
+		else add((float)at.x, (float)at.y, (float)at.z, 44.0f, 255, 215, 150, 0.6f * fading);
+	}
+	if (_muzzleFlashLight > 0.0f) add(_muzzleFlashPos[0], _muzzleFlashPos[1], _muzzleFlashPos[2], 96.0f, 255, 220, 150, 0.5f * _muzzleFlashLight);
+	// The fires nearest the eye, each flickering by its own clock.
+	struct Fire { float distance; int tile; };
+	Fire nearest[8];
+	int fires = 0;
+	const int tileCount = _save->getMapSizeXYZ();
+	for (int tileIndex = 0; tileIndex < tileCount; ++tileIndex)
+	{
+		Tile *tile = _save->getTile(tileIndex);
+		if (!tile->getFire() || !_tileViews[tileIndex].discovered) continue;
+		const Position place = tile->getPosition();
+		const float dx = place.x * 16.0f + 8.0f - (float)from[0], dy = place.y * 16.0f + 8.0f - (float)from[1], dz = place.z * 24.0f + 8.0f - (float)from[2];
+		const Fire fire = { dx * dx + dy * dy + dz * dz, tileIndex };
+		int slot;
+		if (fires < 8) slot = fires++;
+		else if (fire.distance < nearest[7].distance) slot = 7;
+		else continue;
+		while (slot > 0 && nearest[slot - 1].distance > fire.distance) { nearest[slot] = nearest[slot - 1]; --slot; }
+		nearest[slot] = fire;
+	}
+	const float seconds = SDL_GetTicks() / 1000.0f;
+	for (int fire = 0; fire < fires; ++fire)
+	{
+		Tile *tile = _save->getTile(nearest[fire].tile);
+		const Position place = tile->getPosition();
+		const float flicker = 0.5f + 0.12f * std::sin(seconds * 9.0f + tile->getAnimationOffset() * 1.7f) + 0.06f * std::sin(seconds * 23.0f + nearest[fire].tile);
+		add(place.x * 16.0f + 8.0f, place.y * 16.0f + 8.0f, place.z * 24.0f - tile->getTerrainLevel() + 8.0f, 60.0f, 255, 135, 45, flicker);
+	}
 }
 
-// Thanks mom and dad! You were the ones who exposed me to my first comp.
+}

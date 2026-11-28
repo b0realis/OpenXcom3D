@@ -123,6 +123,8 @@ void presentView(const Surface *view, const Uint32 *fullColors = nullptr);
 void presentAtFlip(SDL_Surface *display, int x, int y, int width, int height);
 /// Do the settings ask for the 3D world in full colour (True colour on the card, at the display's size)? The display is then opened in full colour.
 bool wantsFullColorDisplay();
+/// 3DIso (research): its extra "true colour" asks for the display in full colour too.
+void setIsoFullColour(bool wanted);
 /// Does the display keep its video mode when it is reset with its size, colour depth and flags as they were (our mod on)?
 bool keepsVideoMode();
 /// The game's 32-bit screen copied onto a full-colour display opened for the 3D view, magnified to the picture area (the engine's plain output).
@@ -489,6 +491,7 @@ bool tacticalMap(BattlescapeState *state);
 // Stock OXCE: the add-on is left out, and every hook does nothing.
 inline void presentAtFlip(SDL_Surface *, int, int, int, int) { }
 inline bool wantsFullColorDisplay() { return false; }
+inline void setIsoFullColour(bool) { }
 inline bool keepsVideoMode() { return false; }
 inline void flipFullColor(SDL_Surface *, SDL_Surface *, int, int, int, int) { }
 inline void presentAtFlipOpenGl(SDL_Surface *, int, int, int, int, int) { }

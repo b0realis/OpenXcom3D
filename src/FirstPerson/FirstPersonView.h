@@ -235,6 +235,7 @@ public:
 		Uint8 light;     // the game's shade for the tile: 0 brightest .. 15 darkest
 		bool discovered; // the floor (and the object on it) has been seen
 		Uint8 seen;      // bit per part seen: walls are seen from either side, like on the map
+		Uint8 seenDoors; // bit per wall part: a door the squad has seen (3DIso: lit as the map lights it, beside a floor not found)
 		bool empty;
 		Sint16 swing[2]; // door swings reaching into this tile this frame, -1 none
 		Uint8 emissive;  // bit per part: a light source, whose bright voxels shine
@@ -358,6 +359,8 @@ public:
 	/// Whether the graphics card draws the frames now (setting "Renderer": GPU), after waiting so long at most for one being opened.
 	static bool gpuReady(int waitMilliseconds);
 	/// Whether the graphics card is still being opened (and opens it if nobody asked yet).
+	/// How far the card has got with getting ready: 0 to 100 (100 ready), -1 nothing to tell (see FirstPersonGpu::openingProgress).
+	static int gpuProgress();
 	static bool gpuOpening();
 	/// This frame's world in full colour, if the graphics card gave it: a 0x..RRGGBB number a pixel, and the palette colour each
 	/// pixel had from its ray; a pixel of the finished picture that still has that colour may be shown in the full one,
@@ -422,6 +425,110 @@ public:
 	/// Setting "Realistic hitboxes": the smooth (upscaled) picture of a unit this view drew last, if it drew this very frame smooth
 	/// (seen from that side, those pixels; see drawUnits); null else. Its factor set.
 	const Surface *smoothPicture(const BattleUnit *unit, int rotation, const std::vector<Uint8> &pixels, int &factor) const;
+	/// 3DIso (research): the camera the isometric map draws with: looking down the voxel grid's diagonal (yaw -135,
+	/// pitch -30 in true proportions), from so far away that its rays are parallel, a pixel the map's pixel (the map's
+	/// offset, in its pixels), nothing above the map's view level.
+	void setIsoCamera(double mapOffsetX, double mapOffsetY, int viewLevel, int lowLevel, int highLevel);
+	/// 3DIso: the point the isometric camera's view middle shows (voxels), for the map's offset and view level.
+	void isoPivot(double mapOffsetX, double mapOffsetY, int viewLevel, double pivot[3]) const;
+	/// The flight between 3DIso and a soldier's eyes (research): the view drawn in 3D as ever, from wherever the camera is,
+	/// the eye outside the map too (the rays start where they enter it, under the height cutTop); nobody looked through
+	/// until the last moment (lookThrough). keepPicture: what the view shows now is kept, and for the share 1 - shown3D of
+	/// the pixels (a dither) shown over the 3D picture: the map's picture dissolving into the 3D one.
+	void setFlightCamera(const double eye[3], double yawDegrees, double pitchDegrees, double halfFovTangent, float cutTop, const BattleUnit *lookThrough, float shown3D);
+	/// 3DIso's extras over the baseline (research), a bit each: the 3D view's enemy and wounded markers, the icons over the
+	/// downed, smooth light (each pixel lit by the game's light where it is in the world, not by its tile's alone). 0: the
+	/// baseline, as the map draws it. Then the 3D view's own drawing over the map's: its effects (sparks, blood, debris,
+	/// glass, muzzle flashes, marks on walls and floors, the glow round lights), its shots and explosions (in the map's
+	/// place: tracers, beams, pellets, 3D blasts), its smoke and fire (in the map's place: clouds and flames), the facing
+	/// rings while their key is held, the units as their voxel bodies, the units' hitbox outlines, the coloured light of
+	/// shots, blasts and fires.
+	/// 3DIso drawn at another size than the map's (its extra "display": the display's own resolution) and zoomed: the map's
+	/// canvas size, and how many view pixels a map pixel is (the zoom about the map's middle included). The default: the view's
+	/// own size, 1.
+	/// 3DIso turned from the map's own side (extra "turn"), degrees clockwise seen from above; 0: the map's side. Turned, it is
+	/// drawn in 3D (the art exists from the map's side alone), from the same far camera turned about the view's middle.
+	static constexpr double IsoFarBack = 524288.0; // 3DIso: how far back its camera stands (voxels, true proportions): see setIsoCamera
+	static constexpr double IsoNearBack = 5000.0;  // 3DIso tilted its flattest: the eye this near (a slight perspective, see setIsoCamera)
+	static constexpr size_t IsoCardArtMostBytes = 64u << 20; // 3DIso on the card: its store of frames is begun anew past this (see IsoCardArt)
+	void setIsoTurn(double degrees) { _isoTurn = degrees; }
+	/// 3DIso tilted from the map's slant (degrees, more: steeper); turned or tilted it is drawn in 3D, as turned.
+	void setIsoTilt(double degrees) { _isoTilt = degrees; }
+	/// 3DIso turned or tilted: how near the map's own slant it still is, 1 on it, 0 from 20 degrees of turn or 10 of tilt on:
+	/// the units keep the map's ways (upright, its walk, its shade) as long as the picture is near it, and go over to the 3D
+	/// view's gradually (no jump as a turn starts or ends; see drawUnits).
+	float isoSlantShare() const
+	{
+		if (_iso) return 1.0f;
+		if (!_isoTurned) return 0.0f;
+		const double turnOff = std::abs(_isoTurn - 360.0 * std::round(_isoTurn / 360.0));
+		const float away = std::min(1.0f, (float)std::max(turnOff / 20.0, std::abs(_isoTilt) / 10.0));
+		return 1.0f - away * away * (3.0f - 2.0f * away);
+	}
+	/// 3DIso in our 3D art (the voxels' colours in the 3D view's light) at the map's own slant too, the map's overlays and
+	/// order as ever; false: the original art there (the purists').
+	void setIsoVoxelArt(bool on) { setIsoVoxelShare(on ? 1.0f : 0.0f); }
+	/// The same between the two: the share of pixels in our 3D art (dithered), the rest in the original (a live cross-fade).
+	void setIsoVoxelShare(float share) { _isoVoxelShare = std::clamp(share, 0.0f, 1.0f); _isoVoxelArt = _isoVoxelShare > 0.0f; }
+	/// 3DIso scrolled smoothly: the map's own offset less where the picture shows it now (map pixels, see isoMapX).
+	void setIsoShift(double x, double y) { _isoShift[0] = x; _isoShift[1] = y; }
+	/// 3DIso: the levels' cut (voxels up; after setIsoCamera), sliding between levels in 3D.
+	/// 3DIso: the cut at the top (see _isoTop), and while it slides to another level how soft its edge is (voxels: a dithered
+	/// share of the pixels cut up to so much lower, so a floor it passes dissolves instead of going at once; 0 at rest).
+	void setIsoCut(float top, float softness = 0.0f) { _isoTop = top; _isoCutSoftness = softness; }
+	/// 3DIso, turned or not, and its flight (research): is a thing at this height (voxels) on a level the picture shows? Under
+	/// the cut at its top (the view level's, sliding, or the flight's), and with the map's "single layer" not under that level.
+	bool isoLevelShown(double z) const { return !(_iso || _isoTurned || _flight) || (z < _isoTop && (_flight || z >= _isoLowLevel * (double)Position::TileZ)); }
+	/// ...and is the 3D view's culling by distance from the eye off? (3DIso's eye is far off: the map is all near.)
+	bool isoNoDistanceCull() const { return _iso || _isoTurned || _flight; }
+	/// 3DIso: the share of pixels showing the new picture, the rest the kept one (keepPicture): a dissolve between the
+	/// original art and 3D, or two levels of the art.
+	void setIsoDissolve(float shown) { _flightShown3D = shown; }
+	/// The flight's ceiling (research): the share of pixels drawn without the levels' cut (dithered), the ceiling over the
+	/// soldier fading in on the way into their eyes.
+	void setFlightCeiling(float share) { _flightCeiling = share; }
+	/// 3DIso's flight (research): the share of what the squad hasn't found drawn black, as 3DIso has it (1 at its end, 0: the 3D view's way).
+	void setFlightUnknownDark(float share) { _flightUnknownDark = share; }
+	/// 3DIso's flight: how much of the 3D view's darkening and haze with distance shows (0 at the map, which has none, rising).
+	void setFlightDistanceShare(float share) { _flightDistanceShare = share; }
+	/// 3DIso turned: the map's cursor's tile, drawn as a box (the map's own cursor is on its own side's picture); -1: none.
+	void setIsoCursor(int x, int y, int z) { _isoCursor[0] = x; _isoCursor[1] = y; _isoCursor[2] = z; }
+	/// 3DIso: the tile a view pixel shows on a level's floor (in 3D: for the turned view's mouse); false if none.
+	bool isoTileAt(double viewX, double viewY, int level, int &tileX, int &tileY) const;
+	void setIsoScale(int mapWidth, int mapHeight, double zoom) { _isoMapSize[0] = mapWidth; _isoMapSize[1] = mapHeight; _isoZoomTotal = zoom; }
+	/// 3DIso: a view pixel's middle on the map's canvas (fractional), and back.
+	double isoMapX(double viewX) const { return isoMapWidth() / 2.0 + _isoShift[0] + (viewX + 0.5 - getWidth() / 2.0) / _isoZoomTotal; }
+	double isoMapY(double viewY) const { return isoMapHeight() / 2.0 + _isoShift[1] + (viewY + 0.5 - getHeight() / 2.0) / _isoZoomTotal; }
+	double isoViewX(double mapX) const { return getWidth() / 2.0 + (mapX - _isoShift[0] - isoMapWidth() / 2.0) * _isoZoomTotal; }
+	double isoViewY(double mapY) const { return getHeight() / 2.0 + (mapY - _isoShift[1] - isoMapHeight() / 2.0) * _isoZoomTotal; }
+	/// 3DIso's picture in full colour (extra "true colour"): a pixel's colour 0x00RRGGBB, 0 where the palette's is shown; null: none.
+	const Uint32 *isoFullColours() const { return _iso && (_isoExtras & IsoExtraTrueColour) && _isoFull.size() == (size_t)getWidth() * getHeight() ? _isoFull.data() : nullptr; }
+	double isoZoom() const { return _isoZoomTotal; }
+	/// 3DIso: its art drawn smooth (zoomed in, "Smooth sprites"): the map's items, smoke and fire are drawn here smooth too,
+	/// not taken blocky from the map's overlay (with the 3D effects they're the 3D view's anyway).
+	bool isoMapSpritesSmooth() const { return _iso && _isoSmoothFactor > 0 && _isoSmoothShare >= 0.5f; }
+	/// ...as the map's overlay was told this frame (it draws before the view: one choice for both).
+	void setIsoMapSpritesNow(bool on) { _isoMapSpritesNow = on; }
+	/// 3DIso: how far back its eye stands from the point the view's middle shows (true proportions; see setIsoCamera).
+	double isoBack() const { return _isoBack; }
+	int isoMapWidth() const { return _isoMapSize[0] > 0 ? _isoMapSize[0] : getWidth(); }
+	int isoMapHeight() const { return _isoMapSize[1] > 0 ? _isoMapSize[1] : getHeight(); }
+	enum IsoExtra { IsoExtraMarkers = 1, IsoExtraDowned = 2, IsoExtraSmoothLight = 4, IsoExtraEffects = 8, IsoExtraShots = 16, IsoExtraSmoke = 32, IsoExtraFacing = 64, IsoExtraVoxelUnits = 128, IsoExtraOutlines = 256, IsoExtraColouredLight = 512, IsoExtraDisplay = 1024, IsoExtraTrueColour = 2048, IsoExtraTurn = 4096, IsoExtraLayer = 8192, IsoExtraWeather = 16384 };
+	void setIsoExtras(int extras) { _isoExtras = extras; }
+	int isoExtras() const { return _iso ? _isoExtras : 0; }
+	/// Keeps the picture the view shows now, to dissolve from or into during a flight (see setFlightCamera).
+	void keepPicture();
+	/// 3DIso: the 3D view's shots, smoke, fire and effects over the map's overlays (see IsoExtra), depth-tested.
+	void drawIsoEffects();
+	/// Ends a flight: back to 3DIso or to nothing.
+	void endFlight() { _flight = false; }
+	bool inFlight() const { return _flight; }
+	/// 3DIso: whether the view draws as the isometric map does.
+	bool isoMode() const { return _iso; }
+	/// 3DIso: the depth of each pixel of the last frame (along the view, from the far eye; infinity where nothing is).
+	const float *isoDepths() const { return _depthBuffer.data(); }
+	/// 3DIso: the map's overlays (see Map::setOverlayTarget), laid over each frame; null: none.
+	void setIsoOverlay(Surface *overlay) { _isoOverlay = overlay; }
 	/// Places the eye, in voxels.
 	void setEye(double x, double y, double z);
 	/// Gets the eye, in voxels.
@@ -590,6 +697,12 @@ public:
 	void setOffMuzzlePoint(double x, double y, bool valid, const BattleItem *weapon = nullptr) { _offHandMuzzleScreen[0] = x; _offHandMuzzleScreen[1] = y; _offHandMuzzleValid = valid; _offHandWeapon = valid ? weapon : nullptr; }
 	/// Throws a tactical flare from the soldier's shoulder towards a point (a short toss under the sea).
 	void throwFlare(const float target[3]);
+	/// The same from a point (voxels): 3DIso's, from the soldier's shoulder towards the tile pointed at on the map.
+	void throwFlareFrom(const float from[3], const float target[3]);
+	/// Takes another view's flares as they are (3DIso and the 3D view hand them over at the flight between them).
+	/// The coloured lights now (see gatherColouredLights in FirstPersonViewGpu.cpp): `most` at most, the fires nearest `from`.
+	void gatherColouredLights(float lights[][8], int &count, int most, const double from[3]) const;
+	void takeFlares(const FirstPersonView &other) { _flares = other._flares; _decals = other._decals; _scorches = other._scorches; } // (and the marks left: 3DIso's flight)
 
 	// =====================================================================================
 	// Effects on the screen
@@ -723,6 +836,110 @@ private:
 	double _halfFovTangent;                             // tan(horizontal fov / 2)
 	double _zoom = 1.0;                                 // how many times the zoom narrows that (see setFieldOfView)
 	float _maxDistance = 60.0f * Position::TileXY;      // in voxels
+	bool _iso = false;                                  // 3DIso: drawn as the isometric map draws (see setIsoCamera)
+	int _isoViewLevel = 0;                              // ...its view level: nothing above it is drawn
+	float _isoTop = 0.0f;                               // ...the height (voxels) rays start under: the top of that level
+	float _isoCutSoftness = 0.0f;                       // ...how soft the cut's edge is while it slides (see setIsoCut)
+	int _isoExtras = 0;                                 // ...its extras (see IsoExtra)
+	int _isoLowLevel = 0;                               // ...the lowest level drawn (the map's "single layer": the view level)
+	bool _flight = false;                               // in the flight between 3DIso and 3D (see setFlightCamera)
+	bool _isoTurned = false;                            // 3DIso turned from the map's side (extra "turn": drawn as the flight is, in 3D)
+	double _isoTurn = 0.0;                              // ...by how much (degrees), see setIsoTurn
+	double _isoTilt = 0.0;                              // ...tilted (degrees), see setIsoTilt
+	double _isoBack = IsoFarBack;                       // ...its eye's distance back (see isoBack)
+	bool _isoVoxelArt = false;                          // ...in our 3D art, on some pixels at least (see setIsoVoxelArt)
+	float _isoVoxelShare = 0.0f;                       // ...on what share of them (see setIsoVoxelShare)
+	double _isoShift[2] = { 0.0, 0.0 };                 // ...scrolled smoothly (see setIsoShift)
+	int _isoCursor[3] = { -1, -1, -1 };                 // ...the map's cursor's tile, drawn as a box in 3D (-1: none)
+	float _flightShown3D = 1.0f;                        // ...the share of pixels showing the 3D picture
+	float _flightUnknownDark = 0.0f;                    // ...the share of unexplored tiles black (see setFlightUnknownDark)
+	float _flightDistanceShare = 1.0f;                  // ...the share of the distance's darkening and haze (see setFlightDistanceShare)
+	float _flightCeiling = 0.0f;                        // ...the share of pixels drawn without the cut (see setFlightCeiling)
+	std::vector<Uint8> _keptPicture;                    // ...the picture dissolved from or into (see keepPicture)
+	Surface *_isoOverlay = nullptr;                     // ...the map's overlays (see setIsoOverlay)
+	std::vector<Uint32> _isoKeys;                       // ...when the map would have drawn each pixel (see Map::overlayKeys)
+	float _isoLights[16][8] = {};                       // ...its coloured lights this frame (extra "coloured light", see gatherColouredLights)
+	int _isoLightCount = 0;
+	std::vector<Uint8> _isoNearest;                     // ...the palette's colour nearest each colour (32 steps a channel), for the coloured light in the palette
+	Uint32 _isoNearestOf = 0;                           // ...the palette it was made for (a sum of its colours)
+	std::vector<Uint32> _isoFull;                       // ...its picture in full colour (see isoFullColours)
+	std::vector<Uint8> _isoPainted;                     // ...the colour the painter gave each pixel (one drawn over shows in the palette)
+	int _isoMapSize[2] = { 0, 0 };                      // ...the map's canvas size (0: the view's own), see setIsoScale
+	double _isoZoomTotal = 1.0;                         // ...view pixels to a map pixel
+	std::unordered_map<const Uint8*, const Surface*> _isoSmoothArt; // ...this frame's terrain frames made smooth (see prepareIsoSmoothArt), by their pixels
+	int _isoSmoothFactor = 0;                           // ...how much bigger they are (0: none, the art as it is)
+	float _isoSmoothShare = 0.0f;                       // ...the share of pixels showing them (dissolving in and out, see prepareIsoSmoothArt)
+	Uint32 _isoSmoothTick = 0;                          // ...when that share last moved
+	Uint32 _isoSmoothWaitSince = 0;                     // ...since when they're wanted (0: not)
+	Uint64 _isoSmoothShareKey = 0;                      // ...what the share is of: the factor, "Smooth sprites" and the palette
+	bool _isoMapSpritesNow = false;                     // the map's items, smoke and fire drawn here this frame (see setIsoMapSpritesNow)
+	static constexpr float IsoSmoothFade = 150.0f;      // ...how long they take to dissolve in or out (ms)
+	static constexpr Uint32 IsoSmoothWaitMost = 600;    // ...how long the rest wait for a frame not made yet (ms)
+	/// 3DIso turned: the cursor's box and the extras' marks (see drawIsoTurnedMarks in FirstPersonView.cpp).
+	void drawIsoTurnedMarks();
+	/// 3DIso: the map's own marks drawn by us (extra "layer"; always turned): the path, the cursor, the selected soldier's arrow.
+	void drawIsoLayer();
+	/// 3DIso: the smooth versions of the terrain frames in sight, when a map pixel is big enough on the view for them (see upscaled).
+	void prepareIsoSmoothArt();
+	/// 3DIso on the card: the map's order of each pixel from what its ray met (see FirstPersonViewGpu.cpp).
+	void isoKeysFromCard(bool fullColor);
+	/// 3DIso: the coloured lights' share at a point for a colour (unshaded); false: none near.
+	bool isoLightAdded(Uint8 raw, const float point[3], float added[3]) const;
+	/// 3DIso: a pixel's colour with the coloured lights at its point added (none near: as it is); x, y for the dither.
+	Uint8 isoColouredLight(Uint8 shaded, Uint8 raw, const float point[3], int x, int y) const;
+	/// 3DIso, extra "true colour": a pixel of the art in full colour: its colour shaded by a fractional shade (between its
+	/// two nearest shades, as the 3D view's smooth light in full colour), a flare's red, the coloured lights.
+	Uint32 isoFullColour(Uint8 raw, float shade, float flare, const float point[3], bool coloured) const;
+	double _isoCentre[3] = { 0.0, 0.0, 0.0 };           // ...the point the view's middle shows (voxels), for the card's parallel rays
+	std::vector<Uint32> _isoCardResults;               // ...what each of the card's rays met (FirstPersonGpu::RayResult, four numbers each)
+	double _isoMiddle[2] = { 0.0, 0.0 };              // ...the point the view's middle shows on the view level (x, y), what's near counts from (debris, shards)
+	std::vector<float> _isoMarkDepth;                   // ...the depth of the art's own place (a floor's not pushed back: see isoArtAlong), for the marks on it
+	Uint32 isoKeyOf(int tileIndex, int part) const;
+	/// 3DIso: the map's smoke and fire drawn here, smooth (its overlay's are magnified, blocky over the smooth art); see
+	/// isoMapSpritesSmooth.
+	void drawIsoMapSmoke();
+	/// 3DIso at the map's own slant: one of the map's sprites as the map blits it (its corner at a map pixel), at the view's own
+	/// pixels (smooth when the art is), where the map draws it last by its order; in the tile's shade (and the map's night vision)
+	/// or as it is.
+	void drawIsoMapSprite(const Surface *frame, int originX, int originY, Uint32 key, int shade, bool mapShaded, bool overlayCounts);
+	/// 3DIso: the map's cursor, its own sprites at the map's slant (see Map::drawTerrain); turned, a box in their colours.
+	void drawIsoCursor();
+	void drawIsoCursorFrame(const Surface *frame, const double floorMiddle[3]);
+	std::vector<Uint32> _isoOverlayKeys;                // ...the map's order of the overlay's pixel laid on each pixel (0: none), for drawIsoMapSmoke
+	Uint8 isoShaded(Uint8 color, int shade) const;
+	/// 3DIso: whether the map draws what a ray met black, as the squad hasn't found it (see Map::drawTerrain, getWallShade).
+	bool isoUnfound(const Hit &hit) const;
+	double _isoOffset[2] = {};                          // ...the map's offset (its pixels)
+	/// 3DIso: a ray's hit coloured as the map draws that part there: its sprite's pixel under this pixel (else the voxel's), in the map's shade.
+	Uint8 isoColor(const Hit &hit, int pixelX, int pixelY) const;
+	/// 3DIso: the first tile part along a ray (tile by tile, front to back) whose sprite is drawn under this pixel, as the map would
+	/// show it there: its colour in the map's shade, the ray's distance into that tile and the tile's index; false: none.
+	/// 3DIso: whether a view pixel shows the smooth frames yet (dissolving in, see prepareIsoSmoothArt; the card's rule too).
+	bool isoSmoothHere(int x, int y) const;
+	bool isoArtAlong(const float origin[3], const float direction[3], double mapX, double mapY, Uint8 &color, float &distance, int &tileIndex, int &part, Uint8 *raw = nullptr, int *mapShade = nullptr, float *lightDistance = nullptr, float *artPoint = nullptr, bool smoothHere = true) const;
+	/// 3DIso: each tile part's art this frame, for the painter (see prepareIsoTileArt): its frame now (null: none, or a door's
+	/// new part while it swings), its smooth version, its y offset and the map's shade for it.
+	struct IsoPartArt { const Uint8 *pixels = nullptr; const SDL_Surface *smooth = nullptr; int width = 0, height = 0, pitch = 0, yOffset = 0, shade = 0; };
+	struct IsoTileArt { IsoPartArt part[4]; int top = 0, bottom = 0; bool westWall = false, any = false; }; // (top, bottom: the rows its frames cover, from its tile's place)
+	std::vector<IsoTileArt> _isoArt;
+	void prepareIsoTileArt();
+	/// 3DIso on the card (research): the original art's painter there too (see paintIso in FirstPersonGpuShaders.h). The
+	/// frames the tiles show go up once into a store, a slot each (its pixels, and its smooth version at the store's
+	/// factor); each frame the tiles' table points into it: per tile and part the slot | the map's shade << 16 | (its y
+	/// offset + 128) << 21 | a west wall beside a north wall << 29 | an object behind the units << 30.
+	struct IsoCardArt
+	{
+		std::unordered_map<const Uint8*, Uint32> slots; // a frame's pixels: its slot (1 on)
+		std::vector<Uint8> bytes;                      // the frames' pixels, a slot's packed rows after another's
+		std::vector<Uint32> info;                      // four a slot: where its pixels start, width | height << 16, 1 + where its smooth version starts (0: none), its width | height << 16
+		std::vector<Uint32> tiles;                     // four a tile: this frame's table
+		int smoothFactor = 0;                          // the smooth versions' factor (0: none yet)
+		Uint32 smoothKey = 0;                          // ... and the palette and "Smooth sprites" they were made with
+		Uint32 generation = 0;                         // a new number each time the store is begun anew, any view's (the card, one for all, sends it all again)
+		bool wanted = false;                           // the card paints this frame (see prepareIsoTileArt)
+	};
+	IsoCardArt _isoCardArt;
+	Uint32 isoCardSlot(const IsoPartArt &art);
 	float _shake = 0.0f;                                // camera shake, voxels
 	Uint32 _shakeLastTick = 0;                          // when the shake was last updated
 	float _recoilKick = 0.0f;                           // recoil: the view kicked up after your own shot, degrees
@@ -845,6 +1062,7 @@ private:
 		const Uint8 *buffer[8];
 		bool animated;
 		const VoxelModel *steady = nullptr; // a UFO part's steady 3D-only model (the UFO lights option), null otherwise
+		bool steadyAlways = false;          // ...shown whatever the option: X-COM's craft (smooth hulls, see findUfos)
 	};
 	/// A door that turned recently (opened or shut) and is still swinging.
 	struct DoorAnimation
@@ -1107,7 +1325,7 @@ private:
 	/// A shade of the game's light as the isometric map shows it now: in its debug vision modes, or with night vision.
 	int mapShade(int gameShade) const;
 	/// The game's light at a point, blended between tile centres (0 bright .. 15 dark); also a UFO's light there.
-	float lightAt(float x, float y, float z, float *ufoGlow = nullptr) const;
+	float lightAt(float x, float y, float z, float *ufoGlow = nullptr, float *roofed = nullptr) const;
 	/// Is there anything solid between two points? (A shadow ray.)
 	bool shadowed(const float from[3], const float to[3]) const;
 	/// Where a line first meets the world as the view draws it, within a distance (false: nowhere).
@@ -1115,7 +1333,9 @@ private:
 	/// Extra light at a point from nearby lamps and the flashlight, in shades.
 	float pointLight(const float point[3], const float normal[3], bool shadows) const;
 	/// The final colour of the voxel a ray hit: light, shading, glass, mirroring.
-	Uint8 shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY) const;
+	/// What shadeHit worked out for a colour it shaded in the light (3DIso's own coloured light and full colour use it).
+	struct ShadeDetail { Uint8 raw = 0; float shade = 0.0f, flare = 0.0f, point[3] = {}; bool valid = false; };
+	Uint8 shadeHit(Hit &hit, const float rayOrigin[3], const float rayDirection[3], int pixelX, int pixelY, ShadeDetail *detail = nullptr) const;
 	/// What a ray sees after leaving the map: the border tape, the ground, the sky.
 	Uint8 colorOutsideMap(const float rayOrigin[3], const float rayDirection[3], float tExit, int exitAxis, int pixelX, int pixelY, float &depth) const;
 	/// Where the distance haze begins on land, as a share of the view's reach (setting "Distance haze").
@@ -1251,6 +1471,8 @@ private:
 	bool _pointerAimed = false;                         // and whether there is one
 	const BattleUnit *_aimedUnit = nullptr;             // the unit pointed at (see setAimedUnit)
 	Surface *_spriteBuffer;                             // scratch surface for drawing a unit's sprite before it goes into the world
+	Surface *_isoPartBuffer = nullptr;                  // 3DIso: one part of a big unit drawn alone (see drawUnits)
+	std::map<const BattleUnit*, std::vector<Uint8>> _isoParts; // 3DIso: each big unit's parts under its picture's pixels, this frame
 	struct BlendedSprite                                // a sprite's frame dissolved into its next one (see drawSpriteBlend)
 	{
 		const Surface *from = nullptr, *to = nullptr;   // the two frames
@@ -1303,6 +1525,7 @@ private:
 		SpritePose pose = SpritePose::Standing;
 		const SeeThroughSprite *seeThrough = nullptr; // how opaque each pixel is (the smoke); null for a solid sprite
 		BattleUnit *unit = nullptr;       // the unit it pictures, if any: smoke veils it only thinly, and it can be pointed at
+		const std::vector<Uint8> *isoParts = nullptr; // 3DIso: a big unit's part (0-3) under each pixel of its picture (SpriteBufferSize square), 255 none
 		BattleUnit *body = nullptr;       // the unconscious unit lying in the pile it pictures, if any: it can be pointed at
 		const Tile *pile = nullptr;       // the floor tile whose pile it pictures (a big corpse's first), if any: it can be pointed at
 		double lyingSlope = 0.0;          // a lying sprite's floor rising towards the camera: voxels up for each voxel along (see lyingRise)
@@ -1397,6 +1620,7 @@ private:
 		double bodyFeet[3] = {}, bodyCosine = 1.0, bodySine = 0.0, bodyMeasure = 1.0, bodyFloorCut = 0.0, bodyCeilingCut = 1e9;
 		bool bodyItems = true;
 		int bodyShade = 0;
+		Uint32 voxelIsoKey = 0;                                           // ... 3DIso: when the map draws it (its front tile's unit slot, see isoKeyOf); 0 elsewhere
 		Uint16 voxelHitOutline = 0;                                       // ... the hitbox outline drawn round it (its place in _outlineColors + 1; 0 none)
 		bool voxelOutline = false;                                        // ... whether the cubes are cut to their outlines (else the boxes round them)
 		double centre[3]; double radius; int steps; float density;        // GroundShade (see drawGroundShade)
@@ -1597,6 +1821,7 @@ private:
 	void upscaleWorker();
 	/// A sprite frame's upscaled version (factor times bigger), or null until it's ready.
 	const Surface *upscaled(const Surface *sprite, int factor);
+	const Surface *upscaledRaw(const Uint8 *pixels, int pitch, int width, int height, int factor);
 	/// How much bigger units', items' and effects' frames are made for the setting (4, or 6 with "Finest").
 	int spriteUpscaleFactor() const;
 	/// Is a sprite at this point big enough on screen to be worth upscaling?
@@ -1615,6 +1840,7 @@ private:
 	bool _particlesOn = true;        // particles switched on for this view (off for the small helmet-camera view)
 	Uint32 _particleLastTick = 0;    // when the particles were last advanced
 	std::string _weather;                              // the battle's weather: "rain", "snow", "dust" or none (see chooseSky)
+	static constexpr int WeatherIsoMost = 4000;        // 3DIso's weather: at most this many particles (see spawnAmbient)
 	std::vector<std::pair<float, float>> _bubbleVents; // sea floor spots bubbles rise from
 	std::vector<float> _glowBuffer, _glowScratch;      // quarter resolution glow, blurred into a bloom
 	std::vector<float> _glowDepth, _glowDepthScratch;  // the same for the glow's distance (summed, weighted by the glow): how far away the light is
@@ -1934,9 +2160,11 @@ private:
 	float _ufoPulse[2][16] = {};         // this frame's shade of a UFO light: [small light, big panel][phase]
 	float _ufoBreath = 1.0f;             // this frame's strength of the UFOs' pools of light (they breathe slowly)
 	float _ufoFaceShade[64] = {};        // this frame's face shade for each set of open faces (smooth hull shading), -1 none
+	float _ufoRoofedFaceShade[64] = {};  // ...the same under a roof or in the sun's shadow (the indoor rule, see updateColors)
 	Uint32 _ufoPaletteHash = 0;          // the palette the UFOs' light colours were picked for
 	std::set<std::string> _ufoDataSets;     // the map data sets UFOs are built from (less the ones nearly every terrain uses)
 	std::set<std::string> _ufoOnlyDataSets; // of those, the ones no ordinary terrain uses (a UFO's hull)
+	std::set<std::string> _craftDataSets;   // the map data sets X-COM's craft are built from (less those, and the ones nearly every terrain uses)
 	/// Lists the map data sets UFOs are built from (_ufoDataSets, _ufoOnlyDataSets).
 	void collectUfoDataSets();
 	/// Finds the UFOs on the map and builds their parts' steady models.

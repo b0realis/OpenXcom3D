@@ -117,6 +117,46 @@ void FirstPersonView::throwFlare(const float target[3])
 }
 
 /**
+ * 3DIso (research): throws a tactical flare from a point (the soldier's shoulder) on the arc that comes down on the target,
+ * as throwFlare does from the eye (under the sea the short toss towards it).
+ * @param from Where it leaves the hand, in voxels.
+ * @param target Where to throw it, in voxels.
+ */
+void FirstPersonView::throwFlareFrom(const float from[3], const float target[3])
+{
+	Flare flare;
+	std::copy(from, from + 3, flare.pos);
+	float toTarget[3] = { target[0] - from[0], target[1] - from[1], target[2] - from[2] };
+	if (_colors.underwater)
+	{
+		const float flatLength = std::max(1e-6f, std::sqrt(toTarget[0] * toTarget[0] + toTarget[1] * toTarget[1]));
+		flare.vel[0] = toTarget[0] / flatLength * 28.0f;
+		flare.vel[1] = toTarget[1] / flatLength * 28.0f;
+		flare.vel[2] = 6.0f;
+	}
+	else
+	{
+		float distance = std::sqrt(toTarget[0] * toTarget[0] + toTarget[1] * toTarget[1] + toTarget[2] * toTarget[2]);
+		const float reach = 160.0f; // ten tiles, as throwFlare
+		if (distance > reach)
+		{
+			for (float &component : toTarget) component *= reach / distance;
+			distance = reach;
+		}
+		const float flightSeconds = std::clamp(distance / 160.0f, 0.25f, 1.4f);
+		for (int axis = 0; axis < 3; ++axis) flare.vel[axis] = toTarget[axis] / flightSeconds;
+		flare.vel[2] += 0.5f * 120.0f * flightSeconds;
+	}
+	flare.age = 0.0f;
+	flare.resting = false;
+	_flares.push_back(flare);
+	if (_flares.size() > FlareMax)
+	{
+		_flares.erase(_flares.begin());
+	}
+}
+
+/**
  * Moves the flares along, once a frame. A flare flies under gravity (with heavy drag under the
  * sea), bounces off what it hits and comes to rest on a floor; while it burns it gives off red
  * fire and smoke (and a stream of bubbles under the sea), dying down in its last seconds, and
@@ -371,7 +411,7 @@ void FirstPersonView::drawFlares()
 		// Where the flare is on the view; not drawn behind the camera or right in front of it.
 		const double world[3] = { flare.pos[0], flare.pos[1], flare.pos[2] + 0.5 };
 		double screenX, screenY, depth;
-		if (!projectToScreen(world, screenX, screenY, depth) || depth < 3.0) continue;
+		if (!projectToScreen(world, screenX, screenY, depth) || depth < 3.0 || !isoLevelShown(world[2])) continue;
 		const float fade = std::clamp((FlareLife - flare.age) / 8.0f, 0.0f, 1.0f);
 		if (fade <= 0.0f) continue;
 		// The glow's radius in pixels: a voxel's size on the screen there, 1 to 6 pixels.

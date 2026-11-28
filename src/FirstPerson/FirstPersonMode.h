@@ -283,7 +283,7 @@ private:
 	/// The first 3D frame drawn ahead, unseen, where a battle begins (setting "Renderer": GPU): its waiting isn't at the first click.
 	void primeView(BattleUnit *unit);
 	/// Says on the screen that the 3D view is being prepared, before a wait where a battle begins.
-	void showPreparing();
+	void showPreparing(int percent = -1);
 	bool _primeAsked = false;              // the battle's first frame has had its chance to wait for the card (see primeView)
 	bool _viewPrimed = false;              // the 3D view has drawn a frame on the card: nothing is left to wait for
 	FirstPersonSounds *_sounds = nullptr;  // the sounds we make ourselves (hitmarker, heartbeat, near-miss whizz...)
@@ -1322,6 +1322,103 @@ private:
 	bool _mapSoldierCamOpen = false;        // the soldier cam opened from it (a right click; closes off it, or with another)
 	/// Shows the map camera (or the soldier cam opened from it) in the player's turn on the map, or hides it.
 	void updateMapCamera();
+	/// 3DIso (research, env OXC3D_ISO3D): the isometric map drawn by the 3D view, in the map's place (see updateIsoView).
+	FirstPersonView *_isoView = nullptr;
+	double _isoZoom = 1.0, _isoZoomTarget = 1.0; // 3DIso's zoom (extra "display"), and where it's going
+	Uint32 _isoZoomTick = 0;
+	double _isoTurnNow = 0.0, _isoTurnTarget = 0.0, _isoTurnFrom = 0.0; // 3DIso turned (extra "turn"), degrees: now, where it's going, where it set off
+	Uint32 _isoTurnStart = 0;
+	bool _isoTurnKeyDown = false, _isoResetAsked = false; // (the reset key: pressed since the last frame, see handleKey)
+	double _isoHudSlide = 0.0;           // the map's HUD slid down by this share of the screen (the flight)
+	double _isoTiltNow = 0.0, _isoTiltTarget = 0.0, _isoTiltFrom = 0.0; // ...tilted (degrees steeper), see the same
+	Uint32 _isoTiltStart = 0;
+	int _isoArt3D = -1;                  // 3DIso in our 3D art (1, the default) or the original art (0); -1 not read yet
+	int _isoArtSetting = -1;             // the setting "3DIso art" as last read
+	/// 3DIso: our 3D art or the original art, the other one (remembered in the setting).
+	void toggleIsoArt();
+	/// 3DIso's free camera (research, experimental; the key "3DIso: free camera"): over the map the right button dragged turns
+	/// the view round its middle and tilts it, the middle button dragged moves it, the wheel zooms at the mouse, all smoothly
+	/// and at any angle; the FREE button on the top bar (pressed while it's on) and its marks under the bar's left, the one
+	/// in use lit. Off, the view eases back to the map's own side, slant and size (see setIsoFree, handleIsoFreeCamera).
+	bool _isoFree = false;
+	struct IsoFreeDrag
+	{
+		Uint8 button = 0;                 // the button dragging (right: turn and tilt, middle: move), 0 none
+		double startX = 0.0, startY = 0.0; // where it went down, the game's screen pixels
+		double lastX = 0.0, lastY = 0.0;   // where the mouse was at the last move
+		bool moved = false;                // dragged past a click (else it's the map's click on release)
+		double pan[2] = { 0.0, 0.0 };       // the move's part of a pixel not yet handed to the map's camera
+		int windowX = 0, windowY = 0;      // where it went down, the window's pixels (the pointer goes back there near the edge)
+	} _isoFreeDrag;
+	double _isoFreeVelocity[4] = {};    // the free camera's glide on after a drag: turn, tilt (degrees a second), move across, down (screen pixels a second)
+	double _isoFreeGlidePan[2] = {};    // ...the glide's move's part of a pixel not yet handed to the map's camera
+	Uint32 _isoFreeMoveTick = 0;        // when the drag last moved (its speed glides on only if it was moving when let go)
+	Surface *_isoFreeMarks = nullptr;    // the marks (move, turn, zoom), lit while used; a click on them turns it off
+	int _isoFreeMarksLit = -1;           // which was lit when they were last drawn (0 none, 1 move, 2 turn, 3 zoom)
+	Uint32 _isoFreeWheelTick = 0;        // when the wheel last zoomed (its mark lit a moment)
+	TextButton *_btnIsoFree = nullptr, *_isoFreeButtonGroup = nullptr; // the top bar's FREE button (pressed: the free camera on)
+	bool _isoFreeButtonShown = false;
+	double _isoTurnEased = 0.0, _isoTiltEased = 0.0; // the turn and tilt targets the easing set off for (see updateIsoView)
+	void setIsoFree(bool on);
+	bool handleIsoFreeCamera(Action *action);
+	void updateIsoFreeMarks();
+	/// 3DIso's zoom at a point of the map's picture (the point stays where it is), by a factor, within its limits.
+	void isoZoomAt(double mouseX, double mouseY, double factor);
+	double isoMinZoom() const { return _isoFree ? 0.5 : 1.0; }
+	TextButton *_btnIsoArt = nullptr, *_isoArtButtonGroup = nullptr; // the top bar's ART button (pressed: the original art)
+	bool _isoArtButtonShown = false;
+	double _isoShown[2] = { 0.0, 0.0 };  // where 3DIso shows the map's offset now (smooth scrolling)
+	bool _isoShownSet = false;
+	double _isoCutShown = 0.0;           // the levels' cut shown now (sliding)
+	bool _isoCutSet = false;
+	double _isoFrameSeconds = 0.0;       // this frame's time step
+	bool _isoWasPosed = false;            // 3DIso was turned or tilted last frame
+	Uint32 _isoTurnMeltStart = 0;        // when the art began dissolving into the turning 3D picture
+	double _isoVoxelShare = 1.0;         // the share of 3DIso's pixels in our 3D art now (the rest the original art), fading
+	double _isoLastPose[6] = {};        // the last frame's zoom, scroll, turn, tilt and level (a change asks the map for the tile under the mouse again)
+	/// 3DIso (research) shows now, with the 3D view's effects on it (see IsoExtraEffects): glass breaking there.
+	bool isoShowsEffects() const;
+	Surface *_isoOverlay = nullptr; // the map's overlays for it
+	bool _isoOverlayWanted = false; // ...drawn into it the last frame (see updateIsoView)
+	int _isoMode = -1;          // 0: the map as ever; 1: 3DIso over it (the key "3DIso or map" switches)
+	int _isoExtras = -1;        // 3DIso's extras (FirstPersonView::IsoExtra bits: OXC3D_ISO3D_EXTRAS); the key "3DIso: 3D effects" switches them off and on
+	bool _isoExtrasOn = true;
+	void updateIsoView();
+	/// The flight between 3DIso and a soldier's eyes (research): with 3DIso on, the camera flies from the map's picture into
+	/// the soldier's head when 3D is asked for (3D comes at the end), and out again when it's left (see updateIsoView).
+	struct IsoFlight
+	{
+		bool on = false, to3D = true;
+		Uint32 start = 0;
+		BattleUnit *unit = nullptr;
+		double eye[3] = {}, yaw = 0.0, pitch = 0.0, fov = 90.0; // the soldier's end: the 3D view's camera
+		double startYaw = -135.0, startPitch = -30.0;          // 3DIso's end: turned and tilted as it was
+		double startBack = 524288.0;                           // ... its eye that far back (nearer tilted flat: see FirstPersonView::isoBack)
+	} _isoFlight;
+	bool iso3DOn() const;
+	void startIsoFlight(BattleUnit *unit, bool to3D);
+	bool drawIsoFlight(Uint32 now); // a frame of it; false once it's over
+	void endIsoFlight(); // its state put back (the HUD's place, the ceiling, the view)
+	void updateIsoCompass(); // the 3D view's compass on 3DIso turned or tilted
+	bool _isoFlightLanding = false; // the 3D view takes the flight's last pose when it starts
+	Uint32 _isoLandTick = 0;        // when a flight landed in the soldier's eyes: the weapon comes up from below (see IsoLandRaise)
+	static constexpr Uint32 IsoLandRaise = 350; // ...over this long (ms)
+	double _isoFlightLandYaw = 0.0, _isoFlightLandPitch = 0.0;
+	Uint32 _isoShakeStart = 0; // when a big explosion last shook 3DIso
+	/// 3DIso's shot camera (research, setting "3DIso shot camera"): a shot zoomed in on and followed to where it hits, held a
+	/// moment on its blasts, then back to the zoom and place it set off from (see updateIsoView). On the map's own slant, so
+	/// the original art stays exact.
+	struct IsoShotCamera
+	{
+		int phase = 0;          // 0 none, 1 following a shot, 2 on its blasts, 3 going back
+		double pan[2] = {};     // the picture moved off where the map's offset puts it, now (map pixels)
+		double aim[2] = {};     // ...the point it's going to: the shot's, on the map (its canvas less its offset)
+		double zoomBack = 1.0;  // the zoom it goes back to
+		Uint32 since = 0;       // the blasts' last frame (they're held a moment after)
+	} _isoShot;
+	/// 3DIso's tactical flare (research): the flare key on 3DIso throws one from the selected soldier at the tile pointed at.
+	void throwIsoFlare();
+	bool _isoFlareKeyDown = false;
 	/// Is a point on the canvas on the map camera, or on the soldier cam opened from it?
 	bool onMapCamera(int canvasX, int canvasY) const;
 	/// The 3D HUD key on the map: the map camera off, or on again at its last size.

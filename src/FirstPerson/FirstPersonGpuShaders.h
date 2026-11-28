@@ -63,6 +63,16 @@ uniform usamplerBuffer uBlend;      // the palette (768 bytes: red, green, blue 
 
 uniform ivec3 uSize;         // the map in tiles
 uniform float uMaxDistance;  // how far rays go, in voxels
+uniform float uClipSoftness; // 3DIso (research): uClipTop dithered by so much while the cut slides to another level (a floor passed dissolves)
+uniform float uClipTop;      // 3DIso's flight (research): rays from an eye outside the map start where they enter it under this height; 0: never
+uniform int uIsoTurned;      // 3DIso (research), turned or not: past the map black, and what the squad hasn't found, as on the map
+uniform int uOrtho;          // 3DIso (research): parallel rays, each from its own place on a plane uOrthoSpan in front of uOrthoCentre's
+uniform vec3 uOrthoCentre;   // ...the point the view's middle shows (voxels)
+uniform float uOrthoSpan;    // ...how far back the eye it stands for is (its depths measured from there), true proportions
+uniform float uClipBottom;   // 3DIso (research): rays clipped under this height too (the lowest level shown)
+uniform float uDistanceShare; // 3DIso's flight (research): the share of the distance's darkening and haze, rising from 0 (1 otherwise)
+uniform float uUnknownDark;  // 3DIso's flight (research): the share of unexplored tiles black (dithered)
+uniform float uCutFade;      // 3DIso's flight (research): the share of pixels drawn without the cut (dithered: the ceiling fading in)
 uniform vec3 uEye, uForward, uRight, uUp;
 uniform vec2 uHalfPlane;     // the image plane's half-width and half-height
 uniform vec3 uEyePlane;      // an eye's picture (VR): where its view axis meets it (x, y: pixels) and its pixels per unit of the image plane (z); z 0: the view's own, centred
@@ -84,13 +94,58 @@ uniform float uGhostScale;
 uniform int uSeeThroughCrops;
 uniform vec4 uSwingA[16];    // a swinging door: hinge x, y, direction x, y
 uniform vec4 uSwingB[16];    // ... z0, z1, its model's number, 1 if it was a west wall
+#ifdef ISO_RESULTS
+// 3DIso's original art (research), the map's painter on the card (see paintIso).
+uniform usamplerBuffer uIsoArt;    // four numbers a frame in the store (FirstPersonView::IsoCardArt), from uIsoTilesAt four a tile: this frame's table
+uniform usamplerBuffer uIsoFrames; // the store's frames, a byte a pixel
+uniform int uIsoArtOn;             // 1: the pixels not in our 3D art are the painter's
+uniform int uIsoTilesAt;
+uniform float uIsoVoxelShare;      // our 3D art's share of the pixels (dithered)
+uniform ivec2 uIsoMapWhole;        // the map's pixel, less the map's offset, at the middle of the view's first pixel: whole pixels near the view's middle
+uniform vec2 uIsoMapPart;          // ... and the rest (kept small: single precision holds it to a fraction of a pixel)
+uniform float uIsoMapStep;         // ... and a view pixel in map pixels
+uniform ivec2 uIsoMapOffset;       // the map's offset (whole pixels)
+uniform int uIsoViewLevel, uIsoLowLevel; // the levels shown
+uniform int uIsoNightVision;       // the map's night vision colour (0: off)
+uniform int uIsoSmooth;            // the smooth frames' factor (0: the frames as they are)
+uniform float uIsoSmoothShare;     // ...the share of pixels showing them (dissolving in and out; see isoSmoothHere)
+bool isoSmoothHere = true;         // ...this pixel does
+uniform int uIsoLight;             // 1 the extra "smooth light", 2 "true colour"
+uniform int uIsoSwings;            // 1: doors swing this frame (their voxels are walked to)
+uniform int uIsoColourLights;      // 3DIso's extra "coloured light": how many of uColorLightAt and uColorLightOf (0: none)
+// (3DIso's coloured light on our 3D art: the hit's colour unshaded and where it's lit, set by shadeHit)
+uint isoRawColor;
+vec3 isoLitPoint;
+bool isoLitValid;
+// (3DIso, the original art while a door swings: window glass stops the walk, as the CPU's glassStops; glass filled into an
+// opening is passed untinted)
+bool isoGlassStops = false;
+// (3DIso: the sun map, see sunMapSays and FirstPersonGpu.cpp's updateSunMap)
+uniform int uSunMapOn;
+uniform sampler2D uSunMap;
+uniform vec2 uSunMapFrom;          // ...its first texel's corner, across and along the sun's light (voxels)
+uniform float uSunMapStep;         // ...a texel's size (voxels)
+uniform ivec2 uSunMapSize;         // ...its finest level's size (texels)
+uniform vec3 uSunAcross, uSunAlong, uSunMapDir; // ...its ways: across the light, along it, and at the sun
+#endif
 
+#ifdef SUN_MAP
+layout(location = 0) out float outSun;    // 3DIso's sun map (see SunMapSource): how high toward the sun its light first meets something
+#else
 layout(location = 0) out uint outColor;   // the palette colour
 layout(location = 1) out float outDepth;  // along the view axis
 layout(location = 2) out uint outGlow;    // 1 where the pixel shines, 3 a UFO's light (for the bloom)
 layout(location = 3) out vec4 outTrue;    // the pixel in full colour (setting "True colour"): red, green, blue; and the glow again (as outGlow / 255)
+#endif
 #ifdef RESULTS
+#ifdef ISO_RESULTS
+// 3DIso's frames (research): only what they need of a ray's findings, a number a pixel (FirstPersonGpu::Output::isoResults):
+// the tile | the part << 26 | 1 << 29 where something was met | 1 << 30 the art's floor, pushed back by 20 (the marks lie
+// on it) | 1 << 31 the art past the map's box (no marks); none met: 0.
+layout(location = 4) out uint outIsoResult;
+#else
 layout(location = 4) out uvec4 outResult; // FirstPersonGpu::RayResult (the check against the CPU's rays only)
+#endif
 #endif
 // Setting "Reflections" in two goes (see FirstPersonGpu.cpp, castRays): the program with the mirrors' rays in it is slow
 // for every pixel, whether it has a mirror or not (a street with a few windows in sight, 1280 x 800: 14.2 ms a frame
@@ -108,6 +163,18 @@ const float Infinity = uintBitsToFloat(0x7F800000u);
 const vec3 CellSize = vec3(16.0, 16.0, 24.0);
 const ivec3 CellVoxels = ivec3(16, 16, 24);
 const int RAY_HIT = 0, RAY_SIDE = 1, RAY_TOP = 2, RAY_BOTTOM = 3, RAY_FAR = 4;
+#ifdef RESULTS
+#ifdef ISO_RESULTS
+void putResult(uvec4 result)
+{
+	bool art = ((result.y >> 11) & 1u) != 0u, noMarks = ((result.y >> 3) & 1u) != 0u;
+	outIsoResult = ((result.y >> 12) & 15u) != uint(RAY_HIT) ? 0u : (result.x & 0x3FFFFFFu) | (result.y & 7u) << 26 | 1u << 29
+		| (art && (result.y & 7u) == 0u && !noMarks ? 1u << 30 : 0u) | (art && noMarks ? 1u << 31 : 0u);
+}
+#else
+void putResult(uvec4 result) { outResult = result; }
+#endif
+#endif
 const float GhostNearDistance = 24.0, GhostFarDistance = 112.0, GhostNearOpacity = 0.5, GhostFarOpacity = 0.3;
 const float Bayer[16] = float[16](0.0 / 16.0, 8.0 / 16.0, 2.0 / 16.0, 10.0 / 16.0, 12.0 / 16.0, 4.0 / 16.0, 14.0 / 16.0, 6.0 / 16.0,
 	3.0 / 16.0, 11.0 / 16.0, 1.0 / 16.0, 9.0 / 16.0, 15.0 / 16.0, 7.0 / 16.0, 13.0 / 16.0, 5.0 / 16.0);
@@ -303,6 +370,22 @@ bool traceTile(int tileIndex, ivec3 tileCell, vec3 rayOrigin, vec3 rayDirection,
 				}
 				if ((modelRow(model, 0, local) & bit) != 0u)
 				{
+#ifdef ISO_RESULTS
+					if (isoGlassStops)
+					{
+						if ((modelRow(model, 1, local) & bit) != 0u) continue;
+						if ((modelRow(model, 2, local) & bit) != 0u) continue;
+						hit.glass = true;
+						hit.color = color;
+						hit.t = span;
+						hit.axis = faceAxis;
+						hit.part = part;
+						hit.ghost = onGhost;
+						hit.voxel = local;
+						hit.emissive = false;
+						return true;
+					}
+#endif
 					if (!hit.glass) { hit.glassT = span; hit.glassAxis = faceAxis; }
 					hit.glass = true; // window glass: seen through, tinted
 					continue;
@@ -442,7 +525,7 @@ uniform vec3 uMuzzleFlashPos;
 uniform int uUfoLightsOn, uWallPaint;
 // The finer picture, on the card only (settings, all off by default: with them off the picture is the CPU's).
 uniform int uSoftShadows, uAllLightShadows, uAmbientOcclusion;
-#ifdef COLORED_LIGHTS
+#if defined(COLORED_LIGHTS) || defined(ISO_RESULTS)
 uniform vec4 uColorLightAt[16]; // setting "Coloured lights": each light's place (voxels) and reach
 uniform vec4 uColorLightOf[16]; // ... its colour (0..1 each) and strength
 uniform int uColorLightCount;
@@ -473,6 +556,45 @@ vec3 paletteRgb(uint color)
 }
 const float LampReach = 120.0;     // how far a lamp lights (voxels)
 const float SunDiscRadius = 0.04;  // the sun as a disc this wide (the tangent of its half-angle): the width of a shadow's soft edge, a 25th of the way it fell
+#ifdef ISO_RESULTS
+// 3DIso (research): with one ray at the sun (not "Soft sun shadows", whose rays round the sun's disc reach further off), a
+// point surely in the sun or in its shadow is read from the sun map (FirstPersonGpu.cpp, updateSunMap: made anew only where
+// the terrain changed) instead of walking that ray. A texel holds how high toward the sun its column of the sun's light
+// first meets something (from above: that column's top). The ray leaves the point straight up its own column:
+// - surely lit when no column within a voxel of it meets anything above the point's own face (its plane through the
+//   point) by more than a little slack: nothing there can stand in the ray's way;
+// - surely shadowed when each column within half a voxel of it meets something well above that face and in the ray's
+//   reach (shadowed's 260): the ray meets that, or something under it, first. (A gap narrower than the texels' spacing
+//   between those columns isn't seen: a sliver of light through it is shadow here, 5 pixels of a million in urban.)
+// Else (a shadow's edge, a face at the sun's edge) the ray decides, as ever.
+const float SunMapSlack = 0.1, SunMapShadowFrom = 1.0, SunMapShadowReach = 250.0;
+int sunMapSays(vec3 point, vec3 normal)
+{
+	float facing = dot(normal, uSunMapDir);
+	if (uSunMapOn == 0 || facing <= 0.05) return 0;
+	vec2 at = (vec2(dot(point, uSunAcross), dot(point, uSunAlong)) - uSunMapFrom) / uSunMapStep - 0.5; // (texels, from the first's middle)
+	float height = dot(point, uSunMapDir);
+	float riseAcross = -dot(normal, uSunAcross) / facing, riseAlong = -dot(normal, uSunAlong) / facing; // (the face's rise toward the sun, a voxel across and along)
+	ivec2 low = ivec2(ceil(at - 1.0 / uSunMapStep)), high = ivec2(floor(at + 1.0 / uSunMapStep));
+	bool lit = true, shadowed = true;
+	int nearOnes = 0; // (a big map's texels may be coarser than half a voxel: none near, no shadow said)
+	for (int y = low.y; y <= high.y; ++y)
+	{
+		for (int x = low.x; x <= high.x; ++x)
+		{
+			vec2 offset = (vec2(x, y) - at) * uSunMapStep; // (voxels from the point)
+			bool near = max(abs(offset.x), abs(offset.y)) <= 0.5;
+			// (no terrain off the map's box: lit, never shadowed)
+			float above = x < 0 || y < 0 || x >= uSunMapSize.x || y >= uSunMapSize.y ? -1.0e9 : texelFetch(uSunMap, ivec2(x, y), 0).r - height;
+			float face = offset.x * riseAcross + offset.y * riseAlong;
+			if (above > max(0.0, face) + SunMapSlack) lit = false;
+			if (near) ++nearOnes;
+			if (near && !(above - max(0.0, face) > SunMapShadowFrom && above < SunMapShadowReach)) shadowed = false;
+		}
+	}
+	return lit ? 1 : shadowed && nearOnes > 0 ? -1 : 0;
+}
+#endif
 const float CreaseShades = 4.5;    // how many palette shades the deepest corner is darkened
 const float CreaseFadeFrom = 260.0, CreaseFadeTo = 420.0; // corners aren't darkened beyond this far (voxels): too fine to see, and they would shimmer
 #ifdef METAL
@@ -501,7 +623,7 @@ int reliefMirroredPart, reliefMirrorAxis; // ... the part looked at there (-1: a
 int reliefPaintedBase, reliefPaintedTurn, reliefPaintedAxis; // a wall's paint: its donor's side picture, which way its columns run along the wall, and the wall's axis
 ivec2 reliefPaintedAt;       // ... and the column and row there
 #endif
-uniform float uUfoPulse[32], uUfoBreath, uUfoFaceShade[64];
+uniform float uUfoPulse[32], uUfoBreath, uUfoFaceShade[64], uUfoRoofedFaceShade[64];
 
 const int SkyEarth = 0, SkySpace = 1, SkyOrbit = 2, SkyMoon = 3, SkyMars = 4, SkySea = 5, SkyVoid = 6;
 // The rows of uTables.
@@ -578,7 +700,7 @@ float cloudNoise(float x, float y)
 
 float distanceShade(float span)
 {
-	return span / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts);
+	return span / max(DistanceShadeVoxels, uMaxDistance / DistanceShadeReachParts) * uDistanceShare;
 }
 
 float hazeStart()
@@ -588,7 +710,7 @@ float hazeStart()
 
 float terrainHaze(float span)
 {
-	return uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, span) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, span);
+	return (uUnderwater != 0 ? smoothStep(uMaxDistance * 0.12, uMaxDistance * 0.65, span) : smoothStep(uMaxDistance * hazeStart(), uMaxDistance, span)) * uDistanceShare;
 }
 
 uint hazeColor(uint color, float haze, int pixelX, int pixelY)
@@ -604,7 +726,7 @@ uint hazeColor(uint color, float haze, int pixelX, int pixelY)
 // A tile's light (texel 1) and its facts (texel 1's z: discovered, smoke, burning, roofed).
 uvec4 tileLightTexel(int tileIndex) { return texelFetch(uTiles, tileIndex * 4 + 1); }
 
-float lightAt(vec3 point, out float ufoGlow)
+float lightAt(vec3 point, out float ufoGlow, out float roofed)
 {
 	int tileX = clamp(int(floor(point.x / 16.0)), 0, uSize.x - 1);
 	int tileY = clamp(int(floor(point.y / 16.0)), 0, uSize.y - 1);
@@ -614,16 +736,17 @@ float lightAt(vec3 point, out float ufoGlow)
 	if (uSmoothLighting == 0)
 	{
 		ufoGlow = ownTileGlow / 255.0;
+		roofed = (ownTile.z & 0x20000u) != 0u ? 1.0 : 0.0;
 		return ownTileShade;
 	}
 	float gridX = point.x / 16.0 - 0.5, gridY = point.y / 16.0 - 0.5, gridZ = point.z / 24.0 - 0.5;
 	int lowX = int(floor(gridX)), lowY = int(floor(gridY)), lowZ = int(floor(gridZ));
 	float fractionX = gridX - float(lowX), fractionY = gridY - float(lowY), fractionZ = gridZ - float(lowZ);
-	float blendedShade = 0.0, blendedGlow = 0.0;
+	float blendedShade = 0.0, blendedGlow = 0.0, blendedRoofed = 0.0;
 	for (int corner = 0; corner < 8; ++corner)
 	{
 		int cornerX = lowX + (corner & 1), cornerY = lowY + ((corner >> 1) & 1), cornerZ = clamp(lowZ + ((corner >> 2) & 1), 0, uSize.z - 1);
-		float cornerShade, cornerGlow = 0.0;
+		float cornerShade, cornerGlow = 0.0, cornerRoofed = 0.0;
 		if (cornerX < 0 || cornerY < 0 || cornerX >= uSize.x || cornerY >= uSize.y)
 		{
 			cornerShade = float(uAmbient);
@@ -634,14 +757,23 @@ float lightAt(vec3 point, out float ufoGlow)
 			bool discovered = (tileLight.z & 1u) != 0u;
 			cornerShade = discovered ? float(tileLight.x & 0xFFu) : ownTileShade;
 			cornerGlow = discovered ? float(tileLight.x >> 24) : ownTileGlow;
+			cornerRoofed = ((discovered ? tileLight.z : ownTile.z) & 0x20000u) != 0u ? 1.0 : 0.0;
 		}
 		float weight = ((corner & 1) != 0 ? fractionX : 1.0 - fractionX) * (((corner >> 1) & 1) != 0 ? fractionY : 1.0 - fractionY)
 			* (((corner >> 2) & 1) != 0 ? fractionZ : 1.0 - fractionZ);
 		blendedShade += cornerShade * weight;
 		blendedGlow += cornerGlow * weight;
+		blendedRoofed += cornerRoofed * weight;
 	}
 	ufoGlow = blendedGlow / 255.0;
+	roofed = blendedRoofed;
 	return blendedShade;
+}
+
+float lightAt(vec3 point, out float ufoGlow)
+{
+	float roofed;
+	return lightAt(point, ufoGlow, roofed);
 }
 
 bool shadowed(vec3 from, vec3 to)
@@ -1635,6 +1767,12 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 	bool discovered = (tileFacts.z & 1u) != 0u;
 	int tilesPerLevel = uSize.x * uSize.y;
 
+	// (3DIso turned: what the squad hasn't found is black, as on the map)
+	// (what the map draws black, the squad not having found it, see FirstPersonView::isoUnfound: a wall not seen; anything on a
+	// tile whose floor isn't, but a door in its walls the squad has seen. The flight: black dissolving away, see uUnknownDark.)
+	bool wallHit = hit.part == 1 || hit.part == 2;
+	bool unfound = (wallHit && ((seenBits >> uint(hit.part)) & 1u) == 0u) || (!discovered && !(wallHit && (tileFacts.z & (1u << uint(17 + hit.part))) != 0u));
+	if (unfound && (uIsoTurned != 0 || dither(pixelX + 2, pixelY + 3) < uUnknownDark)) { hit.emissive = false; return 15u; } // (no glow round it)
 	// Unexplored parts, as the setting "Unseen terrain" has them.
 	bool seenByTheView = false;
 	if (uFogOfWar != 1)
@@ -1837,32 +1975,47 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 #endif
 	}
 	vec3 surfacePoint = rayOrigin + rayDirection * hit.t + normal * 1.5;
+#ifdef ISO_RESULTS
+	// (3DIso's coloured light: the colour unshaded and where it's lit, as the CPU keeps them, see FirstPersonView::ShadeDetail)
+	isoRawColor = baseColor;
+	isoLitPoint = surfacePoint;
+	isoLitValid = true;
+#endif
 	bool indoors = indoorsAt(surfacePoint);
-	float faceShading = indoors ? uIndoorFaceShade[faceIndex] : uFaceShade[faceIndex];
+	float openFaceShading = uFaceShade[faceIndex], roofedFaceShading = uIndoorFaceShade[faceIndex];
 	// (the part itself, as the tile has it: a steady UFO model's open faces and its lights' pulse)
 	uvec4 partInfo = hit.part >= 0 ? texelFetch(uModelInfo, int(parts[hit.part])) : uvec4(0u);
 	bool onSteadyUfo = partInfo.w != 0u;
 	uint ufoMarks = texelFetch(uTiles, hitTile * 4 + 2).z; // which UFO's light reaches the tile (+1) | its pulse phase and marks << 8
-	if (!indoors && onSteadyUfo)
+	if (onSteadyUfo)
 	{
 		uint openFaces = exposedAt(partInfo, hit.voxel);
-		if (((openFaces >> uint(faceIndex)) & 1u) != 0u && uUfoFaceShade[openFaces & 63u] >= 0.0) faceShading = uUfoFaceShade[openFaces & 63u];
+		if (((openFaces >> uint(faceIndex)) & 1u) != 0u && uUfoFaceShade[openFaces & 63u] >= 0.0)
+		{
+			openFaceShading = uUfoFaceShade[openFaces & 63u];
+			roofedFaceShading = uUfoRoofedFaceShade[openFaces & 63u];
+		}
 	}
-	float ufoGlow = 0.0;
-	float shade = lightAt(surfacePoint, ufoGlow) + faceShading + distanceShade(hit.t) + waveShade;
+	float faceShading = indoors ? roofedFaceShading : openFaceShading;
+	float ufoGlow = 0.0, roofed = 0.0; // (roofed: how much the point is under a roof, blended like the light, see lightAt)
+	float shade = lightAt(surfacePoint, ufoGlow, roofed) + distanceShade(hit.t) + waveShade;
+	if (indoors && underRock(surfacePoint.z)) roofed = 1.0;
 	if (uUfoLightsOn == 0) ufoGlow = 0.0;
-	float sunShadow = 0.0;
+	float sunShadow = 0.0, sunShadowShare = 0.0; // (the shade a sun shadow adds, and that as a share of the deepest)
 	float lampLight = 0.0; // (the shades the lamps near the place brighten it by)
 	if (hit.emissive)
 	{
 		int pulseKind = int(partInfo.z >> 24);
-		shade = pulseKind != 0 ? uUfoPulse[(pulseKind - 1) * 16 + int((ufoMarks >> 8) & 15u)] : min(shade, 0.5);
+		shade = pulseKind != 0 ? uUfoPulse[(pulseKind - 1) * 16 + int((ufoMarks >> 8) & 15u)] : min(shade + faceShading, 0.5);
 	}
 	else if (uShadows != 0)
 	{
+		// (a sun shadow as deep as the game's shade under a roof, its face shaded as under a roof; the roof's shade the light
+		// already holds at a roof's edge counts towards it: as shadeHit on the CPU)
+		const float RoofShade = 2.0;
 		float daylight = uUnderwater != 0 || uOvercast != 0 || uSky == SkyVoid ? 0.0 : 1.0 - uNight;
 		float sunFacing = dot(normal, uSunDir);
-		if (!indoors && daylight > 0.3 && sunFacing > 0.05 && hit.t < 640.0)
+		if (roofed < 1.0 && daylight > 0.3 && sunFacing > 0.05 && hit.t < 640.0)
 		{
 			// One ray at the sun; with the setting "Soft sun shadows", four at points round its disc, the ring of them
 			// turned from pixel to pixel: the share that is blocked is the shadow's depth, so its edge fades.
@@ -1874,6 +2027,11 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			vec3 along = cross(uSunDir, across);
 			float turn = dither(pixelX + 1, pixelY + 3) * 1.5707963;
 			float blocked = 0.0;
+#ifdef ISO_RESULTS
+			int sunSays = sunRays == 1 ? sunMapSays(surfacePoint, normal) : 0; // (surely in the sun or its shadow: no ray)
+			if (sunSays != 0) sunRays = 0;
+			if (sunSays < 0) blocked = 1.0;
+#endif
 			for (int turnOf = 0; turnOf < sunRays; ++turnOf)
 			{
 				int sunRay = turnOf < 2 ? turnOf * 2 + 1 : (turnOf - 2) * 2; // (the rim's two, then the inner two)
@@ -1890,20 +2048,23 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 					break;
 				}
 			}
-			sunShadow = 3.0 * daylight * blocked;
-			shade += sunShadow;
+			faceShading = mix(mix(openFaceShading, roofedFaceShading, roofed), roofedFaceShading, blocked);
+			sunShadowShare = daylight * blocked * (1.0 - roofed);
+			sunShadow = RoofShade * sunShadowShare;
 		}
+		shade += faceShading + sunShadow;
 		lampLight = pointLight(surfacePoint, normal, true);
 		shade -= lampLight;
 	}
 	else
 	{
+		shade += faceShading;
 		lampLight = pointLight(surfacePoint, normal, false);
 		shade -= lampLight;
 	}
 #ifdef RELIEF
 	// The faces' own light on the tilted face, by the cosine law their shading is made with; less of it in the sun's shadow.
-	float reliefShade = -dot(reliefTilt, indoors ? uSunDir : uShadingDir) * max(indoors ? 0.5 : uShadingTurn, ReliefLeastTurn) * (1.0 - ReliefInShadow * sunShadow / 3.0);
+	float reliefShade = -dot(reliefTilt, indoors ? uSunDir : uShadingDir) * max(indoors ? 0.5 : uShadingTurn, ReliefLeastTurn) * (1.0 - ReliefInShadow * sunShadowShare);
 	shade += reliefShade;
 #endif
 	float flare = 0.0;
@@ -1967,7 +2128,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 		float day = uUnderwater != 0 || uOvercast != 0 || uSky == SkyVoid ? 0.0 : 1.0 - uNight;
 		if (!indoors && day > 0.3 && dot(metalNormal, uSunDir) > 0.0)
 		{
-			sheen += MetalSun * pow(max(0.0, dot(metalNormal, normalize(uSunDir + toEye))), MetalShine) * day * (1.0 - sunShadow / (3.0 * day));
+			sheen += MetalSun * pow(max(0.0, dot(metalNormal, normalize(uSunDir + toEye))), MetalShine) * day * (1.0 - sunShadowShare / day);
 		}
 		float lookedAlong = 1.0 - metalFacing;
 		sheen += MetalRim * lookedAlong * lookedAlong * lookedAlong * (indoors ? 0.3 : 1.0) * (1.0 - 0.7 * uNight);
@@ -1981,7 +2142,7 @@ uint shadeHit(inout Hit hit, int hitTile, vec3 rayOrigin, vec3 rayDirection, int
 			vec3 flakeTilt = vec3(float((flakeHash >> 8) & 255u), float((flakeHash >> 16) & 255u), float((flakeHash >> 24) & 255u)) / 127.5 - 1.0;
 			vec3 flakeNormal = normalize(metalNormal + flakeTilt * MetalFlakeTilt);
 			float flakeGlint = 0.0;
-			if (!indoors && day > 0.3) flakeGlint += pow(max(0.0, dot(flakeNormal, normalize(uSunDir + toEye))), MetalFlakeShine) * day * (1.0 - sunShadow / (3.0 * day));
+			if (!indoors && day > 0.3) flakeGlint += pow(max(0.0, dot(flakeNormal, normalize(uSunDir + toEye))), MetalFlakeShine) * day * (1.0 - sunShadowShare / day);
 			flakeGlint += (lampLight + flare * 10.0) * pow(max(0.0, dot(flakeNormal, toEye)), MetalFlakeShine);
 			sheen += MetalFlake * flakeGlint;
 		}
@@ -2252,6 +2413,259 @@ vec3 lightShafts(vec3 rgb, vec3 rayDirection, float span)
 }
 #endif
 
+#ifdef ISO_RESULTS
+// 3DIso's original art (research): FirstPersonView::isoShaded, isoArtAlong and the art's light in renderRows, line for line.
+
+// 3DIso's extra "coloured light" (FirstPersonView::isoLightAdded, isoColouredLight): the lights near a point added to a colour
+// (unshaded, a little brighter, times the light's colour and power, falling off squared to its reach; no facing, no shadows),
+// and back in the palette, the nearest colour, dithered.
+vec3 isoLightAdded(uint raw, vec3 point, out bool lit)
+{
+	vec3 surface = paletteRgb(raw), added = vec3(0.0);
+	lit = false;
+	for (int index = 0; index < uIsoColourLights; ++index)
+	{
+		vec3 towards = uColorLightAt[index].xyz - point;
+		towards.z *= ZScale;
+		float span = sqrt(dot(towards, towards));
+		if (span >= uColorLightAt[index].w) continue;
+		float falling = 1.0 - span / uColorLightAt[index].w;
+		float power = falling * falling * uColorLightOf[index].w * 0.75;
+		if (power < 0.02) continue;
+		added += (surface * 0.9 + vec3(40.0)) * uColorLightOf[index].rgb * power;
+		lit = true;
+	}
+	return added;
+}
+
+uint isoColouredLight(uint shaded, uint raw, vec3 point, int pixelX, int pixelY)
+{
+	bool lit;
+	vec3 added = isoLightAdded(raw, point, lit);
+	if (!lit) return shaded;
+	float wobble = (dither(pixelX, pixelY) - 0.5) * 8.0;
+	ivec3 rgb = clamp(ivec3(paletteRgb(shaded) + added + vec3(wobble)), ivec3(0), ivec3(255));
+	return texelFetch(uBlend, 768 + ((rgb.r >> 3) << 10 | (rgb.g >> 3) << 5 | (rgb.b >> 3))).r;
+}
+
+// A colour shaded as the map blits terrain: down its group by the shade, black past the group's end; under the map's
+// night vision, in its group.
+uint isoShaded(uint color, int shade)
+{
+	if (uIsoNightVision != 0)
+	{
+		int shaded = int(color & 15u) + shade;
+		return (shaded & 0xF0) != 0 ? 15u : uint(((uIsoNightVision - 1) << 4) | shaded);
+	}
+	uint shaded = (color + uint(shade)) & 0xFFu;
+	return ((shaded ^ color) & 0xF0u) != 0u ? 15u : shaded;
+}
+
+// What the painter found at a pixel: the frame's pixel, the map's shade, the tile and part, how far along the ray it lies
+// (a floor pushed back), where it's lit from (not pushed back) and its place.
+struct IsoArt
+{
+	uint raw;
+	int shade, tile, part;
+	float distance, lightDistance;
+	vec3 point;
+};
+
+/**
+ * The map's painter for one pixel: every tile whose frames can cover the map's pixel, on each level shown, in the order
+ * the map draws them (level by level up, then south, then east; in a tile its floor, west wall, north wall, object), the
+ * last with a pixel there wins (see FirstPersonView::isoArtAlong).
+ * @param whole, fraction The map's pixel (less the map's offset) the view's pixel's middle is in: whole pixels, and the rest.
+ */
+bool paintIso(ivec2 whole, vec2 fraction, vec3 origin, vec3 direction, out IsoArt art)
+{
+	art.raw = 0u; art.shade = 0; art.tile = 0; art.part = 0; art.distance = Infinity; art.lightDistance = Infinity; art.point = vec3(0.0);
+	int pixelX = whole.x + int(floor(fraction.x)), pixelY = whole.y + int(floor(fraction.y));
+	// (the levels' cut sliding between two levels: the level it's in shows only its art below the cut)
+	float cutLevels = uClipTop / 24.0;
+	bool cutBetween = abs(cutLevels - floor(cutLevels + 0.5)) > 0.01;
+	int topLevel = cutBetween ? int(floor(cutLevels)) : uIsoViewLevel;
+	int lowU = int(ceil(float(pixelX - 31) / 16.0)), highU = int(floor(float(pixelX) / 16.0));
+	for (int z = min(topLevel, uSize.z - 1); z >= uIsoLowLevel; --z)
+	{
+		int highV = int(floor(float(pixelY + 24 * z) / 8.0)) + 3, lowV = int(floor(float(pixelY + 24 * z - 40) / 8.0)) - 1;
+		int highY = int(floor(float(highV - lowU) / 2.0)), lowY = int(ceil(float(lowV - highU) / 2.0));
+		for (int y = min(highY, uSize.y - 1); y >= max(lowY, 0); --y)
+		{
+			for (int u = highU; u >= lowU; --u)
+			{
+				int x = u + y, v = x + y;
+				if (v < lowV || v > highV || x < 0 || x >= uSize.x) continue;
+				int index = (z * uSize.y + y) * uSize.x + x;
+				uvec4 tileArt = texelFetch(uIsoArt, uIsoTilesAt + index);
+				if (tileArt == uvec4(0u)) continue;
+				int tileX = x * 16 - y * 16, tileY = x * 8 + y * 8 - z * 24;
+				for (int rank = 0; rank < 4; ++rank)
+				{
+					int part = 3 - rank; // (last drawn first: the object, the north wall, the west wall, the floor)
+					uint entry = tileArt[part];
+					if ((entry & 0xFFFFu) == 0u) continue;
+					uvec4 frameInfo = texelFetch(uIsoArt, int(entry & 0xFFFFu) - 1);
+					int yOffset = int((entry >> 21) & 0xFFu) - 128;
+					int originY = tileY - yOffset;
+					int width = int(frameInfo.y & 0xFFFFu), height = int(frameInfo.y >> 16);
+					int spriteX = pixelX - tileX, spriteY = pixelY - originY;
+					if (spriteX < 0 || spriteY < 0 || spriteX >= width || spriteY >= height) continue;
+					if ((entry & (1u << 29)) != 0u && spriteX < width / 2) continue; // (a north wall beside a west wall: its right half)
+					uint drawn;
+					if (uIsoSmooth > 0 && frameInfo.z != 0u && (entry & 0x80000000u) != 0u && isoSmoothHere)
+					{
+						// (its smooth version, taken at the point itself)
+						int bigWidth = int(frameInfo.w & 0xFFFFu), bigHeight = int(frameInfo.w >> 16);
+						int bigX = clamp(int(floor((float(whole.x - tileX) + fraction.x) * float(uIsoSmooth))), 0, bigWidth - 1);
+						int bigY = clamp(int(floor((float(whole.y - originY) + fraction.y) * float(uIsoSmooth))), 0, bigHeight - 1);
+						drawn = texelFetch(uIsoFrames, int(frameInfo.z - 1u) + bigY * bigWidth + bigX).r;
+					}
+					else
+					{
+						drawn = texelFetch(uIsoFrames, int(frameInfo.x) + spriteY * width + spriteX).r;
+					}
+					if (drawn == 0u) continue;
+					// Where on its tile the art pixel lies: a floor on the bottom, a wall on its tile's edge, an object on the
+					// plane through the tile's middle square to the view.
+					float artX = float(whole.x - tileX) + fraction.x, artY = float(whole.y - originY) + fraction.y;
+					vec3 place = vec3(8.0, 8.0, 0.0);
+					if (part == 1) place = vec3(1.0, 16.0 - artX, 24.0 + (16.0 - artX) / 2.0 + float(yOffset) - artY);
+					else if (part == 2) place = vec3(artX - 16.0, 1.0, 24.0 + (artX - 16.0) / 2.0 + float(yOffset) - artY);
+					else if (part == 3) place = vec3(artX / 2.0, 16.0 - artX / 2.0, 32.0 + float(yOffset) - artY);
+					if (cutBetween && z == topLevel)
+					{
+						// (a floor fades in or out with the cut's way through its level, dithered; the rest below the cut)
+						bool shown = part == 0 ? dither(2 * (whole.x + uIsoMapOffset.x) + int(floor(fraction.x * 2.0)), 2 * (whole.y + uIsoMapOffset.y) + int(floor(fraction.y * 2.0))) < (uClipTop - float(z) * 24.0) / 24.0
+							: float(z) * 24.0 + place.z < uClipTop;
+						if (!shown) continue;
+					}
+					art.raw = drawn;
+					art.shade = int((entry >> 16) & 31u);
+					art.tile = index;
+					art.part = part;
+					if (part == 0 && direction.z < 0.0)
+					{
+						// (a floor lies on its tile's bottom; pushed back so that it hides no unit on its own level)
+						art.lightDistance = (origin.z - (float(z) * 24.0 + 1.0)) / -direction.z;
+						art.point = origin + direction * art.lightDistance;
+						art.distance = art.lightDistance + 20.0;
+					}
+					else
+					{
+						art.point = vec3(float(x) * 16.0 + place.x, float(y) * 16.0 + place.y, float(z) * 24.0 + clamp(place.z, 0.5, 40.0));
+						art.distance = dot(art.point - origin, direction);
+						art.lightDistance = art.distance;
+					}
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+// The flares' light at a point lit from any side (FirstPersonView::flareLight without a normal).
+float isoFlareLight(vec3 point)
+{
+	float powers[8];
+	int order[8];
+	int count = 0;
+	float darkness = uUnderwater != 0 ? 0.6 : 0.3 + 0.7 * uNight;
+	for (int flare = 0; flare < uFlareCount && count < 8; ++flare)
+	{
+		float dx = uFlares[flare].x - point.x, dy = uFlares[flare].y - point.y, dz = uFlares[flare].z - point.z;
+		float span = sqrt(dx * dx + dy * dy + dz * dz);
+		if (span > FlareReach || span < 0.01) continue;
+		float power = (1.0 - span / FlareReach) * (1.0 - span / FlareReach) * uFlares[flare].w * uFlareFlicker[flare] * darkness;
+		if (power < 0.02) continue;
+		powers[flare] = power;
+		order[count] = flare;
+		++count;
+	}
+	for (int sorted = 1; sorted < count; ++sorted)
+	{
+		for (int rank = sorted; rank > 0 && powers[order[rank - 1]] < powers[order[rank]]; --rank)
+		{
+			int swapped = order[rank - 1]; order[rank - 1] = order[rank]; order[rank] = swapped;
+		}
+	}
+	for (int rank = 0; rank < count && rank < 2; ++rank)
+	{
+		if (uShadows == 0 || powers[order[rank]] < 0.08 || !shadowed(point, uFlares[order[rank]].xyz))
+		{
+			return powers[order[rank]];
+		}
+	}
+	return 0.0;
+}
+
+// The check's numbers for an art pixel: its tile and part, that it's the art's (1 << 11), no marks on it (1 << 3: past the
+// map's box; see putResult); none: nothing met.
+uvec4 isoArtResult(bool found, IsoArt art, float markDepth, bool noMarks)
+{
+	return found ? uvec4(uint(art.tile), uint(art.part & 7) | (noMarks ? 1u << 3 : 0u) | 1u << 11 | uint(RAY_HIT) << 12 | art.raw << 16, 0u, floatBitsToUint(markDepth))
+		: uvec4(0u, uint(RAY_FAR) << 12, 0u, floatBitsToUint(Infinity));
+}
+
+/**
+ * An art pixel's colour, depth and full colour, lit as renderRows lights it: the map's shade; with the extra "smooth light"
+ * the game's light where the pixel is in the world, and the flares' (red), dithered; in full colour between its two
+ * nearest shades.
+ */
+void isoArtOut(bool found, IsoArt art, vec3 lightPoint, float depthDistance, float markDistance, float directionLength, int pixelX, int pixelY, bool first,
+	out uint rayColor, out float rayDepth, out uint rayGlow, out vec3 rayFullColor)
+{
+	rayGlow = 0u;
+	if (!found)
+	{
+		rayColor = 0u;
+		rayDepth = Infinity;
+		rayFullColor = vec3(0.0);
+		if (first) putResult(isoArtResult(false, art, Infinity, true));
+		return;
+	}
+	uint color = isoShaded(art.raw, art.shade);
+	bool smoothLit = (uIsoLight & 1) != 0, coloured = uIsoColourLights > 0 && uIsoNightVision == 0;
+	bool fullSet = false;
+	vec3 rgb = vec3(0.0);
+	if ((smoothLit || uFlareCount > 0 || coloured) && art.shade < 16)
+	{
+		float ufoGlow;
+		float shade = smoothLit ? lightAt(lightPoint, ufoGlow) : float(art.shade);
+		float flare = uFlareCount > 0 ? isoFlareLight(lightPoint) : 0.0;
+		shade -= flare * 10.0;
+		if (smoothLit || flare > 0.0)
+		{
+			color = isoShaded(art.raw, clamp(int(shade + dither(pixelX, pixelY)), 0, 15));
+			if (flare * 1.5 > 0.04 + dither(pixelX + 1, pixelY + 3)) color = table(FlareRow, color);
+		}
+		if (coloured) color = isoColouredLight(color, art.raw, lightPoint, pixelX, pixelY);
+		if ((uIsoLight & 2) != 0)
+		{
+			float clamped = clamp(shade, 0.0, 15.0);
+			int lower = int(clamped);
+			rgb = mix(paletteRgb(isoShaded(art.raw, lower)), paletteRgb(isoShaded(art.raw, min(15, lower + 1))), clamped - float(lower));
+			if (flare > 0.0)
+			{
+				float red = min(1.0, flare * 1.5);
+				rgb.r = rgb.r * (1.0 + 0.35 * red) + 30.0 * red;
+				rgb.g *= 1.0 - 0.25 * red;
+				rgb.b *= 1.0 - 0.4 * red;
+			}
+			bool lit;
+			if (coloured) rgb += isoLightAdded(art.raw, lightPoint, lit);
+			rgb = clamp(rgb, vec3(0.0), vec3(255.0));
+			fullSet = true;
+		}
+	}
+	rayColor = color;
+	rayFullColor = fullSet ? rgb : paletteRgb(color);
+	rayDepth = depthDistance / directionLength;
+	if (first) putResult(isoArtResult(true, art, markDistance / directionLength, false));
+}
+#endif
+
 // The pixel of the view this fragment's ray is cast for (its block's first): the fragment's own place, but in one of
 // "VR foveation"'s three goes, where the picture drawn into is smaller than the eye's (see main).
 ivec2 rayPixel;
@@ -2272,38 +2686,192 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		: (1.0 - (float(topRow) + float(uPixelSize) * (0.5 + offset.y)) * 2.0 / float(uViewSize.y)) * uHalfPlane.y;
 	float planeU = uEyePlane.z > 0.0 ? ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) - uEyePlane.x) / uEyePlane.z
 		: ((float(leftColumn) + float(uPixelSize) * (0.5 + offset.x)) * 2.0 / float(uViewSize.x) - 1.0) * uHalfPlane.x;
-	vec3 rayDirection = uForward + planeU * uRight + planeV * uUp;
+	// (3DIso, uOrtho: the rays parallel, along the view, each from its own place: the far eye's rays without its distance,
+	// which single precision can't hold; see FirstPersonView::setIsoCamera)
+	vec3 orthoAcross = (planeU * uRight + planeV * uUp) * uOrthoSpan;
+	vec3 rayDirection = uOrtho == 1 ? uForward : uForward + planeU * uRight + planeV * uUp;
 	rayDirection.z /= ZScale;
 	float directionLength = sqrt(rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z);
 	rayDirection /= directionLength;
 
 	Hit hit;
 	hit.color = 0u; hit.t = 0.0; hit.axis = -1; hit.part = 0; hit.voxel = ivec3(0); hit.glassT = 0.0; hit.glassAxis = -1;
-	float ghostThreshold = dither(blockColumn, blockRow) / uGhostScale;
-	float solidGhostThreshold = uSeeThroughCrops != 0 ? dither(blockColumn, blockRow) / SeeThroughCropOpacity : 0.0;
+	float ghostThreshold = uIsoTurned == 2 ? -1.0 : dither(blockColumn, blockRow) / uGhostScale; // (3DIso on the map's slant: ghosts solid, as the map draws them)
+	float solidGhostThreshold = uSeeThroughCrops != 0 && uIsoTurned != 2 ? dither(blockColumn, blockRow) / SeeThroughCropOpacity : 0.0;
 	int hitTile, endAxis;
 	float endDistance;
-	int rayEnd = castRay(uEye, rayDirection, uMaxDistance, ghostThreshold, solidGhostThreshold, hit, hitTile, endDistance, endAxis);
+	// 3DIso's flight (as FirstPersonView::renderRows): an eye outside the map (high over it, far off) casts from where the
+	// ray enters the map under uClipTop, that stretch added to the depth; a ray that never does shows the sky above the
+	// horizon and the ground beyond the map below it (met from a point on the ray above the border's posts).
+	vec3 rayOrigin = uEye;
+	float skipped = 0.0;
+	const float OrthoBack = 4096.0;
+	if (uOrtho == 1)
+	{
+		vec3 start = orthoAcross - uForward * OrthoBack;
+		start.z /= ZScale;
+		rayOrigin = uOrthoCentre + start;
+		skipped = (uOrthoSpan - OrthoBack) * directionLength;
+	}
+	else if (uOrtho == 2)
+	{
+		// (the flight's far eye: each ray from where it crosses the plane through uOrthoCentre, uOrthoSpan ahead of the eye, less
+		// OrthoBack: the same ray, without the eye's distance in single precision)
+		vec3 crossing = orthoAcross;
+		crossing.z /= ZScale;
+		rayOrigin = uOrthoCentre + crossing - rayDirection * OrthoBack;
+		skipped = uOrthoSpan * directionLength - OrthoBack;
+	}
+#ifdef ISO_RESULTS
+	// 3DIso's original art (research): this pixel the map's painter's, by our 3D art's share (dithered, as renderRows has it);
+	// what it found, from where the parallel ray starts (before the cut moves that on).
+	bool isoArtHere = uIsoArtOn != 0 && !(uIsoVoxelShare >= 1.0 || (uIsoVoxelShare > 0.0 && dither(leftColumn + 5, topRow + 7) < uIsoVoxelShare));
+	IsoArt art;
+	bool artFound = false;
+	vec3 artOrigin = rayOrigin;
+	float artSkipped = skipped;
+	isoSmoothHere = uIsoSmoothShare >= 1.0 || (uIsoSmoothShare > 0.0 && dither(leftColumn + 1, topRow + 2) < uIsoSmoothShare);
+	if (isoArtHere) artFound = paintIso(uIsoMapWhole, uIsoMapPart + vec2(float(leftColumn), float(topRow)) * uIsoMapStep, rayOrigin, rayDirection, art);
+#endif
+	// (3DIso's flight: round the map black as 3DIso has it, dissolving into the 3D view's ground and sky, see uUnknownDark)
+	bool aroundBlack = uIsoTurned != 0 || (uUnknownDark > 0.0 && dither(blockColumn + 2, blockRow + 3) < uUnknownDark);
+	if (uClipTop > 0.0)
+	{
+		bool uncut = uCutFade > 0.0 && dither(blockColumn + 3, blockRow + 1) < uCutFade;
+		float softCut = uClipSoftness > 0.0 ? -dither(blockColumn + 1, blockRow + 2) * uClipSoftness : 0.0;
+		vec3 high = vec3(float(uSize.x) * 16.0, float(uSize.y) * 16.0, uncut ? float(uSize.z) * 24.0 : uClipTop + softCut), low = vec3(0.0, 0.0, uClipBottom);
+		float enter = 0.0, leave = 1e30;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			if (abs(rayDirection[axis]) < 1e-9) { if (rayOrigin[axis] < low[axis] || rayOrigin[axis] >= high[axis]) leave = -1.0; continue; }
+			float nearSide = (low[axis] - rayOrigin[axis]) / rayDirection[axis], farSide = (high[axis] - rayOrigin[axis]) / rayDirection[axis];
+			enter = max(enter, min(nearSide, farSide));
+			leave = min(leave, max(nearSide, farSide));
+		}
+		if (leave <= enter + 0.02)
+		{
+#ifdef ISO_RESULTS
+			if (isoArtHere)
+			{
+				// (off the map's box: still the painter's, a floor's art reaching past its front edge; in the map's shade)
+				rayColor = artFound ? isoShaded(art.raw, art.shade) : 0u;
+				rayDepth = artFound ? (art.distance + artSkipped) / directionLength : Infinity;
+				rayGlow = 0u;
+				rayFullColor = paletteRgb(rayColor);
+				if (first) putResult(isoArtResult(artFound, art, Infinity, true));
+				return;
+			}
+#endif
+			float missDistance = Infinity;
+			uint missColor = 0u;
+			if (aroundBlack)
+			{
+				// (3DIso turned: the map's black round it)
+			}
+			else if (rayDirection.z >= 0.0)
+			{
+				missColor = skyColor(rayDirection, blockColumn, blockRow);
+			}
+			else
+			{
+				float above = GroundTop + float(uSurfaceLevel) * 24.0 + 48.0;
+				float reach = (rayOrigin.z - above) / -rayDirection.z;
+				if (reach > 0.0)
+				{
+					float groundDepth;
+					missColor = colorOutsideMap(rayOrigin + rayDirection * reach, rayDirection, 0.0, 0, blockColumn, blockRow, groundDepth);
+					missDistance = reach + groundDepth;
+				}
+			}
+			rayColor = missColor;
+			rayDepth = (missDistance + skipped) / directionLength; // (from the eye, as the CPU's: see uOrtho 2)
+			rayGlow = 0u;
+			rayFullColor = paletteRgb(missColor);
+			return;
+		}
+		enter += 0.01;
+		rayOrigin = clamp(rayOrigin + rayDirection * enter, low, high - vec3(0.001));
+		skipped += enter;
+	}
+#ifdef ISO_RESULTS
+	if (isoArtHere && uIsoSwings == 0)
+	{
+		// (no door swinging: the art needs no walk through the voxels)
+		isoArtOut(artFound, art, art.point - rayDirection * 2.0, art.distance + artSkipped, art.lightDistance + artSkipped, directionLength, leftColumn, topRow, first,
+			rayColor, rayDepth, rayGlow, rayFullColor);
+		return;
+	}
+#endif
+#ifdef ISO_RESULTS
+	isoGlassStops = isoArtHere;
+#endif
+	int rayEnd = castRay(rayOrigin, rayDirection, uMaxDistance, ghostThreshold, solidGhostThreshold, hit, hitTile, endDistance, endAxis);
+#ifdef ISO_RESULTS
+	isoGlassStops = false;
+#endif
 	// What the walk found, before the shading changes any of it (for the check against the CPU's).
 #ifdef RESULTS
-	if (first) outResult = uvec4(uint(hitTile),
+	if (first) putResult(uvec4(uint(hitTile),
 		uint(rayEnd == RAY_HIT ? (hit.part & 7) : 0) | uint((rayEnd == RAY_HIT ? hit.axis : endAxis) + 1) << 4 | uint(hit.ghost) << 8 | uint(hit.glass) << 9 | uint(hit.emissive) << 10 | uint(rayEnd) << 12
 			| hit.color << 16,
 		uint(hit.voxel.x) | uint(hit.voxel.y) << 8 | uint(hit.voxel.z) << 16,
-		floatBitsToUint(rayEnd == RAY_HIT ? hit.t : endDistance));
+		floatBitsToUint(rayEnd == RAY_HIT ? hit.t : endDistance)));
 #endif
 
+#ifdef ISO_RESULTS
+	if (isoArtHere && !(rayEnd == RAY_HIT && hit.part < 0 && (!artFound || uint(art.tile) * 16u + uint(art.part == 0 ? 0 : art.part == 1 ? 4 : art.part == 2 ? 6
+		: (texelFetch(uIsoArt, uIsoTilesAt + art.tile)[3] & (1u << 30)) != 0u ? 8 : 12) <= uint(hitTile) * 16u + 6u)))
+	{
+		// (doors swing: the art, but where the ray meets a swinging door the map would draw before it, the voxel door below;
+		// the art lit where the ray met its own tile)
+		bool ownHit = rayEnd == RAY_HIT && artFound && art.tile == hitTile && art.part != 0;
+		isoArtOut(artFound, art, ownHit ? rayOrigin + rayDirection * (hit.t - 2.0) : art.point - rayDirection * 2.0,
+			ownHit ? hit.t + skipped : art.distance + artSkipped, ownHit ? hit.t + skipped : art.lightDistance + artSkipped, directionLength, leftColumn, topRow, first,
+			rayColor, rayDepth, rayGlow, rayFullColor);
+		return;
+	}
+#endif
 	// Colour the block by how the ray ended.
 	uint color;
 	float distanceAlongRay;
-	if (rayEnd == RAY_HIT)
+	// (3DIso: under its lowest level shown nothing, as "single layer" has it on the map)
+	if (uClipBottom > 0.0 && rayEnd == RAY_HIT && rayOrigin.z + rayDirection.z * hit.t < uClipBottom - 0.01)
 	{
-		color = shadeHit(hit, hitTile, uEye, rayDirection, blockColumn, blockRow);
+		color = 0u;
+		distanceAlongRay = Infinity;
+	}
+	else if (rayEnd == RAY_HIT)
+	{
+#ifdef ISO_RESULTS
+		isoLitValid = false;
+#endif
+		color = shadeHit(hit, hitTile, rayOrigin, rayDirection, blockColumn, blockRow);
 		distanceAlongRay = hit.t;
+#ifdef ISO_RESULTS
+		if (isoArtHere)
+		{
+			// (a door swinging within the original art, drawn as the CPU draws it there: no glass, no glow, no coloured light)
+			hit.glass = false;
+			hit.emissive = false;
+		}
+		else if (uIsoTurned == 2 && isoLitValid && uIsoColourLights > 0 && uIsoNightVision == 0)
+		{
+			// (3DIso, our 3D art on the map's slant: the coloured lights, as renderRows adds them; in full colour once)
+			bool lit;
+			vec3 added = isoLightAdded(isoRawColor, isoLitPoint, lit);
+			if (lit)
+			{
+				fullColor = (fullColorSet ? fullColor : paletteRgb(color)) + added;
+				fullColorSet = true;
+				color = isoColouredLight(color, isoRawColor, isoLitPoint, blockColumn, blockRow);
+			}
+		}
+#endif
 	}
 	else if (rayEnd == RAY_SIDE)
 	{
-		color = colorOutsideMap(uEye, rayDirection, endDistance, endAxis, blockColumn, blockRow, distanceAlongRay);
+		if (aroundBlack) { color = 0u; distanceAlongRay = Infinity; } // (3DIso turned: the map's black round it)
+		else color = colorOutsideMap(rayOrigin, rayDirection, endDistance, endAxis, blockColumn, blockRow, distanceAlongRay);
 	}
 	else if (rayEnd == RAY_FAR)
 	{
@@ -2319,7 +2887,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 		}
 		else
 		{
-			float bottomX = uEye.x + rayDirection.x * endDistance, bottomY = uEye.y + rayDirection.y * endDistance;
+			float bottomX = rayOrigin.x + rayDirection.x * endDistance, bottomY = rayOrigin.y + rayDirection.y * endDistance;
 			uint earth = uGroundModel != 0 ? modelColor(uint(uGroundModel), ivec3(int(floor(bottomX)) & 15, int(floor(bottomY)) & 15, 0)) : 0u;
 			color = earth != 0u ? shadeColor(earth, min(12 - int(earth & 15u), 6 + int(dither(blockColumn, blockRow)))) : scene(SceneUnexplored);
 			distanceAlongRay = endDistance;
@@ -2327,9 +2895,10 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	}
 	else
 	{
-		color = colorOutsideMap(uEye, rayDirection, endDistance, 2, blockColumn, blockRow, distanceAlongRay);
+		if (aroundBlack) { color = 0u; distanceAlongRay = Infinity; }
+		else color = colorOutsideMap(rayOrigin, rayDirection, endDistance, 2, blockColumn, blockRow, distanceAlongRay);
 	}
-	if (hit.glass)
+	if (hit.glass && !((uIsoTurned != 0 || uUnknownDark > 0.0) && (color == 0u || color == 15u))) // (3DIso and its flight's first stretch: not over the map's black)
 	{
 		// (What is seen through the pane in full colour: as the light left it, or, without "Smooth light", its palette colour.
 		// The pane mirrors with "Reflections" either way: it did only with "Smooth light" too, the owner: "Lets make
@@ -2355,7 +2924,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 			// pane's own pale blue, the sky a pane was painted with, is half as strong: the mirrored picture is that
 			// now. It was 8 in 100 straight on over the pale blue, more only from 60 degrees aside: a player, GitHub
 			// issue #224, "I don't think I've noticed it, not once". Through the goggles too, in their colours.)
-			vec3 pane = uEye + rayDirection * hit.glassT;
+			vec3 pane = rayOrigin + rayDirection * hit.glassT;
 			vec3 mirrored = rayDirection;
 			mirrored[hit.glassAxis] = -mirrored[hit.glassAxis];
 			float glancing = 1.0 - abs(rayDirection[hit.glassAxis]);
@@ -2397,7 +2966,7 @@ void shadeRay(vec2 offset, bool first, out uint rayColor, out float rayDepth, ou
 	rayFullColor = lightShafts(rayFullColor, rayDirection, distanceAlongRay);
 #endif
 	rayColor = color;
-	rayDepth = distanceAlongRay / directionLength;
+	rayDepth = (distanceAlongRay + skipped) / directionLength;
 	// Whether it shines (a UFO's light counts three times in the bloom).
 	bool glowing = rayEnd == RAY_HIT && hit.emissive && distanceAlongRay < Infinity;
 	rayGlow = !glowing ? 0u : hit.part >= 0 && (texelFetch(uModelInfo, int(texelFetch(uTiles, hitTile * 4)[hit.part / 2] >> uint(16 * (hit.part & 1))) & 0xFFFF).z >> 24) != 0u ? 3u : 1u;
@@ -2492,6 +3061,34 @@ void main()
  * for each size of block, a pixel a block (uLayers 1); or in one go into one set as big as the eye's (uLayers 0: then
  * the three sets here are that one).
  */
+// 3DIso (research): the sun map (see sunMapSays): a texel's column of the sun's light, from over the map down
+// along it, and how high toward the sun (along uSunMapDir) the first thing it meets is; nothing: very low.
+const char *const SunMapSource = R"(
+uniform vec2 uSunMapFrom;
+uniform float uSunMapStep;
+uniform vec3 uSunAcross, uSunAlong, uSunMapDir;
+uniform float uSunMapTop; // (how high toward the sun the columns start: over the map)
+void main()
+{
+	vec2 place = uSunMapFrom + (floor(gl_FragCoord.xy) + 0.5) * uSunMapStep;
+	vec3 start = uSunAcross * place.x + uSunAlong * place.y + uSunMapDir * uSunMapTop;
+	vec3 direction = -uSunMapDir;
+	vec3 high = vec3(uSize) * CellSize;
+	float segmentStart = 0.0, segmentEnd = 1.0e9;
+	int enterAxis = -1;
+	outSun = -1.0e9;
+	if (!slab(start.x, direction.x, 0.0, high.x, segmentStart, segmentEnd, 0, enterAxis) || !slab(start.y, direction.y, 0.0, high.y, segmentStart, segmentEnd, 1, enterAxis)
+		|| !slab(start.z, direction.z, 0.0, high.z, segmentStart, segmentEnd, 2, enterAxis)) return;
+	float enter = segmentStart + 0.01;
+	vec3 origin = clamp(start + direction * enter, vec3(0.0), high - vec3(0.001));
+	Hit hit;
+	int hitTile, endAxis;
+	float endDistance;
+	// (as the shadows' rays walk: ghosts seen through, glass too, see shadowed)
+	if (castRay(origin, direction, 4096.0, 2.0, 2.0, hit, hitTile, endDistance, endAxis) == RAY_HIT) outSun = uSunMapTop - (enter + hit.t);
+}
+)";
+
 const char *const FoveaFillSource = R"(
 uniform usampler2D uColor, uGlow, uColorHalf, uGlowHalf, uColorQuarter, uGlowQuarter;
 uniform sampler2D uDepth, uTrue, uDepthHalf, uTrueHalf, uDepthQuarter, uTrueQuarter;

@@ -4175,6 +4175,7 @@ void FirstPersonMode::roundPassed(BattlescapeState *state, const Position &voxel
 		return;
 	}
 	const float way[3] = { (float)(voxel.x - from.x), (float)(voxel.y - from.y), (float)(voxel.z - from.z) };
+	if (mode->isoShowsEffects()) { mode->_isoView->breakGlassAt(voxel, way, true); return; } // (3DIso research: its shards there)
 	mode->_view->breakGlassAt(voxel, way, mode->isActive());
 }
 
@@ -4189,6 +4190,7 @@ void FirstPersonMode::roundPassed(BattlescapeState *state, const Position &voxel
 void FirstPersonMode::blastReached(BattlescapeState *state, const Position &center, const std::map<Tile*, int> &tiles)
 {
 	FirstPersonMode *mode = state ? state->_firstPerson : nullptr;
+	if (mode && mode->isoShowsEffects()) { mode->_isoView->blastGlass(center, tiles, true); return; } // (3DIso research: its shards there)
 	if (mode && mode->_view)
 	{
 		mode->_view->blastGlass(center, tiles, mode->isActive());

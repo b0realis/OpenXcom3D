@@ -592,6 +592,11 @@ void FirstPersonMode::updateCamera(BattleUnit *unit, bool canMove, double elapse
 		_trackedUnit = unit;
 		_view->setCameraUnit(unit);
 		_view->lookAlong(unit->getDirection());
+		if (_isoFlightLanding) // (3DIso: a flight turned back into the eyes lands the way the 3D view looked when it left)
+		{
+			_view->rotate(std::remainder(_isoFlightLandYaw - _view->getYawDegrees(), 360.0), _isoFlightLandPitch - _view->getPitchDegrees());
+			_isoFlightLanding = false;
+		}
 		endVault();
 		snapToTile(unit);
 		endLean();

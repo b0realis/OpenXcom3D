@@ -74,6 +74,9 @@
 #include "../Savegame/BattleUnit.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
+#include "../Battlescape/Map.h"
+#include "../Battlescape/BattlescapeState.h"
+#include "../Battlescape/Camera.h"
 #include "../Battlescape/ItemSprite.h"
 #include "../Battlescape/Position.h"
 #include "../Battlescape/UnitSprite.h"
@@ -204,7 +207,8 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1])); // the anchor's angle above the eye
-	const double tilt = cardTilt(_pitch, elevation, draw.layBack); // (a hull's lies back: see HullLayBack)
+	const double slantKept = 1.0 - isoSlantShare(); // (3DIso: upright as the map draws it, near its slant)
+	const double tilt = cardTilt(_pitch * slantKept, elevation * slantKept, draw.layBack); // (a hull's lies back: see HullLayBack)
 	const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 	const double cardFacing[3] = { std::cos(tilt) * level[0], std::cos(tilt) * level[1], std::sin(tilt) };
 	const double anchorAcross = dot(anchor, _levelRight), anchorFacing = dot(anchor, cardFacing);
@@ -267,12 +271,92 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 	// keeps its colours under futuristic night vision; anything else solid (smoke more than
 	// half opaque) drawn over it takes that back (see _ownColours).
 	const Uint8 ownColours = draw.unit || draw.body || draw.pile ? 1 : 0;
+	Uint32 isoUnitKey = 0xFFFFFFFFu, isoPartKeys[4] = {};
+	int isoPartShades[4] = {};
+	int isoPartBox[4][4] = { { -100000, -100000, 100000, 100000 }, { -100000, -100000, 100000, 100000 }, { -100000, -100000, 100000, 100000 }, { -100000, -100000, 100000, 100000 } };
+	Uint32 isoPartAboveKeys[4] = {};      // (3DIso: a part drawn again from the tile above, see below; 0: not)
+	int isoPartAboveBox[4][4] = {};
+	int isoPixel = -1; // (the sprite pixel being plotted, for a big unit's part: see isoParts)
+	// (a big unit's parts were found on its frame in the sprite buffer; drawn smooth, its pixels are that many times smaller)
+	auto isoPartsPixel = [](int spriteX, int spriteY, int frameWidth) {
+		if (frameWidth <= SpriteBufferSize) return spriteY * frameWidth + spriteX;
+		const int factor = frameWidth / SpriteBufferSize;
+		return (spriteY / factor) * SpriteBufferSize + spriteX / factor;
+	};
+	if (_iso && draw.unit)
+	{
+		const Position at = draw.unit->getPosition();
+		isoUnitKey = (Uint32)((at.z * _save->getMapSizeY() + at.y) * _save->getMapSizeX() + at.x) * 16 + 10;
+		for (int part = 0; part < 4; ++part)
+		{
+			isoPartKeys[part] = (Uint32)((at.z * _save->getMapSizeY() + at.y + (part >> 1)) * _save->getMapSizeX() + at.x + (part & 1)) * 16 + 10;
+			// (each part in its own tile's shade, as the map draws it: Map::drawUnit)
+			Tile *partTile = _save->getTile(Position(at.x + (part & 1), at.y + (part >> 1), at.z));
+			isoPartShades[part] = partTile && partTile->isDiscovered(O_FLOOR) ? ((_isoExtras & IsoExtraSmoothLight) ? shade : std::min(15, _map->reShade(partTile))) : 16;
+			if (isoPartShades[part] < 16 && !_flares.empty() && !(_isoExtras & IsoExtraSmoothLight))
+			{
+				const float partChest[3] = { (float)world[0], (float)world[1], (float)world[2] + 12.0f };
+				isoPartShades[part] = std::clamp(isoPartShades[part] - (int)std::lround(flareLight(partChest, nullptr, false) * 8.0f), 0, 15);
+			}
+			// (and the box the map lets it be drawn in there, Map::drawUnit: its tile and a tile to each side, from
+			// 32 pixels above it on the view level, else 16, or 8 below its top when it reaches the tile above; a walking
+			// unit's boxes follow its walk: not yet here)
+			if (partTile)
+			{
+				const int tileX = (at.x + (part & 1)) * 16 - (at.y + (part >> 1)) * 16 + (int)_isoOffset[0];
+				const int tileY = (at.x + (part & 1)) * 8 + (at.y + (part >> 1)) * 8 - at.z * 24 + (int)_isoOffset[1];
+				const Tile *above = _save->getAboveTile(partTile);
+				const int topMargin = at.z == _isoViewLevel ? 32 : (above && above->getOverlappingUnit(_save, TUO_ALWAYS) == draw.unit) ? -8 : 16;
+				const bool moving = draw.unit->getStatus() == STATUS_WALKING || draw.unit->getStatus() == STATUS_FLYING;
+				// (in the view's pixels: drawn bigger, see setIsoScale)
+				isoPartBox[part][0] = moving ? -100000 : (int)std::lround(isoViewX(tileX - 16));
+				isoPartBox[part][1] = moving ? -100000 : (int)std::lround(isoViewY(tileY - topMargin));
+				isoPartBox[part][2] = moving ? 100000 : (int)std::lround(isoViewX(tileX + 48));
+				isoPartBox[part][3] = moving ? 100000 : (int)std::lround(isoViewY(tileY + 40));
+				// (a unit reaching into the tile above is drawn there again, in that level's pass: "from below", from 16
+				// pixels above that tile to 8 below its top, over what the level under it drew, see Map::drawUnit)
+				if (!moving && topMargin == -8)
+				{
+					isoPartAboveKeys[part] = (Uint32)(((at.z + 1) * _save->getMapSizeY() + at.y + (part >> 1)) * _save->getMapSizeX() + at.x + (part & 1)) * 16 + 10;
+					isoPartAboveBox[part][0] = isoPartBox[part][0];
+					isoPartAboveBox[part][1] = (int)std::lround(isoViewY(tileY - 40));
+					isoPartAboveBox[part][2] = isoPartBox[part][2];
+					isoPartAboveBox[part][3] = isoPartBox[part][1];
+				}
+			}
+		}
+	}
+	else if (_iso && draw.pile)
+	{
+		// 3DIso: an item or a body on the floor, in the map's order: after its tile's back object, before a unit standing there
+		// (a unit behind it isn't drawn over it, one on its tile is; see Map::overlayKeys)
+		const Position at = draw.pile->getPosition();
+		isoUnitKey = (Uint32)((at.z * _save->getMapSizeY() + at.y) * _save->getMapSizeX() + at.x) * 16 + 9;
+	}
 	const bool ownOverNight = ownColours && _nightVision && Options::fpsNightVisionUnits;
 	const Uint8 nightGroup = _nightVision ? (Uint8)((_nightVision - 1) * 16) : 0;
 	auto plot = [&](int pixelX, int pixelY, Uint8 color, float depth, int pixelOpacity) {
 		const int index = pixelY * width + pixelX;
 		float &depthHere = _depthBuffer[index];
-		if (!color || depth >= depthHere) return;
+		if (!color) return;
+		Uint32 pixelKey = isoUnitKey;
+		int pixelShade = shade;
+		if (_iso && draw.unit)
+		{
+			// 3DIso: a unit over what the map draws before it, under what it draws after (its order: see Map::overlayKeys).
+			const Uint8 part = draw.isoParts && isoPixel >= 0 && isoPixel < (int)draw.isoParts->size() ? (*draw.isoParts)[isoPixel] : 255;
+			if (part < 4) { pixelKey = isoPartKeys[part]; pixelShade = isoPartShades[part]; }
+			const int partIndex = part < 4 ? part : 0;
+			const int *box = isoPartBox[partIndex];
+			if (pixelX < box[0] || pixelY < box[1] || pixelX >= box[2] || pixelY >= box[3])
+			{
+				const int *above = isoPartAboveBox[partIndex];
+				if (!isoPartAboveKeys[partIndex] || pixelX < above[0] || pixelY < above[1] || pixelX >= above[2] || pixelY >= above[3]) return;
+				pixelKey = isoPartAboveKeys[partIndex];
+			}
+			if (pixelKey < _isoKeys[index]) return;
+		}
+		else if (depth >= depthHere) return;
 		// A pile's picture near the pointer, over the world behind it, solid or faint: noted on its own
 		// (what's drawn after it doesn't take it back), so a faint pile stays faint with a unit behind.
 		if (draw.pile)
@@ -332,8 +416,9 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 			return;
 		}
 		if (opacity < 1.0f && dither(pixelX, pixelY) >= opacity) return;
-		*getRaw(pixelX, pixelY) = shadeColor(color, shade);
+		*getRaw(pixelX, pixelY) = shadeColor(color, pixelShade);
 		depthHere = depth;
+		if (_iso && pixelKey != 0xFFFFFFFFu && index < (int)_isoKeys.size()) _isoKeys[index] = pixelKey; // (3DIso: a unit or an item, in its tile's order; nothing else takes a place in it)
 		_glowMask[index] = 0;
 		_unitVeil[index] = draw.unit ? UnitVeilMax : 255;
 		_ownColours[index] = ownColours;
@@ -413,6 +498,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 				const int spriteX = (int)std::floor(anchorX + (dot(ray, _levelRight) * distance - anchorAcross) / columnSize);
 				if (spriteX < 0 || spriteX >= spriteWidth) continue;
 				const int spriteY = (int)std::floor(spriteRow);
+				isoPixel = isoPartsPixel(spriteX, spriteY, spriteWidth);
 				plot(pixelX, pixelY, spritePixel(spriteX, spriteY), (float)std::max(1.0, distance - depthBias), pixelOpacityAt(spriteX, spriteY));
 			}
 		}
@@ -501,6 +587,7 @@ void FirstPersonView::drawSprite(const SpriteDraw &draw, int bandTop, int bandBo
 				if (column < firstColumn) continue;
 				const int spriteX = (int)column;
 				if (spriteX >= endColumn) continue;
+				isoPixel = isoPartsPixel(spriteX, spriteY, spriteWidth);
 				plot(pixelX, pixelY, spritePixel(spriteX, spriteY), rowDepth, pixelOpacityAt(spriteX, spriteY));
 			}
 		};
@@ -1045,10 +1132,17 @@ void FirstPersonView::drawVoxelUnit(const DrawStep &step, int bandTop, int bandB
 					if (!inside) continue;
 				}
 				const int index = y * width + x;
-				if (splat->depth >= _depthBuffer[index]) continue;
+				if (step.voxelIsoKey)
+				{
+					// (3DIso: in the map's order, see isoKeyOf; among its own cubes by depth)
+					const Uint32 here = _isoKeys[index];
+					if (here > step.voxelIsoKey || (here == step.voxelIsoKey && splat->depth >= _depthBuffer[index])) continue;
+				}
+				else if (splat->depth >= _depthBuffer[index]) continue;
 				if (step.voxelOpacity < 1.0f && dither(x, y) >= step.voxelOpacity) continue;
 				*getRaw(x, y) = splat->colour;
 				_depthBuffer[index] = splat->depth;
+				if (step.voxelIsoKey) _isoKeys[index] = step.voxelIsoKey;
 				_glowMask[index] = 0;
 				_unitVeil[index] = step.sprite.unit ? UnitVeilMax : 255;
 				_ownColours[index] = 1;
@@ -1171,7 +1265,8 @@ void FirstPersonView::cardAxes(const double world[3], double scale, double colum
 	const double level[2] = { std::cos(_yaw), std::sin(_yaw) }; // straight ahead, along the ground
 	const double anchor[3] = { world[0] - _eye[0], world[1] - _eye[1], (world[2] - _eye[2]) * ZScale };
 	const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-	const double tilt = cardTilt(_pitch, elevation, layBack); // (a hull's lies back: see HullLayBack)
+	const double slantKept = 1.0 - isoSlantShare(); // (3DIso: upright as the map draws it, near its slant)
+	const double tilt = cardTilt(_pitch * slantKept, elevation * slantKept, layBack); // (a hull's lies back: see HullLayBack)
 	// A column along the level right; a row up the card (cardUp in true proportions, a row
 	// rowSize = scale * ZScale of it), its height back into voxels (divided by ZScale).
 	const double levelRight[2] = { -level[1], level[0] };
@@ -1956,15 +2051,16 @@ void FirstPersonView::drawUnits()
 	// only the unit pointed at (Aimed at, see setAimedUnit), steady.
 	const double unitScale = std::clamp(Options::fpsUnitSize, 80, 100) / 100.0;
 	int voxelBuilds = _replayPass ? 0 : VoxelBuildsPerFrame; // (voxel bodies still to be made this frame, see below; VR's second eye makes none)
-	const bool hitboxAimedOnly = Options::fpsHitboxes == 3;
-	const float hitboxOpacity = Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
+	// (3DIso: an extra of its own, the boxes always: there's no unit aimed at, and the realistic ones go round 3D's pictures)
+	const bool hitboxAimedOnly = !_iso && Options::fpsHitboxes == 3;
+	const float hitboxOpacity = _iso ? ((_isoExtras & IsoExtraOutlines) ? 1.0f : 0.0f) : Options::fpsHitboxes == 2 || hitboxAimedOnly ? 1.0f
 		: Options::fpsHitboxes == 1 ? 0.5f + 0.5f * (float)std::cos((now % 1000) / 1000.0 * 2.0 * Pi) : 0.0f;
 	// With "Realistic hitboxes" the hitbox is the picture: the same setting outlines that instead,
 	// a line round it (the owner: "the sprites should be then surrounded by red line to show where you
 	// can hit them"): round what the lines from the eye test, from the test's own cards (a player:
 	// "a visualization of the actual hitbox would help"), noted once the units are drawn and drawn
 	// over them (see noteTestedPictures, drawUnitOutlines).
-	_outlining = hitboxOpacity > 0.05f && Options::fpsSpriteHitboxes;
+	_outlining = hitboxOpacity > 0.05f && Options::fpsSpriteHitboxes && !_iso;
 	_outlineColors.clear();
 	_outlinedUnits.clear();
 	_smoothPictures.clear(); // (noted afresh for the units drawn smooth this frame; a smooth picture unused for a frame may go)
@@ -2033,7 +2129,8 @@ void FirstPersonView::drawUnits()
 				noteMarkers(unit, overBody);
 			}
 		}
-		if (lying || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld))
+		if (_iso && unit->getTile() && unit->getTile()->getUnit() != unit && !unit->isOut()) continue; // (3DIso: as the map, only its tile's own unit)
+		if (lying || unit == _cameraUnit || (!debug && !unit->getVisible() && !chainHeld) || !isoLevelShown(unit->getPosition().z * (double)Position::TileZ + 1.0))
 		{
 			continue;
 		}
@@ -2097,6 +2194,16 @@ void FirstPersonView::drawUnits()
 			}
 		}
 		if (!_replayPass) glide.seen = now;
+		const float slantShare = isoSlantShare();
+		if (slantShare > 0.0f && !airFall && !fallingDown)
+		{
+			// 3DIso: where the map draws it (no gliding): its tile's place moved by the map's offset on the screen (the
+			// walk and the terrain level, Map::calculateWalkingOffset), a pixel across half a voxel each way, a pixel up a
+			// voxel up. Turned or tilted near the map's slant, between that and the 3D view's place (see isoSlantShare).
+			const Position at = unit->getPosition(), offset = _map->unitScreenOffset(unit);
+			const double mapFeet[3] = { at.x * 16.0 + 8.0 * unitSize + offset.x / 2.0, at.y * 16.0 + 8.0 * unitSize - offset.x / 2.0, at.z * 24.0 - offset.y };
+			for (int axis = 0; axis < 3; ++axis) feet[axis] += (mapFeet[axis] - feet[axis]) * slantShare;
+		}
 		const double placedFeet[3] = { feet[0], feet[1], feet[2] }; // (before a hit's flinch: the side it's seen from, below)
 		// A hit unit flinches back from the camera for a moment (HitFlinchTime, up to 3 voxels), and
 		// flashes (setting "Hit flash", and "Muzzle flashes", which turns every flash off).
@@ -2147,7 +2254,16 @@ void FirstPersonView::drawUnits()
 		int shade = (int)std::lround(std::clamp(lightAt(chest[0], chest[1], chest[2]) - pointLight(chest, nullptr, false)
 			- flareLight(chest, nullptr, false) * 8.0f - flash * HitFlashShade, 0.0f, 15.0f));
 		if (debugVision() == 1) shade = std::min(shade, NightVisionShade);
-		if (Options::fpsShadows)
+		if (slantShare > 0.0f && !(_isoExtras & IsoExtraSmoothLight))
+		{
+			// 3DIso: the map's shade for the unit's tile (Map::drawUnit), no shadows. (With the extra "smooth light", the 3D
+			// view's own light at its chest.) Turned near the map's slant, between the two.
+			Tile *unitTile = _save->getTile(unit->getPosition());
+			int mapShade = unitTile && unitTile->isDiscovered(O_FLOOR) ? std::min(15, _map->reShade(unitTile)) : 16;
+			if (mapShade < 16 && !_flares.empty()) mapShade = std::clamp(mapShade - (int)std::lround(flareLight(chest, nullptr, false) * 8.0f), 0, 15); // (a tactical flare's light, as in 3D)
+			shade = _iso || mapShade == 16 ? mapShade : (int)std::lround(shade + (mapShade - shade) * slantShare);
+		}
+		if (Options::fpsShadows && !_iso)
 		{
 			recordUnitShadow(feet, 5.5 * unitSize); // flying units too: the shadow on the ground shows where they hover
 			recordFlareShadow(unit, feet, 5.5 * unitSize);
@@ -2161,7 +2277,8 @@ void FirstPersonView::drawUnits()
 		double fall = 0.0;
 		const bool collapsing = unit->getStatus() == STATUS_COLLAPSING;
 		const bool wreckFalling = unitSize != 1 && fallingDown && unit->isOut(); // (a big unit destroyed in the air, coming down)
-		if (Options::fpsVoxelUnits && (unitSize == 1 || collapsing || wreckFalling) && (collapsing || fallingDown || airFall))
+		const bool voxelBodies = _iso ? (_isoExtras & IsoExtraVoxelUnits) != 0 : Options::fpsVoxelUnits; // (3DIso: an extra of its own)
+		if (voxelBodies && (unitSize == 1 || collapsing || wreckFalling) && (collapsing || fallingDown || airFall))
 		{
 			// Going down (the game's own fall, a quick death's, a body coming down from the air): the body it was last
 			// drawn with goes down as its death frames show, to lie as its corpse's picture (see VoxelUnitModel::falls), as
@@ -2185,7 +2302,7 @@ void FirstPersonView::drawUnits()
 			// all the way down. The owner: "it shows sprite when falling. It should be the destroyed model".)
 			if (unitSize != 1) fall = wreckFalling && !collapsing ? 1.0 : 0.0;
 		}
-		else if (Options::fpsVoxelUnits && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
+		else if (voxelBodies && !quickFall && !fallingDown && !airFall && VoxelUnits::suits(unit))
 		{
 			// (a body is made only for a unit in view, and VoxelBuildsPerFrame a frame at most: a first look at a squad
 			// doesn't stall the game; one waiting is drawn as its sprite meanwhile)
@@ -2223,7 +2340,7 @@ void FirstPersonView::drawUnits()
 			const double flat = std::max(1.0, std::hypot(spriteEye[0] - feet[0], spriteEye[1] - feet[1]));
 			const bool level = !fallen && std::atan2((spriteEye[2] - chest[2]) * ZScale, flat) < VoxelSlantAbove * Pi / 180.0;
 			const int direction = fallen ? 3 : ((facing + viewRotation) % 8 + 8) % 8; // (viewRotation: 3 minus the direction to the camera)
-			double standing[3] = { feet[0], feet[1], standingHeight(feet) }, bodyScale = unitScale;
+			double standing[3] = { feet[0], feet[1], _iso ? feet[2] : feet[2] + (standingHeight(feet) - feet[2]) * (1.0 - slantShare) }, bodyScale = unitScale; // (3DIso: on the art's floor, as its card)
 			// A unit the game holds off the ground (its float height: its hit box starts there) whose body, by its
 			// drawings, reaches lower, is lifted until its lowest cube is at that height (a player, GitHub issue #211:
 			// XPiratez's Cacodemon "right against the floor when hitbox (and doom behavior) should indicate it hovering
@@ -2255,8 +2372,14 @@ void FirstPersonView::drawUnits()
 			}
 			const size_t stepsBefore = _drawList.size();
 			// (a wreck coming down faces the way the unit did, as it will lie: see drawFloorItems)
-			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, floorUnderside(feet), shade, bodyScale, unit, fall,
-				true, nullptr, nullptr, body->opacity, ceilingOver(feet, unit));
+			recordVoxelUnit(*body, walkPhase, facing, direction, level, standing, _iso ? -1e9 : floorUnderside(feet), shade, bodyScale, unit, fall,
+				true, nullptr, nullptr, body->opacity, _iso ? 1e9 : ceilingOver(feet, unit));
+			if (_iso && _drawList.size() > stepsBefore)
+			{
+				// (3DIso: drawn when the map draws its front tile's unit, over what the map drew before it, see drawVoxelUnit)
+				const Position front = unit->getPosition() + Position(unitSize - 1, unitSize - 1, 0);
+				_drawList.back().voxelIsoKey = (Uint32)_save->getTileIndex(front) * 16 + 10;
+			}
 			// With realistic hitboxes the body is what the lines test (see FirstPerson::spriteHitAt): outlined as a
 			// picture is (see drawUnitOutlines), round the pixels it's drawn on (noted as they're drawn, see
 			// drawVoxelUnit); not one going down, nor one so close that it fades out.
@@ -2333,6 +2456,26 @@ void FirstPersonView::drawUnits()
 					unitSprite.draw(unit, 1, 32, 16, 0, mask, false);
 					unitSprite.draw(unit, 2, 0, 16, 0, mask, false);
 					unitSprite.draw(unit, 3, 16, 24, 0, mask, false);
+					if (_iso)
+					{
+						// 3DIso: which part is under each pixel (each drawn alone; a later one over an earlier), for the map's
+						// order: it draws each part in the turn of the tile it covers.
+						if (!_isoPartBuffer) { _isoPartBuffer = new Surface(SpriteBufferSize, SpriteBufferSize); _isoPartBuffer->setPalette(getPalette()); }
+						std::vector<Uint8> &parts = _isoParts[unit];
+						parts.assign((size_t)SpriteBufferSize * SpriteBufferSize, 255);
+						static const int partAt[4][2] = { { 16, 8 }, { 32, 16 }, { 0, 16 }, { 16, 24 } };
+						for (int part = 0; part < 4; ++part)
+						{
+							_isoPartBuffer->clear();
+							UnitSprite partSprite(_isoPartBuffer, _game->getMod(), _save, _save->getAnimFrame(), _save->getDepth() != 0, 0, 0);
+							partSprite.setViewRotation(viewRotation);
+							partSprite.draw(unit, part, partAt[part][0], partAt[part][1], 0, mask, false);
+							const SDL_Surface *alone = _isoPartBuffer->getSurface();
+							for (int y = 0; y < SpriteBufferSize; ++y)
+								for (int x = 0; x < SpriteBufferSize; ++x)
+									if (((const Uint8 *)alone->pixels)[y * alone->pitch + x]) parts[(size_t)y * SpriteBufferSize + x] = (Uint8)part;
+						}
+					}
 				}
 			}
 			DrawStep step;
@@ -2342,9 +2485,9 @@ void FirstPersonView::drawUnits()
 			step.sprite.anchorY = unitSize == 1 ? 40 : 48; // the centre of the floor diamond; a big unit's, the corner its four tiles share
 			step.sprite.world[0] = feet[0];
 			step.sprite.world[1] = feet[1];
-			step.sprite.world[2] = standingHeight(feet);
-			step.sprite.floorCut = floorUnderside(feet); // (its art below its feet stays out of the room below)
-			step.sprite.ceilingCut = ceilingOver(feet, unit); // (and its top out of the room above, or off the roof)
+			step.sprite.world[2] = _iso ? feet[2] : feet[2] + (standingHeight(feet) - feet[2]) * (1.0 - slantShare); // (3DIso turned: towards the 3D view's away from the map's slant)
+			step.sprite.floorCut = _iso ? -1e9 : floorUnderside(feet); // (its art below its feet stays out of the room below)
+			step.sprite.ceilingCut = _iso ? 1e9 : ceilingOver(feet, unit); // (and its top out of the room above, or off the roof)
 			step.sprite.shade = shade;
 			step.sprite.scale = unitScale;
 			// The art below its feet (the front half of the floor's diamond: a snake's tail, a long
@@ -2352,12 +2495,13 @@ void FirstPersonView::drawUnits()
 			// of sinking into it (a player's report, GitHub issue #31: X-Com Files' Asmodean Cobra "in
 			// the ground" in some rotations; for most units only a few pixels of the feet). Not for a
 			// unit in the air: its floor would be seen from below, where lying rows aren't drawn.
-			if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING)
+			if (!unit->haveNoFloorBelow() && unit->getStatus() != STATUS_FLYING && !_iso)
 			{
 				step.sprite.pose = SpritePose::Lying;
 			}
 			step.sprite.unit = unit;
-			step.sprite.layBack = FirstPerson::hullLayBack(unit);
+			if (_iso && unitSize == 2) step.sprite.isoParts = &_isoParts[unit];
+			step.sprite.layBack = _iso ? 0.0 : FirstPerson::hullLayBack(unit);
 			useSmoothVersion(step.sprite);
 			// With realistic hitboxes, a picture drawn smooth (upscaled, up close) is the one the lines of the
 			// soldier looked through meet: noted with the frame it is (see smoothPicture).
@@ -2397,7 +2541,7 @@ void FirstPersonView::drawUnits()
 			}
 			_drawList.push_back(step);
 		}
-		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && !Options::fpsSpriteHitboxes && !fallingDown) // (with realistic hitboxes the picture is the hitbox, outlined above; one falling is down)
+		if (hitboxOpacity > 0.05f && (!hitboxAimedOnly || unit == _aimedUnit) && (!Options::fpsSpriteHitboxes || _iso) && !fallingDown) // (with realistic hitboxes the picture is the hitbox, outlined above; one falling is down)
 		{
 			recordHitbox(unit, feet, hitboxOpacity);
 		}
@@ -2971,6 +3115,9 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 		gpuRecordGroundShade(centre, radius, steps, density, away, length, paint);
 		if (_gpuRecordOnly) return;
 	}
+	// (3DIso: on the art's floor, which lies at its tile's bottom, where its marks' depth is: see _isoMarkDepth)
+	const double isoCentre[3] = { centre[0], centre[1], centre[2] - GroundTop + 0.5 };
+	if (_iso) centre = isoCentre;
 	// The screen rectangle around it: the four corners of the box around the disc, or around the
 	// stretched patch from its start to its end at its widest, projected (nothing drawn if any is
 	// behind the camera), cut to the view.
@@ -2984,6 +3131,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 	// Each pixel's ray meets the ground plane half a voxel above the centre: if that is within
 	// the disc and it is the floor the pixel shows, darken the pixel.
 	const double groundZ = centre[2] + 0.5;
+	const float *sceneDepth = _iso && _isoMarkDepth.size() == _depthBuffer.size() ? _isoMarkDepth.data() : _depthBuffer.data();
 	for (int pixelY = top; pixelY <= bottom; ++pixelY)
 	{
 		Uint8 *pixelRow = getRaw(0, pixelY);
@@ -3021,7 +3169,7 @@ void FirstPersonView::drawGroundShade(const double centre[3], double radius, int
 				+ rayDirection[2] * ZScale * _forward[2]); // true depth
 			// (only on the floor right there: within GroundShadeHeight of the ground's height, see there)
 			const double slack = std::max(GroundShadeDepth, GroundShadeHeight * viewDepth / std::max(1.0, _eye[2] - groundZ));
-			if (std::abs(_depthBuffer[pixelY * width + pixelX] - viewDepth) > slack) continue;
+			if (std::abs(sceneDepth[pixelY * width + pixelX] - viewDepth) > slack) continue;
 			// Darker towards the middle: more of the pixels get the shade (dithered), each
 			// darkened within its colour group.
 			if (closeness * density > dither(pixelX, pixelY) && pixelRow[pixelX])
@@ -3143,7 +3291,8 @@ void FirstPersonView::drawFloorItems()
 			continue;
 		}
 		BattleItem *item = tile->getTopItem();
-		if (!item || (item->getUnit() && isObliterated(item->getUnit()))) // (one out cold blown apart: see obliterateBody)
+		if (!item || (item->getUnit() && isObliterated(item->getUnit())) // (one out cold blown apart: see obliterateBody)
+			|| !isoLevelShown(tile->getPosition().z * (double)Position::TileZ + 1.0)) // (3DIso: on a level it shows)
 		{
 			continue;
 		}
@@ -3722,6 +3871,7 @@ void FirstPersonView::drawFire()
 		const Position tilePosition = tile->getPosition();
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0,
 			tilePosition.z * 24.0 - tile->getTerrainLevel() };
+		if (!isoLevelShown(tilePosition.z * 24.0 + 1.0)) continue; // (3DIso: on a level it shows)
 		drawSpriteBlend(smokeSprites->getFrame(firstFrame + phase), smokeSprites->getFrame(firstFrame + (phase + 1) % 4), blend, 16, 32,
 			ground, 2.0, shade, Options::fpsSmoothFire);
 	}
@@ -3738,7 +3888,8 @@ void FirstPersonView::drawFire()
 		}
 		const Position tilePosition = tile->getPosition();
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
-		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
+		if ((!isoNoDistanceCull() && (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance))
+			|| !isoLevelShown(tilePosition.z * 24.0 + 1.0)) // (3DIso: no culling by its far eye, and on a level it shows)
 		{
 			continue;
 		}
@@ -4237,7 +4388,8 @@ void FirstPersonView::drawSeeThroughSmoke()
 		}
 		const Position tilePosition = tile->getPosition();
 		const double ground[3] = { tilePosition.x * 16.0 + 8.0, tilePosition.y * 16.0 + 8.0, tilePosition.z * 24.0 - tile->getTerrainLevel() };
-		if (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance)
+		if ((!isoNoDistanceCull() && (std::abs(ground[0] - _eye[0]) > _maxDistance || std::abs(ground[1] - _eye[1]) > _maxDistance))
+			|| !isoLevelShown(tilePosition.z * 24.0 + 1.0)) // (3DIso: no culling by its far eye, and on a level it shows)
 		{
 			continue;
 		}
@@ -4399,7 +4551,7 @@ void FirstPersonView::cullSmokeDraws()
 		const double columnSize = scale * SpritePixelX, rowSize = scale * ZScale;
 		const double anchor[3] = { smoke.world[0] - _eye[0], smoke.world[1] - _eye[1], (smoke.world[2] - _eye[2]) * ZScale };
 		const double elevation = std::atan2(anchor[2], std::sqrt(anchor[0] * anchor[0] + anchor[1] * anchor[1]));
-		const double tilt = cardTilt(_pitch, elevation, 0.0);
+		const double tilt = cardTilt(_iso ? 0.0 : _pitch, _iso ? 0.0 : elevation, 0.0);
 		const double cardUp[3] = { -std::sin(tilt) * level[0], -std::sin(tilt) * level[1], std::cos(tilt) };
 		// Its corners on the screen.
 		double left = width, right = 0.0, top = height, bottom = 0.0, nearest = Infinity;
@@ -5007,6 +5159,180 @@ void FirstPersonView::drawDamageNumbers()
 		if (spots[index].shown)
 		{
 			FirstPerson::drawDamageNumber(this, font, numbers[index], spots[index].x, bottoms[index], uiScale, now, colors);
+		}
+	}
+}
+
+}
+
+namespace OpenXcom
+{
+
+/**
+ * 3DIso (research), extra "layer", and always turned: what the map draws over its own picture, drawn by us in the world, sharp
+ * at any zoom and from any side: the path's arrows on the floors with what each step leaves (the map's colours: green, yellow,
+ * red), the cursor as a box round its tile on the view level (red; yellow over a unit; aiming: with a cross; psi: purple;
+ * throwing: green), the selected soldier's arrow over their head, bobbing.
+ */
+void FirstPersonView::drawIsoLayer()
+{
+	if (!_map || !_save) return;
+	const SDL_Color *palette = getPalette();
+	auto nearest = [palette](int red, int green, int blue) {
+		int best = 1, bestDistance = 1 << 30;
+		for (int index = 1; index < 256; ++index)
+		{
+			const int dr = palette[index].r - red, dg = palette[index].g - green, db = palette[index].b - blue;
+			const int distance = 2 * dr * dr + 4 * dg * dg + 3 * db * db;
+			if (distance < bestDistance) { bestDistance = distance; best = index; }
+		}
+		return (Uint8)best;
+	};
+	const bool artFloors = _iso && _isoVoxelShare < 0.5f; // (the original art's floors lie at their tiles' bottoms)
+	const double zoom = std::max(1.0, _isoZoomTotal);
+	const int textScale = std::max(1, (int)std::lround(std::max(1.0, _isoZoomTotal)));
+	const int sizeX = _save->getMapSizeX(), sizeY = _save->getMapSizeY(), sizeZ = _save->getMapSizeZ();
+	const int topLevel = std::min(_isoViewLevel, sizeZ - 1);
+	const Uint32 now = SDL_GetTicks();
+	auto floorOf = [&](const Tile *tile, int z) { return z * 24.0f + (artFloors ? 0.0f : (float)GroundTop) - tile->getTerrainLevel() + 0.5f; };
+
+	// The path (the map's preview): an arrow along each step's way, flat on its floor; the units of time left under it.
+	const Font *font = _game->getMod()->getFont("FONT_SMALL");
+	static const int stepX[8] = { 0, 1, 1, 1, 0, -1, -1, -1 }, stepY[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+	for (int z = _isoLowLevel; z <= topLevel; ++z)
+		for (int y = 0; y < sizeY; ++y)
+			for (int x = 0; x < sizeX; ++x)
+			{
+				Tile *tile = _save->getTile(Position(x, y, z));
+				if (!tile || tile->getPreview() == -1 || !tile->isDiscovered(O_FLOOR)) continue;
+				const Uint8 color = (Uint8)((tile->getMarkerColor() & 15) << 4 | 3);
+				const float middle[3] = { x * 16.0f + 8.0f, y * 16.0f + 8.0f, floorOf(tile, z) };
+				const int way = tile->getPreview();
+				if (way >= 0 && way < 8)
+				{
+					float length = std::sqrt((float)(stepX[way] * stepX[way] + stepY[way] * stepY[way]));
+					const float along[2] = { stepX[way] / length, stepY[way] / length }, aside[2] = { -along[1], along[0] };
+					const float tail[3] = { middle[0] - along[0] * 4.0f, middle[1] - along[1] * 4.0f, middle[2] };
+					const float tip[3] = { middle[0] + along[0] * 5.0f, middle[1] + along[1] * 5.0f, middle[2] };
+					const float wingA[3] = { tip[0] - along[0] * 3.0f + aside[0] * 2.5f, tip[1] - along[1] * 3.0f + aside[1] * 2.5f, middle[2] };
+					const float wingB[3] = { tip[0] - along[0] * 3.0f - aside[0] * 2.5f, tip[1] - along[1] * 3.0f - aside[1] * 2.5f, middle[2] };
+					drawLine3D(tail, tip, color, 2, 1.0f, 0.0f, 0, 1 << 30, false, false);
+					drawLine3D(wingA, tip, color, 2, 1.0f, 0.0f, 0, 1 << 30, false, false);
+					drawLine3D(wingB, tip, color, 2, 1.0f, 0.0f, 0, 1 << 30, false, false);
+				}
+				else
+				{
+					// (up or down: a ring on the floor)
+					for (int corner = 0; corner < 8; ++corner)
+					{
+						const double a0 = corner * Pi / 4.0, a1 = (corner + 1) * Pi / 4.0;
+						const float from[3] = { (float)(middle[0] + std::cos(a0) * 4.0), (float)(middle[1] + std::sin(a0) * 4.0), middle[2] };
+						const float to[3] = { (float)(middle[0] + std::cos(a1) * 4.0), (float)(middle[1] + std::sin(a1) * 4.0), middle[2] };
+						drawLine3D(from, to, color, 2, 1.0f, 0.0f, 0, 1 << 30, false, false);
+					}
+				}
+				if (font && tile->getTUMarker() > -1)
+				{
+					double screenX, screenY, depth;
+					const double at[3] = { middle[0], middle[1], middle[2] };
+					if (!projectToScreen(at, screenX, screenY, depth)) continue;
+					FirstPerson::DamageNumber number = {};
+					number.health = tile->getTUMarker();
+					number.start = now;
+					FirstPerson::DamageNumberColors colors = {};
+					colors.health = (Uint8)((tile->getMarkerColor() & 15) << 4 | 1);
+					colors.outline = 15;
+					FirstPerson::drawDamageNumber(this, font, number, (int)std::lround(screenX), (int)std::lround(screenY + 9.0 * zoom), textScale, now, colors);
+				}
+			}
+
+	// The blaster's waypoints: a mark on each, its number, and the way the missile will fly from one to the next.
+	std::vector<Position> *waypoints = _map->getWaypoints();
+	if (waypoints && !waypoints->empty())
+	{
+		static Uint8 gold = 0;
+		static Uint64 goldOf = 0; // (by the palette's colours: a palette at a freed one's address, or changed in place, is another)
+		if (goldOf != _colors.paletteHash) { gold = nearest(255, 200, 40); goldOf = _colors.paletteHash; }
+		const BattleUnit *shooter = _save->getSelectedUnit();
+		float from[3] = { 0.0f, 0.0f, 0.0f };
+		bool haveFrom = false;
+		if (shooter && shooter->getTile())
+		{
+			const Position at = shooter->getPosition();
+			from[0] = at.x * 16.0f + 8.0f; from[1] = at.y * 16.0f + 8.0f; from[2] = floorOf(shooter->getTile(), at.z) + shooter->getHeight() * 0.75f;
+			haveFrom = true;
+		}
+		int number = 1;
+		for (const Position &waypoint : *waypoints)
+		{
+			const Tile *tile = _save->getTile(waypoint);
+			const float floor = tile ? floorOf(tile, waypoint.z) : waypoint.z * 24.0f;
+			const float middle[3] = { waypoint.x * 16.0f + 8.0f, waypoint.y * 16.0f + 8.0f, floor + 12.0f };
+			const float corners[4][3] = { { middle[0] - 6.0f, middle[1], floor }, { middle[0], middle[1] - 6.0f, floor }, { middle[0] + 6.0f, middle[1], floor }, { middle[0], middle[1] + 6.0f, floor } };
+			for (int corner = 0; corner < 4; ++corner) drawLine3D(corners[corner], corners[(corner + 1) % 4], gold, 2, 1.0f, 0.0f, 0, 1 << 30, false, true);
+			const float foot[3] = { middle[0], middle[1], floor };
+			drawLine3D(foot, middle, gold, 1, 0.6f, 0.0f, 0, 1 << 30, false, true);
+			if (haveFrom) drawLine3D(from, middle, gold, 1, 0.6f, 0.0f, 0, 1 << 30, false, true);
+			std::copy(middle, middle + 3, from);
+			haveFrom = true;
+			double screenX, screenY, depth;
+			const double above[3] = { middle[0], middle[1], middle[2] + 6.0 };
+			if (font && projectToScreen(above, screenX, screenY, depth))
+			{
+				FirstPerson::DamageNumber label = {};
+				label.health = number;
+				label.start = now;
+				FirstPerson::DamageNumberColors colors = {};
+				colors.health = gold;
+				colors.outline = 15;
+				FirstPerson::drawDamageNumber(this, font, label, (int)std::lround(screenX), (int)std::lround(screenY), textScale, now, colors);
+			}
+			++number;
+		}
+	}
+
+	// The cursor: the map's own (see drawIsoCursor).
+	drawIsoCursor();
+	const CursorType cursor = _map->getCursorType();
+
+	// The selected soldier's arrow over their head, bobbing (the map's: when its cursor shows, on the player's turn): at the
+	// map's own slant its own sprite where it put it, over all; turned or tilted, one drawn here.
+	const Surface *mapArrow = nullptr;
+	int arrowX = 0, arrowY = 0;
+	if (_iso && _map->getSelectedArrow(mapArrow, arrowX, arrowY))
+	{
+		// (the map's canvas less its offset, then at 3DIso's own: see the cursor's sprites)
+		const Position offset = _map->getCamera()->getMapOffset();
+		drawIsoMapSprite(mapArrow, arrowX - offset.x + (int)_isoOffset[0], arrowY - offset.y + (int)_isoOffset[1], 0xFFFFFFF0u, 0, false, false);
+	}
+	const BattleUnit *soldier = _iso ? nullptr : _save->getSelectedUnit();
+	if (soldier && cursor != CT_NONE && (_save->getSide() == FACTION_PLAYER || _save->getDebugMode()) && soldier->getPosition().z <= _isoViewLevel && soldier->getTile())
+	{
+		const int size = soldier->getArmor()->getSize();
+		const Position at = soldier->getPosition();
+		const double bob = 2.0 * std::sin(now / 1000.0 * 2.0 * Pi * 1.2);
+		const double head[3] = { at.x * 16.0 + 8.0 * size, at.y * 16.0 + 8.0 * size,
+			floorOf(soldier->getTile(), at.z) + soldier->getHeight() + soldier->getFloatHeight() + 6.0 + bob };
+		double screenX, screenY, depth;
+		if (projectToScreen(head, screenX, screenY, depth))
+		{
+			static Uint8 yellow = 0, dark = 0;
+			static Uint64 colorsOf = 0;
+			if (colorsOf != _colors.paletteHash) { yellow = nearest(255, 220, 30); dark = nearest(90, 60, 0); colorsOf = _colors.paletteHash; }
+			const double scale = std::max(1.0, _iso || _isoTurned ? _isoZoomTotal : 1.0);
+			const int halfWidth = (int)std::lround(4.0 * scale), height = (int)std::lround(7.0 * scale);
+			for (int row = 0; row <= height; ++row)
+			{
+				const int y = (int)std::lround(screenY) - height + row;
+				if (y < 0 || y >= getHeight()) continue;
+				const int reach = (int)std::lround(halfWidth * (1.0 - (double)row / height));
+				for (int x = (int)std::lround(screenX) - reach - 1; x <= (int)std::lround(screenX) + reach + 1; ++x)
+				{
+					if (x < 0 || x >= getWidth()) continue;
+					const bool edge = std::abs(x - (int)std::lround(screenX)) > reach || row == 0;
+					*getRaw(x, y) = edge ? dark : yellow;
+				}
+			}
 		}
 	}
 }

@@ -97,9 +97,16 @@ bool displayTakesFullColor()
  * not seeming to make changes"). So the display is opened in full colour for them (Screen), and
  * the game's screen, 32-bit too then, copied onto it (flipFullColor).
  */
+static bool isoFullColour = false; // (3DIso research: see setIsoFullColour)
+
 bool wantsFullColorDisplay()
 {
-	return Options::fpsTrueColor && Options::fpsRenderer == 1 && Options::fpsViewResolution == ViewResolutionDisplay;
+	return (Options::fpsTrueColor && Options::fpsRenderer == 1 && Options::fpsViewResolution == ViewResolutionDisplay) || isoFullColour;
+}
+
+void setIsoFullColour(bool wanted)
+{
+	isoFullColour = wanted;
 }
 
 /**

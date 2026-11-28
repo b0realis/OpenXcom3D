@@ -71,6 +71,10 @@
 #include "../Battlescape/BattlescapeState.h"
 #include "../Battlescape/Camera.h"
 #include "../Battlescape/Map.h"
+#include "../Battlescape/Explosion.h"
+#include "../Battlescape/Projectile.h"
+#include <fstream>
+#include <sstream>
 #include "../Battlescape/Pathfinding.h"
 #include "../Battlescape/TileEngine.h"
 #include "../Battlescape/UnitSprite.h"
@@ -87,6 +91,7 @@
 #include "../Interface/Text.h"
 #include "../Interface/TextButton.h"
 #include "../Mod/Mod.h"
+#include "../Engine/Sound.h"
 #include "../Mod/RuleInterface.h"
 #include "../Savegame/BattleItem.h"
 #include "../Savegame/BattleUnit.h"
@@ -97,6 +102,32 @@
 
 namespace OpenXcom
 {
+
+/// 3DIso's flight's length (setting "3DIso flight": Quick or Smooth; research).
+static double isoFlightSeconds() { return Options::fpsIsoFlight == 1 ? 0.7 : 1.5; }
+
+/**
+ * 3DIso (research): a move on its picture (in the map's screen pixels) as the move on the map's own picture that shows the
+ * same ground: as fast on the screen at any zoom, and the way the picture shows it turned or tilted. The ground's step on the
+ * screen, across and down, for the camera's yaw and pitch (M), turned back into ground, and that ground's step on the map's
+ * own picture (M0).
+ * @param turn, tilt 3DIso's turn and tilt now, degrees.
+ * @param zoom Its zoom.
+ * @param x, y The move; set to the map's.
+ */
+static void isoMoveOnMap(double turn, double tilt, double zoom, double &x, double &y)
+{
+	const double Degree = 3.14159265358979323846 / 180.0, yaw = (-135.0 + turn) * Degree, pitch = std::clamp(-30.0 - tilt, -80.0, -10.0) * Degree;
+	const double yaw0 = -135.0 * Degree, pitch0 = -30.0 * Degree;
+	const double m[2][2] = { { -std::sin(yaw), std::cos(yaw) }, { std::sin(pitch) * std::cos(yaw), std::sin(pitch) * std::sin(yaw) } };
+	const double m0[2][2] = { { -std::sin(yaw0), std::cos(yaw0) }, { std::sin(pitch0) * std::cos(yaw0), std::sin(pitch0) * std::sin(yaw0) } };
+	const double determinant = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+	if (std::abs(determinant) < 1e-9 || zoom <= 0.0) return;
+	const double screenX = x / zoom, screenY = y / zoom;
+	const double groundX = (m[1][1] * screenX - m[0][1] * screenY) / determinant, groundY = (-m[1][0] * screenX + m[0][0] * screenY) / determinant;
+	x = m0[0][0] * groundX + m0[0][1] * groundY;
+	y = m0[1][0] * groundX + m0[1][1] * groundY;
+}
 
 namespace
 {
@@ -518,6 +549,18 @@ void FirstPersonMode::createTopBar()
 	_btnInventory = makeButton(InventoryButtonX, ToolButtonW, _state->tr("STR_FPS_BUTTON_INVENTORY"));
 	_btnEndTurn = makeButton(width - 1 - EndTurnW, EndTurnW, _state->tr("STR_FPS_BUTTON_END_TURN"));
 	_btnHud->setGroup(&_hudButtonGroup);
+	// (3DIso research: our 3D art or the original art, on the map while 3DIso shows; pressed: the original)
+	_btnIsoArt = makeButton(InventoryButtonX, ToolButtonW, "A/R"); // (art or reset, see toggleIsoArt)
+	_btnIsoArt->setGroup(&_isoArtButtonGroup);
+	_btnIsoArt->setVisible(false);
+	// (3DIso research: the free camera, after ART; pressed while it's on; and its marks under the bar's left, see updateIsoFreeMarks)
+	_btnIsoFree = makeButton(InventoryButtonX + ToolButtonW + 1, ToolButtonW, "FREE");
+	_btnIsoFree->setGroup(&_isoFreeButtonGroup);
+	_btnIsoFree->setVisible(false);
+	_isoFreeMarks = new Surface(IsoFreeMarksWidth, IsoFreeMarkSize, 1, BarY + BarH + 2);
+	_state->add(_isoFreeMarks);
+	_isoFreeMarks->setVisible(false);
+	_ownSurfaces.insert(_isoFreeMarks);
 	_btnPrev = makeButton(SquadX, PrevNextW, "<");
 	_btnNext = makeButton(SquadX, PrevNextW, ">");
 
@@ -1148,6 +1191,7 @@ void FirstPersonMode::remakeViewIfResized()
 	_ownSurfaces.insert(newView);
 	_preview->shareCache(newView);
 	_mapCamera->shareCache(newView);
+	if (_isoView) _isoView->shareCache(newView); // (3DIso research: it borrows the 3D view's models too)
 	delete _view;
 	_view = newView;
 	_trackedUnit = nullptr; // re-place the camera
@@ -1527,6 +1571,12 @@ FirstPersonMode::~FirstPersonMode()
 	Timer::maxFrameSkip = Options::maxFrameSkip; // the player's own frame skipping again (see catchUp)
 	_state->_map->setSoundListener(nullptr);
 	_state->_map->setNightVisionHoldBlocked(false);
+	_state->_map->setSelectorTransform(nullptr); // (3DIso research: its picture goes with us)
+	_state->_map->getCamera()->setScrollTransform(nullptr);
+	_state->_map->setOverlayTarget(nullptr);
+	FirstPerson::setIsoFullColour(false);
+	delete _isoOverlay;
+	_isoOverlay = nullptr;
 
 	// A quickload deletes the battle before this screen goes; only a battle that lives on (the
 	// screen remade after an options change) gets its pathfinding back to the rules (no vault
@@ -1602,7 +1652,7 @@ void FirstPersonMode::toggleView()
 		think();
 		return;
 	}
-	_wants3D = !isActive();
+	_wants3D = _isoFlight.on ? !_isoFlight.to3D : !isActive(); // (3DIso research: pressed during a flight, it turns back)
 	if (_wants3D && _save->getSide() != FACTION_PLAYER && !alienTurn3D())
 	{
 		_state->warning("STR_FPS_3D_NEXT_TURN");
@@ -2303,14 +2353,14 @@ void FirstPersonMode::makeVoxelBodies(double milliseconds)
  * screen, in the battle's palette (the screen before still showed, in a palette that is no longer the display's).
  * The game's next frame draws over it.
  */
-void FirstPersonMode::showPreparing()
+void FirstPersonMode::showPreparing(int percent)
 {
 	SDL_Surface *screen = _game->getScreen()->getSurface();
 	const int width = Options::baseXResolution, height = Options::baseYResolution;
 	_game->getScreen()->clear();
 	const SDL_Color *palette = _state->getPalette();
-	Text title(width, 17, 0, height / 2 - 14), note(width, 9, 0, height / 2 + 6);
-	for (Text *text : { &title, &note })
+	Text title(width, 17, 0, height / 2 - 14), note(width, 9, 0, height / 2 + 6), done(width, 9, 0, height / 2 + 27);
+	for (Text *text : { &title, &note, &done })
 	{
 		text->initText(_game->getMod()->getFont("FONT_BIG"), _game->getMod()->getFont("FONT_SMALL"), _game->getLanguage());
 		text->setPalette(palette);
@@ -2318,11 +2368,36 @@ void FirstPersonMode::showPreparing()
 	}
 	title.setBig();
 	title.setColor(textColor(palette, 110, 170, 255));
-	title.setText(_state->tr("STR_FPS_PREPARING_3D"));
+	// (the title's dots running while the card gets ready, one, two, three: the driver takes a big program in one go,
+	// seconds the first time, and the screen must not look hung meanwhile; its place kept, the full title's)
+	std::string titleText = _state->tr("STR_FPS_PREPARING_3D");
+	if (percent >= 0)
+	{
+		title.setText(titleText);
+		title.setAlign(ALIGN_LEFT);
+		title.setX((width - title.getTextWidth()) / 2);
+		while (!titleText.empty() && titleText.back() == '.') titleText.pop_back();
+		titleText += std::string(1 + (SDL_GetTicks() / 350) % 3, '.');
+	}
+	title.setText(titleText);
 	note.setColor(textColor(palette, 160, 160, 170));
 	note.setText(_state->tr("STR_FPS_PREPARING_3D_NOTE"));
 	title.blit(screen);
 	note.blit(screen);
+	if (percent >= 0)
+	{
+		// How far the card has got (see FirstPersonView::gpuProgress): a bar filling, and its percent under it.
+		const int barWidth = 120, barHeight = 5, barX = (width - barWidth) / 2, barY = height / 2 + 18;
+		SDL_Rect frame = { (Sint16)(barX - 1), (Sint16)(barY - 1), (Uint16)(barWidth + 2), (Uint16)(barHeight + 2) };
+		SDL_FillRect(screen, &frame, textColor(palette, 160, 160, 170));
+		SDL_Rect inside = { (Sint16)barX, (Sint16)barY, (Uint16)barWidth, (Uint16)barHeight };
+		SDL_FillRect(screen, &inside, textColor(palette, 20, 24, 40));
+		SDL_Rect filled = { (Sint16)barX, (Sint16)barY, (Uint16)(barWidth * std::clamp(percent, 0, 100) / 100), (Uint16)barHeight };
+		if (filled.w > 0) SDL_FillRect(screen, &filled, textColor(palette, 110, 170, 255));
+		done.setColor(textColor(palette, 160, 160, 170));
+		done.setText(std::to_string(std::clamp(percent, 0, 100)) + "%");
+		done.blit(screen);
+	}
 	_game->getScreen()->flip();
 }
 
@@ -2360,24 +2435,45 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	// driver finishing its programs. The screen says so then, in place of the one before, which would look hung.
 	static bool preparedBefore = false;
 	const bool someone = isActive() || (unit && !unit->isOut() && unit->getTile());
+	const auto began = std::chrono::steady_clock::now();
+	// (3DIso on: everything for it too, behind this screen, the owner's word: its program, built with the rest, can take
+	// many seconds the first time; then its first frame, see below)
+	const bool isoFirst = Options::fpsIso && !isActive();
+	const int waitMs = !first ? 0 : isoFirst ? PrimeIsoCardWaitMs : PrimeCardWaitMs;
+	bool ready = false;
 	if (first && someone && (FirstPersonView::gpuOpening() || (!preparedBefore && FirstPersonView::gpuReady(0))))
 	{
-		showPreparing();
+		// The screen, with how far the card has got (the owner: "show progress on preparing 3D"), drawn again a few times a
+		// second while it gets ready; the window answers the desktop meanwhile (its events left for the game).
+		for (;;)
+		{
+			ready = FirstPersonView::gpuReady(0);
+			showPreparing(ready ? 100 : FirstPersonView::gpuProgress());
+			if (ready || !FirstPersonView::gpuOpening()) break;
+			if (std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count() >= waitMs) break;
+			SDL_PumpEvents();
+			ready = FirstPersonView::gpuReady(100);
+			if (ready)
+			{
+				showPreparing(100);
+				break;
+			}
+		}
+		ready = FirstPersonView::gpuReady(0);
+	}
+	else if (someone)
+	{
+		ready = FirstPersonView::gpuReady(waitMs);
 	}
 	if (isActive())
 	{
 		// (3D shows from the battle's start: the view's own frames do it, on the card from the first if it is there in
 		// time; nothing is left once the card draws them)
-		_viewPrimed = FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0);
+		_viewPrimed = ready;
 		preparedBefore = preparedBefore || _viewPrimed;
 		return;
 	}
-	if (!someone)
-	{
-		return;
-	}
-	const auto began = std::chrono::steady_clock::now();
-	if (!FirstPersonView::gpuReady(first ? PrimeCardWaitMs : 0))
+	if (!someone || !ready)
 	{
 		return;
 	}
@@ -2421,8 +2517,26 @@ void FirstPersonMode::primeView(BattleUnit *unit)
 	Log(LOG_INFO) << "OpenXcom3D: the 3D view's first frame drawn ahead in "
 		<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - frameBegan).count() << " ms (the card waited for "
 		<< (int)cardWait << " ms, the units' bodies " << (int)bodiesWait << " ms)";
+	// 3DIso on (research): its first frame drawn on the card here too, unseen, as the battle's first shown frame will draw
+	// it: the map's frames sent to the card, its sun map made, its kind of frame drawn ahead; so 3DIso shows on the card from
+	// its first frame, the game never standing still for it.
+	if (isoFirst)
+	{
+		const auto isoBegan = std::chrono::steady_clock::now();
+		updateIsoView();
+		if (_isoView && _isoView->getVisible())
+		{
+			Map *map = _state->_map;
+			map->invalidate();
+			map->draw(); // (its overlays, as blit has them first)
+			_isoView->draw();
+			Log(LOG_INFO) << "OpenXcom3D: 3DIso's first frame drawn ahead in "
+				<< (int)std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - isoBegan).count() << " ms";
+		}
+	}
 #endif
 }
+
 
 void FirstPersonMode::think()
 {
@@ -2558,9 +2672,47 @@ void FirstPersonMode::think()
 
 	// Show the 3D view when the player wants it and there's someone to look through.
 	const bool show3D = _wants3D && unit;
-	if (show3D != isActive())
+	if (_isoFlight.on)
 	{
-		setActive(show3D);
+		// (3DIso's flight: 3D comes at its end, see drawIsoFlight. Wanted the other way meanwhile: it turns back from where it
+		// is, the same way it came, in the time it has flown; the eased path is symmetric, so the picture doesn't jump)
+		if (_isoFlight.to3D != show3D && (show3D ? unit == _isoFlight.unit : true))
+		{
+			const Uint32 ticks = SDL_GetTicks(), length = (Uint32)(isoFlightSeconds() * 1000.0);
+			const Uint32 flown = std::min(length, ticks - _isoFlight.start);
+			_isoFlight.to3D = show3D;
+			_isoFlight.start = ticks - (length - flown);
+		}
+		else if (_isoFlight.to3D && !show3D) endIsoFlight();
+	}
+	else if (show3D != isActive())
+	{
+		if (iso3DOn() && show3D && !feedWanted() && Options::fpsIsoFlight)
+		{
+			startIsoFlight(unit, true);
+		}
+		else if (iso3DOn() && !show3D && isActive() && unit && !feedWanted() && Options::fpsIsoFlight)
+		{
+			BattleUnit *flown = unit;
+			double eye[3];
+			_view->getEye(eye);
+			const double yaw = _view->getYawDegrees(), pitch = _view->getPitchDegrees();
+			setActive(false); // (the map's camera goes to the soldier)
+			startIsoFlight(flown, false);
+			std::copy(eye, eye + 3, _isoFlight.eye);
+			_isoFlight.yaw = yaw;
+			_isoFlight.pitch = pitch;
+		}
+		else
+		{
+			// (3DIso on without a flight, setting "3DIso flight" Off: the flares burning and the marks go across all the same)
+			if (iso3DOn() && !feedWanted())
+			{
+				if (show3D) _view->takeFlares(*_isoView);
+				else _isoView->takeFlares(*_view);
+			}
+			setActive(show3D);
+		}
 	}
 	// The 3D view's first frame drawn ahead while the map shows (setting "Renderer": GPU): its waiting is done where
 	// the battle begins, not at the first click of the 3D button.
@@ -2573,15 +2725,17 @@ void FirstPersonMode::think()
 	updateMapCamera(); // (after the card: a squad button's soldier cam wins)
 	placeGameLine(); // (after the map camera: under its window while it shows)
 	updateFeed(); // (the Live command feed, in the map's place with its setting on)
+	updateIsoView(); // (3DIso, research)
 	watchMapLayers();
 	updateMusic(now);
 	updateMapAim();
 	fireTurnShot(); // (akimbo in turn: the other gun's shot, or calling it off on the map)
-	updateFlight(show3D ? unit : nullptr);
+	updateFlight(show3D && !_isoFlight.on ? unit : nullptr);
 
 	// On the isometric map: hide the 3D view's overlays (the scope too: back in 3D the view
-	// starts unzoomed), and that's all.
-	if (!show3D)
+	// starts unzoomed), and that's all. (So too during 3DIso's flight into the eyes: the 3D view
+	// isn't there yet, and nothing may walk or turn the soldier unseen.)
+	if (!show3D || _isoFlight.on)
 	{
 		_zoom = 1.0;
 		updateScope();
@@ -2589,6 +2743,7 @@ void FirstPersonMode::think()
 		updateArmorButtons(nullptr);
 		updateLift(nullptr, now);
 		updateCompass(nullptr, false);
+		updateIsoCompass();
 		updateWalkModeLines(nullptr);
 		updateCrosshair(nullptr, playerTurn);
 		updateUnitName(nullptr);
@@ -2762,10 +2917,46 @@ bool FirstPersonMode::handle(Action *action)
 	const SDL_Event &event = *action->getDetails();
 	const bool active = isActive();
 
+	// 3DIso's flight (research): a moment between the map and the soldier's eyes, which the battle waits out. Only the 3D key
+	// and button (they turn it back) and 3DIso's own switch work; no other key, click or wheel reaches the map or the battle.
+	if (_isoFlight.on)
+	{
+		if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
+		{
+			const SDL_Keycode key = event.key.keysym.sym;
+			const bool flightKey = key == Options::keyBattleFirstPerson || (key == Options::keyBattleFirstPerson2 && key != SDLK_UNKNOWN) || key == Options::keyFpsIsoToggle;
+			return flightKey ? handleKey(action, active) : true;
+		}
+		if (isMouseButtonOrWheel(event))
+		{
+			int eventX = 0, eventY = 0;
+			mouseEventPosition(event, eventX, eventY);
+			action->setMouseAction(eventX, eventY, 0, 0);
+			if (buttonAt(toCanvasX(action->getAbsoluteXMouse()), toCanvasY(action->getAbsoluteYMouse())) == _btnView) return handleFreeCursor(action, active);
+			return true;
+		}
+	}
+
 	// Which squad button (for the soldier card) and lift arrow the free cursor is over (never consumed).
 	if (event.type == SDL_MOUSEMOTION && !wantsMouseCapture())
 	{
 		trackHover(action);
+	}
+
+	// 3DIso's free camera (research): the mouse's drags and wheel over the map are its (see handleIsoFreeCamera).
+	if (!active && _isoFree && iso3DOn() && _isoView->getVisible() && !_isoFlight.on && handleIsoFreeCamera(action))
+	{
+		return true;
+	}
+	// 3DIso: Ctrl and the wheel zoom at the mouse (the point under it stays where it is: the map's offset moves by the change, the
+	// picture gliding with it, see updateIsoView).
+	if (!active && wheelStep(event) != 0 && (SDL_GetModState() & KMOD_CTRL) && iso3DOn() && _isoView->getVisible())
+	{
+		int eventX = 0, eventY = 0;
+		mouseEventPosition(event, eventX, eventY);
+		action->setMouseAction(eventX, eventY, 0, 0);
+		isoZoomAt(action->getAbsoluteXMouse(), action->getAbsoluteYMouse(), wheelStep(event) < 0 ? 1.25 : 0.8); // (up: in)
+		return true;
 	}
 
 	// The mouse's thumb buttons are the game's (next and previous soldier, OXCE's option).
@@ -2873,6 +3064,18 @@ bool FirstPersonMode::handleKey(Action *action, bool active)
 	{
 		if (pressed) grabItemUnderfoot(action);
 		return true;
+	}
+	// 3DIso (research): its switches act on the press itself, so a frame held up by something else (a save, OXCE's voxel
+	// pictures) can't lose one, and while 3DIso shows the key is its alone (see updateIsoView).
+	// (A key left unbound, as most of them are, is SDLK_UNKNOWN: never one the system can't name.)
+	if (!active && key != SDLK_UNKNOWN && (getenv("OXC3D_ISO3D") || Options::fpsIso) && _isoView)
+	{
+		const bool shown = _isoMode == 1 && !_isoFlight.on;
+		if (key == Options::keyFpsIsoToggle) { if (pressed) _isoMode = 1 - _isoMode; return true; }
+		if (shown && key == Options::keyFpsIsoArt) { if (pressed) toggleIsoArt(); return true; }
+		if (shown && key == Options::keyFpsIsoEffects) { if (pressed) _isoExtrasOn = !_isoExtrasOn; return true; }
+		if (shown && key == Options::keyFpsIsoReset) { if (pressed) _isoResetAsked = true; return true; }
+		if (shown && key == Options::keyFpsIsoFree) { if (pressed) setIsoFree(!_isoFree); return true; }
 	}
 	if (!active)
 	{
@@ -3134,7 +3337,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
 		if (event.type == SDL_MOUSEBUTTONUP)
 		{
 			for (TextButton *button : _btnSquad) handleOnCanvas(button, action);
-			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
+			for (TextButton *button : { _btnView, _btnHud, _btnInventory, _btnIsoArt, _btnIsoFree, _btnEndTurn, _btnFly, _btnLight, _btnNight, _btnSpecial, _btnTurret, _btnPrev, _btnNext })
 			{
 				handleOnCanvas(button, action);
 			}
@@ -3302,6 +3505,7 @@ bool FirstPersonMode::handleFreeCursor(Action *action, bool active)
  * enemy buttons. On big screens the view and the overlays are drawn on the canvas and magnified.
  * @return Always true: the screen is drawn here, so the state doesn't draw it itself.
  */
+
 bool FirstPersonMode::blit()
 {
 	SDL_Surface *screen = _game->getScreen()->getSurface();
@@ -3365,9 +3569,45 @@ bool FirstPersonMode::blit()
 		}
 	}
 
-	// The game's own surfaces (in full 3D only its warnings and debug text).
+	// The game's own surfaces (in full 3D only its warnings and debug text). 3DIso is drawn in the
+	// map's place, under the HUD, and the map then isn't (where 3DIso is empty, the screen's black shows).
+	const bool isoShown = _isoView && _isoView->getVisible() && !full3D;
+	// (3DIso at the display's own resolution, extra "display": laid into the display wherever the HUD leaves the key, as the 3D
+	// view at "3D resolution: Display", see FirstPerson::presentView)
+	// (only at the display's picture's own size, which a frame after the display changed it may not be yet; at the map's own
+	// size too when it's in full colour, which only the display can show)
+	int pictureX = 0, pictureY = 0, pictureWidth = 0, pictureHeight = 0;
+	if (isoShown) _game->getScreen()->getPictureArea(pictureX, pictureY, pictureWidth, pictureHeight);
+	const bool isoMapSized = isoShown && _isoView->getWidth() == _state->_map->getWidth() && _isoView->getHeight() == _state->_map->getHeight();
+	const bool isoPresented = isoShown && _isoView->getWidth() == pictureWidth && _isoView->getHeight() == pictureHeight
+		&& (!isoMapSized || _isoView->isoFullColours());
+	if (isoPresented) SDL_FillRect(screen, nullptr, FirstPerson::presentKey(screen));
 	for (Surface *surface : _state->_surfaces)
 	{
+		if (surface == _isoView)
+		{
+			if (isoPresented)
+			{
+				_isoView->drawIfAsked();
+				FirstPerson::presentView(_isoView, _isoView->isoFullColours());
+			}
+			else if (isoMapSized) surface->blit(screen);
+			continue;
+		}
+		if (_isoHudSlide > 0.0 && !_ownSurfaces.count(surface) && surface != _state->_map && !full3D)
+		{
+			// (3DIso's flight: the map's HUD sliding down out of the picture, see drawIsoFlight)
+			const int y = surface->getY();
+			surface->setY(y + (int)std::lround(_isoHudSlide * Options::baseYResolution));
+			surface->blit(screen);
+			surface->setY(y);
+			continue;
+		}
+		if (isoShown && surface == _state->_map)
+		{
+			_state->_map->draw(); // (drawn, not shown: its overlay pass is 3DIso's, see Map::setOverlayTarget)
+			continue;
+		}
 		if (!_ownSurfaces.count(surface) && (!full3D || surface == _state->_warning || surface == _state->_txtDebug))
 		{
 			surface->blit(screen);
@@ -3404,15 +3644,35 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 	const bool enemyButtons = full3D && !hudHidden() && !_feedOverlays;
 	auto shown = [&](const Surface *surface)
 	{
-		return surface != _view && _ownSurfaces.count(const_cast<Surface*>(surface)) && !(hudHidden() && _topBarSurfaces.count(const_cast<Surface*>(surface)))
+		return surface != _view && surface != _isoView && _ownSurfaces.count(const_cast<Surface*>(surface)) && !(hudHidden() && _topBarSurfaces.count(const_cast<Surface*>(surface)))
 			&& (!_feedOverlays || feedOverlay(surface)) // (the Live command feed shows only some, see feedOverlay)
 			&& !(forHud && (surface == _crosshair || surface == _accuracyLine || surface == _scopeCross || surface == _weaponInHand));
+	};
+	// (3DIso's flight just landed in the soldier's eyes: the 3D HUD comes in as the weapon comes up, see IsoLandRaise: what's
+	// low on the screen slides up from under its bottom edge, what's high down from over its top; the top bar, there all along,
+	// and the crosshair, its marks and its labels round the screen's middle, the aim, stay)
+	const Uint32 now = SDL_GetTicks();
+	const double landing = _isoLandTick && now - _isoLandTick < IsoLandRaise ? 1.0 - (double)(now - _isoLandTick) / IsoLandRaise : 0.0;
+	const double away = landing * landing * (3.0 - 2.0 * landing);
+	auto blitShown = [&](Surface *surface, SDL_Surface *into) {
+		const int middleX = surface->getX() + surface->getWidth() / 2, middleY = surface->getY() + surface->getHeight() / 2;
+		const bool aimed = std::abs(middleX - into->w / 2) < into->w / 6 && std::abs(middleY - into->h / 2) < into->h / 6;
+		if (away <= 0.0 || aimed || _topBarSurfaces.count(surface) || surface == _weaponInHand || surface == _crosshair || surface == _accuracyLine || surface == _scopeCross)
+		{
+			surface->blit(into);
+			return;
+		}
+		const int y = surface->getY();
+		const bool low = y + surface->getHeight() / 2 > into->h / 2;
+		surface->setY(y + (int)std::lround(away * (low ? into->h - y : -(y + surface->getHeight()))));
+		surface->blit(into);
+		surface->setY(y);
 	};
 	if (!_canvas)
 	{
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (shown(surface)) surface->blit(target);
+			if (shown(surface)) blitShown(surface, target);
 		}
 		if (enemyButtons) drawEnemyButtons(target);
 	}
@@ -3421,7 +3681,7 @@ void FirstPersonMode::drawOverlays(SDL_Surface *target, bool forHud, bool compos
 		_canvas->clear();
 		for (Surface *surface : _state->_surfaces)
 		{
-			if (shown(surface)) surface->blit(_canvas->getSurface());
+			if (shown(surface)) blitShown(surface, _canvas->getSurface());
 		}
 		if (enemyButtons) drawEnemyButtons(_canvas->getSurface());
 		if (!composing)
@@ -3696,3 +3956,1046 @@ void FirstPersonMode::magnify(SDL_Surface *screen, SDL_Surface *source, bool tra
 }
 
 // Thanks mom and dad! You were the ones who exposed me to my first comp.
+
+namespace OpenXcom
+{
+
+/**
+ * 3DIso (research, only with the environment variable OXC3D_ISO3D: its value the mode to start in, 0 or 1): the
+ * isometric map drawn by the 3D view with the map's own camera (FirstPersonView::setIsoCamera), laid over the map.
+ * The key "3DIso or map" switches between the two. With OXC3D_ISO3D_DUMP a folder: a file "go" in it makes the next frame write the map's
+ * picture (iso.bmp) and the 3D view's (iso3d.bmp) of the same moment, then removes "go"; a file "mode" sets the mode.
+ */
+void FirstPersonMode::updateIsoView()
+{
+	static const char *startMode = getenv("OXC3D_ISO3D");
+	static const char *dumpFolder = getenv("OXC3D_ISO3D_DUMP");
+	// (the setting "3DIso", or a test's OXC3D_ISO3D: its starting mode, 1 3DIso, 0 the map; the key "3DIso or map" switches)
+	if (!startMode && !Options::fpsIso)
+	{
+		FirstPerson::setIsoFullColour(false);
+		if (_isoView && _isoView->getVisible())
+		{
+			// (switched off in the options: the map as ever)
+			_isoView->setVisible(false);
+			_state->_map->setOverlayTarget(nullptr);
+			_state->_map->setSelectorTransform(nullptr);
+			_state->_map->setOverlayLeaves(false, false, false);
+			FirstPerson::setIsoFullColour(false);
+		}
+		return;
+	}
+	if (_isoMode < 0) _isoMode = startMode ? (std::atoi(startMode) ? 1 : 0) : 1;
+	// The extras: the settings' (see settingsIsoExtras), or for a test OXC3D_ISO3D_EXTRAS's words (markers, downed, light,
+	// effects, shots, smoke, colouredlight, facing, voxel, outlines, display, truecolour, turn, layer); F9 switches them off and on.
+	static const char *extrasAsked = getenv("OXC3D_ISO3D_EXTRAS");
+	if (!extrasAsked)
+	{
+		const bool effects = Options::fpsIsoEffects, display = Options::fpsIsoResolution == 1;
+		_isoExtras = FirstPersonView::IsoExtraTurn | (display ? FirstPersonView::IsoExtraDisplay : 0) | (display && Options::fpsTrueColor ? FirstPersonView::IsoExtraTrueColour : 0);
+		if (effects)
+		{
+			// (off: as on the map; on: the 3D view's effects and its settings' marks and light)
+			_isoExtras |= FirstPersonView::IsoExtraEffects | FirstPersonView::IsoExtraShots | FirstPersonView::IsoExtraSmoke | FirstPersonView::IsoExtraLayer
+				| (Options::fpsSmoothLighting ? FirstPersonView::IsoExtraSmoothLight : 0)
+				| (Options::fpsEnemyMarkers > 0 || Options::fpsWoundedMarkers > 0 ? FirstPersonView::IsoExtraMarkers : 0)
+				| (Options::fpsDownedIcons > 0 ? FirstPersonView::IsoExtraDowned : 0)
+				| (Options::fpsVoxelUnits ? FirstPersonView::IsoExtraVoxelUnits : 0)
+				| (Options::fpsHitboxes > 0 ? FirstPersonView::IsoExtraOutlines : 0)
+				| (Options::fpsColoredLights ? FirstPersonView::IsoExtraColouredLight : 0)
+				| (Options::fpsIsoWeather ? FirstPersonView::IsoExtraWeather : 0);
+		}
+	}
+	else if (_isoExtras < 0)
+	{
+		const char *asked = extrasAsked;
+		const std::string list = asked ? asked : "markers,downed,light,effects,shots,smoke,colouredlight,turn"; // (facing: the map shows its own arrows with Alt)
+		static const std::pair<const char*, int> words[] = { { "markers", FirstPersonView::IsoExtraMarkers }, { "downed", FirstPersonView::IsoExtraDowned },
+			{ "light", FirstPersonView::IsoExtraSmoothLight }, { "effects", FirstPersonView::IsoExtraEffects }, { "shots", FirstPersonView::IsoExtraShots },
+			{ "smoke", FirstPersonView::IsoExtraSmoke }, { "facing", FirstPersonView::IsoExtraFacing }, { "voxel", FirstPersonView::IsoExtraVoxelUnits },
+			{ "outlines", FirstPersonView::IsoExtraOutlines }, { "colouredlight", FirstPersonView::IsoExtraColouredLight },
+			{ "display", FirstPersonView::IsoExtraDisplay }, { "truecolour", FirstPersonView::IsoExtraTrueColour }, { "turn", FirstPersonView::IsoExtraTurn },
+			{ "layer", FirstPersonView::IsoExtraLayer }, { "weather", FirstPersonView::IsoExtraWeather } };
+		_isoExtras = 0;
+		std::stringstream named;
+		named << list;
+		for (std::string word; std::getline(named, word, ',');)
+			for (const auto &known : words)
+				if (word == known.first) _isoExtras |= known.second;
+	}
+	Map *map = _state->_map;
+	// (extra "display": the display's own resolution, laid into it under the HUD, see blit; else the map's. "true colour" with
+	// it: the display in full colour, see FirstPerson::wantsFullColorDisplay)
+	const bool isoDisplay = _isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraDisplay);
+	FirstPerson::setIsoFullColour(isoDisplay && (_isoExtras & FirstPersonView::IsoExtraTrueColour) && _isoMode == 1);
+	if (_isoView) _isoView->setWantsTrueColor(isoDisplay && (_isoExtras & FirstPersonView::IsoExtraTrueColour)); // (on the card: its full colour, coloured lights, smooth light)
+	int isoWidth = map->getWidth(), isoHeight = map->getHeight();
+	if (isoDisplay && FirstPerson::canPresentAtDisplaySize())
+	{
+		// (the picture is scaled alike both ways, see setIsoScale: only a display picture of the map's shape, square pixels)
+		int pictureX, pictureY, pictureWidth, pictureHeight;
+		_game->getScreen()->getPictureArea(pictureX, pictureY, pictureWidth, pictureHeight);
+		if (pictureWidth > 0 && pictureHeight > 0 && std::abs(pictureWidth * map->getHeight() - pictureHeight * map->getWidth()) <= map->getWidth())
+		{
+			isoWidth = pictureWidth;
+			isoHeight = pictureHeight;
+		}
+	}
+	if (!_isoView || _isoView->getWidth() != isoWidth || _isoView->getHeight() != isoHeight)
+	{
+		FirstPersonView *view = new FirstPersonView(_game, isoWidth, isoHeight, map->getX(), map->getY());
+		view->setPalette(_state->getPalette());
+		view->shareCache(_view);
+		view->useVoxelUnits(_voxelUnits.get());
+		view->setSavedBattleGame(_save);
+		view->setMap(map);
+		view->setParticles(false);
+		view->setComfort(true);
+		view->setSmoothLighting(false);
+		if (_isoView)
+		{
+			map->setSelectorTransform(nullptr); // (it may point at the old view; set again below)
+			view->takeFlares(*_isoView); // (its flares and marks go on)
+			replaceStateSurface(_isoView, view);
+			_ownSurfaces.erase(_isoView);
+			delete _isoView;
+		}
+		else
+		{
+			_state->add(view);
+			auto &surfaces = _state->_surfaces;
+			surfaces.pop_back();
+			surfaces.insert(std::find(surfaces.begin(), surfaces.end(), map) + 1, view);
+		}
+		_ownSurfaces.insert(view);
+		_isoView = view;
+		map->setOverlayTarget(nullptr); // (the map draws into it: not once it's gone)
+		delete _isoOverlay;
+		_isoOverlay = new Surface(map->getWidth(), map->getHeight(), 0, 0);
+		_isoView->setIsoOverlay(_isoOverlay);
+	}
+	// (3DIso's switches act on the key's press, see handleKey; its camera keys are held, read here)
+	// (3DIso's keys, the player's: see the settings' Controls; none set: never held. SDL 1.2's and SDL2's alike, see isKeyHeld)
+	auto held = [](SDL_Keycode key) { return key != SDLK_UNKNOWN && isKeyHeld(key); };
+	// Our 3D art or the original art (F11, or the top bar's A/R button; OXC3D_ISO3D_ART=original starts on the original).
+	static const char *artAsked = getenv("OXC3D_ISO3D_ART");
+	if (_isoArt3D < 0 || (!artAsked && Options::fpsIsoArt != _isoArtSetting))
+	{
+		// (the setting "3DIso art", read again when the options change it; a test's OXC3D_ISO3D_ARTs)
+		_isoArt3D = artAsked ? (std::string(artAsked) == "original" ? 0 : 1) : (Options::fpsIsoArt == 1 ? 0 : 1);
+		_isoArtSetting = Options::fpsIsoArt;
+	}
+	const bool flareKey = held(Options::keyFpsFlare);
+	if (flareKey && !_isoFlareKeyDown && _isoMode == 1 && !isActive() && !_isoFlight.on) throwIsoFlare();
+	_isoFlareKeyDown = flareKey;
+	const int extrasNow = _isoExtrasOn ? _isoExtras : 0;
+	_isoView->setIsoExtras(extrasNow);
+	_isoView->setParticles((extrasNow & FirstPersonView::IsoExtraEffects) != 0); // (its own sparks, blood, debris)
+	_isoView->setShowFacing((extrasNow & FirstPersonView::IsoExtraFacing) && isKeyHeld(Options::keyFpsShowFacing));
+	// (the map's items, smoke and fire left out of its overlay when 3DIso draws them: with its 3D effects, or its art smooth)
+	const bool smoothSprites = _isoView->isoMapSpritesSmooth();
+	_isoView->setIsoMapSpritesNow(smoothSprites); // (the same for the map's overlay and the view this frame)
+	map->setOverlayLeaves((extrasNow & FirstPersonView::IsoExtraShots) != 0, (extrasNow & FirstPersonView::IsoExtraSmoke) != 0 || smoothSprites,
+		(extrasNow & FirstPersonView::IsoExtraLayer) != 0, smoothSprites);
+	if (!_isoFlight.on) _isoView->setSmoothLighting(_isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraSmoothLight)); // (lightAt blends between tiles only so)
+	if (_isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraMarkers)) updateEnemyMarkers();
+	{
+		// The zoom, + or - held: smoothly, 1 to 4 times the map's own size, about the map's middle (sharper with the extra
+		// "display"); the map's cursor and clicks follow the picture (see Map::setSelectorTransform).
+		const Uint32 ticks = SDL_GetTicks();
+		const double seconds = _isoZoomTick ? std::min(0.1, (ticks - _isoZoomTick) / 1000.0) : 0.0;
+		_isoZoomTick = ticks;
+		_isoFrameSeconds = seconds;
+		// (the camera's keys only while 3DIso shows: in 3D they're the 3D view's)
+		const bool cameraKeys = _isoMode == 1 && !isActive() && !_isoFlight.on;
+		if (cameraKeys && _isoShot.phase == 0) // (the shot camera has the zoom while it follows a shot)
+		{
+			if (held(Options::keyFpsIsoZoomIn) || held(SDLK_KP_PLUS)) _isoZoomTarget = std::min(4.0, _isoZoomTarget * std::pow(2.0, seconds * 1.5));
+			if (held(Options::keyFpsIsoZoomOut) || held(SDLK_KP_MINUS)) _isoZoomTarget = std::max(isoMinZoom(), _isoZoomTarget / std::pow(2.0, seconds * 1.5));
+		}
+		// (the reset key: back to the map's own side, slant and size)
+		if (_isoResetAsked && cameraKeys && _isoShot.phase == 0)
+		{
+			_isoZoomTarget = 1.0;
+			_isoTurnTarget = std::round(_isoTurnNow / 360.0) * 360.0; // (the nearest whole turn: the short way round)
+			_isoTiltTarget = 0.0;
+		}
+		_isoResetAsked = false;
+		// The shot camera (setting "3DIso shot camera"): a shot zoomed in on (1.6 times, up to 3) and followed, its blasts held
+		// a moment (IsoShotHold), then back to the zoom it set off from and the map's offset; a shot after it carries on.
+		IsoShotCamera &shotCamera = _isoShot;
+		{
+			// (only a shot the map shows and would follow: not one out of sight, an unseen alien's; not behind HIDDEN MOVEMENT;
+			// not with following off, Alt held or the weapon's own rule)
+			const Projectile *shot = map->getProjectile() && map->isProjectileInFOV() && map->getFollowProjectile() ? map->getProjectile() : nullptr;
+			const bool followed = Options::fpsIsoShotCamera && _isoMode == 1 && !isActive() && !_isoFlight.on && !map->showsHiddenMovement();
+			const Uint32 IsoShotHold = 350;
+			if (!followed && shotCamera.phase != 0)
+			{
+				// (3D, the flight, the map or the setting off: back at once)
+				_isoZoomTarget = shotCamera.zoomBack;
+				shotCamera = IsoShotCamera();
+			}
+			else if (followed && shot)
+			{
+				if (shotCamera.phase == 0) shotCamera.zoomBack = _isoZoomTarget;
+				shotCamera.phase = 1;
+				Position screen;
+				map->getCamera()->convertVoxelToScreen(shot->getPosition(), &screen);
+				const Position offset = map->getCamera()->getMapOffset();
+				shotCamera.aim[0] = screen.x - offset.x;
+				shotCamera.aim[1] = screen.y - offset.y;
+				_isoZoomTarget = std::max(shotCamera.zoomBack, std::min(3.0, shotCamera.zoomBack * 1.6));
+			}
+			else if (shotCamera.phase == 1 || shotCamera.phase == 2)
+			{
+				if (shotCamera.phase == 1 || !map->getExplosions()->empty()) shotCamera.since = ticks;
+				shotCamera.phase = ticks - shotCamera.since > IsoShotHold ? 3 : 2;
+				if (shotCamera.phase == 3) _isoZoomTarget = shotCamera.zoomBack;
+			}
+		}
+		_isoZoom += (_isoZoomTarget - _isoZoom) * std::min(1.0, seconds * 12.0);
+		if (std::abs(_isoZoom - _isoZoomTarget) < 1e-3) _isoZoom = _isoZoomTarget;
+		_isoView->setIsoScale(map->getWidth(), map->getHeight(), (double)_isoView->getWidth() / map->getWidth() * _isoZoom);
+		// Smooth scrolling: the picture follows the map's own offset (whole pixels, in steps as the map scrolls, at once to a unit
+		// it centres on, a level's height on a level change) gliding, a little behind it (see FirstPersonView::setIsoShift).
+		{
+			const Position actual = map->getCamera()->getMapOffset();
+			const double target[2] = { (double)actual.x, (double)actual.y };
+			if (!_isoShownSet) { _isoShown[0] = target[0]; _isoShown[1] = target[1]; _isoShownSet = true; }
+			for (int axis = 0; axis < 2; ++axis)
+			{
+				_isoShown[axis] += (target[axis] - _isoShown[axis]) * std::min(1.0, seconds * 14.0);
+				if (std::abs(target[axis] - _isoShown[axis]) < 0.02) _isoShown[axis] = target[axis];
+			}
+			// (a big explosion shakes the picture a moment, as the 3D view's camera shakes: setting "Screen shake"; the map flashes)
+			double shake[2] = { 0.0, 0.0 };
+			if (Options::fpsScreenShake)
+			{
+				bool big = false;
+				for (const Explosion *explosion : *map->getExplosions()) big = big || (explosion->isBig() && explosion->getCurrentFrame() >= 0 && explosion->getCurrentFrame() <= 1); // (its first frames shown: a delayed one waits below 0)
+				if (big && ticks - _isoShakeStart > 300) _isoShakeStart = ticks;
+				const double IsoShakeTime = 400.0, since = ticks - _isoShakeStart;
+				if (_isoShakeStart && since < IsoShakeTime)
+				{
+					const double strength = 3.0 * (1.0 - since / IsoShakeTime);
+					shake[0] = strength * std::sin(since * 0.11);
+					shake[1] = strength * std::cos(since * 0.083);
+				}
+			}
+			// (the shot camera's move: the picture's middle on the shot's point, gliding there and back; the map's own offset
+			// may scroll meanwhile, the point stays put on the map)
+			for (int axis = 0; axis < 2; ++axis)
+			{
+				const double middle = (axis == 0 ? map->getWidth() : map->getHeight() - map->getIconHeight()) / 2.0; // (the map over the HUD's middle)
+				const double wanted = shotCamera.phase == 1 || shotCamera.phase == 2 ? shotCamera.aim[axis] - middle + _isoShown[axis] : 0.0;
+				shotCamera.pan[axis] += (wanted - shotCamera.pan[axis]) * std::min(1.0, seconds * (shotCamera.phase == 3 ? 6.0 : 9.0));
+				if (std::abs(wanted - shotCamera.pan[axis]) < 0.05) shotCamera.pan[axis] = wanted;
+			}
+			if (shotCamera.phase == 3 && shotCamera.pan[0] == 0.0 && shotCamera.pan[1] == 0.0 && std::abs(_isoZoom - _isoZoomTarget) < 1e-3) shotCamera.phase = 0;
+			_isoView->setIsoShift(target[0] - _isoShown[0] + shake[0] + shotCamera.pan[0], target[1] - _isoShown[1] + shake[1] + shotCamera.pan[1]);
+		}
+		// Extra "turn": [ and ] turn 3DIso a quarter about the view's middle, Shift+[ and Shift+] tilt it 15 degrees flatter or
+		// steeper (from 10 to 80 degrees down), smoothly; drawn in 3D (see FirstPersonView::setIsoTurn).
+		const bool turnExtra = _isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraTurn);
+		const bool turning = turnExtra && !_isoFlight.on;
+		if (_isoFree && (!turnExtra || _isoMode != 1)) setIsoFree(false); // (the free camera only where 3DIso turns; kept in 3D and back)
+		const bool shifted = (SDL_GetModState() & KMOD_SHIFT) != 0;
+		const bool turnLeftKey = cameraKeys && held(Options::keyFpsIsoTurnLeft), turnRightKey = cameraKeys && held(Options::keyFpsIsoTurnRight);
+		const bool turnLeft = turnLeftKey && !shifted, turnRight = turnRightKey && !shifted;
+		const bool tiltFlatter = cameraKeys && (held(Options::keyFpsIsoTiltFlatter) || (turnLeftKey && shifted));
+		const bool tiltSteeper = cameraKeys && (held(Options::keyFpsIsoTiltSteeper) || (turnRightKey && shifted));
+		if (turning && !_isoTurnKeyDown)
+		{
+			if (tiltFlatter) _isoTiltTarget = std::max(_isoFree ? -20.0 : -15.0, _isoTiltTarget - 15.0); // (in steps of 15 from the map's slant: 15 to 75 degrees down)
+			if (tiltSteeper) _isoTiltTarget = std::min(_isoFree ? 50.0 : 45.0, _isoTiltTarget + 15.0);
+			if (turnLeft) _isoTurnTarget -= 90.0;
+			if (turnRight) _isoTurnTarget += 90.0;
+		}
+		if (!turnExtra)
+		{
+			// (the extra off: back to the map's own side the short way, and its slant)
+			_isoTurnTarget = std::round(_isoTurnNow / 360.0) * 360.0;
+			_isoTiltTarget = 0.0;
+		}
+		// Our 3D art and the original art cross-fade live (IsoArtFadeTime): on switching, and on the original art around a turn
+		// or a tilt: the art fades into 3D where it is first, then the camera moves; back on the map's slant, the 3D fades into
+		// the art (see FirstPersonView::setIsoVoxelShare).
+		{
+			const double IsoArtFadeTime = 250.0;
+			const bool leaving = _isoTurnTarget != 0.0 || _isoTiltTarget != 0.0 || _isoTurnNow != 0.0 || _isoTiltNow != 0.0;
+			const double shareTarget = _isoArt3D != 0 || leaving ? 1.0 : 0.0;
+			const double step = _isoFrameSeconds * 1000.0 / IsoArtFadeTime;
+			_isoVoxelShare = shareTarget > _isoVoxelShare ? std::min(shareTarget, _isoVoxelShare + step) : std::max(shareTarget, _isoVoxelShare - step);
+		}
+		// (the free camera let go while moving: it glides on, slowing down over a quarter of a second)
+		if (_isoFree && !_isoFreeDrag.button && seconds > 0.0)
+		{
+			double *speed = _isoFreeVelocity;
+			if (speed[0] != 0.0 || speed[1] != 0.0)
+			{
+				_isoTurnTarget += speed[0] * seconds;
+				_isoTiltTarget = std::clamp(_isoTiltTarget + speed[1] * seconds, -20.0, 50.0);
+			}
+			if (speed[2] != 0.0 || speed[3] != 0.0)
+			{
+				double moveX = speed[2] * seconds, moveY = speed[3] * seconds;
+				isoMoveOnMap(_isoTurnNow, _isoTiltNow, _isoZoom, moveX, moveY);
+				_isoFreeGlidePan[0] += moveX;
+				_isoFreeGlidePan[1] += moveY;
+				const int stepX = (int)_isoFreeGlidePan[0], stepY = (int)_isoFreeGlidePan[1];
+				if (stepX || stepY) map->getCamera()->scrollXY(stepX, stepY, true, true);
+				_isoFreeGlidePan[0] -= stepX;
+				_isoFreeGlidePan[1] -= stepY;
+			}
+			const double slowing = std::exp(-seconds / 0.25);
+			for (int axis = 0; axis < 4; ++axis)
+			{
+				speed[axis] *= slowing;
+				if (std::abs(speed[axis]) < (axis < 2 ? 1.0 : 4.0)) speed[axis] = 0.0;
+			}
+		}
+		// (a new target, set anywhere since the last frame, eases from where the tilt and the turn are now; with the free camera
+		// they follow the mouse's targets closely instead)
+		const double IsoFreeFollow = 20.0;
+		if (_isoTiltTarget != _isoTiltEased)
+		{
+			_isoTiltFrom = _isoTiltNow;
+			_isoTiltStart = ticks;
+			_isoTiltEased = _isoTiltTarget;
+		}
+		if (_isoFree) _isoTiltNow += (_isoTiltTarget - _isoTiltNow) * std::min(1.0, seconds * IsoFreeFollow);
+		else
+		{
+			const double share = std::min(1.0, (ticks - _isoTiltStart) / 450.0);
+			_isoTiltNow = share >= 1.0 ? _isoTiltTarget : _isoTiltFrom + (_isoTiltTarget - _isoTiltFrom) * share * share * (3.0 - 2.0 * share);
+		}
+		_isoView->setIsoTilt(_isoTiltNow);
+		_isoTurnKeyDown = turnLeftKey || turnRightKey || tiltFlatter || tiltSteeper;
+		if (_isoTurnTarget != _isoTurnEased)
+		{
+			// (each quarter turn eased in and out over IsoTurnTime, from wherever the turn is)
+			_isoTurnFrom = _isoTurnNow;
+			_isoTurnStart = ticks;
+			_isoTurnEased = _isoTurnTarget;
+		}
+		if (_isoFree) _isoTurnNow += (_isoTurnTarget - _isoTurnNow) * std::min(1.0, seconds * IsoFreeFollow);
+		else
+		{
+			const double IsoTurnTime = 450.0;
+			const double share = std::min(1.0, (ticks - _isoTurnStart) / IsoTurnTime);
+			_isoTurnNow = _isoTurnFrom + (_isoTurnTarget - _isoTurnFrom) * share * share * (3.0 - 2.0 * share);
+			if (share >= 1.0)
+			{
+				_isoTurnTarget = std::fmod(_isoTurnTarget, 360.0);
+				if (std::abs(_isoTurnTarget) < 1e-9 || std::abs(std::abs(_isoTurnTarget) - 360.0) < 1e-9) _isoTurnTarget = 0.0;
+				_isoTurnNow = _isoTurnFrom = _isoTurnEased = _isoTurnTarget;
+			}
+		}
+		_isoView->setIsoTurn(_isoTurnNow);
+		// (the map's cursor and clicks go through 3DIso's picture only while it shows: on the map, in 3D or during a flight
+		// they are the map's own)
+		const bool pictureShown = _isoMode == 1 && !isActive() && !feedShown() && !map->showsHiddenMovement() && !_isoFlight.on;
+		if (!pictureShown) map->setSelectorTransform(nullptr);
+		else if (_isoTurnNow != 0.0 || _isoTiltNow != 0.0)
+		{
+			// (the tile the mouse is on in the turned picture, handed to the map as the point of its own picture over that tile:
+			// the floor's middle, less the quarter tile the map adds, see Map::setSelectorPosition; the camera's offset and level
+			// as they are when it's asked, which may be after a scroll since this frame)
+			FirstPersonView *view = _isoView;
+			const double toView = (double)_isoView->getWidth() / map->getWidth();
+			Camera *mapCamera = map->getCamera();
+			const int level = mapCamera->getViewLevel();
+			map->setSelectorTransform([view, toView, mapCamera](int &x, int &y) {
+				const Position offset = mapCamera->getMapOffset();
+				const int viewLevel = mapCamera->getViewLevel();
+				int tileX, tileY;
+				if (!view->isoTileAt((x + 0.5) * toView, (y + 0.5) * toView, viewLevel, tileX, tileY)) { x = -10000; y = -10000; return; }
+				x = 16 * (tileX - tileY) + offset.x + 16;
+				y = 8 * (tileX + tileY) - 24 * viewLevel + offset.y + 32 - 10;
+			});
+			Position selected;
+			map->getSelectorPosition(&selected);
+			const bool cursorShown = map->getCursorType() != CT_NONE && !_state->getMouseOverIcons();
+			_isoView->setIsoCursor(cursorShown ? selected.x : -1, selected.y, level);
+		}
+		else if (_isoZoom != 1.0 || _isoShown[0] != map->getCamera()->getMapOffset().x || _isoShown[1] != map->getCamera()->getMapOffset().y || _isoShot.phase != 0)
+		{
+			// (zoomed, or still gliding: the map's pixel under the mouse in the picture, see FirstPersonView::isoMapX)
+			FirstPersonView *view = _isoView;
+			const double toView = (double)_isoView->getWidth() / map->getWidth();
+			map->setSelectorTransform([view, toView](int &x, int &y) {
+				x = (int)std::floor(view->isoMapX((x + 0.5) * toView - 0.5));
+				y = (int)std::floor(view->isoMapY((y + 0.5) * toView - 0.5));
+			});
+		}
+		else map->setSelectorTransform(nullptr);
+		// (the camera moving under a still mouse: the tile under it is another, see Map::setSelectorTransform)
+		const double pose[6] = { _isoZoom, _isoShown[0] + _isoShot.pan[0], _isoShown[1] + _isoShot.pan[1], _isoTurnNow, _isoTiltNow, (double)map->getCamera()->getViewLevel() };
+		if (pictureShown && !std::equal(pose, pose + 6, _isoLastPose))
+		{
+			map->refreshSelectorPosition();
+			std::copy(pose, pose + 6, _isoLastPose);
+		}
+		// (where the player points on the map: the extra "downed icons" shows the body there, as 3D shows the one under the crosshair)
+		int mouseX = 0, mouseY = 0;
+		SDL_GetMouseState(&mouseX, &mouseY);
+		Screen *screen = _game->getScreen();
+		const double screenX = (mouseX - screen->getCursorLeftBlackBand()) / screen->getXScale(), screenY = (mouseY - screen->getCursorTopBlackBand()) / screen->getYScale();
+		const double toView = (double)_isoView->getWidth() / map->getWidth();
+		_isoView->setPointer((int)(screenX * toView), (int)(screenY * toView), 0); // (the map at the screen's corner: its pixels are the screen's)
+	}
+	bool dump = false;
+	if (dumpFolder)
+	{
+		const std::string folder = dumpFolder;
+		std::ifstream modeFile(folder + "/mode");
+		int mode;
+		if (modeFile >> mode) _isoMode = mode ? 1 : 0;
+		std::ifstream goFile(folder + "/go");
+		dump = goFile.good();
+	}
+	if (_isoFlight.on && _isoMode != 1)
+	{
+		// (the map switched to during a flight: the flight is over at once, into 3D as it would have ended, or back)
+		const bool into3D = _isoFlight.to3D;
+		BattleUnit *flown = _isoFlight.unit;
+		endIsoFlight();
+		if (into3D && flown)
+		{
+			_view->takeFlares(*_isoView); // (the flares burning go on in 3D)
+			_trackedUnit = nullptr;
+			_isoLandTick = SDL_GetTicks();
+			setActive(true);
+			return;
+		}
+	}
+	if (_isoFlight.on && _isoMode == 1)
+	{
+		map->setOverlayTarget(nullptr);
+		if (drawIsoFlight(SDL_GetTicks())) return;
+		if (isActive()) return;
+	}
+	const bool show = _isoMode == 1 && !isActive() && !feedShown() && !map->showsHiddenMovement(); // (the map's HIDDEN MOVEMENT shows as it is)
+	_isoView->setVisible(show);
+	if (!show)
+	{
+		// (the map shows as it is: its cursor, clicks and scrolling its own)
+		map->setSelectorTransform(nullptr);
+		map->getCamera()->setScrollTransform(nullptr);
+	}
+	else if (_isoZoom != 1.0 || _isoTurnNow != 0.0 || _isoTiltNow != 0.0)
+	{
+		// Scrolling as the picture shows the map: as fast on the screen at any zoom, and the way the arrows point on a turned or
+		// tilted picture (see isoMoveOnMap).
+		const double turn = _isoTurnNow, tilt = _isoTiltNow, zoom = _isoZoom;
+		map->getCamera()->setScrollTransform([turn, tilt, zoom](int &x, int &y) {
+			double moveX = x, moveY = y;
+			isoMoveOnMap(turn, tilt, zoom, moveX, moveY);
+			x = (int)std::lround(moveX);
+			y = (int)std::lround(moveY);
+		});
+	}
+	else map->getCamera()->setScrollTransform(nullptr);
+	_isoOverlay->setPalette(map->getPalette());
+	// (the map's overlay pass, labelled for 3DIso, only while the picture shows on the map's own slant: turned or tilted it
+	// isn't used, and the map's drawing costs half as much; back on the slant, drawn afresh at once)
+	const bool overlayWanted = (show && _isoTurnNow == 0.0 && _isoTiltNow == 0.0) || dump;
+	if (overlayWanted && !_isoOverlayWanted) map->invalidate();
+	_isoOverlayWanted = overlayWanted;
+	map->setOverlayTarget(overlayWanted ? _isoOverlay : nullptr);
+	if (!show && !dump) return;
+	Camera *camera = map->getCamera();
+	_isoView->setPalette(map->getPalette());
+	// (the map's levels: up to the view level; all of them with "show all layers"; the view level alone with "single layer")
+	const int lowLevel = camera->getShowSingleLayer() ? camera->getViewLevel() : 0;
+	const int highLevel = camera->getShowSingleLayer() ? camera->getViewLevel() : camera->getShowAllLayers() ? _save->getMapSizeZ() - 1 : camera->getViewLevel();
+	_isoView->setNightVision(map->getNightVisionColor()); // (the map's night vision, as it is now)
+	_isoView->setFlashlight(false, true);
+	_isoView->setIsoVoxelShare(dump ? (_isoArt3D == 1 ? 1.0f : 0.0f) : (float)_isoVoxelShare);
+	_isoView->setIsoCamera(camera->getMapOffset().x, camera->getMapOffset().y, camera->getViewLevel(), lowLevel, highLevel);
+	{
+		// Smooth level changes: the cut slides to the new level's top, in 3D and on the original art alike (the art below the
+		// cut, see FirstPersonView::isoArtAlong).
+		const double cutTarget = (highLevel + 1) * 24.0;
+		if (!_isoCutSet || dump) _isoCutShown = cutTarget;
+		_isoCutSet = true;
+		// (eased, but at least IsoCutLeastSpeed voxels a second: it gets there, not only near it, so the floor of the level it
+		// leaves, which shows as long as the cut is above it, goes on time; while it moves its edge is soft, so that floor
+		// dissolves over the last stretch instead of going in one frame, see setIsoCut)
+		const double IsoCutLeastSpeed = 30.0, IsoCutSoftness = 6.0;
+		const double cutLeft = cutTarget - _isoCutShown;
+		const double cutStep = std::max(std::abs(cutLeft) * std::min(1.0, _isoFrameSeconds * 7.0), IsoCutLeastSpeed * _isoFrameSeconds);
+		_isoCutShown = std::abs(cutLeft) <= cutStep ? cutTarget : _isoCutShown + (cutLeft > 0.0 ? cutStep : -cutStep);
+		_isoView->setIsoCut((float)_isoCutShown, _isoCutShown != cutTarget ? (float)IsoCutSoftness : 0.0f);
+		// (leaving the map's slant on the original art: the camera moves at once, the last picture of the art dissolving into
+		// the moving 3D one over IsoTurnMeltTime; coming back, the 3D fades into the art where it stands, see _isoVoxelShare)
+		const double IsoTurnMeltTime = 220.0;
+		const bool posed = _isoTurnNow != 0.0 || _isoTiltNow != 0.0;
+		const Uint32 now = SDL_GetTicks();
+		if (posed && !_isoWasPosed && _isoVoxelShare < 1.0 && !dump)
+		{
+			_isoView->keepPicture();
+			_isoTurnMeltStart = now;
+		}
+		_isoWasPosed = posed;
+		_isoView->setIsoDissolve(posed && now - _isoTurnMeltStart < IsoTurnMeltTime ? (float)((now - _isoTurnMeltStart) / IsoTurnMeltTime) : 1.0f);
+	}
+	_isoView->invalidate();
+	if (dump)
+	{
+		const std::string folder = dumpFolder;
+		map->invalidate();
+		map->draw();
+		_isoView->draw();
+		SDL_SaveBMP(map->getSurface(), (folder + "/iso.bmp").c_str());
+		SDL_SaveBMP(_isoView->getSurface(), (folder + "/iso3d.bmp").c_str());
+		SDL_SaveBMP(_isoOverlay->getSurface(), (folder + "/overlay.bmp").c_str());
+		{
+			// (the depth of every pixel, as 32-bit floats row by row, for a picture of the 3D world behind it)
+			std::ofstream depth(folder + "/depth.f32", std::ios::binary);
+			depth.write((const char*)_isoView->isoDepths(), sizeof(float) * _isoView->getWidth() * _isoView->getHeight());
+		}
+		std::ofstream info(folder + "/info.txt");
+		info << "offset " << camera->getMapOffset().x << " " << camera->getMapOffset().y << " level " << camera->getViewLevel()
+			<< " size " << map->getWidth() << " " << map->getHeight() << "\n";
+		std::remove((folder + "/go").c_str());
+	}
+}
+
+}
+
+namespace OpenXcom
+{
+
+/// The flight's length, and the share of it the map's picture takes to dissolve into the 3D one.
+static const double IsoFlightDissolve = 0.2;
+/// The isometric camera's distance (true proportions; see FirstPersonView::setIsoCamera).
+static const double IsoFarBack = 524288.0;
+
+void FirstPersonMode::toggleIsoArt()
+{
+	// A/R (the top bar's button, the key "3DIso: art"): turned, tilted or the free camera on, back to the map's own side, slant
+	// and size, smoothly, onto the original art: a reset (the owner's word). On the map's own side and slant: our 3D art or the
+	// original, the other one.
+	const bool posed = _isoFree || std::abs(_isoTurnTarget - std::round(_isoTurnTarget / 360.0) * 360.0) > 1e-6 || std::abs(_isoTiltTarget) > 1e-6
+		|| std::abs(_isoTurnNow - std::round(_isoTurnNow / 360.0) * 360.0) > 0.5 || std::abs(_isoTiltNow) > 0.5;
+	if (posed)
+	{
+		setIsoFree(false);
+		_isoZoomTarget = 1.0;
+		_isoTurnTarget = std::round(_isoTurnNow / 360.0) * 360.0; // (the nearest whole turn: the short way round)
+		_isoTiltTarget = 0.0;
+		_isoArt3D = 0;
+	}
+	else _isoArt3D = _isoArt3D == 0 ? 1 : 0;
+	// (remembered in the setting "3DIso art", unless a test asked for one)
+	if (!getenv("OXC3D_ISO3D_ART"))
+	{
+		Options::fpsIsoArt = _isoArt3D == 1 ? 0 : 1;
+		_isoArtSetting = Options::fpsIsoArt;
+	}
+}
+
+/**
+ * 3DIso's free camera on or off (research). On only where 3DIso turns (its extra "turn"); off, the view eases back to the map's
+ * own side (the nearest whole turn, the short way), slant and size.
+ */
+void FirstPersonMode::setIsoFree(bool on)
+{
+	if (on && !(_isoExtrasOn && (_isoExtras & FirstPersonView::IsoExtraTurn))) on = false;
+	if (on == _isoFree) return;
+	_isoFree = on;
+	_isoFreeDrag = IsoFreeDrag();
+	std::fill(_isoFreeVelocity, _isoFreeVelocity + 4, 0.0);
+	if (!on)
+	{
+		_isoZoomTarget = 1.0;
+		_isoTurnTarget = std::round(_isoTurnNow / 360.0) * 360.0;
+		_isoTiltTarget = 0.0;
+	}
+}
+
+/**
+ * 3DIso's zoom at a point of the map's picture (the game's screen pixels): the point stays where it is, the map's offset moving
+ * by the change (in the picture's own terms: the camera's scroll transform makes it the map's, turned or not), the picture
+ * gliding with it (see updateIsoView).
+ */
+void FirstPersonMode::isoZoomAt(double mouseX, double mouseY, double factor)
+{
+	if (_isoShot.phase == 1 || _isoShot.phase == 2) return; // (the shot camera has the zoom while it follows a shot)
+	const double oldZoom = _isoZoomTarget, newZoom = std::clamp(oldZoom * factor, isoMinZoom(), 4.0);
+	if (newZoom == oldZoom) return;
+	Map *map = _state->_map;
+	const double fromMiddleX = mouseX - map->getWidth() / 2.0, fromMiddleY = mouseY - map->getHeight() / 2.0;
+	const double moveX = fromMiddleX * (1.0 / newZoom - 1.0 / oldZoom), moveY = fromMiddleY * (1.0 / newZoom - 1.0 / oldZoom);
+	map->getCamera()->scrollXY((int)std::lround(moveX * _isoZoom), (int)std::lround(moveY * _isoZoom), true);
+	_isoZoomTarget = newZoom;
+}
+
+/**
+ * The free camera's mouse (research), over the map (not the top bar, the map's HUD or the map camera):
+ * - the right button dragged turns the view round its middle (across) and tilts it (up: flatter, down: steeper);
+ * - the middle button dragged moves it, the ground following the mouse;
+ * - the wheel zooms at the mouse, from half the map's size to four times;
+ * - a click that doesn't drag is the map's as ever (the right one turns the soldier or cancels), given to it on release;
+ * - a left click on the marks turns the free camera off.
+ * @return True if the event was the free camera's.
+ */
+bool FirstPersonMode::handleIsoFreeCamera(Action *action)
+{
+	const SDL_Event &event = *action->getDetails();
+	const bool wheel = wheelStep(event) != 0; // (SDL 1.2's wheel buttons or SDL2's wheel)
+	const bool isButton = !wheel && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP);
+	if (!wheel && !isButton && event.type != SDL_MOUSEMOTION) return false;
+	if (wheel || isButton)
+	{
+		int eventX = 0, eventY = 0;
+		mouseEventPosition(event, eventX, eventY);
+		action->setMouseAction(eventX, eventY, 0, 0);
+	}
+	else action->setMouseAction(event.motion.x, event.motion.y, 0, 0);
+	const double mouseX = action->getAbsoluteXMouse(), mouseY = action->getAbsoluteYMouse();
+	const double canvasX = toCanvasX(mouseX), canvasY = toCanvasY(mouseY);
+	if (isButton && event.button.button == SDL_BUTTON_LEFT && _isoFreeMarks->getVisible()
+		&& canvasX >= _isoFreeMarks->getX() && canvasX < _isoFreeMarks->getX() + _isoFreeMarks->getWidth()
+		&& canvasY >= _isoFreeMarks->getY() && canvasY < _isoFreeMarks->getY() + _isoFreeMarks->getHeight())
+	{
+		if (event.type == SDL_MOUSEBUTTONDOWN) setIsoFree(false);
+		return true;
+	}
+	const bool overMap = canvasY >= BarY + BarH && mouseY < _state->_icons->getY() && !onMapCamera((int)canvasX, (int)canvasY);
+	if (wheel)
+	{
+		if (!overMap) return false;
+		isoZoomAt(mouseX, mouseY, wheelStep(event) < 0 ? 1.2 : 1.0 / 1.2); // (up: in)
+		_isoFreeWheelTick = SDL_GetTicks();
+		return true;
+	}
+	if (event.type == SDL_MOUSEBUTTONDOWN && (event.button.button == SDL_BUTTON_RIGHT || event.button.button == SDL_BUTTON_MIDDLE) && !_isoFreeDrag.button)
+	{
+		if (!overMap) return false;
+		_isoFreeDrag = IsoFreeDrag();
+		_isoFreeDrag.button = event.button.button;
+		_isoFreeDrag.startX = _isoFreeDrag.lastX = mouseX;
+		_isoFreeDrag.startY = _isoFreeDrag.lastY = mouseY;
+		mouseEventPosition(event, _isoFreeDrag.windowX, _isoFreeDrag.windowY);
+		std::fill(_isoFreeVelocity, _isoFreeVelocity + 4, 0.0); // (a new grab stops a glide)
+		return true;
+	}
+	if (event.type == SDL_MOUSEMOTION && _isoFreeDrag.button && !(SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(_isoFreeDrag.button)))
+	{
+		_isoFreeDrag = IsoFreeDrag(); // (its release went elsewhere: another screen on top, the window left)
+		return false;
+	}
+	if (event.type == SDL_MOUSEMOTION && _isoFreeDrag.button)
+	{
+		const double moveX = mouseX - _isoFreeDrag.lastX, moveY = mouseY - _isoFreeDrag.lastY;
+		_isoFreeDrag.lastX = mouseX;
+		_isoFreeDrag.lastY = mouseY;
+		const double fromStartX = mouseX - _isoFreeDrag.startX, fromStartY = mouseY - _isoFreeDrag.startY;
+		if (!_isoFreeDrag.moved && fromStartX * fromStartX + fromStartY * fromStartY < 9.0) return true; // (not yet a drag: maybe a click)
+		_isoFreeDrag.moved = true;
+		// (how fast it moves, smoothed over the last moves: what glides on when it's let go)
+		const Uint32 now = SDL_GetTicks();
+		const double step = std::clamp((now - _isoFreeMoveTick) / 1000.0, 0.004, 0.1);
+		_isoFreeMoveTick = now;
+		const double turnStep = -moveX * (1.0 / 3.0), tiltStep = moveY * 0.35;
+		const bool turningDrag = _isoFreeDrag.button == SDL_BUTTON_RIGHT;
+		const double speeds[4] = { turningDrag ? turnStep / step : 0.0, turningDrag ? tiltStep / step : 0.0, turningDrag ? 0.0 : moveX / step, turningDrag ? 0.0 : moveY / step };
+		for (int axis = 0; axis < 4; ++axis) _isoFreeVelocity[axis] = _isoFreeVelocity[axis] * 0.5 + speeds[axis] * 0.5;
+		// (the pointer back where the drag began as it nears the window's edge: a drag goes on as far as the player likes)
+		{
+			const int windowX = event.motion.x, windowY = event.motion.y;
+			const int windowWidth = _game->getScreen()->getWidth(), windowHeight = _game->getScreen()->getHeight();
+			if (windowX < windowWidth / 8 || windowX >= windowWidth * 7 / 8 || windowY < windowHeight / 8 || windowY >= windowHeight * 7 / 8)
+			{
+				SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
+				SDL_WarpMouse((Uint16)_isoFreeDrag.windowX, (Uint16)_isoFreeDrag.windowY);
+				SDL_EventState(SDL_MOUSEMOTION, SDL_ENABLE);
+				_isoFreeDrag.lastX = _isoFreeDrag.startX;
+				_isoFreeDrag.lastY = _isoFreeDrag.startY;
+			}
+		}
+		if (turningDrag)
+		{
+			// (a third of a degree a pixel across; tilted between 10 and 80 degrees down)
+			_isoTurnTarget += turnStep;
+			_isoTiltTarget = std::clamp(_isoTiltTarget + tiltStep, -20.0, 50.0);
+		}
+		else
+		{
+			// (the move on the map's own picture, whole pixels to the map's camera, the rest kept for the next move: slow drags
+			// at any zoom move it too)
+			double moveOnMapX = moveX, moveOnMapY = moveY;
+			isoMoveOnMap(_isoTurnNow, _isoTiltNow, _isoZoom, moveOnMapX, moveOnMapY);
+			double *pan = _isoFreeDrag.pan;
+			pan[0] += moveOnMapX;
+			pan[1] += moveOnMapY;
+			const int stepX = (int)pan[0], stepY = (int)pan[1];
+			if (stepX || stepY) _state->_map->getCamera()->scrollXY(stepX, stepY, true, true);
+			pan[0] -= stepX;
+			pan[1] -= stepY;
+		}
+		return true;
+	}
+	if (event.type == SDL_MOUSEBUTTONUP && _isoFreeDrag.button && event.button.button == _isoFreeDrag.button)
+	{
+		const bool dragged = _isoFreeDrag.moved;
+		_isoFreeDrag = IsoFreeDrag();
+		if (!dragged) _state->mapClick(action); // (a click, not a drag: the map's, as ever)
+		if (!dragged || SDL_GetTicks() - _isoFreeMoveTick > 60) std::fill(_isoFreeVelocity, _isoFreeVelocity + 4, 0.0); // (held still before it was let go: no glide)
+		return true;
+	}
+	return false;
+}
+
+/**
+ * The free camera's marks under the top bar's left, or under the map camera's window while it shows (research): what each
+ * mouse control does, drawn smooth on 17 pixels (15 and an outline): a
+ * four-way arrow (the middle button dragged moves the view), a turning arrow (the right button turns and tilts it), a
+ * magnifier (the wheel zooms), each in the top bar's colour with soft edges and a dark outline, the one in use lit. Shown
+ * while the free camera is on and 3DIso shows; a click on them turns it off.
+ */
+void FirstPersonMode::updateIsoFreeMarks()
+{
+	const bool show = _isoFree && iso3DOn() && _isoView->getVisible() && !_isoFlight.on && !isActive();
+	_isoFreeMarks->setVisible(show);
+	if (!show)
+	{
+		_isoFreeMarksLit = -1;
+		_isoFreeDrag = IsoFreeDrag(); // (a drag ends with the picture it moved)
+		return;
+	}
+	// (under the map camera's window while it shows: it would cover them, and take their clicks)
+	const int marksY = _mapCameraFrame && _mapCameraFrame->getVisible() ? _mapCameraFrame->getY() + _mapCameraFrame->getHeight() + 2 : BarY + BarH + 2;
+	if (_isoFreeMarks->getY() != marksY) _isoFreeMarks->setY(marksY);
+	const bool wheeled = SDL_GetTicks() - _isoFreeWheelTick < 300;
+	const int lit = _isoFreeDrag.moved ? (_isoFreeDrag.button == SDL_BUTTON_MIDDLE ? 1 : 2) : wheeled ? 3 : 0;
+	if (lit == _isoFreeMarksLit) return;
+	_isoFreeMarksLit = lit;
+	// Each mark as a shape on its own 15 x 15 square (its middle at 7.5, 7.5) a pixel in from its cell's edge (room for the
+	// outline), sampled 4 x 4 a pixel for its share of each pixel.
+	auto inTriangle = [](double x, double y, double ax, double ay, double bx, double by, double cx, double cy) {
+		const double first = (bx - ax) * (y - ay) - (by - ay) * (x - ax), second = (cx - bx) * (y - by) - (cy - by) * (x - bx), third = (ax - cx) * (y - cy) - (ay - cy) * (x - cx);
+		return (first >= 0 && second >= 0 && third >= 0) || (first <= 0 && second <= 0 && third <= 0);
+	};
+	auto nearSegment = [](double x, double y, double ax, double ay, double bx, double by, double half) {
+		const double dx = bx - ax, dy = by - ay, along = std::clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy), 0.0, 1.0);
+		const double ox = ax + dx * along - x, oy = ay + dy * along - y;
+		return ox * ox + oy * oy <= half * half;
+	};
+	auto inside = [&](int mark, double x, double y) {
+		const double cx = 7.5, cy = 7.5, dx = x - cx, dy = y - cy;
+		if (mark == 0)
+		{
+			// (moving: a cross with an arrowhead at each end)
+			if (std::abs(dy) <= 0.9 && std::abs(dx) <= 5.0) return true;
+			if (std::abs(dx) <= 0.9 && std::abs(dy) <= 5.0) return true;
+			for (int side = 0; side < 4; ++side)
+			{
+				const double ux = side == 0 ? 1 : side == 1 ? -1 : 0, uy = side == 2 ? 1 : side == 3 ? -1 : 0;
+				if (inTriangle(dx, dy, ux * 7.4, uy * 7.4, ux * 4.2 - uy * 3.0, uy * 4.2 + ux * 3.0, ux * 4.2 + uy * 3.0, uy * 4.2 - ux * 3.0)) return true;
+			}
+			return false;
+		}
+		if (mark == 1)
+		{
+			// (turning: a ring open at the top right, an arrowhead at its upper end going round)
+			const double radius = std::sqrt(dx * dx + dy * dy), angle = std::atan2(-dy, dx) * 180.0 / Pi; // (0 right, 90 up)
+			if (std::abs(radius - 5.0) <= 0.95 && !(angle > 10.0 && angle < 80.0)) return true;
+			return inTriangle(dx, dy, 1.0, -2.4, 1.0, -7.8, 5.4, -5.1); // (at the ring's top, pointing right: round clockwise)
+		}
+		// (zooming: a magnifier, its glass up left, its handle down right)
+		const double gx = x - 6.0, gy = y - 6.0, radius = std::sqrt(gx * gx + gy * gy);
+		if (std::abs(radius - 4.0) <= 1.0) return true;
+		return nearSegment(x, y, 9.2, 9.2, 13.4, 13.4, 1.35);
+	};
+	const SDL_Color *palette = _state->getPalette();
+	const Uint8 base = _btnIsoArt->getColor();
+	// (the bar's colour; lit: the palette's nearest to a pale gold; edges a shade darker in the colour's own group)
+	const Uint8 fill = base, edge = (Uint8)std::min(255, (int)base + 2), bright = nearestColor(palette, 255, 240, 150), brightEdge = nearestColor(palette, 220, 190, 90),
+		outline = nearestColor(palette, 8, 8, 8);
+	_isoFreeMarks->clear();
+	_isoFreeMarks->lock();
+	const int Cell = IsoFreeMarkSize;
+	for (int mark = 0; mark < 3; ++mark)
+	{
+		const int left = mark * (Cell + 2);
+		double share[Cell][Cell];
+		for (int y = 0; y < Cell; ++y)
+			for (int x = 0; x < Cell; ++x)
+			{
+				int covered = 0;
+				for (int sub = 0; sub < 16; ++sub) covered += inside(mark, x - 1 + (sub % 4 + 0.5) / 4.0, y - 1 + (sub / 4 + 0.5) / 4.0) ? 1 : 0;
+				share[y][x] = covered / 16.0;
+			}
+		const bool on = lit == mark + 1;
+		for (int y = 0; y < Cell; ++y)
+			for (int x = 0; x < Cell; ++x)
+			{
+				if (share[y][x] >= 0.55) { _isoFreeMarks->setPixel(left + x, y, on ? bright : fill); continue; }
+				if (share[y][x] >= 0.2) { _isoFreeMarks->setPixel(left + x, y, on ? brightEdge : edge); continue; }
+				bool touches = false;
+				for (int dy = -1; dy <= 1 && !touches; ++dy)
+					for (int dx = -1; dx <= 1 && !touches; ++dx)
+					{
+						const int nx = x + dx, ny = y + dy;
+						touches = nx >= 0 && ny >= 0 && nx < Cell && ny < Cell && share[ny][nx] >= 0.2;
+					}
+				if (touches) _isoFreeMarks->setPixel(left + x, y, outline);
+			}
+	}
+	_isoFreeMarks->unlock();
+}
+
+/**
+ * 3DIso turned or tilted (research): the 3D view's compass on the map (setting "Compass"), its bearing 3DIso's camera's, the
+ * selected soldier's facing on its rim: which way north is once the map isn't seen from its own side.
+ */
+void FirstPersonMode::updateIsoCompass()
+{
+	const bool show = Options::fpsCompass && iso3DOn() && _isoView->getVisible() && !_isoFlight.on && (_isoTurnNow != 0.0 || _isoTiltNow != 0.0) && !hudHidden();
+	if (!show) return; // (hidden by updateCompass already)
+	_compass->setVisible(true);
+	for (Text *letter : _compassLetters) letter->setVisible(true);
+	const int viewBearing = ((int)std::lround(-135.0 + _isoTurnNow + 90.0) % 360 + 360) % 360;
+	const BattleUnit *unit = _save->getSelectedUnit();
+	const int facing = unit ? unit->getDirection() : ((viewBearing + 22) / 45) % 8;
+	if (viewBearing == _compassDrawn[0] && facing == _compassDrawn[1] && _compassDrawn[2] == 0 && _compassDrawn[3] == -1) return;
+	_compassDrawn[0] = viewBearing;
+	_compassDrawn[1] = facing;
+	_compassDrawn[2] = 0;
+	_compassDrawn[3] = -1;
+	_compassDrawn[4] = _compassDrawn[5] = -1; // (3D draws its own again)
+	drawCompass(viewBearing, facing, 0, -1);
+	const double radius = CompassSize / 2 - 9.0;
+	for (int letter = 0; letter < 4; ++letter)
+	{
+		const double angle = (letter * 90 - viewBearing) * Pi / 180.0;
+		_compassLetters[letter]->setX((int)std::lround(_compass->getX() + CompassSize / 2.0 + radius * std::sin(angle) - 3.5));
+		_compassLetters[letter]->setY((int)std::lround(_compass->getY() + CompassArrowH + CompassSize / 2.0 - radius * std::cos(angle) - 3.5));
+	}
+}
+
+void FirstPersonMode::endIsoFlight()
+{
+	_isoFlight.on = false;
+	_isoHudSlide = 0.0; // (the map's HUD back in its place)
+	if (_isoView)
+	{
+		_isoView->setFlightCeiling(0.0f);
+		_isoView->setFlightUnknownDark(0.0f);
+		_isoView->setFlightDistanceShare(1.0f);
+		_isoView->endFlight();
+	}
+}
+
+bool FirstPersonMode::isoShowsEffects() const
+{
+	return _isoView && _isoView->getVisible() && !isActive() && (_isoView->isoExtras() & FirstPersonView::IsoExtraEffects);
+}
+
+bool FirstPersonMode::iso3DOn() const
+{
+	return (getenv("OXC3D_ISO3D") || Options::fpsIso) && _isoMode == 1 && _isoView;
+}
+
+/**
+ * Starts the flight (see IsoFlight): into the soldier's eyes (the 3D view's camera as 3D starts: the middle of their tile at
+ * eye height, the way they face, the field of view now) or out of them (the caller sets where the 3D view looked). The
+ * map's picture at its end is drawn now and kept, to dissolve from or into.
+ */
+void FirstPersonMode::startIsoFlight(BattleUnit *unit, bool to3D)
+{
+	// (into the eyes from wherever 3DIso is turned, tilted and zoomed, and back onto the same: the camera is kept while in 3D,
+	// the free camera too (the owner's word); a drag and a glide end)
+	_isoFreeDrag = IsoFreeDrag();
+	std::fill(_isoFreeVelocity, _isoFreeVelocity + 4, 0.0);
+	_isoTurnNow = _isoTurnTarget;
+	_isoTiltNow = _isoTiltTarget;
+	_isoZoom = _isoZoomTarget;
+	if (!to3D) _isoView->takeFlares(*_view); // (the flares burning in 3D go on in 3DIso)
+	_isoFlight.startYaw = -135.0 + _isoTurnNow;
+	_isoFlight.startPitch = std::clamp(-30.0 - _isoTiltNow, -80.0, -10.0);
+	_isoFlight.startBack = _isoView->isoBack();
+	_isoFlight.on = true;
+	_isoFlight.to3D = to3D;
+	_isoFlight.start = SDL_GetTicks();
+	_isoFlight.unit = unit;
+	const Position position = unit->getPosition();
+	const int unitSize = unit->getArmor()->getSize();
+	_isoFlight.eye[0] = position.x * 16.0 + 8.0 * unitSize;
+	_isoFlight.eye[1] = position.y * 16.0 + 8.0 * unitSize;
+	_isoFlight.eye[2] = eyeHeight(unit);
+	_isoFlight.yaw = unit->getDirection() * 45.0 - 90.0;
+	_isoFlight.pitch = 0.0;
+	_isoFlight.fov = fieldOfViewNow();
+	// The map's picture of its end: 3DIso drawn now (with the map's overlays as they are now) and kept. Only on the original
+	// art, which the flight dissolves from or into: our 3D art is the flight's own picture (see drawIsoFlight), and drawing
+	// it here made the flight's first frame two frames long.
+	if (_isoArt3D == 1)
+	{
+		return;
+	}
+	Map *map = _state->_map;
+	Camera *camera = map->getCamera();
+	map->setOverlayTarget(_isoOverlay);
+	map->invalidate();
+	map->draw();
+	const int lowLevel = camera->getShowSingleLayer() ? camera->getViewLevel() : 0;
+	const int highLevel = camera->getShowSingleLayer() ? camera->getViewLevel() : camera->getShowAllLayers() ? _save->getMapSizeZ() - 1 : camera->getViewLevel();
+	_isoView->setPalette(map->getPalette());
+	_isoView->setIsoCamera(camera->getMapOffset().x, camera->getMapOffset().y, camera->getViewLevel(), lowLevel, highLevel);
+	_isoView->invalidate();
+	_isoView->draw();
+	_isoView->keepPicture();
+}
+
+/**
+ * A frame of the flight, in two stretches (s: 0 the map, 1 the soldier's eyes).
+ * - Up to IsoFlightOver: the camera turns about a pivot (true proportions), from the middle of the map's picture seen from
+ *   IsoFarBack along the isometric slant (the map's sqrt(2) pixels to a voxel there) to the soldier's head seen from
+ *   IsoFlightAbove away, steeply from above (IsoFlightDivePitch) and the way they face, with the 3D field of view. The
+ *   pivot moves straight, the angles turn the short way, and the distance and the width seen at the pivot change by the
+ *   same factor each moment (a dolly zoom: the parallel picture grows its perspective smoothly).
+ * - Then the dive: from there straight into the soldier's eyes, the view coming up level.
+ * The levels above the map's view level stay away (the map's cut, moved to the soldier's level: what's over them hides
+ * nothing on the way down, and inside their level the rays start at the eye); the map's picture dissolves over the first
+ * IsoFlightDissolve; the soldier is looked through (not drawn) once the eye is close to their head.
+ * @return False once it's over (into 3D: the 3D view takes over in this very pose).
+ */
+bool FirstPersonMode::drawIsoFlight(Uint32 now)
+{
+	const double ZScaleTrue = 0.81649658092772603, Degree = 3.14159265358979323846 / 180.0;
+	const double IsoFlightOver = 0.65, IsoFlightAbove = 56.0, IsoFlightDivePitch = -70.0;
+	// (OXC3D_ISO3D_FLIGHT_HOLD=s: a test's, the flight held at that point for ever: 0 the map, 1 the soldier's eyes)
+	static const char *hold = getenv("OXC3D_ISO3D_FLIGHT_HOLD");
+	const double t = hold && *hold ? 0.5 : std::clamp((now - _isoFlight.start) / (isoFlightSeconds() * 1000.0), 0.0, 1.0);
+	const double eased = t * t * (3.0 - 2.0 * t);
+	const double s = hold && *hold ? std::atof(hold) : _isoFlight.to3D ? eased : 1.0 - eased;
+	Map *map = _state->_map;
+	Camera *camera = map->getCamera();
+	auto forwardOf = [&](double yaw, double pitch, double out[3]) {
+		out[0] = std::cos(yaw * Degree) * std::cos(pitch * Degree);
+		out[1] = std::sin(yaw * Degree) * std::cos(pitch * Degree);
+		out[2] = std::sin(pitch * Degree);
+	};
+	auto smooth = [](double x) { x = std::clamp(x, 0.0, 1.0); return x * x * (3.0 - 2.0 * x); };
+	// The ends and the point above the head between the stretches (true proportions).
+	double isoPivot[3];
+	_isoView->isoPivot(camera->getMapOffset().x, camera->getMapOffset().y, camera->getViewLevel(), isoPivot);
+	isoPivot[2] *= ZScaleTrue;
+	const double head[3] = { _isoFlight.eye[0], _isoFlight.eye[1], _isoFlight.eye[2] * ZScaleTrue };
+	const double isoWidth = _isoView->getWidth() / 2.0 / std::sqrt(2.0) / std::max(1e-6, _isoView->isoZoom()); // (the width seen at the pivot, zoomed: see setIsoScale)
+	const double halfFov = std::tan(_isoFlight.fov * Degree / 2.0);
+	double eye[3], yaw, pitch, halfFovTangent;
+	if (s < IsoFlightOver)
+	{
+		const double u = smooth(s / IsoFlightOver);
+		double pivot[3];
+		for (int axis = 0; axis < 3; ++axis) pivot[axis] = isoPivot[axis] + (head[axis] - isoPivot[axis]) * u;
+		yaw = _isoFlight.startYaw + std::remainder(_isoFlight.yaw - _isoFlight.startYaw, 360.0) * u;
+		pitch = _isoFlight.startPitch + (IsoFlightDivePitch - _isoFlight.startPitch) * u;
+		const double farBack = _isoFlight.startBack; // (where 3DIso's eye stood: far back, nearer tilted flat)
+		const double distance = std::exp(std::log(farBack) + (std::log(IsoFlightAbove) - std::log(farBack)) * u);
+		const double width = std::exp(std::log(isoWidth) + (std::log(IsoFlightAbove * halfFov) - std::log(isoWidth)) * u);
+		double forward[3];
+		forwardOf(yaw, pitch, forward);
+		for (int axis = 0; axis < 3; ++axis) eye[axis] = pivot[axis] - forward[axis] * distance;
+		halfFovTangent = width / distance;
+	}
+	else
+	{
+		const double u = smooth((s - IsoFlightOver) / (1.0 - IsoFlightOver));
+		double forward[3];
+		forwardOf(_isoFlight.yaw, IsoFlightDivePitch, forward);
+		for (int axis = 0; axis < 3; ++axis) eye[axis] = head[axis] - forward[axis] * IsoFlightAbove * (1.0 - u);
+		yaw = _isoFlight.yaw;
+		pitch = IsoFlightDivePitch + (_isoFlight.pitch - IsoFlightDivePitch) * u;
+		halfFovTangent = halfFov;
+	}
+	const double headDistance = std::sqrt((eye[0] - head[0]) * (eye[0] - head[0]) + (eye[1] - head[1]) * (eye[1] - head[1]) + (eye[2] - head[2]) * (eye[2] - head[2]));
+	eye[2] /= ZScaleTrue;
+	// The cut: from the map's (its view level's top, or the map's top with all layers shown) to the soldier's level's top.
+	const int highLevel = camera->getShowAllLayers() ? _save->getMapSizeZ() - 1 : camera->getViewLevel();
+	const float isoTop = (float)((highLevel + 1) * Position::TileZ), unitTop = (float)((_isoFlight.unit->getPosition().z + 1) * Position::TileZ);
+	const float cutTop = isoTop + (unitTop - isoTop) * (float)smooth(s / 0.3);
+	_isoView->setSmoothLighting(Options::fpsSmoothLighting);
+	_isoView->setMaxDistance(FirstPerson::viewDistance(_game->getMod()));
+	_isoView->setNightVision(map->getNightVisionColor());
+	_isoView->setFlashlight(_flashlightOn, true);
+	// (our 3D art: the flight's first picture is 3DIso's own, no dissolve; the original art dissolves into it)
+	const float shown3D = _isoArt3D == 1 ? 1.0f : (float)std::clamp(s / IsoFlightDissolve, 0.0, 1.0);
+	_isoView->setFlightCamera(eye, yaw, pitch, halfFovTangent, cutTop, headDistance < 20.0 ? _isoFlight.unit : nullptr, shown3D);
+	// (the ceiling over the soldier fading in through the dive's last stretch, as the 3D view will show it: no pop at the end)
+	_isoView->setFlightCeiling((float)smooth((s - 0.82) / 0.18));
+	// (what the squad hasn't found: black as 3DIso and the map have it, dissolving into the 3D view's way over the first stretch)
+	_isoView->setFlightUnknownDark((float)(1.0 - smooth(s / 0.4)));
+	// (the 3D view's darkening and haze with distance: none on the map, coming in over the first stretch)
+	_isoView->setFlightDistanceShare((float)smooth(s / 0.6));
+	// (the map's HUD sliding away in the flight's first stretch into the eyes, back in its last stretch out of them)
+	_isoHudSlide = smooth(s / 0.25);
+	_isoView->setVisible(true);
+	_isoView->invalidate();
+	// (OXC3D_ISO3D_FLIGHTDUMP: each frame of the flight saved as a picture, numbered)
+	static const char *flightDump = getenv("OXC3D_ISO3D_FLIGHTDUMP");
+	if (flightDump && *flightDump)
+	{
+		static int frame = 0;
+		_isoView->draw();
+		char name[64];
+		snprintf(name, sizeof(name), "/flight%04d.bmp", frame++);
+		SDL_SaveBMP(_isoView->getSurface(), (std::string(flightDump) + name).c_str());
+	}
+	if (t < 1.0) return true;
+	// Over: into 3D (the 3D view in this pose), or back on 3DIso.
+	endIsoFlight();
+	if (_isoFlight.to3D)
+	{
+		_isoView->setVisible(false);
+		_view->takeFlares(*_isoView); // (the flares burning go on in 3D)
+		_trackedUnit = nullptr; // (the 3D view starts as the flight ended: the soldier's eyes, the way they face)
+		_isoFlightLanding = true; // (exactly the flight's last pose: see updateCamera)
+		_isoLandTick = SDL_GetTicks(); // (the weapon comes up from below, not there at once)
+		_isoFlightLandYaw = _isoFlight.yaw;
+		_isoFlightLandPitch = _isoFlight.pitch;
+		setActive(true);
+	}
+	return false;
+}
+
+}
+
+namespace OpenXcom
+{
+
+/**
+ * 3DIso's tactical flare: from the selected soldier's right shoulder (their eyes' height, a little to the side of the throw)
+ * on the arc that comes down on the tile the map's cursor is on (its floor's middle), as the flare key throws one in 3D at the
+ * crosshair; with the game's throwing sound from the soldier's tile, and the strike and hiss.
+ */
+void FirstPersonMode::throwIsoFlare()
+{
+	BattleUnit *unit = _save->getSelectedUnit();
+	if (!unit || !unit->getTile() || unit->getFaction() != FACTION_PLAYER || _save->getSide() != FACTION_PLAYER) return;
+	Position target;
+	_state->_map->getSelectorPosition(&target);
+	const Tile *targetTile = _save->getTile(target);
+	if (!targetTile) return;
+	const Position position = unit->getPosition();
+	const int unitSize = unit->getArmor()->getSize();
+	const float aim[3] = { target.x * 16.0f + 8.0f, target.y * 16.0f + 8.0f, target.z * 24.0f + 2.0f - targetTile->getTerrainLevel() };
+	float from[3] = { position.x * 16.0f + 8.0f * unitSize, position.y * 16.0f + 8.0f * unitSize, (float)eyeHeight(unit) - 2.0f };
+	const float towardX = aim[0] - from[0], towardY = aim[1] - from[1], flat = std::max(1.0f, std::sqrt(towardX * towardX + towardY * towardY));
+	from[0] += towardX / flat * 3.0f - towardY / flat * 3.0f; // (ahead and to the right, as from the shoulder in 3D)
+	from[1] += towardY / flat * 3.0f + towardX / flat * 3.0f;
+	_isoView->throwFlareFrom(from, aim);
+	if (Sound *sound = _game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_THROW))
+	{
+		sound->play(-1, _state->_map->getSoundAngle(position));
+	}
+	_sounds->play(FirstPersonSounds::FLARE, 0, 0.55f);
+}
+
+}

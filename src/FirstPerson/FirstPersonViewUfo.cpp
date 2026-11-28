@@ -81,6 +81,7 @@
 #include "../Mod/MapData.h"
 #include "../Mod/MapDataSet.h"
 #include "../Mod/Mod.h"
+#include "../Mod/RuleCraft.h"
 #include "../Mod/RuleTerrain.h"
 #include "../Mod/RuleUfo.h"
 #include "../Savegame/SavedBattleGame.h"
@@ -194,6 +195,7 @@ void FirstPersonView::collectUfoDataSets()
 {
 	_ufoDataSets.clear();
 	_ufoOnlyDataSets.clear();
+	_craftDataSets.clear();
 	const Mod *mod = _save ? _save->getMod() : nullptr;
 	if (!mod)
 	{
@@ -213,6 +215,11 @@ void FirstPersonView::collectUfoDataSets()
 			collect(ufo->getBattlescapeTerrainData(), _ufoDataSets);
 		}
 	}
+	for (const auto &type : mod->getCraftsList())
+	{
+		const RuleCraft *craft = mod->getCraft(type);
+		if (craft) collect(craft->getBattlescapeTerrainData(), _craftDataSets);
+	}
 	const int terrainCount = (int)mod->getTerrainList().size();
 	for (const auto &type : mod->getTerrainList())
 	{
@@ -225,6 +232,12 @@ void FirstPersonView::collectUfoDataSets()
 		const int users = terrainsUsing.count(*setName) ? terrainsUsing[*setName] : 0;
 		if (!users) _ufoOnlyDataSets.insert(*setName);
 		if (users * 2 > terrainCount) setName = _ufoDataSets.erase(setName); // (nearly everywhere)
+		else ++setName;
+	}
+	for (auto setName = _craftDataSets.begin(); setName != _craftDataSets.end();)
+	{
+		const int users = terrainsUsing.count(*setName) ? terrainsUsing[*setName] : 0;
+		if (users * 2 > terrainCount || _ufoDataSets.count(*setName)) setName = _craftDataSets.erase(setName);
 		else ++setName;
 	}
 }
@@ -255,6 +268,56 @@ void FirstPersonView::findUfos()
 		return;
 	}
 	const Uint32 startTick = SDL_GetTicks();
+
+	// X-COM's own craft: their parts get steady models too (no trim, no lights), so a craft's stepped hull is shaded by the
+	// direction of the surface round each voxel, as a UFO's, instead of in stripes, whatever the UFO lights option (see
+	// Frames::steadyAlways). Doors keep their own models (they swing), and a part that animates or has lights plays its
+	// frames as anywhere else.
+	if (!_sharedModelsOwner && !_craftDataSets.empty())
+	{
+		const float noOutward[2] = { 0.0f, 0.0f };
+		int craftModelCount = 0;
+		for (MapDataSet *dataSet : *_save->getMapDataSets())
+		{
+			if (!_craftDataSets.count(dataSet->getName())) continue;
+			for (size_t record = 0; record < dataSet->getSize(); ++record)
+			{
+				const MapData *mapData = dataSet->getObject(record);
+				if (mapData->isUFODoor() || mapData->isDoor()) continue;
+				getFrames(mapData); // (makes sure its frames are known)
+				UfoModel &craftModel = _ufoModels[mapData];
+				buildUfoModel(mapData, noOutward, craftModel);
+				bool anyLight = false;
+				for (int z = 0; z < Position::TileZ && !anyLight; ++z)
+					for (int y = 0; y < Position::TileXY && !anyLight; ++y) anyLight = craftModel.lit[z][y] != 0;
+				if (!craftModel.model.empty && !anyLight && !modelsAnimate(mapData) && turnedFrom(mapData) < 0)
+				{
+					// (the joints between a hull's tiles: the art's edge pixels, which the map's next tile hides, gave the two
+					// outer rows of voxels a lighter or darker shade of the hull's colour, a bar at every joint; there they take
+					// the colour two rows in, when it is the same colour a few shades off. Markings in other colours stay.)
+					VoxelModel &model = craftModel.model;
+					auto sameColourNear = [](Uint8 edge, Uint8 inner) { return edge && inner && (edge >> 4) == (inner >> 4) && std::abs((edge & 15) - (inner & 15)) <= 4; };
+					for (int z = 0; z < Position::TileZ; ++z)
+						for (int along = 0; along < 16; ++along)
+							for (int edge : { 0, 1, 14, 15 })
+							{
+								const int inner = edge < 8 ? 2 : 13;
+								Uint8 &atY = model.color[z][edge][along], &atX = model.color[z][along][edge];
+								if (sameColourNear(atY, model.color[z][inner][along])) atY = model.color[z][inner][along];
+								if (sameColourNear(atX, model.color[z][along][inner])) atX = model.color[z][along][inner];
+							}
+					Frames &frames = _frames[mapData];
+					frames.steady = &craftModel.model;
+					frames.steadyAlways = true;
+					++craftModelCount;
+				}
+			}
+		}
+		if (craftModelCount)
+		{
+			Log(LOG_INFO) << "OpenXcom3D: " << craftModelCount << " steady craft models";
+		}
+	}
 
 	// The map data sets UFOs are built from (see collectUfoDataSets).
 	const std::set<std::string> &ufoSets = _ufoDataSets, &exclusiveSets = _ufoOnlyDataSets;
@@ -969,11 +1032,14 @@ void FirstPersonView::updateUfos()
 		const float length = std::sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
 		if (opposite || length < 0.5f)
 		{
-			_ufoFaceShade[openFaces] = -1.0f;
+			_ufoFaceShade[openFaces] = _ufoRoofedFaceShade[openFaces] = -1.0f;
 			continue;
 		}
 		const float lambert = std::max(0.0f, (sum[0] * _colors.shadingDir[0] + sum[1] * _colors.shadingDir[1] + sum[2] * _colors.shadingDir[2]) / length);
-		_ufoFaceShade[openFaces] = _colors.shadingBase + (1.0f - lambert) * _colors.shadingTurn + std::max(0.0f, -sum[2] / length);
+		const float underside = std::max(0.0f, -sum[2] / length);
+		_ufoFaceShade[openFaces] = _colors.shadingBase + (1.0f - lambert) * _colors.shadingTurn + underside;
+		const float lambertRoofed = std::max(0.0f, (sum[0] * _colors.sunDir[0] + sum[1] * _colors.sunDir[1] + sum[2] * _colors.sunDir[2]) / length);
+		_ufoRoofedFaceShade[openFaces] = (1.0f - lambertRoofed) * 0.5f + underside;
 	}
 }
 

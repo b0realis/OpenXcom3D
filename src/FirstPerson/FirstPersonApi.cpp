@@ -563,7 +563,7 @@ const struct { const char *id; HiddenAs as; } HiddenSettings[] = {
 	{ "fpsFlightCostOverride", HIDDEN_FOLDED }, // into "Flight cost per level": Rules, 0 to 24
 	{ "fpsDamageOverkill", HIDDEN_FOLDED },     // into "Damage numbers": Off, On, Overkill (GitHub issue #262)
 	{ "FPS", HIDDEN_ELSEWHERE },                // the game's frame rate limit (its own General tab)
-	{ "fpsCounter", HIDDEN_ELSEWHERE },         // the game's frame counter (F7)
+	// ("fpsCounter", the game's frame counter (F7): listed again under the graphics card's section, the owner's word)
 	{ "fpsVrMode", HIDDEN_DESKTOP },            // VR: the Meta Quest's (a desktop has no headset; VR mode Off)
 	{ "fpsVrEyeSize", HIDDEN_DESKTOP },
 	{ "fpsVrWeapon", HIDDEN_DESKTOP },
@@ -1574,6 +1574,14 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsUnitSize", &fpsUnitSize, 100, "STR_FPS_UNIT_SIZE", category));
 	// Units (one tile big or two by two) as 3D bodies made from their own sprites (see VoxelUnits; the owner's sub-project).
 	options.push_back(OptionInfo(OPTION_OTHER, "fpsVoxelUnits", &fpsVoxelUnits, false, "STR_FPS_VOXEL_UNITS", category));
+	// (3DIso, research: the isometric map drawn by the 3D renderer, see FirstPersonMode::updateIsoView)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIso", &fpsIso, false, "STR_FPS_ISO", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoArt", &fpsIsoArt, 0, "STR_FPS_ISO_ART", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoResolution", &fpsIsoResolution, 0, "STR_FPS_ISO_RESOLUTION", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoEffects", &fpsIsoEffects, true, "STR_FPS_ISO_EFFECTS", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoFlight", &fpsIsoFlight, 2, "STR_FPS_ISO_FLIGHT", category)); // (0 off, 1 quick, 2 smooth)
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoShotCamera", &fpsIsoShotCamera, false, "STR_FPS_ISO_SHOT_CAMERA", category));
+	options.push_back(OptionInfo(OPTION_OTHER, "fpsIsoWeather", &fpsIsoWeather, false, "STR_FPS_ISO_WEATHER", category));
 	// The isometric map as a command post's screens (see CommandFeed; the owner: "Live command feed - herein the iso mode
 	// is replaced with realistic combat dashboard"): the soldiers' helmet cameras in a row along the top, the map below as
 	// a drone's feed, black and white with static, and the tactical map beside it. Experimental, off by default.
@@ -1879,6 +1887,18 @@ void createOptions(std::vector<OptionInfo> &options)
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsGrabItem", &keyFpsGrabItem, SDLK_UNKNOWN, "STR_FPS_KEY_GRAB_ITEM", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlare", &keyFpsFlare, SDLK_t, "STR_FPS_KEY_FLARE", category));
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsFlight", &keyFpsFlight, SDLK_b, "STR_FPS_KEY_FLIGHT", category));
+	// 3DIso (research): the map drawn by the 3D renderer, its art, its effects, and its camera.
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoToggle", &keyFpsIsoToggle, SDLK_UNKNOWN, "STR_FPS_KEY_ISO_TOGGLE", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoArt", &keyFpsIsoArt, SDLK_F11, "STR_FPS_KEY_ISO_ART", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoEffects", &keyFpsIsoEffects, SDLK_UNKNOWN, "STR_FPS_KEY_ISO_EFFECTS", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoZoomIn", &keyFpsIsoZoomIn, SDLK_EQUALS, "STR_FPS_KEY_ISO_ZOOM_IN", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoZoomOut", &keyFpsIsoZoomOut, SDLK_MINUS, "STR_FPS_KEY_ISO_ZOOM_OUT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoTurnLeft", &keyFpsIsoTurnLeft, SDLK_LEFTBRACKET, "STR_FPS_KEY_ISO_TURN_LEFT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoTurnRight", &keyFpsIsoTurnRight, SDLK_RIGHTBRACKET, "STR_FPS_KEY_ISO_TURN_RIGHT", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoTiltFlatter", &keyFpsIsoTiltFlatter, SDLK_SEMICOLON, "STR_FPS_KEY_ISO_TILT_FLATTER", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoTiltSteeper", &keyFpsIsoTiltSteeper, SDLK_QUOTE, "STR_FPS_KEY_ISO_TILT_STEEPER", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoReset", &keyFpsIsoReset, SDLK_UNKNOWN, "STR_FPS_KEY_ISO_RESET", category));
+	options.push_back(keyOption(OPTION_OTHER, "keyFpsIsoFree", &keyFpsIsoFree, SDLK_SLASH, "STR_FPS_KEY_ISO_FREE", category));
 	// A tank's turret switch (a player's report: turning the view turned the whole tank, at its full
 	// cost; the TURRET button on the top bar too): no key until the player gives it one.
 	options.push_back(keyOption(OPTION_OTHER, "keyFpsTurret", &keyFpsTurret, SDLK_UNKNOWN, "STR_FPS_KEY_TURRET", category));

@@ -69,6 +69,7 @@ class OptionsFirstPersonState : public OptionsBaseState
 	TextButton *_btnSettings, *_btnControlsList, *_btnAdvanced, *_owner; // The sub-tab buttons, and the one pressed now.
 	TextList *_lstOptions;                              // The list of settings or keys.
 	std::vector<OptionInfo> _basics, _settings, _keys;  // Copies of the options' infos (they still point at the real options): the first page's, every setting (Advanced), the keys.
+	size_t _isoKeys = 0;                                // Where 3DIso's keys begin among them (research: under a heading of their own).
 	size_t _ownKeys = 0;                                // How many of _keys are the 3D view's own: they come first, then the game's keys that work in 3D (under a heading).
 	std::vector<std::pair<size_t, std::string>> _settingHeadings; // The settings' section headings: the setting each one goes over, and its text.
 	std::vector<int> _rowOptions;                       // For each row of the list shown: its option (an index into _settings or _keys), or -1 for a heading.

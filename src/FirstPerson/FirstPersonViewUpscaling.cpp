@@ -547,7 +547,14 @@ void FirstPersonView::useSmoothVersion(SpriteDraw &draw)
 const Surface *FirstPersonView::upscaled(const Surface *sprite, int factor)
 {
 	const SDL_Surface *source = const_cast<Surface*>(sprite)->getSurface(); // read only
-	const int width = source->w, height = source->h;
+	return upscaledRaw((const Uint8 *)source->pixels, source->pitch, source->w, source->h, factor);
+}
+
+/**
+ * The same for a frame given as its pixels (3DIso's terrain frames: see prepareIsoSmoothArt).
+ */
+const Surface *FirstPersonView::upscaledRaw(const Uint8 *pixels, int pitch, int width, int height, int factor)
+{
 	const bool detail = Options::fpsSpriteUpscale >= 2, keepFeatures = Options::fpsSpriteUpscale >= 3;
 
 	// A new palette: everything made for the old one goes, finished, waiting or queued (a job
@@ -573,7 +580,7 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite, int factor)
 	key = (key ^ _colors.paletteHash) * 1099511628211ULL;
 	for (int y = 0; y < height; ++y)
 	{
-		const Uint8 *row = (const Uint8 *)source->pixels + y * source->pitch;
+		const Uint8 *row = pixels + y * pitch;
 		for (int x = 0; x < width; ++x) key = (key ^ row[x]) * 1099511628211ULL;
 	}
 
@@ -609,8 +616,7 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite, int factor)
 				job.pixels.resize(width * height);
 				for (int y = 0; y < height; ++y)
 				{
-					std::copy((const Uint8 *)source->pixels + y * source->pitch, (const Uint8 *)source->pixels + y * source->pitch + width,
-						job.pixels.begin() + y * width);
+					std::copy(pixels + y * pitch, pixels + y * pitch + width, job.pixels.begin() + y * width);
 				}
 				const SDL_Color *palette = getPalette();
 				job.palette.assign(palette, palette + 256);
@@ -636,7 +642,7 @@ const Surface *FirstPersonView::upscaled(const Surface *sprite, int factor)
 	// UpscaleCacheFrames (400) frames are kept (a unit's 64x64 frame is 64 KB at 4x, 147 KB at 6x:
 	// about 26 or 59 MB when full); when full, the one unused longest goes (never one used this
 	// frame: a unit recorded to be drawn may still point at it, see drawUnits).
-	if (_upscaledSprites.size() >= UpscaleCacheFrames)
+	if (_upscaledSprites.size() >= (_iso || _isoTurned ? IsoUpscaleCacheFrames : UpscaleCacheFrames))
 	{
 		auto oldest = _upscaledSprites.begin();
 		for (auto entry = _upscaledSprites.begin(); entry != _upscaledSprites.end(); ++entry)

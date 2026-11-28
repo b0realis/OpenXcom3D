@@ -33,6 +33,7 @@
 #include <SDL.h>
 #include <memory>
 #include <string>
+#include <vector>
 #include "FirstPersonView.h"
 
 namespace OpenXcom
@@ -73,6 +74,31 @@ public:
 		int swingCount;
 		int size[3];                              // the map's size in tiles
 		float maxDistance;                        // how far rays go, in voxels
+		int isoTurned = 0;                        // 3DIso (research), turned or not: see uIsoTurned
+		int ortho = 0;                            // 3DIso: parallel rays (see uOrtho), from around this point, that far back
+		float orthoCentre[3] = {}, orthoSpan = 0.0f;
+		float clipBottom = 0.0f;                  // 3DIso: the lowest level shown's floor (voxels)
+		float cutFade = 0.0f;                     // 3DIso's flight: see uCutFade
+		float unknownDark = 0.0f;                 // 3DIso's flight: see uUnknownDark
+		float distanceShare = 1.0f;               // ...see uDistanceShare
+		float clipTop = 0.0f;                     // 3DIso's flight (research): rays from an eye outside the map start where they enter it under this height; 0: never
+		float clipSoftness = 0.0f;                // 3DIso: that height dithered by so much while it slides (see uClipSoftness)
+		// 3DIso's original art, painted on the card (research; see FirstPersonView::IsoCardArt and paintIso in the shader).
+		bool isoArt = false;                      // the pixels not in our 3D art are the painter's
+		float isoVoxelShare = 1.0f;               // ... our 3D art's share of the pixels (dithered), the rest the art's
+		const std::vector<Uint8> *isoArtBytes = nullptr;   // the store's frames
+		const std::vector<Uint32> *isoArtInfo = nullptr;   // ... its slots
+		const std::vector<Uint32> *isoArtTiles = nullptr;  // this frame's table
+		Uint32 isoArtGeneration = 0;              // the store's number: another, and it is sent again whole
+		int isoMapWhole[2] = {};                  // the map's pixel (less its offset) at the middle of the view's first: whole pixels near the view's middle,
+		float isoMapPart[2] = {}, isoMapStep = 1.0f; // ... the rest, and a view pixel in map pixels
+		int isoMapOffset[2] = {};                 // the map's offset (whole pixels)
+		int isoViewLevel = 0, isoLowLevel = 0;    // the levels shown
+		int isoNightVision = 0;                   // the map's night vision colour (0: off)
+		int isoSmooth = 0;                        // the smooth frames' factor (0: the frames as they are)
+		float isoSmoothShare = 0.0f;              // ...the share of pixels showing them (dissolving in and out)
+		int isoLight = 0;                         // 1 the extra "smooth light", 2 "true colour" (into the full colour picture)
+		int isoColourLights = 0;                  // 3DIso on the map's slant, the extra "coloured light": how many of colorLights (in the palette's picture too)
 		float eye[3], forward[3], right[3], up[3];
 		float halfPlaneWidth, halfPlaneHeight;    // the image plane one voxel in front of the eye
 		float eyeAxis[2], eyeFocal;               // an eye's picture (VR), off centre: where its view axis meets it, in pixels, and its pixels per unit of the image plane (0: the view's own, by the half plane)
@@ -120,7 +146,7 @@ public:
 		// UFO lights (the option), crafts' mirrored sides and the wall paint (setting).
 		const Uint8 *ufoOfTile, *ufoPhaseOfTile;  // a byte per tile each, or null
 		bool ufoLightsOn;
-		float ufoPulse[32], ufoBreath, ufoFaceShade[64];
+		float ufoPulse[32], ufoBreath, ufoFaceShade[64], ufoRoofedFaceShade[64];
 		int ufoCount;                             // at most 8
 		const Uint8 *ufoTint[8], *ufoSoftTint[8]; // each UFO's tint tables: 2 x 256 and 12 x 256 bytes
 		Uint8 black[256];                         // each palette colour: all but black (see FirstPersonView::mirroredColor)
@@ -153,6 +179,7 @@ public:
 		Uint32 *trueColor;   // the picture in full colour, a pixel each (0x00RRGGBB), width x height, rows from the top; null: not asked (setting "True colour")
 		bool perRay;         // the buffers hold a ray each (the blocks' columns x rows), not a pixel each: nothing is spread over blocks
 		int keep = 0;        // 1: nothing is read back, the pictures stay on the card for drawEffects, which fills these buffers when it is done; 2: read back as ever, and kept for it too (its check against the CPU's passes)
+		Uint32 *isoResults = nullptr; // 3DIso (research), in place of results: a number a pixel, what its picture needs of them (see ISO_RESULTS in the shader)
 	};
 	/// The frame's units and effects for the card: what the CPU's passes after the rays would draw, as primitives in
 	/// their drawing order (see FirstPersonViewGpuEffects.cpp, which records them, and EffectsSource, which draws them).
@@ -284,6 +311,9 @@ public:
 	static std::unique_ptr<FirstPersonGpu> open(int device);
 	/// Opens it on the first graphics card that isn't a software one. Null where there is none.
 	static std::unique_ptr<FirstPersonGpu> openAny();
+	/// The card getting ready: begun, for the settings (prebuild's extras), and how far it has got (0 to 99; -1 nothing to tell).
+	static void beginProgress(int extras);
+	static int openingProgress();
 	~FirstPersonGpu();
 	/// The graphics card's name.
 	const std::string &name() const;

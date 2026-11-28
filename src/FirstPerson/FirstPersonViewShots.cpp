@@ -640,7 +640,7 @@ void FirstPersonView::drawDecals()
 		// How far a pixel's scene point is from the mark, in voxels.
 		auto distanceFromMark = [&](int x, int y)
 		{
-			const double sceneAhead = _depthBuffer[y * width + x];
+			const double sceneAhead = (_iso && _isoMarkDepth.size() == _depthBuffer.size() ? _isoMarkDepth : _depthBuffer)[y * width + x]; // (3DIso: the art's own place)
 			const double sceneRight = (x + 0.5 - viewAxisX) * sceneAhead / focalLength, sceneUp = (viewAxisY - (y + 0.5)) * sceneAhead / focalLength;
 			return std::sqrt((sceneAhead - depth) * (sceneAhead - depth) + (sceneRight - markRight) * (sceneRight - markRight) + (sceneUp - markUp) * (sceneUp - markUp));
 		};
@@ -887,7 +887,7 @@ bool FirstPersonView::spawnGlassShards(const Position &tilePosition, const Voxel
 		return false;
 	}
 	for (float &axis : middle) axis /= glass.size();
-	const double dx = middle[0] - _eye[0], dy = middle[1] - _eye[1];
+	const double dx = middle[0] - (_iso ? _isoMiddle[0] : _eye[0]), dy = middle[1] - (_iso ? _isoMiddle[1] : _eye[1]); // (3DIso: from the view's middle)
 	if (dx * dx + dy * dy > GlassSeenFar * GlassSeenFar)
 	{
 		return false;

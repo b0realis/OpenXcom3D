@@ -498,7 +498,7 @@ void FirstPersonView::spawnTileFireAndSmoke(float elapsedSeconds)
 		const float centreX = tilePosition.x * 16 + 8.0f, centreY = tilePosition.y * 16 + 8.0f;
 		const float groundZ = tilePosition.z * 24 - tile->getTerrainLevel() + 2.0f;
 		const float far = std::max(std::abs(centreX - (float)_eye[0]), std::abs(centreY - (float)_eye[1]));
-		if (far > std::max(_maxDistance, FlamesNear))
+		if ((far > std::max(_maxDistance, FlamesNear) && !isoNoDistanceCull()) || !isoLevelShown(tilePosition.z * 24.0 + 1.0))
 		{
 			continue;
 		}
@@ -573,7 +573,7 @@ void FirstPersonView::spawnBurningUnitFlames(float elapsedSeconds)
 			feet[2] = tilePosition.z * 24 - (tile ? tile->getTerrainLevel() : 0);
 		}
 		const float far = std::max(std::abs(feet[0] - (float)_eye[0]), std::abs(feet[1] - (float)_eye[1]));
-		if (far > std::max(_maxDistance, FlamesNear))
+		if ((far > std::max(_maxDistance, FlamesNear) && !isoNoDistanceCull()) || !isoLevelShown(feet[2] + 1.0))
 		{
 			continue;
 		}
@@ -750,16 +750,42 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 {
 	typedef FirstPersonParticles P; // short for the particle system: its kinds (P::GLOW...) and groups (P::EFFECT...)
 	chooseSky(); // the battle's weather
-	const float eye[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
+	float eye[3] = { (float)_eye[0], (float)_eye[1], (float)_eye[2] };
+	// 3DIso (research, its extra "weather", setting "3DIso weather"): the weather alone (no dust, fireflies or the sea's
+	// lone bubbles), over what the picture shows: round the point its middle shows, falling from over the levels shown, as
+	// many as fill that as thickly as the 3D view's weather fills the air round its eye (at most WeatherIsoMost: the
+	// particles are for the shots and blasts too). Not round 3DIso's eye: it stands far off the map.
+	const bool isoView = _iso || _isoTurned;
+	float weatherReach = 130.0f, weatherShare = 1.0f;
+	if (isoView)
+	{
+		_particles.cull(P::AMBIENT, -1.0e6f, -1.0e6f, 0.0f); // (all of them)
+		if (!(_isoExtras & IsoExtraWeather))
+		{
+			_particles.cull(P::WEATHER, -1.0e6f, -1.0e6f, 0.0f); // (all of them)
+			return;
+		}
+		// (from the middle to the picture's corner, about: a map pixel is three quarters of a voxel across)
+		const double seen = 0.6 * std::max(getWidth(), getHeight()) / std::max(0.25, _isoZoomTotal) * 0.75;
+		weatherReach = (float)std::clamp(seen, 130.0, 700.0);
+		weatherShare = weatherReach * weatherReach / (130.0f * 130.0f);
+		eye[0] = (float)_isoMiddle[0];
+		eye[1] = (float)_isoMiddle[1];
+		eye[2] = (float)((std::min(_isoViewLevel, _save->getMapSizeZ() - 1) + 1) * Position::TileZ) + 20.0f;
+	}
+	const auto weatherCount = [&](int target) { return std::min(isoView ? WeatherIsoMost : target, (int)(target * weatherShare)); };
+	// (3DIso: only over the map; round it is its black, where the weather would look like stars)
+	const float mapEndX = _save->getMapSizeX() * 16.0f, mapEndY = _save->getMapSizeY() * 16.0f;
+	const auto offMap = [&](const float pos[3]) { return isoView && (pos[0] < 0.0f || pos[1] < 0.0f || pos[0] >= mapEndX || pos[1] >= mapEndY); };
 	// What the camera left behind (more than 130 or 150 voxels away across the map) is gone,
 	// and comes back around it.
-	_particles.cull(P::AMBIENT, eye[0], eye[1], 130);
-	_particles.cull(P::WEATHER, eye[0], eye[1], 150);
+	if (!isoView) _particles.cull(P::AMBIENT, eye[0], eye[1], 130);
+	_particles.cull(P::WEATHER, eye[0], eye[1], weatherReach + 20.0f);
 
 	// Top up the ambient particles: 600 bubbles all through the water under the sea, else 90
 	// dust motes by day, or 30 fireflies at night. They appear anywhere within 90 voxels of
 	// the eye east-west and north-south.
-	const int ambientTarget = _colors.underwater ? 600 : (_colors.night > 0.6f ? 30 : 90);
+	const int ambientTarget = isoView ? 0 : _colors.underwater ? 600 : (_colors.night > 0.6f ? 30 : 90);
 	for (int ambientCount = _particles.count(P::AMBIENT); ambientCount < ambientTarget; ++ambientCount)
 	{
 		P::Particle particle;
@@ -824,9 +850,11 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 			|| (ventsCentreX - eye[0]) * (ventsCentreX - eye[0]) + (ventsCentreY - eye[1]) * (ventsCentreY - eye[1]) > 90.0f * 90.0f)
 		{
 			_bubbleVents.clear();
-			for (int attempt = 0; attempt < 24 && _bubbleVents.size() < 7; ++attempt)
+			const float ventReach = weatherReach * 110.0f / 130.0f;
+			const size_t vents = (size_t)weatherCount(7);
+			for (int attempt = 0; attempt < (int)vents * 4 && _bubbleVents.size() < vents; ++attempt)
 			{
-				const float x = eye[0] + _particles.random(-110, 110), y = eye[1] + _particles.random(-110, 110);
+				const float x = eye[0] + _particles.random(-ventReach, ventReach), y = eye[1] + _particles.random(-ventReach, ventReach);
 				if (inWater(x, y, GroundTop + 1.0f)) _bubbleVents.push_back({ x, y });
 			}
 		}
@@ -848,7 +876,7 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 		// Marine snow: 1200 specks hanging in the water, drifting with the current, within 100
 		// voxels of the eye. Below half of that, they all come back at once (after a jump, or
 		// at the start); otherwise they are topped up a little each frame.
-		const int target = 1200;
+		const int target = weatherCount(1200);
 		const int have = _particles.count(P::WEATHER);
 		const int toSpawn = have < target / 2 ? target - have : std::min(target - have, (int)(target * elapsedSeconds * 0.3f) + 1);
 		for (int n = 0; n < toSpawn; ++n)
@@ -858,11 +886,11 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 			// them evenly over the disc).
 			const float angle = _particles.random() < 0.6f ? (float)_yaw + _particles.random(-1.2f, 1.2f)
 				: _particles.random(0, 2 * (float)Pi);
-			const float radius = 100 * std::sqrt(_particles.random());
+			const float radius = weatherReach * (100.0f / 130.0f) * std::sqrt(_particles.random());
 			speck.pos[0] = eye[0] + std::cos(angle) * radius;
 			speck.pos[1] = eye[1] + std::sin(angle) * radius;
 			speck.pos[2] = _particles.random(GroundTop, eye[2] + 25.0f);
-			if (!inWater(speck.pos[0], speck.pos[1], speck.pos[2])) continue;
+			if (offMap(speck.pos) || !inWater(speck.pos[0], speck.pos[1], speck.pos[2])) continue;
 			speck.vel[0] = _particles.random(0.5f, 3.0f); speck.vel[1] = _particles.random(-1.5f, 1.5f);
 			speck.vel[2] = _particles.random(-1.5f, -0.3f);
 			speck.age = 0; speck.life = _particles.random(6, 11); speck.gravity = 0; speck.drag = 0;
@@ -879,7 +907,7 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 		return;
 	}
 	const bool rain = _weather == "rain", snow = _weather == "snow";
-	const int target = rain ? 1500 : snow ? 1400 : 300;
+	const int target = weatherCount(rain ? 1500 : snow ? 1400 : 300);
 	const int have = _particles.count(P::WEATHER);
 	// Spread over time so they don't land together, but fill up at once after a jump.
 	const int toSpawn = have < target / 2 ? target - have : std::min(target - have, (int)(target * elapsedSeconds * 1.5f) + 1);
@@ -888,7 +916,7 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 		P::Particle particle;
 		// Evenly over a disc of 130 voxels around the camera (the square root spreads them
 		// evenly): most of what's seen falls close by.
-		const float angle = _particles.random(0, 2 * (float)Pi), radius = 130 * std::sqrt(_particles.random());
+		const float angle = _particles.random(0, 2 * (float)Pi), radius = weatherReach * std::sqrt(_particles.random());
 		particle.pos[0] = eye[0] + std::cos(angle) * radius;
 		particle.pos[1] = eye[1] + std::sin(angle) * radius;
 		particle.age = 0;
@@ -900,7 +928,7 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 			// Rain or snow: from somewhere between 25 voxels below the eye (not below the
 			// ground) and 45 above it, falling to the ground (rain fast and slanting, snow slowly
 			// and wandering), and gone when it gets there.
-			particle.pos[2] = _particles.random(std::max((float)GroundTop, eye[2] - 25), eye[2] + 45);
+			particle.pos[2] = isoView ? _particles.random((float)GroundTop, eye[2] + 25) : _particles.random(std::max((float)GroundTop, eye[2] - 25), eye[2] + 45); // (3DIso: from the ground to over the levels shown)
 			const float fallSpeed = rain ? _particles.random(260, 320) : _particles.random(18, 30); // voxels per second
 			particle.vel[0] = rain ? 30 : _particles.random(-6, 6); particle.vel[1] = rain ? 10 : _particles.random(-6, 6);
 			particle.vel[2] = -fallSpeed;
@@ -924,9 +952,9 @@ void FirstPersonView::spawnAmbient(float elapsedSeconds)
 		// Nothing falls under a roof: the sky must be open above the point. Particles don't
 		// stop at a roof, so the check starts 100 voxels lower down: a drop spawned above a
 		// roof would fall through it, and is left out too.
-		if (!openSky(particle.pos[0], particle.pos[1], std::max(GroundTop, particle.pos[2] - 100)))
+		if (offMap(particle.pos) || !openSky(particle.pos[0], particle.pos[1], std::max(GroundTop, particle.pos[2] - 100)))
 		{
-			continue; // under a roof
+			continue; // under a roof (3DIso: or off the map)
 		}
 		_particles.add(particle);
 	}
@@ -1277,9 +1305,9 @@ void FirstPersonView::updateParticles()
 	if (!_particlesOn || Options::fpsParticles == 0)
 	{
 		_particles.clear();
-		if (_particlesOn)
+		if (_particlesOn || _iso)
 		{
-			updateFlares(elapsedSeconds); // flares still fly and shine without their particles
+			updateFlares(elapsedSeconds); // flares still fly and shine without their particles (and in 3DIso, which has none)
 		}
 		// The shots and new explosions, with every particle they'd add dropped.
 		_particles.setAccepting(false);

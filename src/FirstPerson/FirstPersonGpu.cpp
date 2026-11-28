@@ -450,7 +450,7 @@ const int TileUints = 16;             // a tile's numbers (four texels of four)
 const int TableRows = 15 + FirstPersonView::DarkFadeSteps;             // the rows of 256 bytes in the colour tables (see encodeTables)
 const int UfoTableRows = 14;          // ... and for each UFO after them: its two tints and twelve soft tints
 const int MaxUfos = 8;
-const int BufferCount = 13;
+const int BufferCount = 15;
 /// The voxel bodies' cubes kept on the card (see State::drawBodies): at most this many, a texel each; then they are begun anew.
 const size_t BodyTexelsMost = 6u << 20;
 
@@ -865,6 +865,16 @@ private:
 
 }
 
+namespace
+{
+// The card getting ready (FirstPersonGpu::openingProgress): its programs built so far, and all it builds when it opens, by
+// their size: a program of the rays 4 (3DIso's 8: the biggest), any other 1, the card itself 1.
+std::atomic<int> progressDone{ 0 }, progressTotal{ 0 };
+constexpr int RaysWeight = 4, IsoRaysWeight = 8;
+constexpr int OpeningWeight = 1 + 1 + 1 + RaysWeight * 2 + 1 + 3 + 1 + 1; // (the card, supersampling, render scale, the rays twice, the effects, the bloom's three, the wash, the frame)
+void progressMade(int weight) { progressDone += weight; }
+}
+
 struct FirstPersonGpu::State
 {
 	// The thread that owns the context: it sleeps until handed a job, does it, and says so.
@@ -888,7 +898,9 @@ struct FirstPersonGpu::State
 	// ... and again with the coloured lights and the reflections in it, when their settings are on (see programFor).
 	Program programs[2];
 	std::map<int, Program> extraPrograms; // by 1 coloured lights | 2 reflections | 4 a pixel's later rays | 8 light shafts | 16 surface relief | 128 metal
-	Program *programFor(const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0);
+	Program *programFor(const Frame &frame, int results, bool laterRays = false, int mirrorGo = 0);
+	Program isoResultsProgram;   // 3DIso's (research): the check's program with its results packed (ISO_RESULTS), made when first asked for
+	bool isoResultsBroken = false;
 	Gl::UInt resolveProgram = 0; // makes one picture of several rays a pixel (ResolveSource); 0: not built, one ray a pixel
 	Gl::UInt upscaleProgram = 0; // magnifies a picture of fewer rays to the view's size (UpscaleSource, setting "Render scale"); 0: not built, a ray a pixel
 	Program *program = &programs[0];
@@ -898,7 +910,7 @@ struct FirstPersonGpu::State
 	{
 		Gl::UInt framebuffer = 0;
 		Gl::UInt textures[5] = {}; // colour, depth, glow, full colour, results
-		bool results = false;
+		int results = 0; // the results' picture: 0 none, 1 the check's (four numbers a ray), 2 3DIso's (one)
 		// "Reflections" in two goes (see castRays): the pixels that want a mirror's ray, marked by the first go, and
 		// the framebuffer that go draws into (the four pictures and the marks; the second go draws into the four alone,
 		// reading the marks).
@@ -912,7 +924,7 @@ struct FirstPersonGpu::State
 	std::vector<Uint8> blockColors, blockGlow; // a ray each, before they are spread over their blocks of pixels
 	std::vector<float> blockDepths;
 	// The buffers and their textures: tile flags, tiles, model colours, model bits, model info, model sides, solid masks, colour tables, the waves' sines.
-	enum { TileFlags, Tiles, ModelColors, ModelBits, ModelInfo, ModelSides, Solids, Tables, WaveSines, Exposed, WallPaints, Mirrors, Blend };
+	enum { TileFlags, Tiles, ModelColors, ModelBits, ModelInfo, ModelSides, Solids, Tables, WaveSines, Exposed, WallPaints, Mirrors, Blend, IsoArt, IsoFrames };
 	Gl::UInt buffers[BufferCount] = {}, textures[BufferCount] = {};
 	Gl::Int maxBufferTexels = 0;
 
@@ -936,6 +948,29 @@ struct FirstPersonGpu::State
 	std::vector<Uint32> wallPaintTexels;
 	std::vector<Sint32> mirrorNumbers, mirrorScratch; // the mirrors as the card has them (see sendMirrors), and this frame's, put together to compare
 	int mirrorUnitsAt = -1;                           // where the units a mirror shows begin in those numbers (setting "Reflections"); -1: none
+	// 3DIso's original art (research, see Frame::isoArt): the store of frames as sent (its number, how much of it, the room
+	// made for it), and its slots with the frame's table after them.
+	Uint32 isoGenerationSent = 0;
+	size_t isoBytesSent = 0, isoBytesRoom = 0;
+	std::vector<Uint32> isoArtTexels, isoArtTexelsSent;
+	void sendIsoArt(const Frame &frame);
+	// 3DIso's sun map (research, see sunMapSays in FirstPersonGpuShaders.h): for each column of the sun's light over the map,
+	// how high toward the sun it first meets something; made whole when the map or the sun's way is new, else anew only
+	// where the terrain changed (sunDirty), and kept: a point surely lit needs no ray at the sun.
+	Gl::UInt sunProgram = 0, sunTexture = 0, sunFramebuffer = 0;
+	bool sunBroken = false;               // this card won't make it: the rays as ever
+	int sunMapSize[3] = { 0, 0, 0 };      // the map it was made for
+	float sunAxes[3][3] = {};             // across the light, along it, at the sun (unit)
+	float sunFrom[2] = {}, sunStep = 0.0f, sunTop = 0.0f;
+	int sunTexels[2] = { 0, 0 };          // its finest level's size
+	bool sunWhole = true;                 // to be made whole
+	int sunDirty[4] = { 1, 1, 0, 0 };     // the finest texels to be made anew: x0, y0, x1, y1 (none: x0 > x1)
+	bool sunReady = false;                // it's there and true to the terrain the card has
+	std::vector<Uint32> sunTiles;         // the 3DIso frames' tiles it was last made for: their shapes (the first four of a tile's numbers)
+	std::vector<Uint8> sunFlags;          // ...and their flags (another view drawn between them, a camera's, isn't counted)
+	void noteSunTile(size_t tile, const Frame &frame);
+	bool updateSunMap(const Frame &frame);
+	bool buildSunProgram();
 
 	void threadLoop();
 	void run(const std::function<void()> &work);
@@ -954,7 +989,7 @@ struct FirstPersonGpu::State
 	void sendMirrors(const Frame &frame);
 	void sendModels();
 	void setScene(const Frame &frame);
-	bool setTargets(int width, int height, bool results, int which = 0);
+	bool setTargets(int width, int height, int results, int which = 0);
 	bool forgetsTargets = false; // OPENXCOM3D_GPU_FORGET_TARGETS on OpenGL ES: the card is told a picture's old contents aren't needed before it is drawn over (see drawOver)
 	void drawOver(int pictures);
 	// Setting "VR foveation" (see FoveaFillSource): the layer of targets the rays with holes go into, the program that
@@ -1100,6 +1135,7 @@ Gl::Int FirstPersonGpu::State::location(const char *name)
  */
 bool FirstPersonGpu::State::start(int device)
 {
+	struct Made { ~Made() { progressMade(1); } } made; // (the card itself: see openingProgress)
 	// OpenGL; or OpenGL ES 3.2 where that is all the device has (an ARM board; the Quest's kind of
 	// card), or when asked for by OPENXCOM3D_GPU_GLES (to prove the ES way on a desktop card).
 	const bool esAsked = getenv("OPENXCOM3D_GPU_GLES") != nullptr;
@@ -1118,7 +1154,7 @@ bool FirstPersonGpu::State::start(int device)
 		return false;
 	}
 	const Gl::Enum formats[BufferCount] = { Gl::R8UI, Gl::RGBA32UI, Gl::R8UI, Gl::R16UI, Gl::RGBA32UI, Gl::R8UI, Gl::R16UI, Gl::R8UI, Gl::R32F,
-		Gl::R8UI, Gl::RGBA32UI, Gl::R32I, Gl::R8UI };
+		Gl::R8UI, Gl::RGBA32UI, Gl::R32I, Gl::R8UI, Gl::RGBA32UI, Gl::R8UI };
 	Gl::GenBuffers(BufferCount, buffers);
 	Gl::GenTextures(BufferCount, textures);
 	for (int unit = 0; unit < BufferCount; ++unit)
@@ -1209,9 +1245,10 @@ std::string FirstPersonGpu::State::shaderHead() const
  */
 bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 {
+	struct Made { int weight; ~Made() { progressMade(weight); } } made{ (extras & 256) ? IsoRaysWeight : RaysWeight }; // (built or not: done)
 	const std::string raySource = shaderHead() + (results ? "#define RESULTS\n" : "") + ((extras & 1) ? "#define COLORED_LIGHTS\n" : "")
 		+ ((extras & 2) ? "#define REFLECTIONS\n" : "") + ((extras & 4) ? "#define LATER_RAYS\n" : "") + ((extras & 8) ? "#define LIGHT_SHAFTS\n" : "") + ((extras & 16) ? "#define RELIEF\n" : "")
-		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + ((extras & 128) ? "#define METAL\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
+		+ ((extras & 32) ? "#define MIRROR_FLAGS\n" : "") + ((extras & 256) ? "#define ISO_RESULTS\n" : "") + ((extras & 64) ? "#define MIRROR_PASS\n" : "") + ((extras & 128) ? "#define METAL\n" : "") + HeaderSource + shaderConstants() + WalkSource + ShadeSource;
 	const std::string vertexSource = shaderHead() + VertexSource;
 	const char *sources[2] = { vertexSource.c_str(), raySource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1245,7 +1282,7 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 	}
 	Gl::UseProgram(built.id);
 	const char *const samplers[BufferCount] = { "uTileFlags", "uTiles", "uModelColor", "uModelBits", "uModelInfo", "uModelSides", "uSolid", "uTables", "uWaveSine",
-		"uModelExposed", "uWallPaints", "uMirrors", "uBlend" };
+		"uModelExposed", "uWallPaints", "uMirrors", "uBlend", "uIsoArt", "uIsoFrames" };
 	for (int unit = 0; unit < BufferCount; ++unit)
 	{
 		Gl::Uniform1i(Gl::GetUniformLocation(built.id, samplers[unit]), unit);
@@ -1256,6 +1293,8 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
 	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uFirstTrue"), BufferCount + 3);
 	// (The first go's marks, for the second go of "Reflections": on the first of those units, which a frame of several rays a pixel never shares with it.)
 	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uMirrorFlags"), BufferCount + 1);
+	// (3DIso's sun map, on a unit of its own always: a 2D sampler left on unit 0, a buffer's, fails every draw)
+	Gl::Uniform1i(Gl::GetUniformLocation(built.id, "uSunMap"), BufferCount + 4);
 	return true;
 }
 
@@ -1265,8 +1304,24 @@ bool FirstPersonGpu::State::build(Program &built, bool results, int extras)
  * are on (the game waits while the driver builds it: some seconds, once; drivers keep what they built; see prebuild
  * for the ones made before the card is called ready). If that one won't build, the plain one draws.
  */
-FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, bool results, bool laterRays, int mirrorGo)
+FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &frame, int results, bool laterRays, int mirrorGo)
 {
+	if (results == 2)
+	{
+		// (3DIso's: built the first time, the game waiting once; if it won't build, none: the CPU draws 3DIso)
+		if (!isoResultsProgram.id && !isoResultsBroken)
+		{
+			const auto buildFrom = std::chrono::steady_clock::now();
+			if (!build(isoResultsProgram, true, 256))
+			{
+				Log(LOG_WARNING) << "OpenXcom3D GPU: no 3DIso program on this card";
+				isoResultsBroken = true;
+				isoResultsProgram.id = 0;
+			}
+			else Log(LOG_INFO) << "OpenXcom3D GPU: 3DIso's program built in " << (int)millisecondsSince(buildFrom) << " ms";
+		}
+		return isoResultsProgram.id ? &isoResultsProgram : nullptr;
+	}
 	if (results)
 	{
 		return &programs[1];
@@ -1308,6 +1363,7 @@ FirstPersonGpu::State::Program *FirstPersonGpu::State::programFor(const Frame &f
  */
 bool FirstPersonGpu::State::buildResolve()
 {
+	struct Made { ~Made() { progressMade(1); } } made; // (see openingProgress)
 	const std::string vertexSource = shaderHead() + VertexSource, resolveSource = shaderHead() + ResolveSource;
 	const char *sources[2] = { vertexSource.c_str(), resolveSource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -1451,7 +1507,7 @@ Uint32 FirstPersonGpu::State::solidId(FirstPersonView::SolidRows solid)
  *  0: parts 0 and 1's model numbers | parts 2 and 3's | the box round the solid voxels (five bits
  *     each: min x, y, z, max x, y, z; bit 30: there is a box) | the solid mask's number
  *  1: light | seen << 8 | emissive << 16 | ufoGlow << 24 | the two door swings (+1, sixteen bits each) |
- *     discovered | smoke << 8 | burning << 16 | roofed << 17 | on the bottom level: the water reaches the map's edge here
+ *     discovered | smoke << 8 | burning << 16 | roofed << 17 | a door seen in the west wall << 18, the north wall << 19 (3DIso) | on the bottom level: the water reaches the map's edge here
  *  2: the parts' next frames: 0 and 1's model numbers | 2 and 3's | which UFO's light reaches it (+1) | its pulse phase and marks << 8 ;
  *     its west wall's paint (+1) | its north wall's << 16
  *  3: its craft's mirror (+1) | (free)
@@ -1493,7 +1549,7 @@ void FirstPersonGpu::State::encodeTiles(const Frame &frame)
 			| (tile.max[0] & 31) << 15 | (tile.max[1] & 31) << 20 | (Uint32)(tile.max[2] & 31) << 25);
 		uints[4] = tile.light | tile.seen << 8 | tile.emissive << 16 | (Uint32)tile.ufoGlow << 24;
 		uints[5] = (Uint32)(tile.swing[0] + 1) | (Uint32)(tile.swing[1] + 1) << 16;
-		uints[6] = (tile.discovered ? 1 : 0) | tile.smoke << 8 | (tile.burning ? 1 << 16 : 0) | (frame.roofed[index] ? 1 << 17 : 0);
+		uints[6] = (tile.discovered ? 1 : 0) | tile.smoke << 8 | (tile.burning ? 1 << 16 : 0) | (frame.roofed[index] ? 1 << 17 : 0) | (Uint32)(tile.seenDoors & 6) << 17;
 		uints[7] = index < perLevel && frame.waterAtEdge ? frame.waterAtEdge[index] : 0;
 		uints[10] = (frame.ufoOfTile ? frame.ufoOfTile[index] : 0) | (frame.ufoPhaseOfTile ? frame.ufoPhaseOfTile[index] << 8 : 0);
 		// (Each wall's paint while the wall stands as it was found, in whichever frame of its animation; not its rubble. See
@@ -1678,6 +1734,39 @@ void FirstPersonGpu::State::sendModels()
 }
 
 /**
+ * 3DIso's original art (research): the store of frames, only what's new in it (all of it when it was begun anew or
+ * outgrew the room made for it: twice what it needs then), and its slots with this frame's table after them, when they
+ * changed.
+ */
+void FirstPersonGpu::State::sendIsoArt(const Frame &frame)
+{
+	if (!frame.isoArt || !frame.isoArtBytes || !frame.isoArtInfo || !frame.isoArtTiles) return;
+	const std::vector<Uint8> &bytes = *frame.isoArtBytes;
+	Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[IsoFrames]);
+	if (frame.isoArtGeneration != isoGenerationSent || bytes.size() > isoBytesRoom)
+	{
+		isoBytesRoom = std::max(bytes.size(), std::min<size_t>(std::max<size_t>(1u << 20, bytes.size() * 2), (size_t)maxBufferTexels));
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)isoBytesRoom, nullptr, Gl::DYNAMIC_DRAW);
+		if (!bytes.empty()) Gl::BufferSubData(Gl::ARRAY_BUFFER, 0, (Gl::SizeiPtr)bytes.size(), bytes.data());
+		isoBytesSent = bytes.size();
+		isoGenerationSent = frame.isoArtGeneration;
+	}
+	else if (bytes.size() > isoBytesSent)
+	{
+		Gl::BufferSubData(Gl::ARRAY_BUFFER, (Gl::IntPtr)isoBytesSent, (Gl::SizeiPtr)(bytes.size() - isoBytesSent), bytes.data() + isoBytesSent);
+		isoBytesSent = bytes.size();
+	}
+	isoArtTexels.assign(frame.isoArtInfo->begin(), frame.isoArtInfo->end());
+	isoArtTexels.insert(isoArtTexels.end(), frame.isoArtTiles->begin(), frame.isoArtTiles->end());
+	if (isoArtTexels != isoArtTexelsSent)
+	{
+		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[IsoArt]);
+		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(isoArtTexels.size() * 4), isoArtTexels.data(), Gl::DYNAMIC_DRAW);
+		isoArtTexelsSent.swap(isoArtTexels);
+	}
+}
+
+/**
  * The camera, the settings and the scene's numbers, as the shader's uniforms.
  */
 void FirstPersonGpu::State::setScene(const Frame &frame)
@@ -1685,6 +1774,31 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	const FirstPersonView::SceneColors &colors = *frame.colors;
 	Gl::Uniform3i(location("uSize"), frame.size[0], frame.size[1], frame.size[2]);
 	Gl::Uniform1f(location("uMaxDistance"), frame.maxDistance);
+	Gl::Uniform1f(location("uClipTop"), frame.clipTop);
+	Gl::Uniform1f(location("uClipSoftness"), frame.clipSoftness);
+	Gl::Uniform1i(location("uIsoTurned"), frame.isoTurned);
+	Gl::Uniform1i(location("uOrtho"), frame.ortho);
+	Gl::Uniform3f(location("uOrthoCentre"), frame.orthoCentre[0], frame.orthoCentre[1], frame.orthoCentre[2]);
+	Gl::Uniform1f(location("uOrthoSpan"), frame.orthoSpan);
+	Gl::Uniform1f(location("uClipBottom"), frame.clipBottom);
+	Gl::Uniform1f(location("uCutFade"), frame.cutFade);
+	Gl::Uniform1f(location("uUnknownDark"), frame.unknownDark);
+	Gl::Uniform1f(location("uDistanceShare"), frame.distanceShare);
+	Gl::Uniform1i(location("uIsoArtOn"), frame.isoArt ? 1 : 0);
+	Gl::Uniform1i(location("uIsoTilesAt"), frame.isoArt && frame.isoArtInfo ? (Gl::Int)(frame.isoArtInfo->size() / 4) : 0);
+	Gl::Uniform1f(location("uIsoVoxelShare"), frame.isoVoxelShare);
+	Gl::Uniform2i(location("uIsoMapWhole"), frame.isoMapWhole[0], frame.isoMapWhole[1]);
+	Gl::Uniform2f(location("uIsoMapPart"), frame.isoMapPart[0], frame.isoMapPart[1]);
+	Gl::Uniform1f(location("uIsoMapStep"), frame.isoMapStep);
+	Gl::Uniform2i(location("uIsoMapOffset"), frame.isoMapOffset[0], frame.isoMapOffset[1]);
+	Gl::Uniform1i(location("uIsoViewLevel"), frame.isoViewLevel);
+	Gl::Uniform1i(location("uIsoLowLevel"), frame.isoLowLevel);
+	Gl::Uniform1i(location("uIsoNightVision"), frame.isoNightVision);
+	Gl::Uniform1i(location("uIsoSmooth"), frame.isoSmooth);
+	Gl::Uniform1f(location("uIsoSmoothShare"), frame.isoSmoothShare);
+	Gl::Uniform1i(location("uIsoLight"), frame.isoLight);
+	Gl::Uniform1i(location("uIsoSwings"), frame.swingCount > 0 ? 1 : 0);
+	Gl::Uniform1i(location("uIsoColourLights"), std::clamp(frame.isoColourLights, 0, 16));
 	Gl::Uniform3f(location("uEye"), frame.eye[0], frame.eye[1], frame.eye[2]);
 	Gl::Uniform3f(location("uForward"), frame.forward[0], frame.forward[1], frame.forward[2]);
 	Gl::Uniform3f(location("uRight"), frame.right[0], frame.right[1], frame.right[2]);
@@ -1762,6 +1876,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
 	Gl::Uniform1fv(location("uUfoPulse"), 32, frame.ufoPulse);
 	Gl::Uniform1f(location("uUfoBreath"), frame.ufoBreath);
 	Gl::Uniform1fv(location("uUfoFaceShade"), 64, frame.ufoFaceShade);
+	Gl::Uniform1fv(location("uUfoRoofedFaceShade"), 64, frame.ufoRoofedFaceShade);
 	Gl::Uniform3f(location("uMuzzleFlashPos"), frame.muzzleFlashPos[0], frame.muzzleFlashPos[1], frame.muzzleFlashPos[2]);
 	float swingA[MaxSwings * 4] = {}, swingB[MaxSwings * 4] = {};
 	for (int swing = 0; swing < std::min(frame.swingCount, MaxSwings); ++swing)
@@ -1781,7 +1896,7 @@ void FirstPersonGpu::State::setScene(const Frame &frame)
  * ray met) of the size asked the ones drawn into now; made the first time a size is asked for,
  * then kept (a few sizes: when there are many, all are made anew).
  */
-bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int layer)
+bool FirstPersonGpu::State::setTargets(int width, int height, int results, int layer)
 {
 	if (targets.size() > 80 && layer == 0 && !keepTargets)
 	{
@@ -1792,7 +1907,7 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 		targets.clear();
 	}
 	Targets &sized = targets[{ width, height, layer }];
-	if (!sized.framebuffer || (results && !sized.results))
+	if (!sized.framebuffer || (results && sized.results != results))
 	{
 		if (sized.framebuffer)
 		{
@@ -1801,7 +1916,8 @@ bool FirstPersonGpu::State::setTargets(int width, int height, bool results, int 
 		Gl::GenFramebuffers(1, &sized.framebuffer);
 		Gl::BindFramebuffer(Gl::FRAMEBUFFER, sized.framebuffer);
 		Gl::GenTextures(5, sized.textures);
-		const Gl::Enum internal[5] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA8, Gl::RGBA32UI }, format[5] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA, Gl::RGBA_INTEGER },
+		const Gl::Enum internal[5] = { Gl::R8UI, Gl::R32F, Gl::R8UI, Gl::RGBA8, results == 2 ? Gl::R32UI : Gl::RGBA32UI },
+			format[5] = { Gl::RED_INTEGER, Gl::RED, Gl::RED_INTEGER, Gl::RGBA, results == 2 ? Gl::RED_INTEGER : Gl::RGBA_INTEGER },
 			type[5] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_BYTE, Gl::UNSIGNED_INT };
 		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
 		for (int which = 0; which < (results ? 5 : 4); ++which)
@@ -1908,17 +2024,17 @@ void FirstPersonGpu::State::drawOver(int pictures)
  * @param attachment Which picture (0 colour, 1 depth, 2 glow, 3 full colour, 4 results).
  * @param width Its width, in pixels.
  * @param height Its height.
- * @param kind What it holds: 0 a byte a pixel, 1 a float, 2 full colour (wanted blue first), 3 four 32-bit numbers.
+ * @param kind What it holds: 0 a byte a pixel, 1 a float, 2 full colour (wanted blue first), 3 four 32-bit numbers, 4 one.
  * @param pixels Where to.
  * @param rowLength The memory's row length, in pixels.
  */
 void FirstPersonGpu::State::readPicture(int attachment, int width, int height, int kind, void *pixels, int rowLength)
 {
-	static const Gl::Enum formats[4] = { Gl::RED_INTEGER, Gl::RED, Gl::BGRA, Gl::RGBA_INTEGER };
-	static const Gl::Enum types[4] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_INT_8_8_8_8_REV, Gl::UNSIGNED_INT };
+	static const Gl::Enum formats[5] = { Gl::RED_INTEGER, Gl::RED, Gl::BGRA, Gl::RGBA_INTEGER, Gl::RED_INTEGER };
+	static const Gl::Enum types[5] = { Gl::UNSIGNED_BYTE, Gl::FLOAT, Gl::UNSIGNED_INT_8_8_8_8_REV, Gl::UNSIGNED_INT, Gl::UNSIGNED_INT };
 	Gl::ReadBuffer(Gl::COLOR_ATTACHMENT0 + attachment);
 	bool direct = !context.es() || kind == 3;
-	if (!direct && kind < 2)
+	if (!direct && (kind < 2 || kind == 4))
 	{
 		Gl::Int format = 0, type = 0;
 		Gl::GetIntegerv(Gl::IMPLEMENTATION_COLOR_READ_FORMAT, &format);
@@ -1951,9 +2067,9 @@ void FirstPersonGpu::State::readPicture(int attachment, int width, int height, i
 	for (int row = 0; row < height; ++row)
 	{
 		const Uint32 *wide = readScratch.data() + (size_t)row * width * 4;
-		if (kind == 1)
+		if (kind == 1 || kind == 4)
 		{
-			Uint32 *narrow = (Uint32 *)pixels + (size_t)row * rowLength; // (a float's bits, moved as they are)
+			Uint32 *narrow = (Uint32 *)pixels + (size_t)row * rowLength; // (a float's bits, moved as they are; 3DIso's packed results)
 			for (int column = 0; column < width; ++column) narrow[column] = wide[column * 4];
 		}
 		else
@@ -1976,7 +2092,8 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	// Not for the check against the CPU's rays, which is a ray a block.
 	const int fullColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, fullRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
 	// (Nor for a VR eye: its picture's size is the headset's, and "VR foveation" thins its rays its own way.)
-	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !output.results && !output.perRay && frame.eyeFocal <= 0.0f;
+	const int resultsKind = output.isoResults ? 2 : output.results ? 1 : 0; // (the check's results, or 3DIso's packed: see Output)
+	const bool scaled = upscaleProgram && frame.rayScale > 1.001f && frame.palette && !resultsKind && !output.perRay && frame.eyeFocal <= 0.0f;
 	const int rayColumnsCast = scaled ? std::max(1, (int)std::lround(fullColumns / frame.rayScale)) : fullColumns;
 	const int rayRowsCast = scaled ? std::max(1, (int)std::lround(fullRows / frame.rayScale)) : fullRows;
 	Frame rays = frame; // (the frame as the rays' program has it: the view as large as the rays' grid)
@@ -2003,7 +2120,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	auto start = std::chrono::steady_clock::now();
 	stages.picture(frame.width, frame.height, true);
 	stages.begin(StageWorldSent);
-	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !output.results && output.keep != 2; // (never in a check against the CPU's picture)
+	foveaNow = frame.fovea[0] > 0.0f && frame.eyeFocal > 0.0f && !resultsKind && output.keep != 2; // (never in a check against the CPU's picture)
 	// Setting "Reflections" in two goes, where a pixel has one ray and the picture isn't thinned for a headset: the program
 	// with the mirrors' rays in it is slow for every pixel, mirror or none (see MIRROR_FLAGS in the shader), so every pixel
 	// is drawn by the program without them, and the few that want a mirror again by the one with them.
@@ -2017,10 +2134,17 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		mirrorGoesBroken = true;
 		Log(LOG_INFO) << "OpenXcom3D GPU: Mesa's AMD driver (radeonsi): \"Reflections\" in one go";
 	}
-	bool mirrorGoes = frame.reflections && frame.palette && !output.results && !foveaNow && !oneGoMirrors && !mirrorGoesBroken
+	bool mirrorGoes = frame.reflections && frame.palette && !resultsKind && !foveaNow && !oneGoMirrors && !mirrorGoesBroken
 		&& !(resolveProgram && frame.samples >= 2);
 	Program *mirrorProgram = mirrorGoes ? programFor(frame, false, false, 2) : nullptr;
-	program = programFor(frame, output.results != nullptr, false, mirrorGoes ? 1 : 0);
+	program = programFor(frame, resultsKind, false, mirrorGoes ? 1 : 0);
+	if (!program)
+	{
+		// (3DIso's program won't build on this card: its frames are the CPU's, the rest stays on the card)
+		program = &programs[0];
+		overLimit = true;
+		return false;
+	}
 	if (mirrorGoes && (program == &programs[0] || mirrorProgram == &programs[0]))
 	{
 		// (Either of the two wouldn't build on this card, a fifth picture to draw into being one more than it must have: in one go.)
@@ -2035,6 +2159,17 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	sendMirrors(frame); // (before the scene's numbers: it finds where the units a mirror shows begin)
 	setScene(rays);
 	sendWallPaints(frame);
+	if (frame.isoArt && frame.isoArtBytes && (frame.isoArtBytes->size() > (size_t)maxBufferTexels || (frame.isoArtInfo->size() + frame.isoArtTiles->size()) / 4 > (size_t)maxBufferTexels))
+	{
+		// (3DIso's original art more than this card's buffers take: that frame is the CPU's, the rest stays on the card)
+		if (!limitLogged)
+		{
+			limitLogged = true;
+			Log(LOG_INFO) << "OpenXcom3D GPU: 3DIso's original art is bigger than this card's buffers take: the CPU draws it";
+		}
+		overLimit = true;
+		return false;
+	}
 	if (modelColors.size() > (size_t)maxBufferTexels || tileUints.size() / 4 > (size_t)maxBufferTexels)
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: the world is bigger than this card's buffers take";
@@ -2059,17 +2194,38 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 		tablesSent = tables;
 	}
 	sendModels();
+	sendIsoArt(frame);
 	if (solidsChanged)
 	{
 		Gl::BindBuffer(Gl::ARRAY_BUFFER, buffers[Solids]);
 		Gl::BufferData(Gl::ARRAY_BUFFER, (Gl::SizeiPtr)(solidRows.size() * 2), solidRows.data(), Gl::DYNAMIC_DRAW);
 		solidsChanged = false;
 	}
+	// (3DIso: the sun map, made or brought up to date for its frames, and handed to their program)
+	if (resultsKind == 2)
+	{
+		const bool sunOn = updateSunMap(frame);
+		Gl::UseProgram(program->id);
+		Gl::Uniform1i(location("uSunMapOn"), sunOn ? 1 : 0);
+		if (sunOn)
+		{
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 4);
+			Gl::BindTexture(Gl::TEXTURE_2D, sunTexture);
+			Gl::Uniform1i(location("uSunMap"), BufferCount + 4);
+			Gl::Uniform2f(location("uSunMapFrom"), sunFrom[0], sunFrom[1]);
+			Gl::Uniform1f(location("uSunMapStep"), sunStep);
+			Gl::Uniform2i(location("uSunMapSize"), sunTexels[0], sunTexels[1]);
+			Gl::Uniform3f(location("uSunAcross"), sunAxes[0][0], sunAxes[0][1], sunAxes[0][2]);
+			Gl::Uniform3f(location("uSunAlong"), sunAxes[1][0], sunAxes[1][1], sunAxes[1][2]);
+			Gl::Uniform3f(location("uSunMapDir"), sunAxes[2][0], sunAxes[2][1], sunAxes[2][2]);
+			Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount); // (as every binding here leaves it)
+		}
+	}
 	const int blockColumns = (frame.width + frame.pixelSize - 1) / frame.pixelSize, blockRows = (frame.height + frame.pixelSize - 1) / frame.pixelSize;
 	// (With "VR foveation" the rays' own pictures are a set aside, with holes; the frame's are filled from them after.
 	// A foveated frame is never scaled: see `scaled`.)
 	const bool foveated = foveaNow;
-	if (!setTargets(rayColumnsCast, rayRowsCast, output.results != nullptr, foveated ? FoveaLayer : 0))
+	if (!setTargets(rayColumnsCast, rayRowsCast, resultsKind, foveated ? FoveaLayer : 0))
 	{
 		Log(LOG_WARNING) << "OpenXcom3D GPU: this card can't draw into the pictures the rays need";
 		return false;
@@ -2087,7 +2243,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	if (frame.palette) sendBlend(frame); // (the palette: for the full-colour picture and for several rays a pixel)
 	stages.begin(StageRays);
 	Gl::Viewport(0, 0, rayColumnsCast, rayRowsCast);
-	const int samples = resolveProgram && frame.palette && !output.results ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
+	const int samples = resolveProgram && frame.palette && !resultsKind ? (frame.samples >= 4 ? 4 : frame.samples >= 2 ? 2 : 1) : 1;
 	// (With "VR foveation" and a ray a pixel: in three goes into three smaller sets of pictures, see castFoveaLayers.)
 	const bool foveaLayers = foveated && foveaInLayers && samples == 1 && frame.pixelSize == 1;
 	if (foveaLayers)
@@ -2106,7 +2262,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 			mirrorGoesBroken = true; // (this frame has no mirrors; the next ones are drawn in one go)
 			Log(LOG_INFO) << "OpenXcom3D GPU: this card won't mark the pixels that want a mirror: \"Reflections\" in one go";
 		}
-		drawOver(marked || output.results ? 5 : 4);
+		drawOver(marked || resultsKind ? 5 : 4);
 		if (marked)
 		{
 			// The second go: the pixels the first marked, by the program with the mirrors in it, into the four pictures
@@ -2251,6 +2407,10 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
 	{
 		readPicture(4, blockColumns, blockRows, 3, output.results, blockColumns);
 	}
+	else if (output.isoResults)
+	{
+		readPicture(4, blockColumns, blockRows, 4, output.isoResults, blockColumns);
+	}
 	if (output.trueColor && !blocks)
 	{
 		// The full-colour picture (blue, green, red, the glow: a 0xGGRRGGBB number a pixel as this machine reads it).
@@ -2294,6 +2454,7 @@ bool FirstPersonGpu::State::draw(const Frame &frame, const Output &output, Timin
  */
 bool FirstPersonGpu::State::buildEffects()
 {
+	struct Made { ~Made() { progressMade(1); } } made; // (see openingProgress)
 	std::string constants;
 	auto number = [&](const char *name, double value) { constants += std::string("const float ") + name + " = " + glslFloat(value) + ";\n"; };
 	auto whole = [&](const char *name, int value) { constants += std::string("const int ") + name + " = " + std::to_string(value) + ";\n"; };
@@ -2523,8 +2684,188 @@ void FirstPersonGpu::State::checkFovea(const Frame &frame, int columns, int rows
 /**
  * A program of the picture-wide triangle and a fragment shader. 0: it would not build (the log says why).
  */
+/**
+ * 3DIso's sun map (research): a changed tile's columns of the sun's light are made anew (all of them crossing its box).
+ */
+void FirstPersonGpu::State::noteSunTile(size_t tile, const Frame &frame)
+{
+	if (sunWhole || sunStep <= 0.0f || frame.size[0] != sunMapSize[0] || frame.size[1] != sunMapSize[1] || frame.size[2] != sunMapSize[2]) { sunWhole = true; return; }
+	const int x = (int)(tile % frame.size[0]), y = (int)((tile / frame.size[0]) % frame.size[1]), z = (int)(tile / ((size_t)frame.size[0] * frame.size[1]));
+	float low[2] = { 1e30f, 1e30f }, high[2] = { -1e30f, -1e30f };
+	for (int corner = 0; corner < 8; ++corner)
+	{
+		const float point[3] = { (float)(x + (corner & 1)) * 16.0f, (float)(y + ((corner >> 1) & 1)) * 16.0f, (float)(z + (corner >> 2)) * 24.0f };
+		for (int way = 0; way < 2; ++way)
+		{
+			const float along = point[0] * sunAxes[way][0] + point[1] * sunAxes[way][1] + point[2] * sunAxes[way][2];
+			low[way] = std::min(low[way], along);
+			high[way] = std::max(high[way], along);
+		}
+	}
+	const int x0 = (int)std::floor((low[0] - sunFrom[0]) / sunStep) - 1, y0 = (int)std::floor((low[1] - sunFrom[1]) / sunStep) - 1;
+	const int x1 = (int)std::ceil((high[0] - sunFrom[0]) / sunStep) + 1, y1 = (int)std::ceil((high[1] - sunFrom[1]) / sunStep) + 1;
+	if (sunDirty[0] > sunDirty[2]) { sunDirty[0] = x0; sunDirty[1] = y0; sunDirty[2] = x1; sunDirty[3] = y1; }
+	else
+	{
+		sunDirty[0] = std::min(sunDirty[0], x0); sunDirty[1] = std::min(sunDirty[1], y0);
+		sunDirty[2] = std::max(sunDirty[2], x1); sunDirty[3] = std::max(sunDirty[3], y1);
+	}
+}
+
+/**
+ * 3DIso's sun map's program (see SunMapSource): the walk with its own end. Built once (ahead, see prebuild); if it won't build,
+ * no sun map: 3DIso's sun shadows cast every ray.
+ */
+bool FirstPersonGpu::State::buildSunProgram()
+{
+	if (sunProgram || sunBroken) return sunProgram != 0;
+	sunProgram = compileFragment(std::string("#define SUN_MAP\n") + HeaderSource + shaderConstants() + WalkSource + SunMapSource, "3DIso's sun map shader");
+	progressMade(1); // (with the walk in it: a bigger one, see openingProgress)
+	if (!sunProgram)
+	{
+		sunBroken = true;
+		Log(LOG_INFO) << "OpenXcom3D GPU: no sun map for 3DIso on this card: its sun shadows cast every ray";
+		return false;
+	}
+	Gl::UseProgram(sunProgram);
+	const char *const samplers[BufferCount] = { "uTileFlags", "uTiles", "uModelColor", "uModelBits", "uModelInfo", "uModelSides", "uSolid", "uTables", "uWaveSine",
+		"uModelExposed", "uWallPaints", "uMirrors", "uBlend", "uIsoArt", "uIsoFrames" };
+	for (int unit = 0; unit < BufferCount; ++unit) Gl::Uniform1i(Gl::GetUniformLocation(sunProgram, samplers[unit]), unit);
+	return true;
+}
+
+/**
+ * 3DIso's sun map (research, see sunMapSays in FirstPersonGpuShaders.h): made whole for a new map or a new way of the sun,
+ * else its columns over the tiles that changed; not while doors swing (the shadows' rays meet them, the map doesn't: it
+ * waits). A texel half a voxel across (coarser on a big map: 3072 at most), on the texture unit after the frame's
+ * buffers' and pictures' (BufferCount + 4).
+ * @return Whether it's there and true to the terrain: 3DIso's frames may read it.
+ */
+bool FirstPersonGpu::State::updateSunMap(const Frame &frame)
+{
+	static const bool sunMapOff = getenv("OXC3D_ISO3D_NOSUNMAP") && *getenv("OXC3D_ISO3D_NOSUNMAP"); // (the research's check: every ray, as before)
+	if (sunMapOff || sunBroken || !frame.shadows || frame.softShadows || !frame.colors) return false; // (soft: their rays reach further than it looks)
+	const float *sun = frame.colors->sunDir;
+	const float length = std::sqrt(sun[0] * sun[0] + sun[1] * sun[1] + sun[2] * sun[2]);
+	if (length <= 0.0f || sun[2] / length < 0.05f) return false; // (the sun down: no shadows of it)
+	const float way[3] = { sun[0] / length, sun[1] / length, sun[2] / length };
+	if (frame.size[0] != sunMapSize[0] || frame.size[1] != sunMapSize[1] || frame.size[2] != sunMapSize[2]
+		|| std::abs(way[0] - sunAxes[2][0]) > 1e-6f || std::abs(way[1] - sunAxes[2][1]) > 1e-6f || std::abs(way[2] - sunAxes[2][2]) > 1e-6f)
+	{
+		// A new map or sun: its ways, how far its columns reach across and along the map's box, and its texture.
+		std::copy(frame.size, frame.size + 3, sunMapSize);
+		std::copy(way, way + 3, sunAxes[2]);
+		const float up[3] = { 0.0f, 0.0f, 1.0f }, east[3] = { 1.0f, 0.0f, 0.0f };
+		const float *other = std::abs(way[2]) < 0.9f ? up : east;
+		float across[3] = { way[1] * other[2] - way[2] * other[1], way[2] * other[0] - way[0] * other[2], way[0] * other[1] - way[1] * other[0] };
+		const float acrossLength = std::sqrt(across[0] * across[0] + across[1] * across[1] + across[2] * across[2]);
+		for (float &part : across) part /= acrossLength;
+		std::copy(across, across + 3, sunAxes[0]);
+		sunAxes[1][0] = way[1] * across[2] - way[2] * across[1];
+		sunAxes[1][1] = way[2] * across[0] - way[0] * across[2];
+		sunAxes[1][2] = way[0] * across[1] - way[1] * across[0];
+		float low[3] = { 1e30f, 1e30f, 1e30f }, high[3] = { -1e30f, -1e30f, -1e30f };
+		for (int corner = 0; corner < 8; ++corner)
+		{
+			const float point[3] = { (corner & 1) ? frame.size[0] * 16.0f : 0.0f, (corner & 2) ? frame.size[1] * 16.0f : 0.0f, (corner & 4) ? frame.size[2] * 24.0f : 0.0f };
+			for (int axis = 0; axis < 3; ++axis)
+			{
+				const float along = point[0] * sunAxes[axis][0] + point[1] * sunAxes[axis][1] + point[2] * sunAxes[axis][2];
+				low[axis] = std::min(low[axis], along);
+				high[axis] = std::max(high[axis], along);
+			}
+		}
+		sunStep = std::max(0.5f, std::max(high[0] - low[0], high[1] - low[1]) / 3072.0f);
+		sunFrom[0] = low[0] - sunStep;
+		sunFrom[1] = low[1] - sunStep;
+		sunTop = high[2] + 1.0f;
+		sunTexels[0] = (int)std::ceil((high[0] - low[0]) / sunStep) + 2;
+		sunTexels[1] = (int)std::ceil((high[1] - low[1]) / sunStep) + 2;
+		if (!sunTexture) Gl::GenTextures(1, &sunTexture);
+		if (!sunFramebuffer) Gl::GenFramebuffers(1, &sunFramebuffer);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount + 4);
+		Gl::BindTexture(Gl::TEXTURE_2D, sunTexture);
+		Gl::TexImage2D(Gl::TEXTURE_2D, 0, (Gl::Int)Gl::R32F, sunTexels[0], sunTexels[1], 0, Gl::RED, Gl::FLOAT, nullptr);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MIN_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::TexParameteri(Gl::TEXTURE_2D, Gl::TEXTURE_MAG_FILTER, (Gl::Int)Gl::NEAREST);
+		Gl::ActiveTexture(Gl::TEXTURE0 + BufferCount);
+		sunWhole = true;
+		sunReady = false;
+	}
+	// (the tiles whose shapes changed since the last 3DIso frame: a tile's parts, its mask, its box and its flags; not its light,
+	// smoke and the rest, which change all the time)
+	const size_t tileCount = (size_t)frame.size[0] * frame.size[1] * frame.size[2];
+	if (sunTiles.size() != tileCount * 4 || sunFlags.size() != tileCount)
+	{
+		sunWhole = true;
+		sunTiles.assign(tileCount * 4, 0);
+		sunFlags.assign(tileCount, 0);
+	}
+	for (size_t tile = 0; tile < tileCount; ++tile)
+	{
+		Uint32 *kept = &sunTiles[tile * 4];
+		const Uint32 *now = &tileUints[tile * TileUints];
+		if (std::memcmp(kept, now, 4 * sizeof(Uint32)) != 0 || sunFlags[tile] != frame.tileFlags[tile])
+		{
+			noteSunTile(tile, frame);
+			std::copy(now, now + 4, kept);
+			sunFlags[tile] = frame.tileFlags[tile];
+		}
+	}
+	if (frame.swingCount > 0) return false; // (doors swinging: the rays; what changed is made when they've stopped)
+	if (!sunProgram && !buildSunProgram()) return false;
+	int rect[4] = { 0, 0, sunTexels[0] - 1, sunTexels[1] - 1 };
+	if (!sunWhole)
+	{
+		if (sunDirty[0] > sunDirty[2]) return sunReady; // (nothing changed)
+		rect[0] = std::max(0, sunDirty[0]); rect[1] = std::max(0, sunDirty[1]);
+		rect[2] = std::min(sunTexels[0] - 1, sunDirty[2]); rect[3] = std::min(sunTexels[1] - 1, sunDirty[3]);
+	}
+	const bool wholeNow = sunWhole;
+	sunDirty[0] = 1; sunDirty[1] = 1; sunDirty[2] = 0; sunDirty[3] = 0;
+	sunWhole = false;
+	if (rect[0] > rect[2] || rect[1] > rect[3]) return sunReady;
+	const auto madeFrom = std::chrono::steady_clock::now();
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, sunFramebuffer);
+	const Gl::Enum drawn = Gl::COLOR_ATTACHMENT0;
+	Gl::FramebufferTexture2D(Gl::FRAMEBUFFER, Gl::COLOR_ATTACHMENT0, Gl::TEXTURE_2D, sunTexture, 0);
+	Gl::DrawBuffers(1, &drawn);
+	const bool made = Gl::CheckFramebufferStatus(Gl::FRAMEBUFFER) == Gl::FRAMEBUFFER_COMPLETE;
+	if (made)
+	{
+		Gl::Enable(Gl::SCISSOR_TEST);
+		Gl::Viewport(0, 0, sunTexels[0], sunTexels[1]);
+		Gl::Scissor(rect[0], rect[1], rect[2] - rect[0] + 1, rect[3] - rect[1] + 1);
+		Gl::UseProgram(sunProgram);
+		Gl::Uniform3i(Gl::GetUniformLocation(sunProgram, "uSize"), frame.size[0], frame.size[1], frame.size[2]);
+		Gl::Uniform2f(Gl::GetUniformLocation(sunProgram, "uSunMapFrom"), sunFrom[0], sunFrom[1]);
+		Gl::Uniform1f(Gl::GetUniformLocation(sunProgram, "uSunMapStep"), sunStep);
+		Gl::Uniform1f(Gl::GetUniformLocation(sunProgram, "uSunMapTop"), sunTop);
+		Gl::Uniform3f(Gl::GetUniformLocation(sunProgram, "uSunAcross"), sunAxes[0][0], sunAxes[0][1], sunAxes[0][2]);
+		Gl::Uniform3f(Gl::GetUniformLocation(sunProgram, "uSunAlong"), sunAxes[1][0], sunAxes[1][1], sunAxes[1][2]);
+		Gl::Uniform3f(Gl::GetUniformLocation(sunProgram, "uSunMapDir"), sunAxes[2][0], sunAxes[2][1], sunAxes[2][2]);
+		Gl::DrawArrays(Gl::TRIANGLES, 0, 3);
+		Gl::Disable(Gl::SCISSOR_TEST);
+	}
+	Gl::BindFramebuffer(Gl::FRAMEBUFFER, 0);
+	if (!made)
+	{
+		sunBroken = true;
+		Log(LOG_INFO) << "OpenXcom3D GPU: no sun map for 3DIso on this card (it won't draw into one): its sun shadows cast every ray";
+		return sunReady = false;
+	}
+	if (wholeNow)
+	{
+		Gl::Finish(); // (once a map: how long it took, in the log)
+		Log(LOG_INFO) << "OpenXcom3D GPU: 3DIso's sun map made, " << sunTexels[0] << "x" << sunTexels[1] << " texels of " << sunStep << " voxels, in "
+			<< millisecondsSince(madeFrom) << " ms";
+	}
+	return sunReady = true;
+}
+
 Gl::UInt FirstPersonGpu::State::compileFragment(const std::string &source, const char *what)
 {
+	struct Made { ~Made() { progressMade(1); } } made; // (built or not: done)
 	const std::string vertexSource = shaderHead() + VertexSource, fragmentSource = shaderHead() + source;
 	const char *sources[2] = { vertexSource.c_str(), fragmentSource.c_str() };
 	const Gl::Enum kinds[2] = { Gl::VERTEX_SHADER, Gl::FRAGMENT_SHADER };
@@ -3627,7 +3968,7 @@ void FirstPersonGpu::prebuild(int extras)
 	state.run([&] {
 		// (Each program asked for below is one build by the driver, seconds each with no cache: the game's end waits
 		// for the one being built, not for the rest.)
-		const auto build = [&state](const Frame &frame, bool results, bool laterRays = false, int mirrorGo = 0) {
+		const auto build = [&state](const Frame &frame, int results, bool laterRays = false, int mirrorGo = 0) {
 			if (!buildingStopped) state.programFor(frame, results, laterRays, mirrorGo);
 		};
 		Frame wanted = {};
@@ -3651,7 +3992,44 @@ void FirstPersonGpu::prebuild(int extras)
 			if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) build(wanted, false);
 			if (extras & 4) build(wanted, false, true);
 		}
+		// (3DIso's, research: its program, a big one (9 s to build here with no cache, the game standing still at its first
+		// frame), and its sun map's; the CPU draws 3DIso meanwhile, as it draws the 3D view)
+		if (extras & 256)
+		{
+			build(wanted, 2);
+			if (!buildingStopped) state.buildSunProgram();
+		}
 	});
+}
+
+/**
+ * The card getting ready begins: how much it will build (see openingProgress), for the settings it is opened for (the extras
+ * prebuild takes).
+ */
+void FirstPersonGpu::beginProgress(int extras)
+{
+	int total = OpeningWeight;
+	for (int mask = 0; mask <= 11; ++mask)
+	{
+		// (as prebuild goes through them)
+		if ((mask & 4) || (mask & extras) != mask) continue;
+		if (mask & 2) total += 2 * RaysWeight;
+		if ((mask || (extras & (16 | 128))) && (!(mask & 2) || (extras & 4))) total += RaysWeight;
+		if (extras & 4) total += RaysWeight;
+	}
+	if (extras & 256) total += IsoRaysWeight + 2;
+	progressDone = 0;
+	progressTotal = total;
+}
+
+/**
+ * How far the card has got with getting ready (its programs built, by their size; the driver takes a big one in one go,
+ * seconds the first time): 0 to 99 while it does, -1 when there's nothing to tell.
+ */
+int FirstPersonGpu::openingProgress()
+{
+	const int total = progressTotal;
+	return total <= 0 ? -1 : std::min(99, progressDone * 100 / total);
 }
 
 std::unique_ptr<FirstPersonGpu> FirstPersonGpu::openAny()

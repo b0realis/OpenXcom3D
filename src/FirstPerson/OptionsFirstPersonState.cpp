@@ -382,7 +382,7 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 			"fpsHitboxes", "fpsGlowingOutlines", "fpsDownedIcons", "fpsFacingIcons", "fpsEnemyMarkers", "fpsWoundedMarkers", "fpsDamageNumbers", "fpsDamageOverkill", "fpsHitLogDetail", "fpsCompass", "fpsCompassCosts", "fpsMiddleClickIdentify" } },
 		{ "STR_FPS_SECTION_SOUND", { "fpsCombatMusic", "fpsHitSounds", "fpsAmbientSounds" } },
 		{ "STR_FPS_SECTION_CHEATS", { "fpsDoomMode", "fpsDoomIdkfa", "fpsDoomIddqd", "fpsDoomIdclip", "fpsDoomPrimeOnThrow", "fpsDoomFreeGrenades", "fpsDoomGrenadeFuse", "fpsCommandFeed" } },
-		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits" } },
+		{ "STR_FPS_SECTION_EXPERIMENTAL", { "fpsVoxelUnits", "fpsIso", "fpsIsoArt", "fpsIsoResolution", "fpsIsoEffects", "fpsIsoFlight", "fpsIsoShotCamera", "fpsIsoWeather" } }, // (3DIso, research: experimental, the owner's word)
 		{ "STR_FPS_SECTION_VR", { "fpsVrMode", "fpsVrEyeSize", "fpsVrWeapon", "fpsVrTurning", "fpsVrLaser", "fpsVrSmoothing", "fpsVrFoveation" } },
 		{ "STR_FPS_SECTION_GPU", { "fpsRenderer", "fpsViewResolution", "fpsHudScale", "fpsRenderScale", "fpsPixelSize", "fpsShadows", "fpsSupersampling", "fpsSoftShadows", "fpsAllLightShadows", "fpsAmbientOcclusion",
 			"fpsTrueColor", "fpsSmoothLight", "fpsColoredLights", "fpsReflections", "fpsLiquidScreens", "fpsLightShafts", "fpsSurfaceRelief", "fpsMetallic", "fpsVrCardEyes", "FPS", "fpsCounter" } },
@@ -430,6 +430,9 @@ OptionsFirstPersonState::OptionsFirstPersonState(OptionsOrigin origin) : Options
 		_settingHeadings.push_back({ _settings.size(), section.heading });
 		_settings.insert(_settings.end(), section.options.begin(), section.options.end());
 	}
+	// 3DIso's keys (research) after the 3D view's own, under a heading of their own (the owner's word).
+	std::stable_partition(_keys.begin(), _keys.end(), [](const OptionInfo &option) { return option.id().rfind("keyFpsIso", 0) != 0; });
+	_isoKeys = std::find_if(_keys.begin(), _keys.end(), [](const OptionInfo &option) { return option.id().rfind("keyFpsIso", 0) == 0; }) - _keys.begin();
 	// After our own keys come the game's keys that work in 3D, in the order of GameKeys and
 	// then the ten enemy keys.
 	_ownKeys = _keys.size();
@@ -579,6 +582,20 @@ std::string OptionsFirstPersonState::valueText(const OptionInfo &option) const
 		{
 			const int level = std::clamp(*option.asInt(), 0, 2);
 			return level == 0 ? std::string(tr("STR_FPS_SUPERSAMPLING_OFF")) : level == 1 ? "x2" : "x4";
+		}
+		// 3DIso's art and resolution (research): choices of two, shown by name.
+		if (option.id() == "fpsIsoArt")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_ISO_ART_ORIGINAL" : "STR_FPS_ISO_ART_3D"));
+		}
+		if (option.id() == "fpsIsoFlight")
+		{
+			static const char *const flightNames[] = { "STR_FPS_ISO_FLIGHT_OFF", "STR_FPS_ISO_FLIGHT_QUICK", "STR_FPS_ISO_FLIGHT_SMOOTH" };
+			return std::string(tr(flightNames[std::clamp(*option.asInt(), 0, 2)]));
+		}
+		if (option.id() == "fpsIsoResolution")
+		{
+			return std::string(tr(*option.asInt() == 1 ? "STR_FPS_ISO_RESOLUTION_DISPLAY" : "STR_FPS_ISO_RESOLUTION_MAP"));
 		}
 		// The surface relief is a choice of three, shown by name.
 		if (option.id() == "fpsSurfaceRelief")
@@ -772,7 +789,8 @@ void OptionsFirstPersonState::updateList()
 	_selectedKey = -1;
 	_selKey = nullptr;
 	const std::vector<OptionInfo> &shown = shownOptions();
-	const std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } }, none;
+	std::vector<std::pair<size_t, std::string>> keyHeadings = { { _ownKeys, "STR_FPS_GAME_KEYS" } }, none;
+	if (_isoKeys < _ownKeys) keyHeadings.insert(keyHeadings.begin(), { _isoKeys, "STR_FPS_SECTION_ISO" });
 	const std::vector<std::pair<size_t, std::string>> &headings = _owner == _btnAdvanced ? _settingHeadings : _owner == _btnControlsList ? keyHeadings : none;
 	for (size_t optionIndex = 0; optionIndex < shown.size(); ++optionIndex)
 	{
@@ -977,10 +995,15 @@ void OptionsFirstPersonState::lstOptionsClick(Action *action)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
 		}
-		// Surface relief (off, subtle, strong): round and round.
-		else if (value == &Options::fpsSurfaceRelief)
+		// Surface relief (off, subtle, strong), 3DIso's flight (off, quick, smooth): round and round.
+		else if (value == &Options::fpsSurfaceRelief || value == &Options::fpsIsoFlight)
 		{
 			*value = (std::clamp(*value, 0, 2) + direction + 3) % 3;
+		}
+		// 3DIso's art and resolution (research): either button switches.
+		else if (value == &Options::fpsIsoArt || value == &Options::fpsIsoResolution)
+		{
+			*value = *value == 1 ? 0 : 1;
 		}
 		// Metallic surfaces (off, on): either button switches.
 		else if (value == &Options::fpsMetallic)

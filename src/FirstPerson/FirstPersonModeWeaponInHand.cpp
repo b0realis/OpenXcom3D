@@ -1153,6 +1153,16 @@ void FirstPersonMode::updateWeaponInHand(BattleUnit *unit)
 	{
 		dip += slideShare * slideShare * (3.0 - 2.0 * slideShare) * _weaponInHand->getHeight() * 0.8;
 	}
+	// 3DIso's flight just landed in the soldier's eyes: the weapon comes up from below (eased), not there in one frame.
+	if (_isoLandTick && !(_vrModelInHand && vrEyes))
+	{
+		if (now - _isoLandTick < IsoLandRaise)
+		{
+			const double down = 1.0 - (double)(now - _isoLandTick) / IsoLandRaise;
+			dip += down * down * (3.0 - 2.0 * down) * _weaponInHand->getHeight() * 0.8;
+		}
+		else _isoLandTick = 0;
+	}
 	_weaponInHand->clear();
 	_weaponInHand->lock();
 	// (VR's eyes: the faces gathered here, in the weapon's camera space, see drawVoxelFaces; its flashes and muzzles too)
